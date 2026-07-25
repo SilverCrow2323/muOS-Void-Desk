@@ -82,7 +82,16 @@ def build(profile, cfg, keys):
     out = ["# QJoyPad 4.3 Layout File",
            "# VOIDDESK - profilo %s (numeri pulsante letti dal kernel)"
            % profile, "Joystick 1 {"]
-    if stick == "sinistro":
+    if profile == "terminale":
+        # niente mouse: qui serve solo una tastiera seria. Sinistro e
+        # dpad restano frecce (navigano la tastiera a schermo); il
+        # destro scorre lo storico del terminale (Prior/Next), xterm
+        # e' configurato per accettarli senza bisogno di Shift.
+        out += ["\tAxis 1: gradient, +key 114, -key 113",
+                "\tAxis 2: gradient, +key 116, -key 111",
+                "\tAxis 3: gradient, +key 117, -key 112",
+                "\tAxis 4: gradient, +key 117, -key 112"]
+    elif stick == "sinistro":
         out += ["\tAxis 1: gradient, maxSpeed 3, mouse+h",
                 "\tAxis 2: gradient, maxSpeed 3, mouse+v",
                 "\tAxis 3: gradient, +key 114, -key 113",
@@ -95,7 +104,29 @@ def build(profile, cfg, keys):
     out += ["\tAxis 5: +key 114, -key 113",
             "\tAxis 6: +key 116, -key 111"]
     used = []
+    if profile == "terminale":
+        # mappatura scritta apposta per una tastiera a schermo: A
+        # digita il carattere puntato, X cancella, Y spazio, START
+        # come A (equivalente a invio anche a tastiera nascosta)
+        nm = names_map(keys)
+        by_name = {v: k for k, v in nm.items()}
+        term_map = {"A": "key 36", "START": "key 36",
+                   "X": "key 22", "Y": "key 65"}
+        for bname, act in term_map.items():
+            ev = by_name.get(bname)
+            if ev is None:
+                continue
+            qj = qj_of(int(ev), computed, learned)
+            if qj:
+                out.append("\tButton %d: %s" % (qj, act))
+                used.append((qj, bname))
+        out.append("}")
+        return "\n".join(out) + "\n", used
+    skip_mouse = False
     for func, evs in m.items():
+        if skip_mouse and func in ("click_l", "click_r", "click_m",
+                                   "wheel_up", "wheel_dn"):
+            continue
         act = ACT.get(func)
         if not act:
             continue

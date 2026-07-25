@@ -11,7 +11,7 @@ LOG="$DATA/voiddesk.log"
 . "$APP_DIR/lib/glyph_install.sh"
 INSTALL_GLYPH "$APP_DIR/resources/voiddesk.png" "voiddesk"
 
-echo "$(date) === VOIDDESK v9.0 launch (dir: $APP_DIR) ===" >>"$LOG"
+echo "$(date) === VOIDDESK v9.63 launch (dir: $APP_DIR) ===" >>"$LOG"
 
 PY3="$(command -v python3)"
 if [ -z "$PY3" ]; then
@@ -157,6 +157,14 @@ while :; do
 				echo "$OLDGOV" >"$P/scaling_governor" 2>/dev/null
 			done
 		fi
+		MENULOAD
+		;;
+	17)
+		CMDX="$(cat "$DATA/.xterm_cmd" 2>/dev/null)"
+		echo "$(date) avvio terminale vero (cmd='$CMDX')" >>"$LOG"
+		"$APP_DIR/bin/vd_xterm_launch.sh" "$CMDX"
+		XRC=$?
+		echo "$(date) rientro da terminale vero ($XRC)" >>"$LOG"
 		MENULOAD
 		;;
 	*)

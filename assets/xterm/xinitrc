@@ -1,0 +1,62 @@
+#!/bin/sh
+# Sessione X per il terminale vero di VoidDesk. matchbox-window-manager
+# porta le finestre a schermo intero di default (dispositivi embedded).
+# Niente mouse -- qjoypad col profilo "terminale" manda frecce vere
+# (navigano la tastiera a schermo), A/START sono Invio, X e' Backspace,
+# Y e' spazio, lo stick destro scorre lo storico. vd_hotkey.py (lanciato
+# dall'host, gia' attivo) gestisce il tasto per tastiera/pannello.
+xset -dpms s off 2>/dev/null
+command -v xsetroot >/dev/null 2>&1 && xsetroot -cursor_name X_cursor \
+	>/dev/null 2>&1
+command -v unclutter >/dev/null 2>&1 && unclutter -idle 0 -root \
+	>/dev/null 2>&1 &
+
+command -v matchbox-window-manager >/dev/null 2>&1 && \
+	matchbox-window-manager -use_titlebar no >/dev/null 2>&1 &
+sleep 0.3
+
+command -v qjoypad >/dev/null 2>&1 && qjoypad --notray "Default" \
+	>/dev/null 2>&1 &
+( i=0
+  while [ "$i" -lt 20 ]; do
+	if command -v xdotool >/dev/null 2>&1; then
+		WID="$(xdotool search --class qjoypad 2>/dev/null | head -1)"
+		if [ -n "$WID" ]; then
+			xdotool windowunmap "$WID" 2>/dev/null
+			break
+		fi
+	fi
+	i=$((i + 1))
+	sleep 0.25
+  done ) >/dev/null 2>&1 &
+
+# tastiera a schermo SEMPRE visibile fin dall'apertura -- non piu' in
+# attesa del tasto MENU. Altezza scelta dall'utente (pannello Live),
+# scritta dall'host in un file (qui dentro $DATA non esiste, e' un
+# percorso host, non del chroot).
+KBH="$(cat /tmp/vd_kbd_h 2>/dev/null)"
+[ -n "$KBH" ] || KBH=230
+KBY=$((480 - KBH))
+[ "$KBY" -lt 0 ] && KBY=0
+command -v matchbox-keyboard >/dev/null 2>&1 && \
+	matchbox-keyboard -g "${KBH}x640.${KBY}.0" --fontptsize 16 \
+	>/dev/null 2>&1 &
+
+# Prior/Next scorrono lo storico anche SENZA Shift, cosi' lo stick
+# destro (mappato su quei tasti) puo' controllarli direttamente
+XRES="$(printf '*VT100.translations: #override\n<Key>Prior: scroll-back(1,halfpage)\n<Key>Next: scroll-forw(1,halfpage)\n')"
+
+CMD="$(cat /tmp/vd_xterm_cmd 2>/dev/null)"
+BANNER='printf "\033[1;32m"; figlet -f small "VoidDesk" 2>/dev/null || echo "=== VOIDDESK CLI ==="; printf "\033[0;32m\n"; printf "M: Keyboard    | Stick R: Scroll history\n"; printf "START: Enter   | SELECT: Close CLI Terminal\n"; printf "START+SELECT: LIVE Menu\033[0m\n\n"'
+
+if [ -n "$CMD" ]; then
+	exec xterm -xrm "$XRES" -fa Monospace -fs 13 -bg black \
+		-fg "#e9e9e2" +sb -geometry 100x34+0+0 -fullscreen \
+		-T "VoidDesk :: CLI" \
+		-e sh -c "$BANNER; $CMD; echo; echo '[fine -- premi INVIO per chiudere]'; read _riga"
+else
+	exec xterm -xrm "$XRES" -fa Monospace -fs 13 -bg black \
+		-fg "#e9e9e2" +sb -geometry 100x34+0+0 -fullscreen \
+		-T "VoidDesk :: Terminal" \
+		-e sh -c "$BANNER; exec bash"
+fi

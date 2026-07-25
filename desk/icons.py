@@ -357,6 +357,65 @@ def draw(surf, key, x, y, sz, col):
         line((3, 7), (12, 12), 1.4)
         line((21, 7), (12, 12), 1.4)
         line((12, 12), (12, 22), 1.4)
+    elif key == "usb":                     # connettore USB (MTP)
+        rect(10, 2, 4, 6, 0)
+        line((12, 8), (12, 13), 2)
+        line((12, 13), (7, 17), 2)
+        line((12, 13), (17, 17), 2)
+        circ(7, 19, 2, 0)
+        circ(17, 19, 2, 0)
+        line((5, 5), (8, 5), 1.4)
+        line((16, 4), (19, 6), 1.4)
+    elif key == "android":                 # omino Android (ADB)
+        arc(12, 11, 7, 200, 340, 2)
+        rect(6, 11, 12, 8, 0, 2)
+        line((6, 19), (6, 22), 2)
+        line((18, 19), (18, 22), 2)
+        line((3, 7), (6, 10), 1.6)
+        line((21, 7), (18, 10), 1.6)
+        circ(9, 8, 1, 0)
+        circ(15, 8, 1, 0)
+    elif key == "w_sunny":                 # sole pieno
+        circ(12, 12, 5, 2)
+        for a in range(0, 360, 45):
+            x1 = 12 + 8 * math.cos(math.radians(a))
+            y1 = 12 + 8 * math.sin(math.radians(a))
+            x2 = 12 + 11 * math.cos(math.radians(a))
+            y2 = 12 + 11 * math.sin(math.radians(a))
+            line((x1, y1), (x2, y2), 1.6)
+    elif key == "w_cloudy":                # nuvola piena
+        circ(9, 13, 5, 0)
+        circ(14, 10, 6, 0)
+        circ(18, 14, 4, 0)
+        rect(7, 13, 13, 6, 0, 3)
+    elif key == "w_partly":                # sole+nuvola
+        circ(8, 8, 4, 2)
+        circ(11, 15, 4, 0)
+        circ(15, 13, 5, 0)
+        rect(9, 15, 10, 5, 0, 2)
+    elif key == "w_rain":                  # nuvola + pioggia
+        circ(9, 8, 4, 0)
+        circ(14, 6, 5, 0)
+        rect(6, 8, 13, 5, 0, 3)
+        line((8, 15), (6, 21), 1.8)
+        line((13, 15), (11, 21), 1.8)
+        line((18, 15), (16, 21), 1.8)
+    elif key == "w_snow":                  # nuvola + fiocchi
+        circ(9, 8, 4, 0)
+        circ(14, 6, 5, 0)
+        rect(6, 8, 13, 5, 0, 3)
+        for sx in (8, 13, 18):
+            line((sx - 2, 18), (sx + 2, 22), 1.6)
+            line((sx + 2, 18), (sx - 2, 22), 1.6)
+    elif key == "w_storm":                 # nuvola + fulmine
+        circ(9, 7, 4, 0)
+        circ(14, 5, 5, 0)
+        rect(6, 7, 13, 5, 0, 3)
+        pygame.draw.polygon(surf, col, [p(14, 13), p(10, 19), p(13, 19),
+                                        p(10, 24), p(16, 17), p(13, 17)])
+    elif key == "w_fog":                   # nebbia a bande
+        for fy in (7, 11, 15, 19):
+            line((3, fy), (21, fy), 1.8)
     else:                                  # ripiego: quadratino
         rect(4, 4, 16, 16, 2, 2)
 

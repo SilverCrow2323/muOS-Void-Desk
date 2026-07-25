@@ -54,6 +54,17 @@ def cfg_get(k, d=None):
         return d
 
 
+def comp_color(c):
+    """Complementare del tema (stesso algoritmo di desk/main.py): usato
+    per colorare l'intera schermata di progresso quando si sta
+    disinstallando, cosi' il colore racconta cosa sta succedendo anche
+    da qui, non solo nel menu."""
+    r, g, b = 255 - c[0], 255 - c[1], 255 - c[2]
+    if r + g + b < 250:
+        r, g, b = min(255, r + 90), min(255, g + 90), min(255, b + 90)
+    return (r, g, b)
+
+
 class Screen(object):
     """Schermata di installazione: barra per pacchetto + barra totale."""
 
@@ -77,6 +88,8 @@ class Screen(object):
             self.acc = {"ambra": (255, 176, 46), "cremisi": (231, 54, 84),
                         "ciano": (74, 206, 224), "verde": (112, 224, 122),
                         "acciaio": (208, 214, 210)}.get(acc, ACC)
+            if os.environ.get("VOIDDESK_MODE") == "remove":
+                self.acc = comp_color(self.acc)
             pygame.display.init()
             pygame.font.init()
             self.surf = pygame.display.set_mode((W, H))
@@ -98,6 +111,18 @@ class Screen(object):
             while s and f.size(s)[0] > maxw:
                 s = s[:-1]
         self.surf.blit(f.render(s, True, col), pos)
+
+    def spinner(self, cx, cy, r=11):
+        """Rotore di caricamento, stesso stile del menu principale: si
+        vede che sta lavorando anche nei secondi vuoti prima che apt
+        cominci a dare segni di vita (mount, apt update...)."""
+        t = time.time() * 5.2
+        for i, (rr, wd) in enumerate(((r, 3), (r - 5, 2))):
+            a0 = t * (1 if i == 0 else -1.4) + i * 2.1
+            pygame.draw.arc(self.surf, self.acc,
+                            (cx - rr, cy - rr, rr * 2, rr * 2),
+                            a0, a0 + 3.6, wd)
+        pygame.draw.circle(self.surf, self.acc, (cx, cy), 2)
 
     def bar(self, x, y, w, h, pct, col):
         pygame.draw.rect(self.surf, (10, 10, 16), (x, y, w, h),
@@ -130,9 +155,9 @@ class Screen(object):
         self.text("Void-", (14, 9), self.f_big, FG)
         bw = self.f_big.size("Void-")[0]
         self.text("DESK", (14 + bw, 9), self.f_big, self.acc)
-        lab = self.t("installazione", "installing")
+        lab = "INSTALLER"
         if os.environ.get("VOIDDESK_MODE") == "remove":
-            lab = self.t("rimozione", "removing")
+            lab = "UNINSTALLER"
         self.text(lab, (24 + bw + self.f_big.size("DESK")[0], 17),
                   self.f_tiny, DIM)
         self.text(self.title, (W - self.f_small.size(self.title)[0] - 14, 15),
@@ -176,14 +201,21 @@ class Screen(object):
         # barra pacchetto corrente
         y = H - 132
         cur_lab = self.cur or self.t("preparazione...", "preparing...")
-        self.text(cur_lab, (20, y), self.f_med, FG, maxw=W - 90)
-        self.text("%d%%" % self.cur_pct, (W - 58, y), self.f_med, self.acc)
+        if self.phase in ("prep", "dl") and self.cur_pct == 0:
+            self.spinner(W - 34, y + 8)
+            self.text(cur_lab, (20, y), self.f_med, FG, maxw=W - 130)
+        else:
+            self.text(cur_lab, (20, y), self.f_med, FG, maxw=W - 90)
+            self.text("%d%%" % self.cur_pct, (W - 58, y), self.f_med,
+                      self.acc)
         self.bar(20, y + 24, W - 40, 14, self.cur_pct, self.acc)
 
         # barra totale
         y += 50
+        rm_mode = os.environ.get("VOIDDESK_MODE") == "remove"
         ph = {"dl": self.t("SCARICAMENTO", "DOWNLOADING"),
-              "inst": self.t("INSTALLAZIONE", "INSTALLING"),
+              "inst": self.t("RIMOZIONE" if rm_mode else "INSTALLAZIONE",
+                             "REMOVING" if rm_mode else "INSTALLING"),
               "prep": self.t("PREPARAZIONE", "PREPARING"),
               "done": self.t("COMPLETATO", "DONE")}.get(self.phase, "")
         self.text(self.t("TOTALE", "OVERALL") + "  -  " + ph, (20, y),
@@ -436,6 +468,29 @@ def main():
                  else "FATAL: install failed (rc=%d)" % rc)
             time.sleep(6)
             return 1
+        # rc==0 non garantisce che OGNI postinst sia arrivato in fondo:
+        # in un chroot senza init, un passo come "update-alternatives"
+        # dentro un postinst puo' restare a meta' silenziosamente (e'
+        # la stessa causa che serviva policy-rc.d per udisks2/polkitd).
+        # Un secondo giro di configure -a lo completa, se serve.
+        subprocess.call(["chroot", MNT, "/usr/bin/env",
+                         "DEBIAN_FRONTEND=noninteractive",
+                         "PATH=/usr/sbin:/usr/bin:/sbin:/bin",
+                         "dpkg", "--configure", "-a"],
+                        stdout=logf, stderr=logf)
+        try:
+            with open(os.path.join(os.path.dirname(MNT),
+                                   "post_install_check.log"), "a") as vf:
+                vf.write("%s pacchetti richiesti: %r\n" %
+                        (time.strftime("%H:%M:%S"), pkgs))
+                for probe in ("usr/bin/figlet", "usr/bin/convert"):
+                    full = MNT + "/" + probe
+                    isl = os.path.islink(full)
+                    tgt = os.readlink(full) if isl else None
+                    vf.write("  %s: esiste=%r  link=%r  punta a=%r\n" %
+                            (probe, os.path.exists(full), isl, tgt))
+        except OSError:
+            pass
         for p in scr.pkgs:
             scr.state[p] = "done"
         scr.phase = "done"

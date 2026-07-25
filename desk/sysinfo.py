@@ -177,14 +177,60 @@ def bt_status():
 def battery():
     base = "/sys/class/power_supply"
     try:
+        names = os.listdir(base)
+    except OSError:
+        return None, False
+    pct = None
+    chg = False
+    for n in names:
+        cap = os.path.join(base, n, "capacity")
+        if os.path.exists(cap) and pct is None:
+            try:
+                pct = int(_read(cap, "0"))
+            except ValueError:
+                pct = None
+        st = _read(os.path.join(base, n, "status"), "").strip().lower()
+        if st and "discharg" not in st and "not charg" not in st and \
+                "charg" in st:
+            chg = True
+        on = _read(os.path.join(base, n, "online"), "").strip()
+        if on == "1":
+            chg = True
+    return pct, chg
+
+
+def usb_mode():
+    """MTP o ADB attivi sulla porta USB, se il gadget li espone.
+    None se non determinabile (nessun crash, solo nessuna icona).
+    Nota d'onesta': i percorsi esatti usati da muOS per esporre questo
+    stato non sono documentati pubblicamente, quindi controlliamo piu'
+    candidati invece di fidarci di uno solo."""
+    for p in (os.environ.get("VD_USB_FUNCTIONS"),
+              "/sys/kernel/config/usb_gadget/g1/configs/c.1/strings/0x409/configuration",
+              "/config/usb_gadget/g1/configs/c.1/strings/0x409/configuration",
+              "/sys/kernel/config/usb_gadget/g1/os_desc/use",
+              "/sys/class/android_usb/android0/functions",
+              "/sys/class/android_usb/android0/state"):
+        if not p:
+            continue
+        v = _read(p, "").strip().lower()
+        if not v:
+            continue
+        if "adb" in v:
+            return "adb"
+        if "mtp" in v:
+            return "mtp"
+    # rete di sicurezza: interfaccia kernel piu' generica (UDC), dice
+    # solo "connesso" senza sapere quale funzione, ma meglio di niente
+    try:
+        base = "/sys/class/udc"
         for n in os.listdir(base):
-            cap = os.path.join(base, n, "capacity")
-            if os.path.exists(cap):
-                return (int(_read(cap, "0")),
-                        _read(os.path.join(base, n, "status")) == "Charging")
-    except (OSError, ValueError):
+            st = _read(os.path.join(base, n, "state"), "").strip().lower()
+            if st == "configured":
+                return "mtp"
+    except OSError:
         pass
-    return None, False
+    return None
 
 
 def backlight_dev():

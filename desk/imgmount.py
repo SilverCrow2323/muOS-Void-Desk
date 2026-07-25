@@ -45,6 +45,18 @@ def is_mounted(path):
     return False
 
 
+def is_mounted_rw(path):
+    """Come is_mounted(), ma dice anche SE è scrivibile -- is_mounted()
+    da sola non lo sa, e un mount rimasto in sola lettura da un
+    controllo precedente farebbe fallire una scrittura in silenzio."""
+    p = os.path.abspath(path)
+    for ln in mounts():
+        f = ln.split()
+        if len(f) > 3 and f[1] == p:
+            return "rw" in f[3].split(",")
+    return False
+
+
 def submounts(root):
     """Tutti i punti di mount sotto root, dal piu' profondo al piu' alto."""
     r = os.path.abspath(root)

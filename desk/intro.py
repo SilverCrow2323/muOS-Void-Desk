@@ -3,9 +3,12 @@
 #  VOIDDESK // intro — sigla d'avvio disegnata a runtime.
 #  Atti: 1) SPDW FACTORY presents  2) montaggio del logo  3) sottotitolo
 #        4) atterraggio del logo nell'header e comparsa del menu.
-#  Si salta con qualsiasi tasto. Zero file esterni: e' tutto codice.
+#  Si salta con qualsiasi tasto. Un solo file esterno: il simbolo di
+#  Void Desk (assets/brand/voiddesk_symbol.png), colori suoi propri,
+#  mai ricolorato sul tema -- e' un marchio, non un elemento della UI.
 # ============================================================================
 import math
+import os
 import random
 import time
 
@@ -13,6 +16,24 @@ import pygame
 
 FONT = None
 STAR_N = 90
+_SYMBOL_CACHE = {}
+
+
+def _symbol(h):
+    """Simbolo Void Desk, ridimensionato e tenuto in cache per altezza
+    richiesta -- caricato una volta sola dal disco, mai ricalcolato."""
+    if h in _SYMBOL_CACHE:
+        return _SYMBOL_CACHE[h]
+    path = os.path.join(os.path.dirname(__file__), "..", "assets",
+                        "brand", "voiddesk_symbol.png")
+    try:
+        img = pygame.image.load(path).convert_alpha()
+        w = int(img.get_width() * h / img.get_height())
+        img = pygame.transform.smoothscale(img, (w, h))
+    except Exception:
+        img = None
+    _SYMBOL_CACHE[h] = img
+    return img
 
 
 def _f(sz, bold=False):
@@ -22,6 +43,39 @@ def _f(sz, bold=False):
         f = pygame.font.Font(None, sz)
     f.set_bold(bold)
     return f
+
+
+def _rainbow_text(surface, text, font, x, y, t, tremor=1):
+    """Parola con bordo multicolore che ruota nel tempo e un lieve
+    tremolio -- 'Rintromping' vive qui. Restituisce (larghezza totale,
+    posizione stimata del puntino della prima 'i'), utile a chi deve
+    far partire un effetto proprio da li'."""
+    palette = [(255, 70, 70), (255, 170, 40), (255, 230, 60),
+              (90, 230, 110), (70, 200, 255), (150, 110, 255),
+              (255, 90, 200)]
+    jx = random.randint(-tremor, tremor) if tremor else 0
+    jy = random.randint(-tremor, tremor) if tremor else 0
+    img = font.render(text, True, (255, 255, 255))
+    n = len(palette)
+    for i2, (ox, oy) in enumerate(((2, 0), (2, 2), (0, 2), (-2, 2),
+                                   (-2, 0), (-2, -2), (0, -2),
+                                   (2, -2))):
+        col = palette[int(t * 3 + i2) % n]
+        ring = font.render(text, True, col)
+        surface.blit(ring, (x + ox + jx, y + oy + jy))
+    surface.blit(img, (x + jx, y + jy))
+    # stima del puntino della prima "i": subito prima del gambo,
+    # vicino alla sommita' del carattere -- va bene un'approssimazione,
+    # nessuno la misurera' al pixel
+    idx = text.find("i")
+    if idx >= 0:
+        pre_w = font.size(text[:idx])[0]
+        glyph_w = font.size("i")[0]
+        dot_x = x + jx + pre_w + glyph_w // 2
+        dot_y = y + jy + int(font.get_height() * 0.22)
+    else:
+        dot_x, dot_y = x + jx, y + jy
+    return img.get_width(), (dot_x, dot_y)
 
 
 def _rgb_split(surface, img, x, y, amount, alpha=255):
@@ -122,7 +176,7 @@ class Sparks(object):
 
 def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
          skip_check=None, font_path=None, duration=1.0, menu_surf=None,
-         subtitle=None):
+         jingle=None):
     global FONT
     FONT = font_path
     W, H = surface.get_size()
@@ -133,19 +187,19 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
     f_pres = _f(15)
     f_fact = _f(30, True)
     f_logo = _f(46, True)
-    f_sub = _f(15)
-    f_tag = _f(12)
-
-    sub_txt = subtitle or "THE COMPLETE XFCE DESKTOP  //  muOS EDITION"
-    tag_txt = "Extensive Desktop Experience  //  muOS"
+    f_sub = _f(16)
+    f_rint = _f(16, True)
 
     i_fact = f_fact.render("SPDW FACTORY", True, (240, 240, 246))
     i_pres = f_pres.render("p r e s e n t s", True, (140, 140, 158))
     na, nb = (app_name.split("-", 1) + [""])[:2]
     i_a = f_logo.render(na, True, (244, 244, 250))
     i_b = f_logo.render("-" + nb if nb else "", True, accent)
-    i_tag = f_tag.render(tag_txt, True, (120, 120, 140))
     logo_w = i_a.get_width() + i_b.get_width()
+    sub_pre = f_sub.render("A muOS ", True, (216, 216, 228))
+    sub_post = f_sub.render(" Experience", True, (216, 216, 228))
+    rint_w0 = f_rint.size("Rintromping")[0]
+    sub_w = sub_pre.get_width() + rint_w0 + sub_post.get_width()
 
     def skipped():
         return bool(skip_check and skip_check())
@@ -230,6 +284,7 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
     # =================== ATTO 3: montaggio del logo ===================
     ly = H // 2 - 46
     n = wait(40)
+    jingle_fired = False
     for i in range(n):
         if skipped():
             return
@@ -245,6 +300,12 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
                    int(6 * (1 - ease)), a)
         # anelli d'impatto
         if k > 0.62:
+            if jingle is not None and not jingle_fired:
+                try:
+                    jingle.play()
+                except Exception:
+                    pass
+                jingle_fired = True
             for r in (int((k - 0.62) * 700), int((k - 0.62) * 430)):
                 if r > 0:
                     al = max(0, 150 - r)
@@ -260,6 +321,16 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         gw = int(logo_w * ease)
         pygame.draw.line(surface, accent, (W // 2 - gw // 2, ly + 62),
                          (W // 2 + gw // 2, ly + 62), 3)
+        # il simbolo arriva in dissolvenza, un filo dopo l'impatto del
+        # logo -- stessa soglia k>0.62 di jingle e anelli, cosi' tutto
+        # si sente come un unico evento
+        sym = _symbol(50)
+        if sym is not None and k > 0.55:
+            sa = int(255 * min(1, (k - 0.55) / 0.35))
+            simg = sym.copy()
+            simg.set_alpha(sa)
+            sx2 = x - off - sym.get_width() - 16
+            surface.blit(simg, (sx2, ly - 2 + sy))
         # scia che attraversa il logo
         if 0.45 < k < 0.95:
             px = int((k - 0.45) / 0.5 * (logo_w + 90)) + W // 2 - logo_w // 2 \
@@ -275,6 +346,7 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         time.sleep(0.018)
 
     # =================== ATTO 4: sottotitolo che si scrive ===============
+    rint_dot = [(W // 2, 260)]     # posizione di riserva, aggiornata a frame
     n = wait(52)
     for i in range(n):
         if skipped():
@@ -285,24 +357,26 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         x = W // 2 - logo_w // 2
         surface.blit(i_a, (x, ly))
         surface.blit(i_b, (x + i_a.get_width(), ly))
+        sym = _symbol(50)
+        if sym is not None:
+            surface.blit(sym, (x - sym.get_width() - 16, ly - 2))
         pygame.draw.line(surface, accent, (W // 2 - logo_w // 2, ly + 62),
                          (W // 2 + logo_w // 2, ly + 62), 3)
         sparks.step(surface)
-        # macchina da scrivere
-        nch = int(len(sub_txt) * min(1, k * 1.7))
-        part = sub_txt[:nch]
-        if part:
-            img = f_sub.render(part, True, (216, 216, 228))
-            surface.blit(img, (W // 2 - f_sub.size(sub_txt)[0] // 2, ly + 74))
-            if nch < len(sub_txt) and int(t * 6) % 2:
-                cw = f_sub.size(part)[0]
-                pygame.draw.rect(surface, accent,
-                                 (W // 2 - f_sub.size(sub_txt)[0] // 2 + cw,
-                                  ly + 76, 7, 15))
-        if k > 0.62:
-            tg = i_tag.copy()
-            tg.set_alpha(int(255 * min(1, (k - 0.62) * 3.2)))
-            surface.blit(tg, (W // 2 - tg.get_width() // 2, ly + 100))
+        # sottotitolo unico, in dissolvenza: "Rintromping" ha il
+        # trattamento speciale, il resto e' testo normale
+        sub_a = int(255 * min(1, k * 1.6))
+        if sub_a > 0:
+            sub_surf = pygame.Surface((sub_w + 4, 30), pygame.SRCALPHA)
+            sub_surf.blit(sub_pre, (0, 2))
+            rint_w, dot_rel = _rainbow_text(
+                sub_surf, "Rintromping", f_rint, sub_pre.get_width(), 0,
+                t, tremor=1)
+            sub_surf.blit(sub_post, (sub_pre.get_width() + rint_w, 2))
+            sub_surf.set_alpha(sub_a)
+            sub_x0 = W // 2 - sub_w // 2
+            surface.blit(sub_surf, (sub_x0, ly + 72))
+            rint_dot[0] = (sub_x0 + dot_rel[0], ly + 72 + dot_rel[1])
         _scanlines(surface)
         _vignette(surface)
         flip()
@@ -321,33 +395,41 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
     f_hdr = _f(26)
     tw = f_hdr.size("Void-DESK")[0]
     tx, ty = 14, 8
+    ox, oy = rint_dot[0]
+    diag = int(math.hypot(max(ox, W - ox), max(oy, H - oy))) + 20
     n = wait(26)
-    frozen = surface.copy()
+    frozen = surface.copy().convert_alpha()
     for i in range(n):
         if skipped():
             break
         k = i / float(n)
         e = 1 - (1 - k) ** 3
-        # il menu entra in dissolvenza
-        surface.blit(frozen, (0, 0))
-        m = menu_surf.copy()
-        m.set_alpha(int(255 * e))
-        surface.blit(m, (0, int(18 * (1 - e))))
-        # il logo scivola e rimpicciolisce fino all'header
-        cw = int(logo_w + (tw - logo_w) * e)
-        ch = int(i_a.get_height() * (cw / float(logo_w)))
-        cx = int((W // 2 - logo_w // 2) + (tx - (W // 2 - logo_w // 2)) * e)
-        cy = int(ly + (ty - ly) * e)
-        if cw > 4:
-            img = pygame.transform.smoothscale(logo_full, (cw, ch))
-            img.set_alpha(255 if e < 0.9 else int(255 * (1 - e) * 10))
-            surface.blit(img, (cx, cy))
-        # lampo finale
-        if k > 0.86:
-            fl = pygame.Surface((W, H))
-            fl.fill(accent)
-            fl.set_alpha(int(70 * (1 - (k - 0.86) / 0.14)))
-            surface.blit(fl, (0, 0))
+        sweep = e * 2 * math.pi
+        surface.blit(menu_surf, (0, 0))
+        # maschera a settore: quel che il fascio NON ha ancora
+        # spazzato resta della vecchia sigla, il resto lascia vedere
+        # il menu sotto -- moltiplico l'alpha del fotogramma congelato
+        # per una maschera a spicchio che cresce nel tempo
+        mask = pygame.Surface((W, H), pygame.SRCALPHA)
+        mask.fill((0, 0, 0, 0))
+        pts = [(ox, oy)]
+        steps = 40
+        for s in range(steps + 1):
+            a = -math.pi / 2 + sweep + s * (2 * math.pi - sweep) / steps
+            pts.append((ox + diag * math.cos(a), oy + diag * math.sin(a)))
+        if len(pts) > 2:
+            pygame.draw.polygon(mask, (255, 255, 255, 255), pts)
+        fr = frozen.copy()
+        fr.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        surface.blit(fr, (0, 0))
+        # il fascio vero e proprio: una lama di luce all'angolo attuale
+        bx = ox + diag * math.cos(-math.pi / 2 + sweep)
+        by = oy + diag * math.sin(-math.pi / 2 + sweep)
+        beam = pygame.Surface((W, H), pygame.SRCALPHA)
+        pygame.draw.line(beam, accent + (210,), (ox, oy), (bx, by), 5)
+        pygame.draw.circle(beam, (255, 255, 255, 230), (int(ox), int(oy)),
+                           5)
+        surface.blit(beam, (0, 0), special_flags=pygame.BLEND_ADD)
         flip()
         time.sleep(0.016)
     surface.blit(menu_surf, (0, 0))

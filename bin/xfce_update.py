@@ -87,6 +87,12 @@ def main():
         scr.state[scr.pkgs[0]] = "done"
         scr.msg = ("Sistema aggiornato." if lang == "it"
                    else "System updated.")
+        try:
+            import json as _j
+            _j.dump({"ts": time.time(), "upgradable": 0},
+                    open(os.path.join(DATA, ".apt_state.json"), "w"))
+        except OSError:
+            pass
         scr.draw()
         time.sleep(3)
         return 0

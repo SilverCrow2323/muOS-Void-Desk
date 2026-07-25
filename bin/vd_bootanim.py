@@ -18,6 +18,7 @@
 # ============================================================================
 import os
 import random
+import subprocess
 import sys
 import time
 
@@ -37,59 +38,23 @@ FRAMES = 30
 HOLD = 0.55
 
 # --- glifi 16x16 (bit piu' alto = colonna sinistra) -------------------------
-MOUSE = [  # il "muso" xfce, versione lastra
-    0b0000011111100000,
-    0b0001111111111000,
-    0b0011111111111100,
-    0b0111111111111110,
-    0b0111111111111110,
-    0b1111111111111111,
-    0b1111001111001111,
-    0b1111001111001111,
-    0b1111111111111111,
-    0b1111111111111111,
-    0b0111111111111110,
-    0b0111100110011110,
-    0b0011111111111100,
-    0b0001111111111000,
-    0b0000011111100000,
-    0b0000000000000000,
+MOUSE = [  # muso XFCE: corpo, muso a sinistra, orecchio, coda a destra
+    0x0000, 0x0000, 0x0380, 0x0383,
+    0x07E2, 0x1FF6, 0x3FFC, 0x7FFC,
+    0x7FFC, 0x3FFC, 0x0FF8, 0x07F8,
+    0x0780, 0x0000, 0x0000, 0x0000,
 ]
-BOLT = [  # scheggia/fulmine icewm
-    0b0000001111110000,
-    0b0000011111100000,
-    0b0000111111000000,
-    0b0001111110000000,
-    0b0011111111111000,
-    0b0111111111110000,
-    0b0000011111100000,
-    0b0000111111000000,
-    0b0001111110000000,
-    0b0011111100000000,
-    0b0111111000000000,
-    0b0111110000000000,
-    0b0011100000000000,
-    0b0001100000000000,
-    0b0001000000000000,
-    0b0000000000000000,
+BOLT = [  # tre picchi montani IceWM, altezza decrescente
+    0x0000, 0x0000, 0x0000, 0x0000,
+    0x1800, 0x1840, 0x1840, 0x3CE0,
+    0x3CE0, 0x3DFC, 0x7FFC, 0x7FFC,
+    0x7FFE, 0xFFFE, 0xFFFF, 0x0000,
 ]
-SWOOSH = [  # planata lxde
-    0b0000000000000000,
-    0b1100000000000000,
-    0b1111000000000000,
-    0b0111110000000000,
-    0b0011111100000000,
-    0b0001111111000000,
-    0b0000111111110000,
-    0b0000011111111100,
-    0b0000011111111111,
-    0b0000111111110000,
-    0b0001111110000000,
-    0b0011111000000000,
-    0b0111100000000000,
-    0b1110000000000000,
-    0b1000000000000000,
-    0b0000000000000000,
+SWOOSH = [  # ala/swoosh LXDE, punta in alto, tre dita in basso
+    0x0060, 0x00F0, 0x00F0, 0x00F8,
+    0x01F8, 0x01F8, 0x01FC, 0x03FC,
+    0x03FE, 0x07FE, 0x06FC, 0x04D8,
+    0x0CB0, 0x09A0, 0x0100, 0x0000,
 ]
 
 
@@ -113,17 +78,95 @@ def frame_base(pt, fb):
     pt.fill(0, fb.h - 2, fb.w, 2, INK)
 
 
-def title(pt, fb, txt, col, acc):
-    tw = len(txt) * fbtext.CW * 3
-    tx = (fb.w - tw) // 2
+SPDW_CORE = [   # ingranaggio: la firma SPDW per xfce/CORE (struttura)
+    0x0000, 0x0000, 0x0180, 0x13C8,
+    0x0FF0, 0x0FF0, 0x1C38, 0x3C3C,
+    0x3C3C, 0x1C38, 0x0FF0, 0x0FF0,
+    0x13C8, 0x0180, 0x0000, 0x0000,
+]
+SPDW_TURBO = [  # fulmine: la firma SPDW per icewm/TURBO (velocita')
+    0x0070, 0x00E0, 0x00E0, 0x01E0,
+    0x01C0, 0x03C0, 0x0780, 0x07F0,
+    0x0FE0, 0x01C0, 0x0380, 0x0300,
+    0x0600, 0x0C00, 0x0800, 0x1000,
+]
+SPDW_LIGHT = [  # foglia: la firma SPDW per lxde/LIGHT (leggerezza)
+    0x0000, 0x0080, 0x01F0, 0x03FC,
+    0x07F8, 0x0FF0, 0x1FE0, 0x1FE0,
+    0x1FC0, 0x1F80, 0x3F00, 0x3C00,
+    0x3000, 0x2000, 0x0000, 0x0000,
+]
+ENV_CODENAME = {"xfce": "CORE", "icewm": "TURBO", "lxde": "LIGHT"}
+
+
+def signature(pt, fb):
+    """SPDW Factory Lab, vicino al bordo superiore, centrata: la firma
+    apre la scena invece di chiuderla in fondo."""
+    sig = "SPDW Factory Lab"
+    fb.text((fb.w // fbtext.CW - len(sig)) // 2, 2, sig, (100, 103, 110))
+
+
+def title_row(pt, fb, env, name, col, f, reveal_start, reveal_frames):
+    """Nome ambiente grande, centrato in basso. A sinistra non un
+    doppione rimpicciolito del logo ufficiale (che sta gia' al centro
+    scena) ma il marchio SPDW proprio di quell'ambiente -- ingranaggio,
+    fulmine o foglia -- con sotto il nome in codice (CORE/TURBO/LIGHT).
+    Ognuno prende forma in modo suo: CORE a blocchi che convergono dai
+    bordi, TURBO con uno sweep fulmineo, LIGHT con una dissolvenza
+    morbida (interpolazione colore, qui non c'e' alpha vero)."""
+    p = max(0.0, min(1.0, (f - reveal_start) / float(reveal_frames)))
+    if p <= 0:
+        return
+    mask = {"xfce": SPDW_CORE, "icewm": SPDW_TURBO,
+            "lxde": SPDW_LIGHT}[env]
+    sym_sc = 3
+    sym_w = 16 * sym_sc + 16
+    tw = len(name) * fbtext.CW * 3
     ty = fb.h - 132
-    pt.big_text(tx + 2, ty + 2, txt, INK, 3)
-    pt.big_text(tx, ty, txt, col, 3)
-    for hx in range(tx, tx + tw, 14):
-        pt.fill(hx, ty + 66, 8, 4, acc)
-    sig = "SPDW FACTORY"
-    fb.text((fb.w // fbtext.CW - len(sig)) // 2,
-            (ty + 82) // fbtext.CH, sig, (100, 103, 110))
+    x0 = (fb.w - sym_w - tw) // 2
+    sym_x, sym_y = x0, ty + 4
+    if env == "xfce":
+        rows = int(8 * min(1.0, p * 1.5))
+        for ry in list(range(0, rows)) + list(range(16 - rows, 16)):
+            bits = mask[ry]
+            for rx in range(16):
+                if bits & (1 << (15 - rx)):
+                    pt.fill(sym_x + rx * sym_sc, sym_y + ry * sym_sc,
+                           sym_sc - 1, sym_sc - 1, col)
+    elif env == "icewm":
+        # sweep orizzontale fulmineo: resta il piu' veloce dei tre (la
+        # velocita' e' il punto), ma con vera progressione a colonne,
+        # non un semplice on/off
+        if p > 0.1:
+            wp = min(1.0, (p - 0.1) / 0.3)
+            cols = max(1, int(round(16 * wp)))
+            for ry in range(16):
+                bits = mask[ry]
+                for rx in range(cols):
+                    if bits & (1 << (15 - rx)):
+                        pt.fill(sym_x + rx * sym_sc, sym_y + ry * sym_sc,
+                               sym_sc - 1, sym_sc - 1, col)
+    else:
+        fade = min(1.0, p * 1.3)
+        fc = tuple(int(c0 + (c1 - c0) * fade)
+                  for c0, c1 in zip((10, 10, 12), col))
+        glyph(pt, mask, sym_x, sym_y, sym_sc, fc)
+    if p > 0.55:
+        cp = min(1.0, (p - 0.55) / 0.45)
+        code = ENV_CODENAME[env]
+        chars = max(1, int(round(len(code) * cp)))
+        fb.text((sym_x) // fbtext.CW,
+                (sym_y + 16 * sym_sc + 3) // fbtext.CH,
+                code[:chars], col)
+    if p > 0.35:
+        tp = min(1.0, (p - 0.35) / 0.65)
+        chars = max(1, int(round(len(name) * tp)))
+        shown = name[:chars]
+        tx = x0 + sym_w
+        pt.big_text(tx + 2, ty + 2, shown, INK, 3)
+        pt.big_text(tx, ty, shown, col, 3)
+    if p >= 0.99:
+        signature(pt, fb)
 
 
 # ---------------------------------------------------------------- XFCE -----
@@ -154,8 +197,7 @@ def anim_xfce(pt, fb):
         # riga di scansione che "stampa" il glifo
         if rows < 16:
             pt.fill(gx - 26, gy + rows * sc, 16 * sc + 52, 2, CYAN)
-        if f > FRAMES - 10:
-            title(pt, fb, "XFCE", STEEL, CYAN)
+        title_row(pt, fb, "xfce", "XFCE", STEEL, f, FRAMES - 14, 14)
         scanlines(pt, fb)
         fb.flush()
         time.sleep(FPS_DT)
@@ -191,8 +233,8 @@ def anim_icewm(pt, fb):
         if f == arrive:                      # flash d'impatto
             pt.fill(0, gy - 8, fb.w, 3, ICE)
             pt.fill(0, gy + 16 * sc, fb.w, 3, ICE)
+        title_row(pt, fb, "icewm", "ICEWM", ICE, f, arrive + 2, 8)
         if f > arrive + 3:
-            title(pt, fb, "ICEWM", ICE, BLU)
             tag = "// TURBO"
             fb.text((fb.w // fbtext.CW - len(tag)) // 2,
                     (fb.h - 36) // fbtext.CH, tag, BLU)
@@ -225,8 +267,7 @@ def anim_lxde(pt, fb):
         for k, col in ((2, (60, 45, 22)), (1, DIMW)):
             glyph(pt, SWOOSH, px - k * 34, py + k * 22, sc, col)
         glyph(pt, SWOOSH, px, py, sc, AMBER if f % 6 else WARM)
-        if t >= 1.0:
-            title(pt, fb, "LXDE", WARM, AMBER)
+        title_row(pt, fb, "lxde", "LXDE", AMBER, f, FRAMES - 12, 12)
         scanlines(pt, fb)
         fb.flush()
         time.sleep(FPS_DT)
@@ -239,16 +280,29 @@ def bgm_log(msg):
     print("[vd_bootanim/bgm] " + msg)
 
 
-def synth_bgm(env):
-    """Jingle di avvio sintetizzato: campane luminose + delay, quel sapore
-    da boot di console anni '99. Tre spartiti diversi, ~3 secondi, zero
-    file audio.
+def alsa_volume_hint():
+    """Diagnostica extra, a costo quasi zero: se il mixer ALSA di
+    sistema e' a 0 o mutato, tutto il resto di questo file puo'
+    funzionare alla perfezione e restare comunque muto -- e' una causa
+    molto comune, e da qui non potevamo vederla finche' non la
+    controlliamo esplicitamente."""
+    try:
+        out = subprocess.run(["amixer", "get", "Master"],
+                             capture_output=True, text=True,
+                             timeout=3).stdout
+        if out:
+            bgm_log("amixer Master: " + " | ".join(
+                ln.strip() for ln in out.splitlines()
+                if "%" in ln or "[on]" in ln or "[off]" in ln))
+    except Exception as e:
+        bgm_log("amixer non disponibile per la diagnostica: %s" % e)
 
-    Se non si sente nulla, prima la causa restava invisibile (fallimento
-    silenzioso): ora ogni passo che fallisce lo scrive nel log, e prima
-    di arrendersi si prova una piccola cascata di formati — su alcuni
-    ALSA embedded il mixer rifiuta 22050 mono e vuole 44100 stereo, o
-    viceversa."""
+
+def load_bgm(env):
+    """Preferisce il file WAV vero in assets/bgm/<env>.wav — cosi'
+    l'utente puo' sostituirlo col proprio (stesso nome) senza toccare
+    codice. Se manca o e' illeggibile, ripiega sulla sintesi al volo
+    (nessuna sigla resta mai muta per un file assente)."""
     if os.environ.get("VD_BGM_OFF"):
         bgm_log("disattivato da VD_BGM_OFF")
         return None
@@ -257,16 +311,14 @@ def synth_bgm(env):
     except Exception as e:
         bgm_log("pygame non importabile: %s" % e)
         return None
-
     drv = os.environ.get("VD_BGM_DRIVER")
     if drv:
         os.environ["SDL_AUDIODRIVER"] = drv
-
-    rate_env = os.environ.get("VD_BGM_RATE")
-    combos = ([(int(rate_env), -16, 1, 512)] if rate_env else []) + [
-        (22050, -16, 1, 512), (44100, -16, 2, 1024),
-        (44100, -16, 1, 1024), (48000, -16, 2, 1024)]
-    ok = False
+    wav = os.environ.get("VD_BGM_WAV",
+                         os.path.join(APP, "assets", "bgm",
+                                      env + ".wav"))
+    combos = [(44100, -16, 2, 1024), (44100, -16, 1, 1024),
+              (22050, -16, 1, 512), (48000, -16, 2, 1024)]
     for freq, size, ch, buf_sz in combos:
         try:
             pygame.mixer.quit()
@@ -274,21 +326,35 @@ def synth_bgm(env):
             pass
         try:
             pygame.mixer.init(freq, size, ch, buf_sz)
-            ok = True
-            got = pygame.mixer.get_init()
-            bgm_log("mixer OK richiesto=%r ottenuto=%r driver=%s"
-                    % ((freq, size, ch), got,
-                       os.environ.get("SDL_AUDIODRIVER", "(default)")))
-            SR = got[0] if got else freq
+            bgm_log("mixer OK per file: %r driver=%s" %
+                    ((freq, size, ch),
+                     os.environ.get("SDL_AUDIODRIVER", "(default)")))
             break
         except Exception as e:
             bgm_log("mixer.init%r fallito: %s" % ((freq, size, ch), e))
-    if not ok:
+    else:
         bgm_log("nessun formato audio disponibile: silenzio")
         return None
+    if os.path.exists(wav):
+        try:
+            return pygame.mixer.Sound(wav)
+        except Exception as e:
+            bgm_log("caricamento %s fallito: %s -- ripiego su sintesi"
+                    % (wav, e))
+    else:
+        bgm_log("%s assente -- ripiego su sintesi" % wav)
+    return synth_bgm_pcm(env)
 
+
+def synth_bgm_pcm(env):
+    """Sintesi di riserva (usata solo se il WAV su disco manca o e'
+    corrotto): stesso spartito di sempre, generato al volo sul mixer
+    che load_bgm() ha gia' aperto."""
     import math as m
     import random as r
+    import pygame
+    got = pygame.mixer.get_init()
+    SR = got[0] if got else 44100
     N = int(SR * 3.0)
     buf = [0.0] * N
 
@@ -365,7 +431,7 @@ def main():
     if not fb.ok:
         return 0
     pt = Painter(fb)
-    bgm = synth_bgm(env)
+    bgm = load_bgm(env)
     if bgm:
         try:
             import pygame
@@ -374,6 +440,7 @@ def main():
             bgm_log("play() chiamato, get_busy()=%r" % busy)
         except Exception as e:
             bgm_log("play() fallito: %s" % e)
+        alsa_volume_hint()
     ANIMS.get(env, anim_xfce)(pt, fb)
     time.sleep(HOLD)
     if bgm:

@@ -75,23 +75,40 @@ def onboard_toggle():
     if pids:
         log("nascondo matchbox (SIGTERM)")
         sig_all(pids, signal.SIGTERM)
+        time.sleep(0.3)
+        still = kbd_pids()
+        if still:
+            log("SIGTERM ignorato o in ritardo, scalo a SIGKILL: %r"
+                % still)
+            sig_all(still, signal.SIGKILL)
     else:
         lay = "default"
+        kbh = 230
         try:
             import json
-            lay = json.load(open(os.path.join(
-                os.path.dirname(MNT), "desk_config.json"))
-                ).get("kbd_mb", "default")
+            cfgd = json.load(open(os.path.join(
+                os.path.dirname(MNT), "desk_config.json")))
+            lay = cfgd.get("kbd_mb", "default")
+            kbh = int(cfgd.get("kbd_h", 230))
         except Exception:
             pass
-        log("avvio matchbox-keyboard (%s)" % lay)
+        # nel terminale (niente Thunar/Xfpanel a fare da riferimento
+        # visivo) la tastiera di default risultava minuscola: qui la
+        # ancoro in basso, piena larghezza, con caratteri leggibili
+        extra = []
+        if os.environ.get("VD_TERM_KBD") == "1":
+            kby = max(0, 480 - kbh)
+            extra = ["-g", "%dx640.%d.0" % (kbh, kby),
+                    "--fontptsize", "16"]
+        log("avvio matchbox-keyboard (%s)%s" %
+            (lay, " terminale" if extra else ""))
         if lay and lay != "default":
-            session_cmd(["matchbox-keyboard", lay])
+            session_cmd(["matchbox-keyboard"] + extra + [lay])
             time.sleep(0.6)
             if kbd_pids():
                 return
             log("layout %s assente: fallback default" % lay)
-        session_cmd(["matchbox-keyboard"])
+        session_cmd(["matchbox-keyboard"] + extra)
 
 
 def pids_of(*names):
@@ -150,17 +167,65 @@ def do_action(act):
             onboard_toggle()
         session_cmd(["xrefresh", "-display", ":0"])
         return
-    if act == "restart":
-        try:
-            open(os.path.join(MNT, "tmp/.vd_restart"), "w").close()
-        except OSError:
-            pass
+    if act == "refresh":
+        time.sleep(0.25)
+        session_cmd(["xrefresh", "-display", ":0"])
+        return
+    if act and act.startswith("start:"):
+        time.sleep(0.25)
+        name = act[len("start:"):]
+        cmds = {"matchbox-window-manager":
+                ["matchbox-window-manager", "-use_titlebar", "no"],
+                "qjoypad": ["qjoypad", "--notray", "Default"]}
+        cmd = cmds.get(name)
+        if cmd:
+            log("Core Tasks: riavvio %s" % name)
+            session_cmd(cmd)
+        session_cmd(["xrefresh", "-display", ":0"])
+        return
+    if act == "ctrlc":
+        time.sleep(0.25)
+        session_cmd(["sh", "-c",
+                    "WID=$(xdotool search --name 'VoidDesk :: CLI' "
+                    "2>/dev/null | head -1); "
+                    "[ -n \"$WID\" ] && xdotool key --window \"$WID\" "
+                    "--clearmodifiers ctrl+c || "
+                    "xdotool key --clearmodifiers ctrl+c"])
+        session_cmd(["xrefresh", "-display", ":0"])
+        return
     env = "xfce"
     try:
         env = (open(os.path.join(MNT, "tmp/.vd_env")).read().strip()
                or "xfce")
     except OSError:
         pass
+    if env == "cli":
+        # niente XFCE/IceWM/LXDE da salutare con le buone: qui c'e'
+        # solo xterm, si passa dritti a terminare X. "close" e
+        # "launch_clitools" atterrano entrambi su CLI Arsenal --
+        # e' li' che si sceglie il prossimo tool, non ha senso avere
+        # due meccanismi diversi per la stessa destinazione.
+        if act in ("close", "launch_clitools"):
+            try:
+                open(os.path.join(os.path.dirname(MNT),
+                                  ".land_clitools"), "w").close()
+            except OSError:
+                pass
+        elif act == "restart":
+            try:
+                open(os.path.join(MNT, "tmp/.vd_restart"), "w").close()
+            except OSError:
+                pass
+        xp = pids_of("Xorg", "X")
+        if xp:
+            log("chiusura CLI Terminal: termino X")
+            sig_all(xp, signal.SIGTERM)
+        return
+    if act == "restart":
+        try:
+            open(os.path.join(MNT, "tmp/.vd_restart"), "w").close()
+        except OSError:
+            pass
     if env == "icewm":
         session_cmd(["sh", "-c", "kill $(pidof icewm-session) 2>/dev/null"])
     elif env == "lxde":

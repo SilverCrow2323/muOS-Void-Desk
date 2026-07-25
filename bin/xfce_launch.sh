@@ -360,7 +360,20 @@ PROG 96 "sigla di avvio" "boot animation"
 # il loader lascia il palco alla bootanim (stop dedicato), poi la sigla
 : > /tmp/.vd_anim
 sleep 0.2
-"$PY3" "$APP_DIR/bin/vd_bootanim.py" "$DESKENV" >>"$XLOG" 2>&1
+BOOTANIM_ON=1
+python3 -c "
+import json, sys
+try:
+    cfg = json.load(open('$DATA/desk_config.json'))
+    v = (cfg.get('env_bootanim') or {}).get('$DESKENV', True)
+    sys.exit(0 if v else 1)
+except Exception:
+    sys.exit(0)
+" || BOOTANIM_ON=0
+if [ "$BOOTANIM_ON" = "1" ]; then
+	PYTHONPATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" PYGAME_HIDE_SUPPORT_PROMPT=1 \
+		"$PY3" "$APP_DIR/bin/vd_bootanim.py" "$DESKENV" >>"$XLOG" 2>&1
+fi
 
 rm -f "$MNT/tmp/.vd_x_up" 2>/dev/null
 SLOG="$DATA/session_$DESKENV.log"

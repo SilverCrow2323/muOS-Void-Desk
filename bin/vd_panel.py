@@ -47,7 +47,8 @@ ENV_SECONDARY = {
     "verde":   {"icewm": (74, 206, 224),  "lxde": (255, 176, 46)},
     "acciaio": {"icewm": (110, 195, 250), "lxde": (255, 176, 46)},
 }
-ENV_NAMES = {"xfce": "XFCE", "icewm": "IceWM", "lxde": "LXDE"}
+ENV_NAMES = {"xfce": "XFCE", "icewm": "IceWM", "lxde": "LXDE",
+            "cli": "CLI Terminal"}
 ENV_GLYPHS = {
  "xfce": [0x07E0, 0x1FF8, 0x3FFC, 0x7FFE, 0x7FFE, 0xFFFF, 0xF3CF, 0xF3CF,
           0xFFFF, 0xFFFF, 0x7FFE, 0x799E, 0x3FFC, 0x1FF8, 0x07E0, 0x0000],
@@ -183,6 +184,15 @@ def swap_mb():
         return 0
 
 
+CORE_TASKS = [
+    ("Xorg", ("Xorg", "X"), None),
+    ("matchbox-window-manager", ("matchbox-window-manager",),
+     ["matchbox-window-manager", "-use_titlebar", "no"]),
+    ("matchbox-keyboard", ("matchbox-keybo", "matchbox-keyboard"), None),
+    ("qjoypad", ("qjoypad",), ["qjoypad", "--notray", "Default"]),
+]
+
+
 def task_list(n=12):
     rows = []
     me = os.getpid()
@@ -253,6 +263,7 @@ class Panel(object):
         self.running = True
         self.vol = get_vol()
         self.bri = get_bri()
+        self.vol_osd_until = 0.0
         self._dpad = 0.0
         self._st = ({}, 0.0)
 
@@ -302,7 +313,8 @@ class Panel(object):
         bw = self.f_big.size("Void-")[0]
         self.text("DESK", (WIN.x + 74 + bw, WIN.y + 10), self.f_big,
                   self.accent)
-        self.text(title, (WIN.x + 218, WIN.y + 18), self.f_tiny, DIM)
+        self.text(title, (WIN.x + 218, WIN.y + 18), self.f_tiny, DIM,
+                  maxw=WIN.w - 218 - 130)
         # indicatori console
         st = self.status()
         x = WIN.right - 12
@@ -357,8 +369,40 @@ class Panel(object):
 
     # -------------------------------------------------------------- voci
     def items(self):
-        it = [("back", "start", self.t("back"), self.t("back_s")),
-              ("diag", "monitor", self.t("diag"), self.t("diag_s")),
+        if self.env == "cli":
+            it_ = (self.lang == "it")
+            return [
+                ("resume", "start", "Riprendi" if it_ else "Resume",
+                 "torna al terminale" if it_ else "back to the "
+                 "terminal"),
+                ("launch_clitools", "terminal",
+                 "Lancia CLI Tools" if it_ else "Launch CLI Tools",
+                 "chiudi e avvia un altro tool" if it_ else "close "
+                 "and launch another tool"),
+                ("core_tasks", "task", "Core Tasks",
+                 "processi necessari, tutti attivi?" if it_ else
+                 "required processes, all running?"),
+                ("cli_troubleshoot", "monitor",
+                 "CLI Troubleshooting",
+                 "diagnosi per questo ambiente" if it_ else
+                 "diagnostics for this environment"),
+                ("kbd_settings", "keyboard",
+                 "Keyboard settings" if it_ else "Keyboard settings",
+                 "dimensione, layout" if it_ else "size, layout"),
+                ("restart", "start",
+                 "Restart CLI Tool" if it_ else "Restart CLI Tool",
+                 "riavvia il tool corrente" if it_ else "restart the "
+                 "current tool"),
+                ("close", "info",
+                 "Termina CLI Terminal" if it_ else "Close CLI "
+                 "Terminal", "torna a CLI Arsenal" if it_ else
+                 "back to CLI Arsenal"),
+            ]
+        it = [("back", "start", self.t("back").replace("XFCE",
+                                                        self.envname),
+               self.t("back_s")),
+              ("diag", "monitor", self.t("diag"),
+               self.t("diag_s").replace("XFCE", self.envname)),
               ("fix", "gear", self.t("fix"), self.t("fix_s"))]
         if self.vol is not None:
             it.append(("vol", "speaker", self.t("vol"), self.t("vol_s")))
@@ -389,18 +433,19 @@ class Panel(object):
         st = self.status()
         d.append(("Xorg", bool(pids_of("Xorg", "X")),
                   L("server grafico", "graphics server"), "xorg"))
-        d.append((L("Window manager", "Window manager"),
-                  bool(self.chroot_pids(
+        if self.env != "cli":
+            d.append((L("Window manager", "Window manager"),
+                      bool(self.chroot_pids(
+                          {"xfce": "xfwm4", "icewm": "icewm",
+                           "lxde": "openbox"}[self.env])),
                       {"xfce": "xfwm4", "icewm": "icewm",
-                       "lxde": "openbox"}[self.env])),
-                  {"xfce": "xfwm4", "icewm": "icewm",
-                   "lxde": "openbox"}[self.env], "window"))
-        d.append((L("Pannello XFCE", "XFCE panel"),
-                  bool(self.chroot_pids(
-                      {"xfce": "xfce4-panel", "icewm": "icewm",
-                       "lxde": "lxpanel"}[self.env])),
-                  {"xfce": "xfce4-panel", "icewm": "icewm-tray",
-                   "lxde": "lxpanel"}[self.env], "panel"))
+                       "lxde": "openbox"}[self.env], "window"))
+            d.append((L("Pannello XFCE", "XFCE panel"),
+                      bool(self.chroot_pids(
+                          {"xfce": "xfce4-panel", "icewm": "icewm",
+                           "lxde": "lxpanel"}[self.env])),
+                      {"xfce": "xfce4-panel", "icewm": "icewm-tray",
+                       "lxde": "lxpanel"}[self.env], "panel"))
         d.append(("QJoyPad", bool(self.chroot_pids("qjoypad")),
                   L("controller -> mouse", "controller -> mouse"),
                   "gamepad"))
@@ -481,6 +526,17 @@ class Panel(object):
         except Exception:
             pass
         return 0
+
+    def cli_trouble_actions(self):
+        it = (self.lang == "it")
+        return [
+            ("ctrlc", "terminal", "Ctrl+C",
+             "interrompi il comando in corso" if it else
+             "interrupt the running command"),
+            ("refresh", "monitor", "Refresh schermo" if it else
+             "Refresh screen", "se rimangono artefatti visivi" if it
+             else "if visual artifacts remain"),
+        ]
 
     def fixes(self):
         it = (self.lang == "it")
@@ -681,6 +737,7 @@ class Panel(object):
                 if key == "vol" and self.vol is not None:
                     self.vol = max(0, min(100, self.vol + d))
                     set_vol(self.vol)
+                    self.vol_osd_until = time.time() + 1.4
                 elif key == "bri" and self.bri is not None:
                     self.bri = max(5, min(100, self.bri + d))
                     set_bri(self.bri)
@@ -693,6 +750,47 @@ class Panel(object):
                     # MAI toccare un client X mentre Xorg e' SIGSTOPpato:
                     # il toggle lo fa vd_hotkey DOPO il SIGCONT.
                     self.result = "kbd"
+                    self.running = False
+                elif key == "ctrlc":
+                    # stesso motivo di "kbd": mai toccare X qui dentro,
+                    # lo fa vd_hotkey dopo aver ripreso Xorg
+                    self.result = "ctrlc"
+                    self.running = False
+                elif key == "kbdsize":
+                    # questo invece e' solo un file di configurazione,
+                    # nessun client X coinvolto: sicuro farlo qui
+                    try:
+                        cfgp = os.path.join(os.path.dirname(self.mnt),
+                                            "desk_config.json")
+                        cfgd = json.load(open(cfgp))
+                    except Exception:
+                        cfgd = {}
+                    sizes = [170, 230, 300]
+                    cur = cfgd.get("kbd_h", 230)
+                    nxt = sizes[(sizes.index(cur) + 1) % len(sizes)
+                               if cur in sizes else 1]
+                    cfgd["kbd_h"] = nxt
+                    try:
+                        json.dump(cfgd, open(cfgp, "w"))
+                    except Exception:
+                        pass
+                    self.note = (("tastiera: %dpx (si applica alla "
+                                 "prossima apertura)" % nxt) if
+                                 self.lang == "it" else
+                                 ("keyboard: %dpx (applies next time "
+                                 "it opens)" % nxt))
+                elif key == "launch_clitools":
+                    self.stack.append("launch_clitools")
+                elif key == "core_tasks":
+                    self.sub_sel = 0
+                    self.stack.append("core_tasks")
+                elif key == "cli_troubleshoot":
+                    self.sub_sel = 0
+                    self.stack.append("cli_troubleshoot")
+                elif key == "kbd_settings":
+                    self.sub_sel = 0
+                    self.stack.append("kbd_settings")
+                elif key == "resume":
                     self.running = False
                 elif key == "diag":
                     self.note = self.t("checking")
@@ -751,12 +849,83 @@ class Panel(object):
                     self.note = self.t("killed") % comm
                 except OSError as e:
                     self.note = str(e)
+        elif top == "launch_clitools":
+            if b == "B":
+                self.stack.pop()
+            elif b == "A":
+                self.result = "launch_clitools"
+                self.running = False
+        elif top == "core_tasks":
+            n = len(CORE_TASKS)
+            if b == "UP":
+                self.sub_sel = (self.sub_sel - 1) % n
+            elif b == "DOWN":
+                self.sub_sel = (self.sub_sel + 1) % n
+            elif b == "B":
+                self.stack.pop()
+            elif b == "A":
+                name, comms, launch = CORE_TASKS[self.sub_sel]
+                running = bool(pids_of(*comms))
+                if running:
+                    self.note = (("gia' attivo" if self.lang == "it"
+                                 else "already running"))
+                elif name == "matchbox-keyboard":
+                    self.result = "kbd"
+                    self.running = False
+                elif launch:
+                    self.result = "start:" + name
+                    self.running = False
+                else:
+                    self.note = ("non riavviabile da qui" if
+                                 self.lang == "it" else "can't be "
+                                 "restarted from here")
+        elif top == "cli_troubleshoot":
+            actions = self.cli_trouble_actions()
+            n = len(actions)
+            if b == "UP":
+                self.sub_sel = (self.sub_sel - 1) % n
+            elif b == "DOWN":
+                self.sub_sel = (self.sub_sel + 1) % n
+            elif b == "B":
+                self.stack.pop()
+            elif b == "A":
+                key = actions[self.sub_sel][0]
+                if key == "ctrlc":
+                    self.result = "ctrlc"
+                    self.running = False
+                elif key == "refresh":
+                    self.result = "refresh"
+                    self.running = False
+        elif top == "kbd_settings":
+            if b == "B":
+                self.stack.pop()
+            elif b == "A":
+                try:
+                    cfgp = os.path.join(os.path.dirname(self.mnt),
+                                        "desk_config.json")
+                    cfgd = json.load(open(cfgp))
+                except Exception:
+                    cfgd = {}
+                sizes = [170, 230, 300]
+                cur = cfgd.get("kbd_h", 230)
+                nxt = sizes[(sizes.index(cur) + 1) % len(sizes)
+                           if cur in sizes else 1]
+                cfgd["kbd_h"] = nxt
+                try:
+                    json.dump(cfgd, open(cfgp, "w"))
+                except Exception:
+                    pass
+                self.note = (("dimensione: %dpx (attiva alla "
+                             "prossima apertura)" % nxt) if
+                             self.lang == "it" else
+                             ("size: %dpx (applies next time it "
+                             "opens)" % nxt))
 
     # ------------------------------------------------------------ render
     def render(self):
         top = self.stack[-1]
         if top == "menu":
-            self.window("LIVE // " + self.envname)
+            self.window(self.envname)
             gm = ENV_GLYPHS.get(self.env)
             if gm:
                 for ry in range(16):
@@ -768,8 +937,12 @@ class Panel(object):
                                 (WIN.right - 52 + rx * 2,
                                  WIN.y + 12 + ry * 2, 1, 1))
             items = self.items()
+            per = 8
+            first = max(0, min(self.sel - per // 2, len(items) - per))
+            first = max(0, first)
             y = WIN.y + 52
-            for i, (key, ic, label, sub) in enumerate(items):
+            for i in range(first, min(first + per, len(items))):
+                key, ic, label, sub = items[i]
                 if i == self.sel:
                     pygame.draw.rect(self.surface, SEL,
                                      (WIN.x + 8, y, WIN.w - 16, 38),
@@ -791,6 +964,12 @@ class Panel(object):
                     self.text("%d%%" % self.bri, (WIN.right - 48, y + 10),
                               self.f_small, self.accent)
                 y += 40
+            if first > 0:
+                self.text("^", (WIN.right - 26, WIN.y + 48), self.f_small,
+                          self.accent)
+            if first + per < len(items):
+                self.text("v", (WIN.right - 26, WIN.y + WIN.h - 60),
+                          self.f_small, self.accent)
             self.wfooter([("SU/GIU", self.t("sel")), ("SX/DX", self.t("adj")),
                           ("A", self.t("ok")), ("B", self.t("back_b"))])
         elif top == "diag":
@@ -878,7 +1057,153 @@ class Panel(object):
                 self.text(self.note, (WIN.x + 16, WIN.bottom - 50),
                           self.f_tiny, OK_G)
             self.wfooter([("A", self.t("kill")), ("B", self.t("back_b"))])
+        elif top == "launch_clitools":
+            it = (self.lang == "it")
+            self.window("Launch CLI Tools" if not it else
+                       "Lancia CLI Tools")
+            active = None
+            try:
+                active = open(os.path.join(
+                    self.mnt, "tmp/vd_xterm_cmd")).read().strip()
+            except OSError:
+                pass
+            y = WIN.y + 70
+            if active:
+                self.text(("in esecuzione ora:" if it else
+                          "currently running:"), (WIN.x + 24, y),
+                          self.f_small, FAINT)
+                y += 24
+                self.text(active, (WIN.x + 24, y), self.f_med,
+                          self.accent, maxw=WIN.w - 48)
+                y += 40
+            self.text(("Chiudere e passare a CLI Arsenal per "
+                      "sceglierne un altro?" if it else
+                      "Close it and go to CLI Arsenal to pick "
+                      "another?"), (WIN.x + 24, y), self.f_small, FG,
+                      maxw=WIN.w - 48)
+            self.wfooter([("A", "conferma" if it else "confirm"),
+                         ("B", self.t("back_b"))])
+        elif top == "core_tasks":
+            it = (self.lang == "it")
+            self.window("Core Tasks")
+            y = WIN.y + 52
+            for i, (name, comms, launch) in enumerate(CORE_TASKS):
+                running = bool(pids_of(*comms))
+                if i == self.sub_sel:
+                    pygame.draw.rect(self.surface, SEL,
+                                     (WIN.x + 8, y, WIN.w - 16, 36),
+                                     border_radius=5)
+                    pygame.draw.rect(self.surface, self.accent,
+                                     (WIN.x + 8, y, 3, 36))
+                led = OK_G if running else NO_R
+                pygame.draw.circle(self.surface, led,
+                                   (WIN.x + 26, y + 18), 6)
+                self.text(name, (WIN.x + 46, y + 5), self.f_med,
+                          FG if i == self.sub_sel else DIM)
+                if running:
+                    stxt = "attivo" if it else "running"
+                    scol = OK_G
+                else:
+                    can_start = launch or name == "matchbox-keyboard"
+                    if can_start:
+                        stxt = ("spento -- premi A per avviarlo" if it
+                                else "off -- press A to start it")
+                    else:
+                        stxt = "spento" if it else "off"
+                    scol = FAINT
+                self.text(stxt, (WIN.x + 46, y + 22), self.f_tiny, scol)
+                y += 42
+            if self.note:
+                self.text(self.note, (WIN.x + 16, WIN.bottom - 50),
+                          self.f_tiny, OK_G)
+            self.wfooter([("A", "avvia" if it else "start"),
+                         ("B", self.t("back_b"))])
+        elif top == "cli_troubleshoot":
+            self.window("CLI Troubleshooting")
+            actions = self.cli_trouble_actions()
+            y = WIN.y + 52
+            for i, (key, ic, label, sub) in enumerate(actions):
+                if i == self.sub_sel:
+                    pygame.draw.rect(self.surface, SEL,
+                                     (WIN.x + 8, y, WIN.w - 16, 38),
+                                     border_radius=5)
+                    pygame.draw.rect(self.surface, self.accent,
+                                     (WIN.x + 8, y, 3, 38))
+                icons.draw(self.surface, ic, WIN.x + 20, y + 8, 22,
+                          self.accent if i == self.sub_sel else DIM)
+                self.text(label, (WIN.x + 52, y + 3), self.f_med,
+                          FG if i == self.sub_sel else DIM)
+                self.text(sub, (WIN.x + 52, y + 21), self.f_tiny, FAINT,
+                          maxw=WIN.w - 90)
+                y += 40
+            if self.note:
+                self.text(self.note, (WIN.x + 16, WIN.bottom - 50),
+                          self.f_tiny, OK_G)
+            self.wfooter([("A", self.t("ok")), ("B", self.t("back_b"))])
+        elif top == "kbd_settings":
+            it = (self.lang == "it")
+            self.window("Keyboard settings")
+            try:
+                cfgd = json.load(open(os.path.join(
+                    os.path.dirname(self.mnt), "desk_config.json")))
+            except Exception:
+                cfgd = {}
+            cur = cfgd.get("kbd_h", 230)
+            y = WIN.y + 60
+            self.text("Dimensione" if it else "Size", (WIN.x + 24, y),
+                      self.f_med, FG)
+            y += 30
+            for sz, lab in ((170, "piccola" if it else "small"),
+                            (230, "media" if it else "medium"),
+                            (300, "grande" if it else "large")):
+                sel = (sz == cur)
+                col = self.accent if sel else WIN_EDGE
+                pygame.draw.rect(self.surface, col,
+                                 (WIN.x + 24, y, 140, 34), 2 if sel
+                                 else 1, border_radius=6)
+                self.text("%s (%dpx)" % (lab, sz), (WIN.x + 34, y + 8),
+                          self.f_small, FG if sel else DIM)
+                y += 42
+            self.text("A: cicla piccola/media/grande" if it else
+                      "A: cycle small/medium/large",
+                      (WIN.x + 24, y + 6), self.f_tiny, FAINT)
+            if self.note:
+                self.text(self.note, (WIN.x + 16, WIN.bottom - 50),
+                          self.f_tiny, OK_G)
+            self.wfooter([("A", "cambia" if it else "change"),
+                         ("B", self.t("back_b"))])
+        if time.time() < self.vol_osd_until and self.vol is not None:
+            self.draw_vol_osd()
         pygame.display.flip()
+
+    def draw_vol_osd(self):
+        """Finestrella verticale del volume, a sinistra: compare al
+        variare del volume (o quando scende a zero, cioe' muto) e
+        sparisce da sola dopo un attimo."""
+        bx, by, bw, bh = 14, WIN.centery - 90, 34, 180
+        pygame.draw.rect(self.surface, (10, 11, 15), (bx, by, bw, bh),
+                         border_radius=10)
+        pygame.draw.rect(self.surface, self.accent, (bx, by, bw, bh), 2,
+                         border_radius=10)
+        pad = 6
+        fh = bh - pad * 2
+        lvl = max(0, min(100, self.vol))
+        filled = int(fh * lvl / 100.0)
+        muted = lvl == 0
+        col = (200, 60, 56) if muted else self.accent
+        pygame.draw.rect(self.surface, (26, 28, 34),
+                         (bx + pad, by + pad, bw - pad * 2, fh),
+                         border_radius=4)
+        if filled > 0:
+            pygame.draw.rect(self.surface, col,
+                             (bx + pad, by + pad + (fh - filled),
+                              bw - pad * 2, filled), border_radius=4)
+        icons.volume_icon(self.surface, bx + bw // 2 - 9, by - 30, 18,
+                          0 if muted else lvl, col, (90, 92, 98))
+        pct = "MUTE" if muted else "%d%%" % lvl
+        pw = self.f_tiny.size(pct)[0]
+        self.text(pct, (bx + bw // 2 - pw // 2, by + bh + 8),
+                  self.f_tiny, col)
 
     # --------------------------------------------------------- animazione
     def animate_open(self):

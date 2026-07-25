@@ -21,11 +21,13 @@ NO_R = (235, 90, 90)
 
 ROWS_LOW = ["1234567890-", "qwertyuiop", "asdfghjkl;", "zxcvbnm,./"]
 ROWS_UP = ["!@#$%^&*()_", "QWERTYUIOP", "ASDFGHJKL:", "ZXCVBNM<>?"]
-SPECIALS = ["SPAZIO", "<-", "INVIO", "MAIUSC", "TAB", "|", "~", "'", '"']
+SPECIALS_IT = ["MAIUSC", "SPAZIO", "<-", "INVIO"]
+SPECIALS_EN = ["SHIFT", "SPACE", "<-", "ENTER"]
 
 
 class Shell(object):
-    def __init__(self, surface, font_path, accent, mnt="", lang="it"):
+    def __init__(self, surface, font_path, accent, mnt="", lang="it",
+                auto_cmd=None):
         self.s = surface
         self.accent = accent
         self.mnt = mnt if mnt and os.path.isdir(os.path.join(mnt, "usr")) \
@@ -35,6 +37,7 @@ class Shell(object):
         self.f_key = self._font(font_path, 15)
         self.f_small = self._font(font_path, 13)
         self.line = ""
+        self.cursor = 0
         self.hist = []
         self.hist_i = 0
         self.out = [self._t("VoidDesk shell — A preme il tasto, "
@@ -52,6 +55,9 @@ class Shell(object):
         self.running = True
         self.busy = False
         self.cwd = "/root" if self.mnt else "/"
+        if auto_cmd:
+            self.line = auto_cmd
+            self.run_cmd()
 
     def _font(self, p, sz):
         try:
@@ -63,10 +69,12 @@ class Shell(object):
         return en if self.lang == "en" else it
 
     # ------------------------------------------------------------- tastiera
+    def specials(self):
+        return SPECIALS_EN if self.lang == "en" else SPECIALS_IT
+
     def rows(self):
         base = ROWS_UP if self.shift else ROWS_LOW
-        return [list(r) for r in base] + [["MAIUSC", "SPAZIO", "<-",
-                                           "INVIO"]]
+        return [list(r) for r in base] + [self.specials()]
 
     def key_at(self, x, y):
         rs = self.rows()
@@ -77,16 +85,22 @@ class Shell(object):
 
     def press(self):
         k = self.key_at(self.kx, self.ky)
-        if k == "MAIUSC":
+        sp = self.specials()
+        c = self.cursor
+        if k == sp[0]:
             self.shift = not self.shift
-        elif k == "SPAZIO":
-            self.line += " "
-        elif k == "<-":
-            self.line = self.line[:-1]
-        elif k == "INVIO":
+        elif k == sp[1]:
+            self.line = self.line[:c] + " " + self.line[c:]
+            self.cursor += 1
+        elif k == sp[2]:
+            if c > 0:
+                self.line = self.line[:c - 1] + self.line[c:]
+                self.cursor -= 1
+        elif k == sp[3]:
             self.run_cmd()
         else:
-            self.line += k
+            self.line = self.line[:c] + k + self.line[c:]
+            self.cursor += 1
 
     # --------------------------------------------------------------- comandi
     def run_cmd(self):
@@ -97,6 +111,7 @@ class Shell(object):
         self.hist_i = len(self.hist)
         self.out.append("$ " + cmd)
         self.line = ""
+        self.cursor = 0
         if cmd in ("exit", "quit"):
             self.running = False
             return
@@ -133,23 +148,32 @@ class Shell(object):
         elif b == "A":
             self.press()
         elif b == "B":
-            self.line = self.line[:-1]
+            c = self.cursor
+            if c > 0:
+                self.line = self.line[:c - 1] + self.line[c:]
+                self.cursor -= 1
         elif b == "START":
             self.run_cmd()
         elif b == "Y":
             self.shift = not self.shift
         elif b == "X":
-            self.line += " "
+            c = self.cursor
+            self.line = self.line[:c] + " " + self.line[c:]
+            self.cursor += 1
         elif b == "L1":                     # cronologia
             if self.hist:
                 self.hist_i = max(0, self.hist_i - 1)
                 self.line = self.hist[self.hist_i]
+                self.cursor = len(self.line)
         elif b == "R1":
             if self.hist:
                 self.hist_i = min(len(self.hist) - 1, self.hist_i + 1)
                 self.line = self.hist[self.hist_i]
-        elif b == "L2":
-            self.line = ""
+                self.cursor = len(self.line)
+        elif b == "L2":                     # cursore carattere per carattere
+            self.cursor = max(0, self.cursor - 1)
+        elif b == "R2":
+            self.cursor = min(len(self.line), self.cursor + 1)
         elif b == "UP":
             self.ky = (self.ky - 1) % len(self.rows())
             self.kx = min(self.kx, len(self.rows()[self.ky]) - 1)
@@ -190,7 +214,9 @@ class Shell(object):
         prompt = "$ " + self.line
         self.s.blit(self.f_mono.render(prompt[-86:], True, FG), (12, cy + 4))
         if int(time.time() * 2) % 2:
-            cw = self.f_mono.size("$ " + self.line[-84:])[0]
+            cpos = max(0, min(len(self.line), self.cursor))
+            pre = ("$ " + self.line[:cpos])[-86:]
+            cw = self.f_mono.size(pre)[0]
             pygame.draw.rect(self.s, self.accent, (12 + cw, cy + 5, 7, 15))
         # tastiera
         rs = self.rows()
@@ -210,8 +236,8 @@ class Shell(object):
                                      (x + 2, y2, kw - 4, 40), 1,
                                      border_radius=5)
                 lab = k
-                if k == "MAIUSC" and self.shift:
-                    lab = "maiusc"
+                if k == self.specials()[0] and self.shift:
+                    lab = k.lower()
                 tcol = (10, 10, 14) if sel else FG
                 img = self.f_key.render(lab, True, tcol)
                 self.s.blit(img, (x + (kw - img.get_width()) // 2,
