@@ -174,7 +174,7 @@ OSK_PAGES = [
 CLOCK_LAYOUTS = ["classic", "minimal", "segmented", "analog", "skeleton",
                  "pilot"]
 HOME_STYLES = ["blame", "hud", "terminal", "orbit", "nexus"]
-VERSION = "9.63"
+VERSION = "9.67"
 GITHUB_REPO = "SilverCrow2323/muOS-Void-Desk"
 # gruppi tematici del Rt:Toolbox: (titolo IT, titolo EN, icona sezione,
 # quante voci ci stanno, stile del widget) -- l'ordine deve combaciare
@@ -1008,6 +1008,8 @@ TR = {
   "need_xfce": "Prima installa il desktop XFCE (voce in alto nel menu).",
   "opt_theme": "Tema colore", "opt_home_style": "Stile menu principale",
   "opt_font_scale": "Dimensione testo",
+  "opt_vfx_bg": "Sfondo animato", "opt_vfx_trans": "Transizioni",
+  "opt_vfx_fx": "Effetti schermo",
   "opt_lang": "Lingua",
   "opt_ctrl": "Profilo controller", "opt_batt": "Batteria nell'header",
   "opt_st_clock": "Orologio nell'header",
@@ -1043,7 +1045,7 @@ TR = {
   "h_exit": "SHUTDOWN", "h_exit_s": "torna a muOS",
   "f_inst": "Void Installer", "f_inst_s": "installa e rimuovi (L1: tab)",
   "f_auto": "Avvio al boot", "f_auto_s": "app che partono col desktop",
-  "f_upd": "Aggiorna sistema", "f_upd_s": "apt update + upgrade",
+  "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
   "f_vdupd": "Void-Desk Update", "f_vdupd_s": "aggiorna l'app da GitHub",
   "f_cli": "CLI Tools", "f_cli_s": "roba simpatica da terminale",
   "w_stats": "Void Stats", "w_stats_s": "il quadro completo del sistema",
@@ -1164,6 +1166,8 @@ TR = {
   "need_xfce": "Install the XFCE desktop first (top menu entry).",
   "opt_theme": "Colour theme", "opt_home_style": "Main menu style",
   "opt_font_scale": "Text size",
+  "opt_vfx_bg": "Animated background", "opt_vfx_trans": "Transitions",
+  "opt_vfx_fx": "Screen effects",
   "opt_lang": "Language",
   "opt_ctrl": "Controller profile", "opt_batt": "Status bar icons",
   "opt_st_clock": "Clock in header",
@@ -1199,7 +1203,7 @@ TR = {
   "h_exit": "SHUTDOWN", "h_exit_s": "back to muOS",
   "f_inst": "Void Installer", "f_inst_s": "install & remove (L1: tab)",
   "f_auto": "Startup apps", "f_auto_s": "apps that boot with the desktop",
-  "f_upd": "Update system", "f_upd_s": "apt update + upgrade",
+  "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
   "f_vdupd": "Void-Desk Update", "f_vdupd_s": "update the app from GitHub",
   "f_cli": "CLI Tools", "f_cli_s": "fun stuff for the terminal",
   "w_stats": "Void Stats", "w_stats_s": "the full system picture",
@@ -1940,8 +1944,9 @@ class App(object):
         self.play("open")
         self.prev_frame = self.surface.copy()
         r = self.last_sel_rect or (W // 2 - 60, H // 2 - 40, 120, 80)
-        self.trans = ({"t0": time.time(), "rect": r, "color": color}
-                      if self.cfg.get("anim", True) else None)
+        lvl = self.cfg.get("vfx_trans", 3)
+        self.trans = ({"t0": time.time(), "rect": r, "color": color,
+                      "dur": 0.1 + lvl * 0.048} if lvl > 0 else None)
         self.stack.append(state)
 
     def pop_state(self):
@@ -1949,9 +1954,10 @@ class App(object):
             return
         self.play("back")
         self.prev_frame = self.surface.copy()
+        lvl = self.cfg.get("vfx_trans", 3)
         self.trans = ({"t0": time.time(), "rect": (0, 42, 52, H - 70),
-                       "color": None}
-                      if self.cfg.get("anim", True) else None)
+                       "color": None, "dur": 0.1 + lvl * 0.048}
+                      if lvl > 0 else None)
         self.stack.pop()
 
     def switch(self, x, y, on, w=64, h=30):
@@ -1976,17 +1982,21 @@ class App(object):
     def interference(self):
         """Interferenze orizzontali leggere: due bande in scorrimento con
         micro-shift, uno spike raro. Non sono le scanline: e' il tremolio
-        del segnale. Spegnibile dalle opzioni."""
-        if not self.cfg.get("fx", True):
+        del segnale. Livello 0-5 dalle opzioni, 0 la spegne del tutto."""
+        lvl = self.cfg.get("vfx_fx", 3)
+        if lvl <= 0:
             return
+        scale = lvl / 5.0
         t = time.time()
         for spd, ph, amp, hh in ((26.0, 0, 2, 2), (9.0, 170, 1, 3)):
+            amp = max(1, round(amp * scale))
             y = int((t * spd + ph) % (H + 50)) - 25
             if 0 <= y < H - hh:
                 band = self.surface.subsurface((0, y, W, hh)).copy()
                 self.surface.blit(band,
                                   (amp if int(t * 7) % 2 else -amp, y))
-        if int(t * 10) % 47 == 0:
+        spike_mod = max(8, int(50 - lvl * 8))
+        if int(t * 10) % spike_mod == 0:
             base = int((t * 26) % (H - 8))
             for k in range(3):
                 y = (base + k * 57) % (H - 3)
@@ -2067,9 +2077,13 @@ class App(object):
                 self.run_busy(self.t("checking"), self.scan_status)
                 self.clihub_sel = 0
                 self.push("clihub")
+            elif key == "update":
+                self.envdet_env = ENVS[0][0]
+                self.envdet_sel = 0
+                self.push("envdetail")
             else:
                 self.comp_action({"installer": "install", "autostart":
-                                  "autostart", "update": "update"}[key])
+                                  "autostart"}[key])
         elif hub == "workshop":
             if key == "stats":
                 self.info_lines = self.run_busy(self.t("checking"),
@@ -2077,10 +2091,19 @@ class App(object):
                 self.scroll = 0
                 self.push("info")
             elif key == "diag":
-                self.info_lines = self.run_busy(self.t("checking"),
-                                                self.diag_lines) or []
-                self.scroll = 0
-                self.push("info")
+                def go():
+                    self.diag_scan_steps = self.diag_steps()
+                    self.diag_scan_idx = 0
+                    self.diag_scan_t0 = time.time()
+                    self.diag_scan_log = []
+                    self.diag_scan_results = [("sec", "gear",
+                                              "VOID DIAG")]
+                    self.push("diagscan")
+                self.confirm = (("Device pronto al setaccio. Procedere "
+                                "con la diagnosi?" if self.lang == "it"
+                                else "Device ready for the sieve. "
+                                "Proceed with diagnosis?"), go)
+                self.push("confirm")
             elif key == "monitor":
                 self.mon = {"cpu": [], "ram": [], "net": [], "tmp": [],
                             "last": None, "t": 0}
@@ -4913,6 +4936,71 @@ class App(object):
         if len(self.calc_expr) > 34:
             self.calc_expr = self.calc_expr[:34]
 
+    def diag_steps(self):
+        """La stessa diagnosi di prima, ma spezzata in passi discreti:
+        ognuno restituisce (etichetta_it, etichetta_en, righe_risultato).
+        Serve per mostrare un avanzamento vero, passo per passo, invece
+        di un'unica chiamata bloccante che finisce tutta insieme."""
+        it = (self.lang == "it")
+
+        def step_image():
+            img = os.path.join(DATA, "xfce.img")
+            ok = os.path.exists(img)
+            return [("kv", "IMMAGINE" if it else "IMAGE",
+                    human(os.path.getsize(img)) if ok else
+                    ("assente" if it else "missing"),
+                    FG if ok else NO_R)]
+
+        def step_envs():
+            base, extra = self.read_envs()
+            return [("kv", "AMBIENTI" if it else "ENVS",
+                    ("xfce " + " ".join(sorted(extra - {"xfce"}))).strip()
+                    if base else ("base non installata" if it
+                                  else "base not installed"),
+                    FG if base else DIM)]
+
+        def step_sys():
+            out = []
+            try:
+                sw = open("/proc/swaps").read().splitlines()[1:]
+                out.append(("kv", "SWAP", sw[0].split()[0] if sw else
+                           ("nessuna" if it else "none"),
+                           OK_G if sw else DIM))
+            except OSError:
+                pass
+            try:
+                gv = open("/sys/devices/system/cpu/cpufreq/policy0/"
+                          "scaling_governor").read().strip()
+                out.append(("kv", "GOVERNOR", gv, FG))
+            except OSError:
+                pass
+            return out
+
+        def step_logs():
+            out = []
+            for name, p in (("voiddesk.log", LOG),
+                            ("session", os.path.join(
+                                DATA, "xfce_session.log"))):
+                try:
+                    bad = [ln for ln in open(p, errors="ignore").read()
+                           .splitlines()[-200:]
+                           if "FALLITO" in ln or "error" in ln.lower()
+                           ][-2:]
+                    for b in bad:
+                        out.append(("kv", "!", b[-70:], NO_R))
+                except OSError:
+                    pass
+            return out
+
+        return [
+            ("immagine chroot" if it else "chroot image", step_image),
+            ("ambienti installati" if it else "installed environments",
+             step_envs),
+            ("swap e governor" if it else "swap and governor", step_sys),
+            ("diario alla ricerca di errori" if it else
+             "scanning logs for errors", step_logs),
+        ]
+
     def diag_lines(self):
         it = (self.lang == "it")
         L = [("sec", "gear", "VOID DIAG")]
@@ -5794,9 +5882,14 @@ class App(object):
         """I quattro accenti animati agli angoli, fissi rispetto allo
         schermo (non scorrono col fondo): ingranaggio in basso a sx,
         rombo in basso a dx, griglia in alto a dx, linea curva in alto
-        a sx. Sobri apposta -- decorano, non distraggono."""
+        a sx. Sobri apposta -- decorano, non distraggono. Il livello
+        0-5 dalle opzioni aggiunge un elemento in piu' a ogni soglia,
+        non e' un semplice acceso/spento."""
+        lvl = self.cfg.get("vfx_bg", 3)
+        if lvl <= 0:
+            return
         sec = theme_secondary(self.accent)
-        # ingranaggio, basso sinistra
+        # livello 1+: ingranaggio, basso sinistra
         ggx, ggy, ggr = 22, H - 24, 14
         gang = t * 1.1
         for k in range(8):
@@ -5807,12 +5900,16 @@ class App(object):
             y2 = ggy + int(ggr * math.sin(a))
             pygame.draw.line(self.surface, sec, (x1, y1), (x2, y2), 2)
         pygame.draw.circle(self.surface, sec, (ggx, ggy), ggr - 6, 1)
-        # rombo, basso destra: pulsa di dimensione
+        if lvl < 2:
+            return
+        # livello 2+: rombo, basso destra: pulsa di dimensione
         rx, ry = W - 24, H - 26
         rs = 10 + int(4 * abs(math.sin(t * 1.6)))
         pygame.draw.polygon(self.surface, sec, [
             (rx, ry - rs), (rx + rs, ry), (rx, ry + rs), (rx - rs, ry)], 2)
-        # griglia, alto destra: una riga che la percorre in loop
+        if lvl < 3:
+            return
+        # livello 3+: griglia (alto dx) e curva (alto sx)
         gx0, gy0, gw, gh = W - 58, 12, 46, 26
         for i in range(4):
             lx = gx0 + i * (gw // 3)
@@ -5825,7 +5922,6 @@ class App(object):
         sweep = gy0 + int((gh - 2) * ((math.sin(t * 1.3) + 1) / 2))
         pygame.draw.line(self.surface, self.accent, (gx0, sweep),
                          (gx0 + gw, sweep), 2)
-        # linea curva, alto sinistra: una scintilla la percorre
         cx0, cy0, cx1, cy1 = 8, 10, 56, 30
         ccx, ccy = 20, 34
         steps = 14
@@ -5841,10 +5937,9 @@ class App(object):
         py = (1-pk)**2*cy0 + 2*(1-pk)*pk*ccy + pk**2*cy1
         pygame.draw.circle(self.surface, self.accent, (int(px), int(py)),
                            2)
-        # (i due pozzi di luce sono stati tolti: BLEND_RGBA_ADD ignorava
-        # l'alpha e produceva cerchi pieni vistosi invece di un
-        # bagliore sottile -- da rifare con una tecnica diversa)
-        # ventola, meta' altezza a sinistra: pale che ruotano davvero
+        if lvl < 4:
+            return
+        # livello 4+: ventola, meta' altezza a sinistra
         fx0, fy0, fr = 16, H // 2, 15
         fang = t * 2.4
         for k in range(4):
@@ -5856,7 +5951,9 @@ class App(object):
             pygame.draw.polygon(self.surface, sec, [
                 (fx0, fy0), (bx1, by1), (bx2, by2)], 1)
         pygame.draw.circle(self.surface, sec, (fx0, fy0), 4, 1)
-        # tre LED lungo il margine destro, ognuno col suo ritmo
+        if lvl < 5:
+            return
+        # livello 5: tre LED lungo il margine destro
         for k, (lyf, spd) in enumerate(((0.32, 1.7), (0.5, 2.3),
                                         (0.68, 1.3))):
             on = math.sin(t * spd + k * 2) > 0.4
@@ -7192,10 +7289,13 @@ class App(object):
             ("opt_theme", "theme", list(ACCENTS.keys())),
             ("opt_home_style", "home_style", HOME_STYLES),
             ("opt_font_scale", "font_scale", CYCLES["fscale"][1]),
-            ("opt_fx", "fx", [True, False]),
-            ("opt_anim", "anim", [True, False]),
             ("opt_intro", "intro", [True, False]),
             ("opt_batt", "battery", [True, False]),
+            ("hdr", "ANIMAZIONI & EFFETTI" if it else "ANIMATIONS & VFX",
+             None),
+            ("opt_vfx_bg", "vfx_bg", [0, 1, 2, 3, 4, 5]),
+            ("opt_vfx_trans", "vfx_trans", [0, 1, 2, 3, 4, 5]),
+            ("opt_vfx_fx", "vfx_fx", [0, 1, 2, 3, 4, 5]),
             ("hdr", "STATUS BAR", None),
             ("opt_st_clock", "clock_badge", [True, False]),
             ("opt_st_batt", "st_batt", [True, False]),
@@ -7380,6 +7480,9 @@ class App(object):
                 self.push("envdetail")
             elif btn == "B":
                 self.pop_state()
+        elif top == "diagscan":
+            if btn == "B":
+                self.pop_state()
         elif top == "envdetail":
             env = self.envdet_env
             base, extra = self.read_envs()
@@ -7389,6 +7492,16 @@ class App(object):
                 self.envdet_sel = (self.envdet_sel - 1) % len(acts)
             elif btn == "DOWN":
                 self.envdet_sel = (self.envdet_sel + 1) % len(acts)
+            elif btn == "L1":
+                envs = [e[0] for e in ENVS]
+                i2 = (envs.index(env) - 1) % len(envs)
+                self.envdet_env = envs[i2]
+                self.envdet_sel = 0
+            elif btn == "R1":
+                envs = [e[0] for e in ENVS]
+                i2 = (envs.index(env) + 1) % len(envs)
+                self.envdet_env = envs[i2]
+                self.envdet_sel = 0
             elif btn == "A":
                 self.env_detail_do(env, acts[self.envdet_sel][0])
             elif btn == "B":
@@ -7472,6 +7585,12 @@ class App(object):
                 self.opt_sel = k
                 self.opt_scroll = max(0, min(self.opt_sel - 5,
                                              max(0, len(defs) - 10)))
+            elif btn in ("LEFT", "RIGHT") and \
+                    defs[self.opt_sel][1].startswith("vfx_"):
+                ck = defs[self.opt_sel][1]
+                cur = self.cfg.get(ck, 3)
+                step = -1 if btn == "LEFT" else 1
+                self.cfg[ck] = max(0, min(5, cur + step))
             elif btn == "A":
                 key, ck, vals = defs[self.opt_sel]
                 if key == "hdr" or not vals:
@@ -9831,6 +9950,61 @@ class App(object):
             self.footer([("A", self.t("sess_a")),
                          ("X", "dettagli" if it else "details"),
                          ("B", self.t("back"))])
+        elif top == "diagscan":
+            it = (self.lang == "it")
+            self.header("VOID DIAG", icon="gear")
+            steps = self.diag_scan_steps
+            idx = self.diag_scan_idx
+            n = len(steps)
+            # avanzo di un passo alla volta, col tempo reale -- non
+            # tutto insieme: e' quello che rende visibile l'avanzamento
+            if idx < n and time.time() - self.diag_scan_t0 > 0.22:
+                label, fn = steps[idx]
+                try:
+                    res = fn()
+                except Exception as e:
+                    res = [("kv", "!", str(e)[:70], NO_R)]
+                self.diag_scan_results.extend(res)
+                mark = "OK" if not any(r[3] == NO_R for r in res
+                                       if len(r) > 3) else "!!"
+                self.diag_scan_log.append("[%s] %s" % (mark, label))
+                self.diag_scan_idx += 1
+                self.diag_scan_t0 = time.time()
+                idx = self.diag_scan_idx
+            self.content_panel(46, H - 40)
+            pct = int(100 * idx / max(1, n))
+            status_txt = (("scansione in corso..." if idx < n else
+                          "scansione completata") if it else
+                          ("scanning..." if idx < n else "scan complete"))
+            self.text(status_txt, (20, 56), self.f_med,
+                      self.accent if idx < n else OK_G)
+            pw = W - 40
+            pygame.draw.rect(self.surface, (14, 15, 19), (20, 84, pw, 10))
+            pygame.draw.rect(self.surface, self.accent if idx < n
+                             else OK_G, (20, 84, pw * pct // 100, 10))
+            self.text("%d%%" % pct, (W - 50, 60), self.f_small, DIM)
+            # riquadro diario: le ultime righe di stato, come un log
+            # box vero
+            ly0 = 106
+            pygame.draw.rect(self.surface, (5, 6, 8), (20, ly0, W - 40,
+                             H - 40 - ly0 - 10))
+            pygame.draw.rect(self.surface, LINE, (20, ly0, W - 40,
+                             H - 40 - ly0 - 10), 1)
+            ty = ly0 + 8
+            for ln in self.diag_scan_log[-9:]:
+                col = NO_R if "!!" in ln else OK_G
+                self.text(ln, (28, ty), self.f_small, col)
+                ty += 20
+            if idx >= n:
+                if len(self.diag_scan_results) < 3:
+                    self.diag_scan_results.append(
+                        ("kv", "", "tutto in ordine" if it else
+                         "all clear", OK_G))
+                self.info_lines = self.diag_scan_results
+                self.scroll = 0
+                self.stack[-1] = "info"
+            self.footer([("B", ("annulla" if it else "cancel")
+                         if idx < n else self.t("back"))])
         elif top == "envdetail":
             it = (self.lang == "it")
             env = self.envdet_env
@@ -9839,8 +10013,22 @@ class App(object):
             col = self.env_color(env)
             self.header(env.upper() + " // " + ENV_CODENAME.get(env, ""),
                         icon="uplink")
-            self.npanel(8, 48, W - 16, 46, border=col, fill=INK, cut=10)
-            self.env_glyph(env, 18, 55, 2, col)
+            # striscia di schede: una per ambiente, L1/R1 le scorre
+            tabx = 8
+            tabw = (W - 16) // len(ENVS)
+            for e_ in ENVS:
+                ecol = self.env_color(e_[0])
+                on = (e_[0] == env)
+                self.npanel(tabx, 48, tabw - 4, 22,
+                           border=ecol if on else LINE,
+                           fill=(sel_tint(ecol) if on else INK), cut=5)
+                tlab = e_[0].upper()
+                tw2 = self.f_tiny.size(tlab)[0]
+                self.text(tlab, (tabx + (tabw - 4 - tw2) // 2, 52),
+                          self.f_tiny, ecol if on else FAINT)
+                tabx += tabw
+            self.npanel(8, 74, W - 16, 46, border=col, fill=INK, cut=10)
+            self.env_glyph(env, 18, 81, 2, col)
             if not base:
                 stxt, scol = self.t("e_base"), DIM
             elif inst:
@@ -9850,12 +10038,12 @@ class App(object):
                 scol = OK_G
             else:
                 stxt, scol = self.t("e_missing"), NO_R
-            self.text(stxt, (56, 62), self.f_med, scol)
+            self.text(stxt, (56, 88), self.f_med, scol)
             imgtxt, imgcol = self.img_state_line()
-            self.text(imgtxt, (W - 26 - self.f_tiny.size(imgtxt)[0], 68),
+            self.text(imgtxt, (W - 26 - self.f_tiny.size(imgtxt)[0], 94),
                       self.f_tiny, imgcol)
             acts = self.env_detail_actions(env, base, inst)
-            y = 104
+            y = 130
             for j, (k, ic, lab) in enumerate(acts):
                 sel = (j == self.envdet_sel)
                 if sel:
@@ -9867,7 +10055,8 @@ class App(object):
                           NO_R if k == "remove" else
                           (FG if sel else DIM), maxw=W - 80)
                 y += 46
-            self.footer([("A", self.t("open")), ("B", self.t("back"))])
+            self.footer([("L1/R1", "amb." if it else "env"),
+                        ("A", self.t("open")), ("B", self.t("back"))])
         elif top == "autostart":
             rows = [r for r in self.rows if r[0] == "item"]
             auto = set(self.cfg.get("autostart", []))
@@ -9989,6 +10178,19 @@ class App(object):
                     self.sel_frame(8, y, W - 16, 36)
                 self.text(self.t(key), (22, y + 7), self.f_med,
                           FG if k == self.opt_sel else DIM)
+                if ck.startswith("vfx_"):
+                    lvl = self.cfg.get(ck, 3)
+                    seg_w, seg_h, gap = 26, 18, 4
+                    bx0 = W - 20 - 6 * seg_w - 5 * gap
+                    for si in range(6):
+                        on = si <= lvl
+                        scol = self.accent if on else LINE
+                        pygame.draw.rect(self.surface, scol,
+                                         (bx0 + si * (seg_w + gap),
+                                          y + 9, seg_w, seg_h),
+                                         0 if on else 1)
+                    y += 40
+                    continue
                 val = self.cfg.get(ck, vals[0] if vals else "")
                 vs = self.tx(VAL_EN, self.t("yes") if val is True else
                              self.t("no") if val is False else str(val))
@@ -9997,7 +10199,9 @@ class App(object):
                             border=LINE, fill=INK, cut=6)
                 self.text(vs, (W - vw - 30, y + 8), self.f_med, self.accent)
                 y += 40
-            self.footer([("A", self.t("change")), ("B", self.t("back"))])
+            self.footer([("SX/DX", "regola" if self.lang == "it"
+                         else "adjust"), ("A", self.t("change")),
+                        ("B", self.t("back"))])
         elif top == "logs":
             self.header(self.t("w_logs"), icon="doc")
             per = 9
