@@ -1,7 +1,5 @@
 <div align="center">
 
-# ![VoidDesk logo, or the Sir Pips / circle-triangle symbol on transparent background, sized for a README header](https://immaguinequicoglione.sbrobs)
-
 # ◈ VoidDesk
 
 **The definitive desktop layer for muOS.**
@@ -46,6 +44,7 @@ Everything is built for a d-pad first. Nothing about this app assumes you have a
 | 📜 **Session logging** | Every desktop session logs to its own file, browsable from the Log Registry |
 
 ![XFCE Environment](https://i.ibb.co/fzGVBrZT/muos-20260725-175947.png)
+
 ![Live menu of the Desktop Sessions](https://i.ibb.co/nMDqSVyH/muos-20260725-180006.png)
 
 ### 📦 Void Installer
@@ -120,7 +119,6 @@ Everything is built for a d-pad first. Nothing about this app assumes you have a
 | 🌀 **Real transitions, not cuts** | Window open/close has actual weight to it — a slight mechanical overshoot, not a flat fade |
 | ✨ **A boot sequence with an ending** | Custom animated intro, closing on a rotating light-wipe that reveals the menu underneath it |
 
-# ![GIF or a few frames: a window transition with the overshoot visible, or the boot animation's final light-wipe reveal](https://immaguinequicoglione.sbrobs)
 
 ---
 
@@ -150,7 +148,6 @@ Full reference lives in-app: **INFO & ABOUT → Quick guide**.
 | **3. Launch** | Open it from **MuOS Apps** on the device |
 | **4. First run** | Pick a desktop environment to bootstrap — this downloads a real desktop, budget a few minutes and a stable connection |
 
-# ![Screenshot: the first-run environment picker, or the bootstrap progress screen mid-download](https://immaguinequicoglione.sbrobs)
 
 ### Requirements
 
@@ -213,14 +210,6 @@ VoidDesk is under active, genuinely relentless development. Core functionality i
 Designed and built by **Sir Pips** — SPDW Factory.
 
 Symbol design, brand identity, and the whole visual language are original SPDW Factory work.
-
-
-
----
-
-## 📄 License
-
-# add the actual license here once picked — MIT / GPLv3 / other, not yet decided as far as I know
 
 ---
 
