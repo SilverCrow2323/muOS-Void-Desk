@@ -94,13 +94,6 @@ def draw(surf, key, x, y, sz, col):
         line((12, 12), (12, 6), 2)
         line((12, 12), (17, 14), 2)
         return
-    if key == "calc":                      # calcolatrice
-        rect(5, 3, 14, 18, 2, 1)
-        rect(7, 5, 10, 4, 2)
-        for gy in (11, 15):
-            for gx in (8, 12, 16):
-                rect(gx, gy, 2, 2, 0)
-        return
     if key == "shield":                    # protetta / sistema
         line((12, 3), (20, 6), 2)
         line((12, 3), (4, 6), 2)
@@ -154,9 +147,12 @@ def draw(surf, key, x, y, sz, col):
                   12 + r1 * math.sin(math.radians(a))),
                  (12 + r2 * math.cos(math.radians(a)),
                   12 + r2 * math.sin(math.radians(a))), 1.6)
-    elif key == "start":                   # play in cerchio
-        circ(12, 12, 9, 2)
-        pygame.draw.polygon(surf, col, [p(10, 8), p(10, 16), p(16.5, 12)])
+    elif key == "start":                   # monitor con avvio dentro
+        rect(3, 3, 18, 13, 2, 2)
+        line((10, 20), (14, 20), 2)
+        line((12, 16), (12, 20), 2)
+        pygame.draw.polygon(surf, col, [p(9.5, 7), p(9.5, 12.5),
+                                        p(15, 9.75)])
     elif key == "panel":                   # barra applicazioni
         rect(2, 5, 20, 14, 2, 1)
         line((2, 15), (22, 15), 1.5)
@@ -166,10 +162,11 @@ def draw(surf, key, x, y, sz, col):
         rect(2, 4, 20, 16, 2, 1)
         rect(5, 7, 3.5, 3.5, 0)
         rect(5, 12, 3.5, 3.5, 0)
-    elif key == "window":                  # finestra
-        rect(3, 4, 18, 15, 2, 1)
-        line((3, 8), (21, 8), 1.5)
-        circ(5.5, 6, 0.8, 0)
+    elif key == "window":                  # griglia app 2x2
+        rect(3, 3, 8, 8, 2, 1.5)
+        rect(13, 3, 8, 8, 2, 1.5)
+        rect(3, 13, 8, 8, 2, 1.5)
+        rect(13, 13, 8, 8, 2, 1.5)
     elif key == "folder":                  # cartella
         line((2, 7), (9, 7), 2)
         rect(2, 7, 20, 13, 2, 1.5)
@@ -238,6 +235,10 @@ def draw(surf, key, x, y, sz, col):
         rect(4, 2, 16, 20, 2, 2)
         circ(12, 9, 3.5, 2)
         rect(7, 15, 10, 5, 2, 1)
+    elif key == "cd_disc":                 # disco ottico vero
+        circ(12, 12, 10, 2)
+        circ(12, 12, 3, 1.6)
+        arc(12, 12, 6.5, -60, 30, 1.4)
     elif key == "globe":                   # browser
         circ(12, 12, 9, 2)
         line((3, 12), (21, 12), 1.5)
@@ -297,7 +298,7 @@ def draw(surf, key, x, y, sz, col):
         for cy in (12, 16, 19.5):
             for cx in (8, 12, 16):
                 circ(cx, cy, 0.9, 0)
-    elif key == "archive":                 # archivio zip
+    elif key == "zip":                     # archivio zip vero
         rect(3, 5, 18, 15, 2, 1.5)
         line((3, 9), (21, 9), 1.3)
         rect(10.5, 9, 3, 5, 0)
@@ -331,6 +332,13 @@ def draw(surf, key, x, y, sz, col):
         circ(12, 12, 9, 2)
         circ(12, 7.5, 1, 0)
         line((12, 11), (12, 17), 2)
+    elif key == "search":                  # lente d'ingrandimento
+        circ(10, 10, 6, 2)
+        line((14.3, 14.3), (20, 20), 2.4)
+    elif key == "goto":                    # vai a: freccia in avanti
+        line((4, 12), (18, 12), 2)
+        line((12, 6), (18, 12), 2)
+        line((12, 18), (18, 12), 2)
     elif key == "font":
         line((5, 19), (11, 5), 2)
         line((11, 5), (17, 19), 2)
@@ -416,6 +424,19 @@ def draw(surf, key, x, y, sz, col):
     elif key == "w_fog":                   # nebbia a bande
         for fy in (7, 11, 15, 19):
             line((3, fy), (21, fy), 1.8)
+    elif key == "w_clear_night":           # falce di luna + stelle
+        pts = []
+        for a in range(-100, 101, 10):     # arco esterno convesso
+            rad = math.radians(a)
+            pts.append(p(11.5 + 8 * math.sin(rad),
+                         12 - 8 * math.cos(rad)))
+        for a in range(75, -76, -10):      # arco interno concavo
+            rad = math.radians(a)
+            pts.append(p(16 + 7.2 * math.sin(rad),
+                         12 - 7.2 * math.cos(rad)))
+        pygame.draw.polygon(surf, col, pts)
+        circ(20, 6, 1.4, 0)
+        circ(20.5, 13, 1.1, 0)
     else:                                  # ripiego: quadratino
         rect(4, 4, 16, 16, 2, 2)
 

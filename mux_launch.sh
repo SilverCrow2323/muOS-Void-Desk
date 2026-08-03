@@ -11,7 +11,7 @@ LOG="$DATA/voiddesk.log"
 . "$APP_DIR/lib/glyph_install.sh"
 INSTALL_GLYPH "$APP_DIR/resources/voiddesk.png" "voiddesk"
 
-echo "$(date) === VOIDDESK v9.67 launch (dir: $APP_DIR) ===" >>"$LOG"
+echo "$(date) === VOIDDESK v9.147 launch (dir: $APP_DIR) ===" >>"$LOG"
 
 PY3="$(command -v python3)"
 if [ -z "$PY3" ]; then
