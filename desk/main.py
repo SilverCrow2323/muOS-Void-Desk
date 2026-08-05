@@ -211,6 +211,33 @@ OSK_PAGES = [
 CLOCK_LAYOUTS = ["classic", "minimal", "segmented", "analog", "skeleton",
                  "pilot"]
 HOME_STYLES = ["blame", "hud", "terminal", "orbit", "nexus"]
+# VOIDDESK V10 -- Net-Sphere: come sono raggruppati i 9 nodi del menu
+# principale sulle 3 orbite concentriche. Gli indici sono quelli di
+# self.menu/self.menu_icons (rebuild_menu). L'anello esterno del
+# progetto originale prevedeva SHUTDOWN al posto di INFO & ABOUT, ma
+# spegnimento non e' mai stato un nodo di primo livello in questa app
+# (si apre da un percorso separato) -- ho tenuto INFO & ABOUT cosi'
+# com'e' invece di dargli un'etichetta "SHUTDOWN" che premuta con A
+# non spegnerebbe nulla. Vedi nota nella risposta.
+NEXUS_RING_INNER = [0]                # START SESSION
+NEXUS_RING_MID = [3, 5, 2, 6]          # FORGE, UPLINK, MEDIA, WORKSHOP
+NEXUS_RING_OUT = [4, 1, 8, 7]          # TOOLBOX, MUOS APPS, SYSTEM, INFO
+NEXUS_NODE_COLOR = {
+    0: (255, 205, 120),    # START SESSION -- bianco/ambra
+    3: (240, 90, 60),      # FORGE -- rosso/ambra
+    5: (80, 205, 255),     # UPLINK -- ciano
+    2: (230, 80, 190),     # MEDIA VAULT -- magenta/teal
+    6: (175, 110, 240),    # WORKSHOP -- viola/giallo
+    4: (95, 210, 140),     # TOOLBOX -- verde/acciaio
+    1: (225, 225, 235),    # MUOS APPS -- bianco/argento
+    8: (100, 130, 210),    # SETTINGS ("SYSTEM") -- blu scuro/grigio
+    7: (150, 160, 180),    # INFO & ABOUT
+}
+NEXUS_NODE_CODE = {
+    0: "RAIL-0α", 3: "RAIL-1α", 5: "RAIL-2α", 2: "RAIL-3α",
+    6: "RAIL-4α", 4: "RAIL-5β", 1: "RAIL-6β", 8: "RAIL-7β",
+    7: "RAIL-8β",
+}
 NOTIF_KINDS = {
     # tipo: (colore, icona, etichetta_it, etichetta_en)
     "standard": ((140, 150, 165), "info", "NOTIFICA", "NOTICE"),
@@ -284,6 +311,30 @@ CTRL_EXCLUDE_NAMES = ["gpio", "joypad", "power button",
                       "adc joystick", "axp2202", "muos-keys",
                       "direct-keys", "dierct-keys"]
 CTRL_PRESETS = [
+    ("hdr", "NESSUNO", "NONE"),
+    ("custom:none", "Nessuno (personalizzato / disattivo)",
+    "None (custom / inactive)"),
+
+    ("hdr", "TASTI CONSOLE", "CONSOLE BUTTONS"),
+    ("console:btn_up", "Console: D-pad Su", "Console: D-pad Up"),
+    ("console:btn_down", "Console: D-pad Giù", "Console: D-pad Down"),
+    ("console:btn_left", "Console: D-pad Sinistra",
+    "Console: D-pad Left"),
+    ("console:btn_right", "Console: D-pad Destra",
+    "Console: D-pad Right"),
+    ("console:btn_a", "Console: tasto A", "Console: button A"),
+    ("console:btn_b", "Console: tasto B", "Console: button B"),
+    ("console:btn_x", "Console: tasto X", "Console: button X"),
+    ("console:btn_y", "Console: tasto Y", "Console: button Y"),
+    ("console:btn_l1", "Console: L1", "Console: L1"),
+    ("console:btn_l2", "Console: L2", "Console: L2"),
+    ("console:btn_r1", "Console: R1", "Console: R1"),
+    ("console:btn_r2", "Console: R2", "Console: R2"),
+    ("console:btn_start", "Console: Start", "Console: Start"),
+    ("console:btn_select", "Console: Select", "Console: Select"),
+    ("console:btn_menu", "Console: Menu (M)", "Console: Menu (M)"),
+
+    ("hdr", "AZIONI CONSOLE", "CONSOLE ACTIONS"),
     ("console:open_files", "Console: apri File Grid-Diver",
     "Console: open File Grid-Diver"),
     ("console:open_shell", "Console: apri Rt:Shell",
@@ -294,6 +345,21 @@ CTRL_PRESETS = [
     "Console: open Clock"),
     ("console:open_stats", "Console: apri Device Stats",
     "Console: open Device Stats"),
+    ("console:open_notes", "Console: apri Note",
+    "Console: open Notes"),
+    ("console:open_cal", "Console: apri Calendario",
+    "Console: open Calendar"),
+    ("console:open_weather", "Console: apri Meteo",
+    "Console: open Weather"),
+    ("console:open_rss", "Console: apri RSS", "Console: open RSS"),
+    ("console:open_calc", "Console: apri Calcolatrice",
+    "Console: open Calculator"),
+    ("console:open_options", "Console: apri Opzioni",
+    "Console: open Options"),
+    ("console:media_panel", "Console: apri pannello media",
+    "Console: open media panel"),
+    ("console:shutdown_menu", "Console: apri menu spegnimento",
+    "Console: open shutdown menu"),
     ("console:screenshot", "Console: scatta screenshot",
     "Console: take screenshot"),
     ("console:wifi_toggle", "Console: attiva/disattiva WiFi",
@@ -304,15 +370,21 @@ CTRL_PRESETS = [
     "Console: volume down"),
     ("console:home", "Console: torna al menu principale",
     "Console: back to main menu"),
+
+    ("hdr", "PC (BASESTATION)", "PC (BASESTATION)"),
     ("pc:notify", "PC: invia notifica al Basestation",
     "PC: send notification to Basestation"),
     ("pc:screenshot", "PC: richiedi screenshot al PC",
     "PC: request PC screenshot"),
     ("pc:stats", "PC: mostra statistiche PC",
     "PC: show PC stats"),
-    ("custom:none", "Nessuno (personalizzato / disattivo)",
-    "None (custom / inactive)"),
 ]
+# lookup rapido O(1) comando -> etichette, usato nel loop di disegno
+# (prima si rifaceva una scansione lineare dell'intera lista ad ogni
+# riga, ad ogni fotogramma: con 40+ preset ha senso pagarla una volta
+# sola qui invece che ripeterla decine di volte al secondo)
+CTRL_PRESET_LABELS = {k: (lit, en) for k, lit, en in CTRL_PRESETS
+                      if k != "hdr"}
 SHUTDOWN_OPTS = [
     ("close", (90, 190, 220), "power"),
     ("restart_app", (230, 180, 60), "gear"),
@@ -1014,6 +1086,55 @@ def _build_names():
 
 EV2NAME = _build_names() or dict(KNOWN_NAMES)
 NAME2EV = {v: k for k, v in EV2NAME.items()}
+
+# Nomi leggibili per i segnali grezzi di un dispositivo HID esterno
+# (tastiera USB, gamepad generico): solo per la resa a schermo nel
+# Controller Hub -- il confronto vero, ovunque, resta sempre sul
+# codice numerico grezzo dentro la stringa "hid:N" / "midi:note:...".
+HID_KEY_NAMES = dict(KNOWN_NAMES)
+HID_KEY_NAMES.update({
+    1: "ESC", 14: "BACKSPACE", 15: "TAB", 28: "ENTER", 29: "CTRL",
+    42: "SHIFT", 54: "SHIFT", 56: "ALT", 57: "SPACE", 58: "CAPS",
+    100: "ALT", 97: "CTRL",
+    2: "1", 3: "2", 4: "3", 5: "4", 6: "5", 7: "6", 8: "7", 9: "8",
+    10: "9", 11: "0",
+    16: "Q", 17: "W", 18: "E", 19: "R", 20: "T", 21: "Y", 22: "U",
+    23: "I", 24: "O", 25: "P",
+    30: "A", 31: "S", 32: "D", 33: "F", 34: "G", 35: "H", 36: "J",
+    37: "K", 38: "L",
+    44: "Z", 45: "X", 46: "C", 47: "V", 48: "B", 49: "N", 50: "M",
+    59: "F1", 60: "F2", 61: "F3", 62: "F4", 63: "F5", 64: "F6",
+    65: "F7", 66: "F8", 67: "F9", 68: "F10", 87: "F11", 88: "F12",
+    102: "HOME", 103: "UP", 104: "PAGEUP", 105: "LEFT", 106: "RIGHT",
+    107: "END", 108: "DOWN", 109: "PAGEDOWN", 110: "INS", 111: "DEL",
+    113: "MUTE", 114: "VOL-", 115: "VOL+", 116: "POWER",
+})
+MIDI_NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#",
+                   "A", "A#", "B"]
+
+
+def ctrl_sig_label(sig):
+    """Etichetta leggibile per un segnale raw ('hid:304' -> 'A', una
+    nota MIDI -> 'C#4 ch1'): solo estetica, non tocca mai il confronto
+    vero che resta sulla stringa grezza salvata nel binding."""
+    if not sig:
+        return "?"
+    if sig.startswith("hid:"):
+        try:
+            code = int(sig[4:])
+        except ValueError:
+            return sig
+        return HID_KEY_NAMES.get(code, "HID %d" % code)
+    if sig.startswith("midi:note:"):
+        parts = sig.split(":")
+        try:
+            note = int(parts[2])
+            ch = parts[3][2:] if len(parts) > 3 else "?"
+        except (IndexError, ValueError):
+            return sig
+        return "%s%d ch%s" % (MIDI_NOTE_NAMES[note % 12],
+                              note // 12 - 1, ch)
+    return sig
 
 
 def ev_of(name):
@@ -1928,6 +2049,9 @@ class App(object):
         except OSError:
             pass
         self.sel = 0
+        self.nexus_ring = 0
+        self.nexus_rot_mid = 0
+        self.nexus_rot_out = 0
         self.home_scroll = 0
         self.sel_log = 0
         self.opt_sel = 0
@@ -1975,11 +2099,15 @@ class App(object):
         self.ctrl_active_readers = {}
         self.ctrl_map_dev = None
         self.ctrl_map_sel = 0
-        self.ctrl_recording = False
-        self.ctrl_record_t0 = 0.0
-        self.ctrl_last_signal = None
+        self.ctrl_capturing = False
+        self.ctrl_capture_t0 = 0.0
+        self.ctrl_capture_target = None
+        self.ctrl_pending = None
         self.ctrl_edit_key = None
-        self.ctrl_preset_scope = "console"
+        self.ctrl_preset_sel = 0
+        self.ctrl_preset_scroll = 0
+        self.ctrl_exec_log = []
+        self.ctrl_pump_errors = {}
         self.ctrl_profile_sel = 0
         self.ctrl_profile_dev = None
         self.shutdown_sel = 0
@@ -5163,13 +5291,71 @@ class App(object):
             del b[signal]
             save_cfg(self.cfg)
 
+    def ctrl_rebind_signal(self, dev_name, old_sig, new_sig):
+        """Sposta un binding esistente su un segnale fisico diverso
+        (nuovo tasto premuto durante la cattura), mantenendo nome e
+        comando gia' assegnati. Se new_sig e' gia' occupato da un
+        ALTRO binding, non tocca nulla e restituisce quel segnale --
+        chi chiama puo' chiedere conferma prima di sovrascriverlo."""
+        b = self.ctrl_bindings(dev_name)
+        if new_sig == old_sig:
+            return None
+        if new_sig in b:
+            return new_sig
+        cur = b.pop(old_sig, None)
+        if cur is None:
+            return None
+        b[new_sig] = cur
+        save_cfg(self.cfg)
+        return None
+
+    def ctrl_force_rebind(self, dev_name, old_sig, new_sig):
+        """Come ctrl_rebind_signal, ma dopo conferma esplicita
+        dell'utente: sovrascrive quello che occupava new_sig."""
+        b = self.ctrl_bindings(dev_name)
+        cur = b.pop(old_sig, None)
+        if cur is None:
+            return
+        b[new_sig] = cur
+        save_cfg(self.cfg)
+
+    def ctrl_open_presets(self, sig):
+        """Apre la lista comandi per il segnale sig, partendo sempre
+        da una voce reale (mai da un'intestazione)."""
+        self.ctrl_edit_key = sig
+        self.ctrl_preset_sel = next(
+            (i for i, p in enumerate(CTRL_PRESETS) if p[0] != "hdr"),
+            0)
+        self.ctrl_preset_scroll = 0
+        self.push("ctrlpresets")
+
     def ctrl_diagnostics(self):
         """Raccoglie cosa il dispositivo vede DAVVERO quando un
         controller e' collegato -- lsusb, /dev/snd, schede ALSA,
         log kernel filtrato. Ogni comando e' opzionale: se manca
         (sistema molto ridotto, comune su dispositivi pensati per
         l'emulazione) lo dichiara invece di fallire in silenzio."""
+        it = (self.lang == "it")
         L = []
+        L.append(("sec", "gear", "log comandi eseguiti" if it else
+                 "executed command log"))
+        if not self.ctrl_exec_log:
+            L.append(("kv", "", "nessun comando eseguito finora" if it
+                     else "no command executed yet", DIM))
+        else:
+            now = time.time()
+            for t_, cmd, ok, msg in reversed(self.ctrl_exec_log[-10:]):
+                ago = ("%ds fa" if it else "%ds ago") % int(now - t_)
+                lbl = cmd if ok else "%s -- %s" % (
+                    cmd, msg or ("errore" if it else "error"))
+                L.append(("kv", ago, lbl, OK_G if ok else NO_R))
+        if self.ctrl_pump_errors:
+            L.append(("sec", "gear", "errori di lettura recenti" if it
+                     else "recent read errors"))
+            now = time.time()
+            for name_, (t_, err) in self.ctrl_pump_errors.items():
+                ago = ("%ds fa" if it else "%ds ago") % int(now - t_)
+                L.append(("kv", name_, "%s (%s)" % (err, ago), NO_R))
         L.append(("sec", "gear", "diagnosi HID precisa" if
                  self.lang == "it" else "precise HID diagnosis"))
         for ln in controllers.diagnose_hid(
@@ -5293,8 +5479,11 @@ class App(object):
         corrispondono a un tasto con un comando assegnato lo esegue
         davvero. Prima la mappatura veniva salvata ma nessuno la
         controllava mai fuori dalla schermata di configurazione --
-        e' questo il pezzo che mancava."""
-        if self.ctrl_recording:
+        e' questo il pezzo che mancava. Gli errori non spariscono
+        piu' in silenzio: finiscono in ctrl_pump_errors, visibile
+        dalla diagnostica -- cosi' un problema hardware vero si vede
+        invece di sembrare 'il binding non funziona' senza indizi."""
+        if self.ctrl_capturing:
             return
         all_bindings = self.cfg.get("controller_bindings", {})
         if not all_bindings:
@@ -5306,8 +5495,8 @@ class App(object):
                 self.ctrl_devices = \
                     controllers.list_all_controllers(
                         exclude_names=CTRL_EXCLUDE_NAMES)
-            except Exception:
-                pass
+            except Exception as e:
+                self.ctrl_pump_errors["__scan__"] = (now, str(e)[:80])
         for dev in self.ctrl_devices:
             bindings = all_bindings.get(dev["name"])
             if not bindings:
@@ -5333,8 +5522,9 @@ class App(object):
                         b = bindings.get(sig)
                         if b and b.get("command"):
                             self.ctrl_exec_command(b["command"])
-            except Exception:
-                pass
+                self.ctrl_pump_errors.pop(dev["name"], None)
+            except Exception as e:
+                self.ctrl_pump_errors[dev["name"]] = (now, str(e)[:80])
 
     def ctrl_open_reader(self, dev):
         key = dev["path"]
@@ -5361,7 +5551,13 @@ class App(object):
         if not command or command == "custom:none":
             return True, ""
         try:
-            if command == "console:open_files":
+            if command.startswith("console:btn_"):
+                # emula la pressione reale di un tasto della console:
+                # stesso dispatcher usato dal pad fisico, quindi si
+                # comporta in modo identico in qualunque schermata ci
+                # si trovi in quel momento.
+                self.on_button(command[len("console:btn_"):].upper())
+            elif command == "console:open_files":
                 self.fm_open()
             elif command == "console:open_shell":
                 self.rtsh_open()
@@ -5375,6 +5571,35 @@ class App(object):
                 self.info_lines = self.void_stats() or []
                 self.scroll = 0
                 self.push("info")
+            elif command == "console:open_notes":
+                self.notes = self.notes_refresh()
+                self.note_sel = 0
+                self.push("notes")
+            elif command == "console:open_cal":
+                self.evs = self.cal_load()
+                lt = time.localtime()
+                self.cal_cur = [lt.tm_year, lt.tm_mon, lt.tm_mday]
+                self.cal_view = "month"
+                self.ev_sel = 0
+                self.push("cal")
+            elif command == "console:open_weather":
+                self.wx_sel = 0
+                self.push("weather")
+            elif command == "console:open_rss":
+                self.rss_sel = 0
+                self.push("rss")
+            elif command == "console:open_calc":
+                self.calc_expr = ""
+                self.calc_sel = 0
+                self.push("calc")
+            elif command == "console:open_options":
+                self.opt_sel = 0
+                self.push("options")
+            elif command == "console:media_panel":
+                self._media_panel_toggle()
+            elif command == "console:shutdown_menu":
+                self.shutdown_sel = 0
+                self.push("shutdownmenu")
             elif command == "console:screenshot":
                 png_b64 = self.uplink_device_screenshot()
                 import base64
@@ -5415,9 +5640,21 @@ class App(object):
                 self.notify("Controller", "PC stats richieste" if
                            self.lang == "it" else "PC stats "
                            "requested", "message")
+            self._ctrl_log(command, True, "")
             return True, ""
         except Exception as e:
-            return False, str(e)[:60]
+            msg = str(e)[:60]
+            self._ctrl_log(command, False, msg)
+            return False, msg
+
+    def _ctrl_log(self, command, ok, msg):
+        """Buffer circolare corto: cosa e' stato eseguito davvero
+        dal Controller Mapper, visibile dalla diagnostica invece di
+        sparire nel nulla se qualcosa va storto su hardware reale
+        che qui non posso testare."""
+        self.ctrl_exec_log.append((time.time(), command, ok, msg))
+        if len(self.ctrl_exec_log) > 20:
+            del self.ctrl_exec_log[:-20]
 
     def vol_change(self, delta):
         try:
@@ -10273,120 +10510,190 @@ class App(object):
             gcol = self.accent if grnd.random() < 0.5 else (200, 60, 90)
             pygame.draw.line(self.surface, gcol, (0, gy2), (W, gy2), 1)
 
-    def _nexus_hue(self, i):
-        hues = [self.env_color(e) for e, *_r in ENVS] + \
-            [self.accent, (110, 195, 250), (200, 130, 250),
-             OK_G, STEEL, (250, 150, 90)]
-        return hues[i % len(hues)]
+    def _nexus_ring_list(self, ring):
+        return (NEXUS_RING_INNER, NEXUS_RING_MID, NEXUS_RING_OUT)[ring]
+
+    def _nexus_ring_rot(self, ring):
+        if ring == 1:
+            return self.nexus_rot_mid
+        if ring == 2:
+            return self.nexus_rot_out
+        return 0
+
+    def _nexus_set_ring_rot(self, ring, rot):
+        if ring == 1:
+            self.nexus_rot_mid = rot
+        elif ring == 2:
+            self.nexus_rot_out = rot
+
+    def _nexus_sync_sel(self):
+        """Il resto dell'app (activate(), ecc.) ragiona ancora su un
+        indice piatto self.sel: lo tengo allineato al nodo che si
+        trova davvero al punto di aggancio dell'anello attivo."""
+        ring_list = self._nexus_ring_list(self.nexus_ring)
+        rot = self._nexus_ring_rot(self.nexus_ring)
+        self.sel = ring_list[rot % len(ring_list)]
+
+    def _nexus_dashed_ring(self, cx, cy, r, col, active):
+        steps = max(24, int(r / 3))
+        w = 2 if active else 1
+        for s in range(steps):
+            if s % 3 == 0:
+                continue
+            a0 = math.radians(s * 360.0 / steps)
+            a1 = math.radians((s + 1) * 360.0 / steps)
+            p0 = (cx + r * math.cos(a0), cy + r * math.sin(a0))
+            p1 = (cx + r * math.cos(a1), cy + r * math.sin(a1))
+            pygame.draw.line(self.surface, col, p0, p1, w)
+
+    def _nexus_draw_scene(self, cx, cy, mid_phase=None, out_phase=None):
+        """Disegna l'intera scena Net-Sphere: le 3 orbite (RAIL
+        SYSTEM), i 9 nodi, i raggi di collegamento verso il centro.
+        mid_phase/out_phase (gradi) forzano la fase di rotazione di
+        quell'anello durante un'animazione; se None uso la rotazione
+        salvata."""
+        t_now = time.time()
+        node_r = {0: 32, 1: 24, 2: 19}
+        sel_r = {0: 39, 1: 30, 2: 24}
+        radii = {0: 50, 1: 98, 2: 148}
+        phases = {
+            0: 0.0,
+            1: mid_phase if mid_phase is not None else
+               self.nexus_rot_mid * 90.0,
+            2: out_phase if out_phase is not None else
+               self.nexus_rot_out * 90.0,
+        }
+        ring_cols = {0: (150, 150, 165), 1: (110, 110, 130),
+                    2: (75, 75, 95)}
+        for ring in (2, 1, 0):
+            active = (ring == self.nexus_ring)
+            col = self.accent if active else ring_cols[ring]
+            self._nexus_dashed_ring(cx, cy, radii[ring], col, active)
+        rings = ((0, NEXUS_RING_INNER), (1, NEXUS_RING_MID),
+                 (2, NEXUS_RING_OUT))
+        positions = {}
+        for ring, ring_list in rings:
+            n = len(ring_list)
+            for i, idx in enumerate(ring_list):
+                ang = math.radians(-90 + (360.0 / n) * i -
+                                   phases[ring]) if n > 1 else \
+                    math.radians(-90)
+                nx = cx + radii[ring] * math.cos(ang)
+                ny = cy + radii[ring] * math.sin(ang)
+                positions[idx] = (nx, ny, ring)
+        for idx, (nx, ny, ring) in positions.items():
+            spoke_col = tuple(max(18, c - ring * 22)
+                              for c in (68, 68, 88))
+            pygame.draw.line(self.surface, spoke_col, (cx, cy),
+                             (nx, ny), 1)
+        for idx, (nx, ny, ring) in positions.items():
+            sel = (idx == self.sel)
+            r = sel_r[ring] if sel else node_r[ring]
+            col = NEXUS_NODE_COLOR.get(idx, self.accent)
+            if sel:
+                halo_a = int(50 * (0.5 + 0.5 * math.sin(t_now * 3.4)))
+                for gr in (r + 11, r + 5):
+                    s = pygame.Surface((gr * 2 + 4, gr * 2 + 4),
+                                       pygame.SRCALPHA)
+                    pygame.draw.circle(s, col + (halo_a,),
+                                       (gr + 2, gr + 2), gr)
+                    self.surface.blit(s, (nx - gr - 2, ny - gr - 2))
+            tn = t_now * 1.8 if sel else t_now
+            self._nexus_sphere(nx, ny, r, col, self.menu_icons[idx],
+                               tn, 0.18 if sel else 0.0)
+            if sel:
+                self.last_sel_rect = (nx - r, ny - r, r * 2, r * 2)
+        return positions
+
+    def _nexus_side_panels(self, cx, cy):
+        idx = self.sel
+        label, sub = self.menu[idx]
+        col = NEXUS_NODE_COLOR.get(idx, self.accent)
+        bx = cx + 148 + 30
+        bw = max(120, W - bx - 14)
+        by = 54
+        self.npanel(bx, by, bw, 50, border=col, fill=INK, cut=8)
+        self.text(NEXUS_NODE_CODE.get(idx, "RAIL-?α"), (bx + 10,
+                 by + 3), self.f_tiny, col)
+        lw = self.f_med_b.size(label)[0]
+        self.text(label, (bx + max(10, (bw - lw) // 2), by + 20),
+                 self.f_med_b, FG, maxw=bw - 20)
+        by2 = by + 58
+        self.npanel(bx, by2, bw, 78, border=LINE, fill=INK, cut=6)
+        self.text("NODE REPORT", (bx + 10, by2 + 3), self.f_tiny,
+                 self.accent)
+        self.text(sub, (bx + 10, by2 + 22), self.f_small, FAINT,
+                 maxw=bw - 20)
 
     def render_home_nexus(self):
-        """Nexus: un nodo alla volta, grande, a sinistra. Rette che
-        accennano ai vicini senza mostrare l'intero percorso -- lo
-        vedi tutto solo viaggiandoci sopra, un salto alla volta. I
-        due riquadri d'informazione stanno a destra, un cavo li
-        collega fisicamente al primo."""
+        """VOIDDESK V10 -- Net-Sphere: tre orbite concentriche
+        attorno a un centro comune, nove nodi (RAIL SYSTEM). Su/Giu'
+        cambia l'orbita attiva, Sinistra/Destra la fa ruotare
+        portando il nodo successivo/precedente al punto di aggancio
+        in alto."""
         self.header("__brand__")
         self._nexus_bg()
-        n = len(self.menu)
-        cx, cy = 138, H // 2 + 6
-        r = 58 if self.sel == 0 else 44
-        for nb, sign in ((self.sel - 1, -1), (self.sel + 1, 1)):
-            nb %= n
-            _cx, _cy = self._nexus_curve(self.sel, nb, cx, cy,
-                                         cx + sign * 200, cy)
-            steps = 10
-            prev = (cx, cy)
-            for s in range(1, steps + 1):
-                tt = s / float(steps) * 0.4
-                bx = (1-tt)**2*cx + 2*(1-tt)*tt*_cx + tt**2*(cx+sign*200)
-                by = (1-tt)**2*cy + 2*(1-tt)*tt*_cy + tt**2*cy
-                a = max(0, 120 - s * 12)
-                pygame.draw.line(self.surface, (a, a, a + 10), prev,
-                                 (bx, by), 2)
-                prev = (bx, by)
-        self._nexus_sphere(cx, cy, r, self._nexus_hue(self.sel),
-                           self.menu_icons[self.sel], time.time())
-        self.last_sel_rect = (cx - r, cy - r, r * 2, r * 2)
-        label, sub = self.menu[self.sel]
-        bx = cx + r + 34
-        bw = W - bx - 14
-        by = H // 2 - 92
-        # cavo dal bordo inferiore centrale del riquadro nome verso il
-        # riquadro dettaglio sotto: due segmenti dritti, non una linea
-        # dritta unica, per sembrare un vero cavo posato
-        cable_x = bx + bw // 2
-        cable_y0 = by + 46
-        cable_y1 = by + 68
-        pygame.draw.line(self.surface, STEEL, (cable_x, cable_y0),
-                         (cable_x - 14, cable_y0 + 11), 3)
-        pygame.draw.line(self.surface, STEEL, (cable_x - 14, cable_y0 + 11),
-                         (cable_x, cable_y1), 3)
-        self.npanel(bx, by, bw, 46, border=self.accent, fill=INK, cut=8)
-        self.text("NODO" if self.lang == "it" else "NODE", (bx + 10, by + 3),
-                  self.f_tiny, self.accent)
-        lw = self.f_med_b.size(label)[0]
-        self.text(label, (bx + (bw - lw) // 2, by + 18), self.f_med_b,
-                  FG, maxw=bw - 20)
-        by2 = by + 68
-        self.npanel(bx, by2, bw, 62, border=LINE, fill=INK, cut=6)
-        self.text("IN DEPTH", (bx + 10, by2 + 3), self.f_tiny, self.accent)
-        self.text(sub, (bx + 10, by2 + 22), self.f_small, FAINT,
-                  maxw=bw - 20)
+        cx, cy = 175, 250
+        self._nexus_draw_scene(cx, cy)
+        self._nexus_side_panels(cx, cy)
+        updown = "SU/GIÙ" if self.lang == "it" else "UP/DOWN"
+        orbita = "orbita" if self.lang == "it" else "orbit"
         self.footer([("Y", self.t("view")),
-                     ("SX/DX", self.t("change")), ("A", self.t("open")),
-                     ("M", "MEDIA"), ("R1", "USER ID")])
+                     ("SX/DX", self.t("change")),
+                     (updown, orbita),
+                     ("A", self.t("open"))])
 
-    def nexus_travel(self, direction):
-        """Animazione bloccante: la vista viaggia lungo la retta dal
-        nodo attuale al successivo, seguendo davvero la curva di
-        quella connessione, poi arriva e il nuovo nodo cresce a
-        sinistra. Suono dedicato, diverso da tutti gli altri."""
+    def nexus_ring_rotate(self, direction):
+        """Ruota di uno scatto l'orbita attiva (RAIL SYSTEM),
+        animando la transizione -- stesso principio di prima
+        (nexus_travel) ma su un intero anello invece di un salto
+        singolo tra due nodi."""
+        ring_list = self._nexus_ring_list(self.nexus_ring)
+        if len(ring_list) < 2:
+            return
         self.play("nexus")
-        n = len(self.menu)
-        i0 = self.sel
-        i1 = (self.sel + direction) % n
-        cx, cy = 138, H // 2 + 6
-        r0 = 58 if i0 == 0 else 44
-        r1 = 58 if i1 == 0 else 44
-        col0, col1 = self._nexus_hue(i0), self._nexus_hue(i1)
-        ic0, ic1 = self.menu_icons[i0], self.menu_icons[i1]
-        tx = cx + direction * 200
-        ccx, ccy = self._nexus_curve(i0, i1, cx, cy, tx, cy)
-        frames = 20
-        t0 = time.time()
+        rot0 = self._nexus_ring_rot(self.nexus_ring)
+        cx, cy = 175, 250
+        frames = 10
         for f in range(frames):
-            k = f / float(frames - 1)
+            k = (f + 1) / float(frames)
+            shift = direction * 90.0 * k
+            mid_ph = (rot0 * 90.0 + shift) if self.nexus_ring == 1 \
+                else None
+            out_ph = (rot0 * 90.0 + shift) if self.nexus_ring == 2 \
+                else None
             self.header("__brand__")
             self._nexus_bg()
-            bx = (1 - k) ** 2 * cx + 2 * (1 - k) * k * ccx + \
-                k ** 2 * tx
-            by = (1 - k) ** 2 * cy + 2 * (1 - k) * k * ccy + \
-                k ** 2 * cy
-            steps = max(2, int(18 * k))
-            prev = (cx, cy)
-            for s in range(1, steps + 1):
-                tt = s / 18.0
-                lx = (1-tt)**2*cx + 2*(1-tt)*tt*ccx + tt**2*tx
-                ly = (1-tt)**2*cy + 2*(1-tt)*tt*ccy + tt**2*cy
-                pygame.draw.line(self.surface, self.accent, prev,
-                                 (lx, ly), 2)
-                prev = (lx, ly)
-            shrink = max(0.15, 1 - k * 1.6)
-            grow = max(0.0, k * 1.6 - 0.6) if k > 0.4 else 0.0
-            if shrink > 0.15:
-                self._nexus_sphere(cx, cy, max(4, int(r0 * shrink)),
-                                   col0, ic0, t0)
-            spark_r = max(3, int(6 - abs(k - 0.5) * 6))
-            pygame.draw.circle(self.surface, FG, (int(bx), int(by)),
-                               spark_r)
-            if grow > 0:
-                self._nexus_sphere(tx, cy, max(4, int(r1 * min(1.0,
-                                   grow))), col1, ic1, t0)
+            self._nexus_draw_scene(cx, cy, mid_ph, out_ph)
+            self._nexus_side_panels(cx, cy)
             self.footer([("SX/DX", self.t("change"))])
             pygame.display.flip()
             self.clock.tick(40)
-        self.sel = i1
+        rot1 = (rot0 + direction) % len(ring_list)
+        self._nexus_set_ring_rot(self.nexus_ring, rot1)
+        self._nexus_sync_sel()
         self.render()
+
+    def nexus_ring_switch(self, direction):
+        """Passa all'orbita interna/esterna successiva (Su/Giu')."""
+        new_ring = self.nexus_ring + direction
+        if new_ring < 0 or new_ring > 2:
+            return
+        self.play("nexus")
+        self.nexus_ring = new_ring
+        self._nexus_sync_sel()
+        cx, cy = 175, 250
+        updown = "SU/GIÙ" if self.lang == "it" else "UP/DOWN"
+        for f in range(6):
+            self.header("__brand__")
+            self._nexus_bg()
+            self._nexus_draw_scene(cx, cy)
+            self._nexus_side_panels(cx, cy)
+            self.footer([(updown, self.t("change"))])
+            pygame.display.flip()
+            self.clock.tick(40)
+        self.render()
+
 
     def _tb_tile(self, j, item, x, y, w, h, icon_sz=24, big=False,
                 compact=False):
@@ -11735,6 +12042,9 @@ class App(object):
                 self.cfg["home_style"] = HOME_STYLES[idx]
                 save_cfg(self.cfg)
                 self.sel = 0
+                self.nexus_ring = 0
+                self.nexus_rot_mid = 0
+                self.nexus_rot_out = 0
                 self.play("snap")
                 return
             if style == "blame":
@@ -11785,10 +12095,14 @@ class App(object):
                 elif btn == "START":
                     self.crt_off()
             elif style == "nexus":
-                if btn in ("LEFT", "UP"):
-                    self.nexus_travel(-1)
-                elif btn in ("RIGHT", "DOWN"):
-                    self.nexus_travel(1)
+                if btn == "LEFT":
+                    self.nexus_ring_rotate(-1)
+                elif btn == "RIGHT":
+                    self.nexus_ring_rotate(1)
+                elif btn == "UP":
+                    self.nexus_ring_switch(-1)
+                elif btn == "DOWN":
+                    self.nexus_ring_switch(1)
                 elif btn == "A":
                     self.activate(self.sel)
                 elif btn == "START":
@@ -13954,44 +14268,32 @@ class App(object):
             bindings = self.ctrl_bindings(dev["name"]) if dev else {}
             keys = list(bindings.keys())
             n = len(keys)
-            if self.ctrl_recording:
-                reader = self.ctrl_active_readers.get(dev["path"])
-                if reader:
-                    if dev["kind"] == "midi":
-                        for status, d1, d2 in reader.poll():
-                            if (status & 0xF0) in (0x90,) and d2:
-                                sig = controllers.midi_signature(
-                                    status, d1, d2)
-                                self.ctrl_last_signal = sig
-                                self.ctrl_recording = False
-                                if sig not in bindings:
-                                    self.ctrl_save_binding(
-                                        dev["name"], sig, sig, "")
-                                break
-                    else:
-                        for code, pressed in reader.poll():
-                            if pressed:
-                                sig = "hid:%d" % code
-                                self.ctrl_last_signal = sig
-                                self.ctrl_recording = False
-                                if sig not in bindings:
-                                    self.ctrl_save_binding(
-                                        dev["name"], sig, sig, "")
-                                break
-                if time.time() - self.ctrl_record_t0 > 5.0:
-                    self.ctrl_recording = False
-                if btn == "B":
-                    self.ctrl_recording = False
-                return
             if btn == "UP" and n:
                 self.ctrl_map_sel = (self.ctrl_map_sel - 1) % n
             elif btn == "DOWN" and n:
                 self.ctrl_map_sel = (self.ctrl_map_sel + 1) % n
-            elif btn == "X":
-                self.ctrl_recording = True
-                self.ctrl_record_t0 = time.time()
-                self.ctrl_last_signal = None
-            elif btn == "A" and n:
+            elif btn == "X" and dev:
+                # cattura un tasto fisico per una riga NUOVA -- stessa
+                # finestra usata per riassegnarne una esistente
+                self.ctrl_capture_target = "__new__"
+                self.ctrl_capturing = True
+                self.ctrl_capture_t0 = time.time()
+                self.ctrl_open_reader(dev)
+                self.push("ctrlcapture")
+            elif btn == "A" and n and dev:
+                # cattura un tasto fisico per RIASSEGNARE la riga
+                # selezionata: stessa modalita' (finestra grande,
+                # attesa del tasto, countdown) della sezione
+                # "Mappatura tasti", qui applicata alla sorgente
+                # giusta (il dispositivo esterno, non il pad interno)
+                self.ctrl_capture_target = keys[self.ctrl_map_sel]
+                self.ctrl_capturing = True
+                self.ctrl_capture_t0 = time.time()
+                self.ctrl_open_reader(dev)
+                self.push("ctrlcapture")
+            elif btn == "Y" and n:
+                self.ctrl_open_presets(keys[self.ctrl_map_sel])
+            elif btn == "L1" and n and dev:
                 sig = keys[self.ctrl_map_sel]
                 cur = bindings[sig]
 
@@ -14003,41 +14305,69 @@ class App(object):
                 self.osk_open("NOME COMANDO" if self.lang == "it"
                              else "COMMAND NAME",
                              cur.get("name", ""), done_name)
-            elif btn == "Y" and n:
-                sig = keys[self.ctrl_map_sel]
-                self.ctrl_edit_key = sig
-                self.push("ctrlpresets")
-            elif btn == "SELECT" and n:
+            elif btn == "SELECT" and n and dev:
                 sig = keys[self.ctrl_map_sel]
                 self.ctrl_reset_binding(dev["name"], sig)
                 self.ctrl_map_sel = max(0, min(self.ctrl_map_sel,
-                                              len(bindings) - 2))
+                                              len(bindings) - 1))
             elif btn == "B":
                 self.ctrl_close_all_readers()
                 self.pop_state()
-        elif top == "ctrlpresets":
-            scope = getattr(self, "ctrl_preset_scope", "console")
-            presets = [p for p in CTRL_PRESETS if p[0].startswith(scope + ":")]
-            n = len(presets)
-            if btn == "L1" or btn == "R1":
-                scope = "console" if scope == "pc" else "pc"
-                self.ctrl_preset_scope = scope
-                self.ctrl_map_sel2 = 0
-            elif btn == "UP" and n:
-                self.ctrl_map_sel2 = (getattr(self, "ctrl_map_sel2",
-                                             0) - 1) % n
-            elif btn == "DOWN" and n:
-                self.ctrl_map_sel2 = (getattr(self, "ctrl_map_sel2",
-                                             0) + 1) % n
-            elif btn == "A" and n:
-                dev = self.ctrl_map_dev
-                sig = self.ctrl_edit_key
-                bindings = self.ctrl_bindings(dev["name"])
-                cur = bindings.get(sig, {"name": sig})
-                key_, _lit, _len_ = presets[getattr(self, "ctrl_map_sel2", 0)]
-                self.ctrl_save_binding(dev["name"], sig,
-                                      cur.get("name", sig), key_)
+        elif top == "ctrlcapture":
+            # la cattura vera gira ogni fotogramma dentro
+            # handle_ctrl_capture() (chiamata da render()); qui serve
+            # solo B per annullare subito invece di aspettare il
+            # timeout di 5s.
+            if btn == "B":
+                self.ctrl_capturing = False
                 self.pop_state()
+        elif top == "ctrlswap":
+            if btn == "A":
+                dev_name, old_sig, new_sig, _other = self.ctrl_pending
+                self.ctrl_force_rebind(dev_name, old_sig, new_sig)
+                keys2 = list(self.ctrl_bindings(dev_name).keys())
+                if new_sig in keys2:
+                    self.ctrl_map_sel = keys2.index(new_sig)
+                self.pop_state()
+            elif btn == "B":
+                self.pop_state()
+        elif top == "ctrlpresets":
+            n = len(CTRL_PRESETS)
+            if btn in ("UP", "DOWN") and n:
+                d = -1 if btn == "UP" else 1
+                k = self.ctrl_preset_sel
+                for _ in range(n):
+                    k = (k + d) % n
+                    if CTRL_PRESETS[k][0] != "hdr":
+                        break
+                self.ctrl_preset_sel = k
+                self.ctrl_preset_scroll = max(0, min(
+                    self.ctrl_preset_sel - 4, max(0, n - 9)))
+            elif btn in ("L1", "R1") and n:
+                # salta all'intestazione di categoria successiva o
+                # precedente -- comodo ora che la lista e' molto piu'
+                # lunga di prima
+                d = -1 if btn == "L1" else 1
+                k = self.ctrl_preset_sel
+                for _ in range(n):
+                    k = (k + d) % n
+                    if CTRL_PRESETS[k][0] == "hdr":
+                        k = (k + 1) % n
+                        break
+                self.ctrl_preset_sel = k
+                self.ctrl_preset_scroll = max(0, min(
+                    self.ctrl_preset_sel - 4, max(0, n - 9)))
+            elif btn == "A" and n:
+                key_ = CTRL_PRESETS[self.ctrl_preset_sel][0]
+                if key_ != "hdr":
+                    dev = self.ctrl_map_dev
+                    sig = self.ctrl_edit_key
+                    bindings = self.ctrl_bindings(dev["name"])
+                    cur = bindings.get(
+                        sig, {"name": ctrl_sig_label(sig)})
+                    self.ctrl_save_binding(dev["name"], sig,
+                                          cur.get("name", sig), key_)
+                    self.pop_state()
             elif btn == "B":
                 self.pop_state()
         elif top == "shutdownmenu":
@@ -19474,6 +19804,7 @@ class App(object):
                        icon="keyboard")
             self.content_panel(46, H - 40)
             if not self.ctrl_devices:
+                yy = 60
                 for wl in self.note_wrap(
                         "nessun controller esterno rilevato -- "
                         "collega una tastiera USB o un dispositivo "
@@ -19481,14 +19812,17 @@ class App(object):
                         "no external controller detected -- plug "
                         "in a USB keyboard or MIDI device and "
                         "press Y", W - 40, self.f_small, 4):
-                    self.text(wl, (20, 60), self.f_small, DIM,
+                    self.text(wl, (20, yy), self.f_small, DIM,
                              maxw=W - 40)
+                    yy += 20
             y = 50
             for j, dev in enumerate(self.ctrl_devices):
                 sel = (j == self.ctrl_sel)
                 if sel:
                     self.sel_frame(8, y, W - 16, 44)
-                icons.draw(self.surface, "keyboard", 16, y + 10, 22,
+                icons.draw(self.surface,
+                          "music" if dev["kind"] == "midi" else
+                          "keyboard", 16, y + 10, 22,
                           ctrl_col if sel else DIM)
                 self.text(dev["name"], (48, y + 6), self.f_small,
                          FG if sel else DIM, maxw=W - 130)
@@ -19540,76 +19874,159 @@ class App(object):
         elif top == "ctrlmap":
             it = (self.lang == "it")
             ctrl_col = (175, 115, 225)
+            btn_col = (110, 200, 140)
             dev = self.ctrl_map_dev
             self.header(dev["name"][:26] if dev else "?",
-                       icon="keyboard")
+                       icon=("music" if dev and dev["kind"] == "midi"
+                            else "keyboard"))
             self.content_panel(46, H - 40)
-            if self.ctrl_recording:
-                remain = max(0, 5.0 - (time.time() -
-                            self.ctrl_record_t0))
-                self.npanel(40, 90, W - 80, 100, border=ctrl_col,
-                           fill=INK)
-                self.text(("premi il tasto da registrare..." if it
-                          else "press the key to record..."),
-                          (60, 110), self.f_small, FG, maxw=W - 120)
-                self.text("%.1fs" % remain, (60, 140), self.f_big,
-                         ctrl_col)
-                self.footer([("B", "annulla" if it else "cancel")])
-                return
             bindings = self.ctrl_bindings(dev["name"]) if dev else {}
             keys = list(bindings.keys())
             if not keys:
-                self.text(("nessun tasto mappato -- X per "
-                          "registrarne uno nuovo" if it else
-                          "no keys mapped yet -- X to record a new "
-                          "one"), (20, 60), self.f_small, DIM,
-                         maxw=W - 40)
+                yy = 60
+                for wl in self.note_wrap(
+                        ("nessun tasto mappato -- premi X, poi il "
+                         "tasto del dispositivo esterno da "
+                         "registrare" if it else "no key mapped yet "
+                         "-- press X, then the external device's "
+                         "key you want to record"), W - 40,
+                        self.f_small, 4):
+                    self.text(wl, (20, yy), self.f_small, DIM,
+                             maxw=W - 40)
+                    yy += 20
+            first = max(0, min(self.ctrl_map_sel - 3,
+                               max(0, len(keys) - 7)))
             y = 50
-            for j, sig in enumerate(keys):
+            for j in range(first, len(keys)):
                 if y > H - 90:
                     break
+                sig = keys[j]
                 sel = (j == self.ctrl_map_sel)
                 b = bindings[sig]
                 if sel:
                     self.sel_frame(8, y, W - 16, 40)
-                self.text(b.get("name", sig), (18, y + 4),
-                         self.f_small, FG if sel else DIM,
-                         maxw=W - 40)
-                self.text(sig, (18, y + 22), self.f_tiny, FAINT,
-                         maxw=W - 200)
+                self.text(b.get("name") or ctrl_sig_label(sig),
+                         (18, y + 4), self.f_small,
+                         FG if sel else DIM, maxw=W - 220)
+                self.text(ctrl_sig_label(sig), (18, y + 23),
+                         self.f_tiny, FAINT)
                 cmd = b.get("command", "")
-                cmd_lbl = next((lit if it else en for k2, lit, en
-                               in CTRL_PRESETS if k2 == cmd), cmd or
-                               ("nessuno" if it else "none"))
-                self.text(cmd_lbl[:26], (W - 210, y + 22),
-                         self.f_tiny, ctrl_col)
+                lit, en = CTRL_PRESET_LABELS.get(cmd, (None, None))
+                if lit is None:
+                    cmd_lbl = "nessuno" if it else "none"
+                    cmd_col = FAINT
+                else:
+                    cmd_lbl = (lit if it else en)[:26]
+                    cmd_col = (btn_col if cmd.startswith(
+                        "console:btn_") else ctrl_col if
+                        cmd.startswith("pc:") else self.accent)
+                cw = self.f_tiny.size(cmd_lbl)[0]
+                self.npanel(W - cw - 30, y + 13, cw + 14, 20,
+                           border=LINE, fill=INK, cut=5)
+                self.text(cmd_lbl, (W - cw - 23, y + 16),
+                         self.f_tiny, cmd_col)
                 y += 44
-            self.footer([("A", "nome" if it else "name"),
+            self.footer([("A", "cattura" if it else "capture"),
+                        ("X", "nuovo" if it else "new"),
                         ("Y", "comando" if it else "command"),
-                        ("X", "registra" if it else "record"),
+                        ("L1", "nome" if it else "name"),
                         ("SELECT", "reset"),
                         ("B", self.t("back"))])
+        elif top == "ctrlcapture":
+            it = (self.lang == "it")
+            ctrl_col = (175, 115, 225)
+            dev = self.ctrl_map_dev
+            target = self.ctrl_capture_target
+            self.header(dev["name"][:26] if dev else "?",
+                       icon=("music" if dev and dev["kind"] == "midi"
+                            else "keyboard"))
+            if target == "__new__":
+                lab = "nuovo tasto" if it else "new key"
+            else:
+                bindings = (self.ctrl_bindings(dev["name"])
+                           if dev else {})
+                lab = (bindings.get(target, {}).get("name") or
+                      ctrl_sig_label(target))
+            self.npanel(60, 150, W - 120, 170, border=ctrl_col,
+                       fill=INK, cut=14)
+            icons.draw(self.surface,
+                      "music" if dev and dev["kind"] == "midi" else
+                      "keyboard", W // 2 - 16, 172, 32, ctrl_col)
+            t1 = "premi il tasto per:" if it else "press the key for:"
+            self.text(t1, (W // 2 - self.f_small.size(t1)[0] // 2,
+                     218), self.f_small, DIM)
+            lab = lab[:20]
+            self.text(lab, (W // 2 - self.f_big.size(lab)[0] // 2,
+                     240), self.f_big, FG)
+            left = max(0, 5 - int(time.time() -
+                       self.ctrl_capture_t0))
+            t2 = "%s  (%ds)" % ("premi ora" if it else "press now",
+                                left)
+            self.text(t2, (W // 2 - self.f_tiny.size(t2)[0] // 2,
+                     288), self.f_tiny, FAINT)
+            self.footer([("B", "annulla" if it else "cancel")])
+        elif top == "ctrlswap":
+            it = (self.lang == "it")
+            ctrl_col = (175, 115, 225)
+            dev_name, old_sig, new_sig, other_sig = self.ctrl_pending
+            bindings = self.ctrl_bindings(dev_name)
+            other_name = (bindings.get(other_sig, {}).get("name")
+                         or ctrl_sig_label(other_sig))
+            self.header("CONFLITTO" if it else "CONFLICT",
+                       icon="keyboard")
+            self.npanel(40, 150, W - 80, 170, border=NO_R, fill=INK,
+                       cut=14)
+            m1 = (("%s e' gia' usato da \"%s\"" % (
+                  ctrl_sig_label(new_sig), other_name)) if it else
+                 ("%s is already used by \"%s\"" % (
+                  ctrl_sig_label(new_sig), other_name)))
+            self.text(m1, (W // 2 - self.f_med.size(m1)[0] // 2, 180),
+                     self.f_med, FG, maxw=W - 100)
+            m2 = (("%s  →  qui" % ctrl_sig_label(new_sig)) if it else
+                 ("%s  →  here" % ctrl_sig_label(new_sig)))
+            self.text(m2, (W // 2 - self.f_med.size(m2)[0] // 2, 222),
+                     self.f_med, ctrl_col)
+            m3 = ("A: sposta qui   B: annulla" if it else
+                 "A: move here   B: cancel")
+            self.text(m3, (W // 2 - self.f_small.size(m3)[0] // 2,
+                     270), self.f_small, DIM)
         elif top == "ctrlpresets":
             it = (self.lang == "it")
             ctrl_col = (175, 115, 225)
+            btn_col = (110, 200, 140)
             self.header("SCEGLI COMANDO" if it else "PICK COMMAND",
                        icon="keyboard")
             self.content_panel(46, H - 40)
-            sel2 = getattr(self, "ctrl_map_sel2", 0)
+            n = len(CTRL_PRESETS)
+            first = max(0, min(self.ctrl_preset_scroll,
+                               max(0, n - 1)))
             y = 50
-            for j, (key_, lit, en) in enumerate(CTRL_PRESETS):
-                if y > H - 50:
+            for k in range(first, n):
+                if y > H - 44:
                     break
-                sel = (j == sel2)
+                key_, lit, en = CTRL_PRESETS[k]
+                if key_ == "hdr":
+                    pygame.draw.line(self.surface, LINE,
+                                     (10, y + 14), (W - 10, y + 14),
+                                     1)
+                    pygame.draw.rect(self.surface, self.accent,
+                                     (10, y + 6, 4, 10))
+                    self.text(lit if it else en, (22, y + 2),
+                             self.f_tiny, self.accent)
+                    y += 24
+                    continue
+                sel = (k == self.ctrl_preset_sel)
                 if sel:
-                    self.sel_frame(8, y, W - 16, 32)
+                    self.sel_frame(8, y, W - 16, 28)
                 lbl = lit if it else en
-                col2 = ctrl_col if key_.startswith("pc:") else \
-                    (FG if sel else DIM)
-                self.text(lbl, (18, y + 6), self.f_small,
-                         col2 if not sel else FG, maxw=W - 40)
-                y += 36
+                col2 = (btn_col if key_.startswith("console:btn_")
+                       else ctrl_col if key_.startswith("pc:") else
+                       DIM)
+                self.text(lbl, (20, y + 5), self.f_small,
+                         FG if sel else col2, maxw=W - 40)
+                y += 32
             self.footer([("A", "scegli" if it else "select"),
+                        ("L1/R1", "categoria" if it else "category"),
                         ("B", self.t("back"))])
         elif top == "shutdownmenu":
             it = (self.lang == "it")
@@ -20510,6 +20927,8 @@ class App(object):
         self.interference()
         self._pc_notif_pump()
         self.ctrl_listen_pump()
+        if self.stack and self.stack[-1] == "ctrlcapture":
+            self.handle_ctrl_capture()
         self._radio_health_update()
         self._notif_draw()
         self._media_panel_draw()
@@ -20744,6 +21163,75 @@ class App(object):
                 self.apply_map()
             return
         if time.time() - self.capture_t > 5:      # annulla per timeout
+            self.pop_state()
+
+    def handle_ctrl_capture(self):
+        """Cattura per il Controller Mapper: aspetta un segnale dal
+        dispositivo ESTERNO selezionato -- usa il reader specifico di
+        quel dispositivo (HidReader/MidiReader), non evinput/jsmap
+        che leggono il pad interno. Stessa logica di
+        handle_capture(), sulla sorgente giusta. Chiamata ogni
+        fotogramma da render(), cosi' B sul pad interno resta libero
+        per annullare subito (gestito in on_button)."""
+        dev = self.ctrl_map_dev
+        if dev is None:
+            self.ctrl_capturing = False
+            self.pop_state()
+            return
+        reader = self.ctrl_active_readers.get(dev["path"])
+        if reader is None:
+            reader = self.ctrl_open_reader(dev)
+        sig = None
+        if reader is not None:
+            try:
+                if dev["kind"] == "midi":
+                    for status, d1, d2 in reader.poll():
+                        if (status & 0xF0) == 0x90 and d2:
+                            sig = controllers.midi_signature(
+                                status, d1, d2)
+                            break
+                else:
+                    for code, pressed in reader.poll():
+                        if pressed:
+                            sig = "hid:%d" % code
+                            break
+            except Exception:
+                sig = None
+        if sig:
+            target = self.ctrl_capture_target
+            bindings = self.ctrl_bindings(dev["name"])
+            self.ctrl_capturing = False
+            self.pop_state()                  # esce da "ctrlcapture"
+            if target == "__new__":
+                if sig in bindings:
+                    # gia' mappato: seleziono quella riga invece di
+                    # crearne una doppia
+                    keys = list(bindings.keys())
+                    self.ctrl_map_sel = keys.index(sig)
+                    self.notify(("gia' mappato" if self.lang == "it"
+                                else "already mapped"),
+                               ctrl_sig_label(sig), "message")
+                else:
+                    self.ctrl_save_binding(dev["name"], sig,
+                                          ctrl_sig_label(sig), "")
+                    keys = list(
+                        self.ctrl_bindings(dev["name"]).keys())
+                    self.ctrl_map_sel = keys.index(sig)
+                    self.ctrl_open_presets(sig)
+            else:
+                other = self.ctrl_rebind_signal(
+                    dev["name"], target, sig)
+                if other:
+                    self.ctrl_pending = (dev["name"], target, sig,
+                                         other)
+                    self.push("ctrlswap")
+                else:
+                    keys = list(bindings.keys())
+                    if sig in keys:
+                        self.ctrl_map_sel = keys.index(sig)
+            return
+        if time.time() - self.ctrl_capture_t0 > 5:   # annulla per timeout
+            self.ctrl_capturing = False
             self.pop_state()
 
     def run(self):

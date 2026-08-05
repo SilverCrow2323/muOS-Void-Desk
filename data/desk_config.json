@@ -1,0 +1,65 @@
+{
+ "controller_bindings": {
+  "Test Keyboard": {
+   "hid:1": {
+    "name": "Esc",
+    "command": "console:home"
+   }
+  },
+  "Fake Pad": {
+   "hid:30": {
+    "name": "A",
+    "command": "console:btn_a"
+   }
+  },
+  "Fake Pad 2": {
+   "hid:31": {
+    "name": "Row A",
+    "command": "console:btn_a"
+   }
+  },
+  "Fake Pad 3": {
+   "hid:40": {
+    "name": "New name",
+    "command": "console:home"
+   }
+  },
+  "PresetTest": {
+   "hid:1": {
+    "name": "row",
+    "command": "pc:stats"
+   }
+  },
+  "Fake HID": {
+   "hid:30": {
+    "name": "Row A",
+    "command": "console:btn_a"
+   },
+   "hid:9999": {
+    "name": "Unknown",
+    "command": ""
+   }
+  },
+  "Fake MIDI": {
+   "midi:note:60:ch0": {
+    "name": "C4",
+    "command": "pc:notify"
+   }
+  },
+  "PumpDev": {
+   "hid:30": {
+    "name": "A",
+    "command": "console:btn_a"
+   }
+  }
+ },
+ "notification_history": [
+  {
+   "title": "gia' mappato",
+   "body": "A",
+   "kind": "message",
+   "ts": 1785815582.1145923
+  }
+ ],
+ "home_style": "blame"
+}
