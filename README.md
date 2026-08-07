@@ -1,4 +1,4 @@
-# ◈ VoidDesk
+#  ◈ Void-Desk
 
 **The definitive desktop layer for muOS.**
 *A real Linux machine lives inside your handheld. VoidDesk is how you drive it.*
@@ -319,8 +319,5 @@ Symbol design, brand identity, and the whole visual language are original SPDW F
 
 <div align="center">
 
-*continua a smontare le cose.*
-
-[⬆ Back to top](#--voiddesk)
 
 </div>
