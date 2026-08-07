@@ -199,47 +199,59 @@ Full reference lives in-app: **INFO & ABOUT → Quick guide**.
 
 ## 📂 Project Structure
 
+```
 VoidDesk/
-├── desk/
-│ ├── main.py # The application itself — every screen, every render path
-│ ├── intro.py # The boot animation
-│ ├── icons.py # Procedural glyph set
-│ ├── rtshell.py # Native terminal with PTY and ANSI emulation
-│ ├── qrgen.py # Pure Python QR code generator
-│ ├── controllers.py # HID/MIDI device reading
-│ ├── sysinfo.py # System state (battery, network, audio, etc.)
-│ ├── imgmount.py # chroot image mount/unmount handling
-│ ├── fbdisplay.py # Framebuffer output without SDL video driver
-│ ├── pcuplink.py # PC Basestation client
-│ ├── evinput.py # Direct /dev/input/event* reading
-│ └── jsmap.py # evdev ↔ QJoyPad mapping
-├── bin/ # Host-side scripts: mount, install, launch, network setup
-│ ├── vd_loader.py # Loading indicator with progress bar
-│ ├── vd_panel.py # LIVE panel (START+SELECT)
-│ ├── vd_hotkey.py # System key daemon
-│ ├── vd_bootanim.py # Environment boot animation
-│ ├── vd_boost.sh # System optimizations (swap, CPU governor)
-│ ├── xfce_launch.sh # Desktop launch script
-│ ├── xfce_bootstrap.py # Initial XFCE chroot installation
-│ ├── xfce_install.py # Package install/removal
-│ ├── bootstrap_lite.py # Pygame runtime bootstrapping
-│ ├── gen_layout.py # QJoyPad layout generator
-│ └── vd_hotspot_*.sh # Hotspot scripts (hostapd + dnsmasq)
-├── assets/ # Resources (fonts, images, configurations)
-│ ├── brand/ # SPDW Factory artwork, symbols
-│ ├── basestation/ # PC companion (basestation.py)
-│ ├── bgm/ # Boot animation audio
-│ ├── glyphs/ # 22×22 app icon set
-│ └── xfce/ # XFCE configuration files
-├── lib/ # Support libraries
-│ ├── fbtext.py # Text on framebuffer (no pygame)
-│ ├── fbmsg.py # Framebuffer messaging
-├── data/ # Runtime state, logs, config, user data (created on first run)
-└── mux_launch.sh # muOS entry point
+├── desk/                              # Core application modules
+│   ├── main.py                        # The application itself — every screen, every render path
+│   ├── intro.py                       # The boot animation
+│   ├── icons.py                       # Procedural glyph set
+│   ├── rtshell.py                     # Native terminal with PTY and ANSI emulation
+│   ├── qrgen.py                       # Pure Python QR code generator
+│   ├── controllers.py                 # HID/MIDI device reading
+│   ├── sysinfo.py                     # System state (battery, network, audio, etc.)
+│   ├── imgmount.py                    # chroot image mount/unmount handling
+│   ├── fbdisplay.py                   # Framebuffer output without SDL video driver
+│   ├── pcuplink.py                    # PC Basestation client
+│   ├── evinput.py                     # Direct /dev/input/event* reading
+│   └── jsmap.py                       # evdev ↔ QJoyPad mapping
+│
+├── bin/                               # Host-side scripts: mount, install, launch, network setup
+│   ├── vd_loader.py                   # Loading indicator with progress bar
+│   ├── vd_panel.py                    # LIVE panel (START+SELECT)
+│   ├── vd_hotkey.py                   # System key daemon
+│   ├── vd_bootanim.py                 # Environment boot animation
+│   ├── vd_boost.sh                    # System optimizations (swap, CPU governor)
+│   ├── xfce_launch.sh                 # Desktop launch script
+│   ├── xfce_bootstrap.py              # Initial XFCE chroot installation
+│   ├── xfce_install.py                # Package install/removal
+│   ├── xfce_update.py                 # System update
+│   ├── bootstrap_lite.py              # Pygame runtime bootstrapping
+│   ├── gen_layout.py                  # QJoyPad layout generator
+│   ├── vd_xterm_launch.sh             # Real terminal (xterm) launcher
+│   ├── vd_chdman_run.sh               # CHD conversion runner
+│   └── vd_hotspot_*.sh                # Hotspot scripts (hostapd + dnsmasq)
+│
+├── assets/                            # Resources (fonts, images, configurations)
+│   ├── brand/                         # SPDW Factory artwork, symbols
+│   ├── basestation/                   # PC companion (basestation.py)
+│   ├── bgm/                           # Boot animation audio
+│   ├── glyphs/                        # 22×22 app icon set
+│   ├── xfce/                          # XFCE configuration files
+│   └── DejaVuSans.ttf                 # System font
+│
+├── lib/                               # Support libraries
+│   ├── fbtext.py                      # Text on framebuffer (no pygame)
+│   ├── fbmsg.py                       # Framebuffer messaging
+│   └── glyph_install.sh               # Glyph installation in muOS theme
+│
+├── data/                              # Runtime state, logs, config, user data (created on first run)
+│   ├── desk_config.json               # Main configuration file
+│   ├── *.log                          # Application logs
+│   └── xfce.img                       # Desktop environment disk image (~4GB)
+│
+└── mux_launch.sh                      # muOS entry point
 
-
----
-
+```
 ## ⚙️ Under the Hood
 
 VoidDesk's own interface is a single pygame application drawing directly to `/dev/fb0`. The desktop environments it manages are a different animal entirely: a real Ubuntu chroot in an ext4 disk image, bootstrapped with `debootstrap`, mounted and launched through a minimal X session only when you ask for it. The two worlds meet at a small, deliberate seam — a handful of shell scripts that mount, launch, and clean up, and a config file both sides read.
