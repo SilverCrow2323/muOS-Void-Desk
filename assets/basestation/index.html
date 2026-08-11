@@ -1,0 +1,1182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VOID // "Direct Link" Rt:SERVER</title>
+<style>
+:root{
+  --bg:#0a0b0e;
+  --panel:#0d1013;
+  --panel2:#10151a;
+  --line:#232a33;
+  --cyan:#5ac8dc;
+  --cyan-dim:#2e5860;
+  --amber:#ffb443;
+  --green:#33ff55;
+  --red:#ff4d4d;
+  --fg:#e7ecef;
+  --dim:#8993a1;
+  --faint:#4d5661;
+  --mono:ui-monospace,"SF Mono","Cascadia Code","Courier New",monospace;
+  --sans:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+
+/* Modals fix */
+[hidden], .modal-overlay[hidden] {
+  display: none !important;
+}
+
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.4;
+  min-height:100vh;
+  position:relative;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";
+  position:fixed;inset:0;
+  pointer-events:none;
+  z-index:50;
+  background:repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.018) 0px,
+    rgba(255,255,255,0.018) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode:screen;
+}
+body::after{
+  content:"";
+  position:fixed;inset:0;
+  pointer-events:none;
+  z-index:49;
+  background:radial-gradient(ellipse at 50% 0%, rgba(90,200,220,0.05), transparent 60%);
+}
+a{color:var(--cyan);text-decoration:none}
+
+/* ---------- layout shell ---------- */
+.wrap{max-width:980px;margin:0 auto;padding:18px 16px 60px}
+
+/* ---------- Header Hero Banner ---------- */
+.hero-banner{
+  position:relative;
+  background:url('https://i.ibb.co/PvJvGMNZ/BCO-fa031b25-c5de-45f6-b989-4eaef8b8e721.png') center/cover no-repeat;
+  border:1px solid var(--line);
+  border-bottom:2px solid var(--cyan);
+  padding:20px;
+  margin-bottom:12px;
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);
+  overflow:hidden;
+}
+.hero-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(135deg, rgba(10,11,14,0.92) 0%, rgba(13,16,19,0.82) 100%);
+  z-index:1;
+}
+.hero-content{
+  position:relative;
+  z-index:2;
+}
+.hero-top-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+}
+.lab-tag{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--amber);
+  letter-spacing:.12em;
+  font-weight:700;
+  text-transform:uppercase;
+}
+.factory-logo{
+  height:26px;
+  width:auto;
+  filter:drop-shadow(0 0 4px rgba(255,180,67,0.4));
+}
+.hero-symbols{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.sym-img{
+  height:28px;
+  width:auto;
+  filter:drop-shadow(0 0 6px rgba(90,200,220,0.5));
+  opacity:0.9;
+  transition:opacity .2s;
+}
+.sym-img:hover{opacity:1}
+
+.main-title{
+  margin:4px 0 10px;
+  font-family:var(--mono);
+  font-size:22px;
+  font-weight:700;
+  color:var(--fg);
+  letter-spacing:.06em;
+  text-shadow:0 0 10px rgba(90,200,220,0.3);
+}
+.main-title .accent{color:var(--cyan);margin:0 2px}
+.main-title .sub-rt{color:var(--amber);font-size:18px;font-weight:400}
+
+/* Status Indicator / LED */
+.status-indicator{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  background:rgba(0,0,0,0.45);
+  border:1px solid var(--line);
+  padding:4px 10px;
+  font-family:var(--mono);
+  font-size:11px;
+  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
+}
+.led-dot{
+  width:8px;height:8px;border-radius:50%;
+  display:inline-block;
+  transition:background .3s, box-shadow .3s;
+}
+.led-dot.green{
+  background:var(--green);
+  box-shadow:0 0 8px rgba(51,255,85,0.9);
+  animation:pulse 1.8s ease-in-out infinite;
+}
+.led-dot.red{
+  background:var(--red);
+  box-shadow:0 0 8px rgba(255,77,77,0.9);
+}
+.status-text{
+  font-weight:700;
+  letter-spacing:.08em;
+}
+.status-text.green{color:var(--green)}
+.status-text.red{color:var(--red)}
+.status-ping{color:var(--dim);margin-left:4px;font-size:10px}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.barcode{display:flex;align-items:flex-end;gap:1px;height:16px;margin:10px 4px 18px;opacity:.4}
+.barcode span{display:block;width:2px;background:var(--green)}
+
+/* ---------- Companion Cards (BaseStation & AndroidStation) ---------- */
+.companions-container{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin-bottom:22px;
+}
+
+.basestation-card{
+  background:var(--panel2);
+  border:1px solid var(--line);
+  border-left:3px solid var(--cyan);
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
+  position:relative;
+}
+.basestation-card.android-card{
+  border-left-color:var(--green);
+}
+.basestation-card::before{
+  content:"";
+  position:absolute;
+  top:0; right:0;
+  width:50px; height:50px;
+  background:linear-gradient(135deg, transparent 50%, rgba(90,200,220,0.04) 50%);
+  pointer-events:none;
+}
+.bs-left{display:flex;align-items:center;gap:14px}
+.bs-icon{
+  width:40px;height:40px;
+  background:rgba(90,200,220,0.08);
+  border:1px solid var(--cyan-dim);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--cyan);
+  flex-shrink:0;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+}
+.android-card .bs-icon{
+  background:rgba(51,255,85,0.08);
+  border-color:rgba(51,255,85,0.3);
+  color:var(--green);
+}
+.bs-info .bs-title{
+  font-family:var(--mono);
+  font-size:14px;
+  font-weight:700;
+  color:var(--fg);
+  letter-spacing:.05em;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.bs-info .bs-title .badge{
+  font-size:9px;
+  padding:2px 6px;
+  background:var(--cyan-dim);
+  color:var(--cyan);
+  border-radius:2px;
+  letter-spacing:0;
+}
+.android-card .badge{
+  background:rgba(51,255,85,0.15) !important;
+  color:var(--green) !important;
+}
+.bs-info .bs-desc{
+  font-size:12px;
+  color:var(--dim);
+  margin-top:3px;
+  max-width:520px;
+}
+
+.bs-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.bs-btn{
+  background:var(--cyan);
+  color:#000;
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:700;
+  padding:9px 14px;
+  white-space:nowrap;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  transition:all .15s ease;
+  box-shadow:0 0 8px rgba(90,200,220,0.2);
+}
+.bs-btn:hover{
+  background:#72daf0;
+  color:#000;
+  box-shadow:0 0 12px rgba(90,200,220,0.4);
+}
+
+.bs-btn.apk-btn{
+  background:var(--green);
+  box-shadow:0 0 8px rgba(51,255,85,0.2);
+}
+.bs-btn.apk-btn:hover{
+  background:#55ff72;
+  box-shadow:0 0 12px rgba(51,255,85,0.4);
+}
+
+.bs-btn.py-btn{
+  background:var(--panel);
+  border:1px solid var(--green);
+  color:var(--green);
+  box-shadow:none;
+}
+.bs-btn.py-btn:hover{
+  background:rgba(51,255,85,0.12);
+  color:var(--green);
+}
+
+/* ---------- main panel ---------- */
+.panel{
+  background:var(--panel);border:1px solid var(--line);
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);
+  position:relative;
+}
+.panel::before,.panel::after{
+  content:"";position:absolute;width:5px;height:5px;border-radius:50%;
+  background:var(--cyan-dim);
+}
+.panel::before{top:8px;left:8px}
+.panel::after{bottom:8px;right:8px}
+
+.panel-header-title{
+  padding:12px 16px;
+  background:rgba(255,255,255,0.015);
+  border-bottom:1px solid var(--line);
+  font-family:var(--mono);
+  font-size:13px;
+  font-weight:600;
+  color:var(--amber);
+  letter-spacing:.08em;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;
+}
+.breadcrumb{font-family:var(--mono);font-size:13px;color:var(--dim);
+  display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0}
+.breadcrumb button{
+  background:none;border:none;color:var(--dim);font-family:var(--mono);
+  font-size:13px;cursor:pointer;padding:2px 4px;
+}
+.breadcrumb button:hover,.breadcrumb button:last-child{color:var(--cyan)}
+.breadcrumb .sep{color:var(--faint)}
+
+.search-box{
+  position:relative;
+  display:flex;
+  align-items:center;
+}
+.search-box input{
+  background:var(--bg);
+  border:1px solid var(--line);
+  color:var(--fg);
+  font-family:var(--mono);
+  font-size:12px;
+  padding:6px 10px 6px 26px;
+  width:160px;
+  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
+}
+.search-box input:focus{outline:none;border-color:var(--cyan);width:200px;transition:width .2s}
+.search-icon{position:absolute;left:8px;color:var(--faint);font-size:11px;pointer-events:none}
+
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.actions button,.upload-btn{
+  background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+  font-family:var(--sans);font-size:13px;padding:7px 12px;cursor:pointer;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  transition:border-color .15s,color .15s,background .15s;
+}
+.actions button:hover,.upload-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.actions button:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line) !important;color:var(--dim) !important}
+.actions button.btn-danger{border-color:rgba(255,77,77,0.4);color:var(--red)}
+.actions button.btn-danger:hover:not(:disabled){border-color:var(--red);background:rgba(255,77,77,0.1)}
+.upload-btn{display:inline-block}
+#btnUp{padding:7px 10px}
+
+/* Multi-select bar */
+.batch-bar{
+  background:rgba(90,200,220,0.06);
+  border-bottom:1px solid var(--cyan-dim);
+  padding:8px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--cyan);
+}
+
+.dropzone{position:relative;min-height:220px;overflow-x:auto}
+.dropzone.drag::before{
+  content:"release to upload";
+  position:absolute;inset:6px;z-index:5;
+  display:flex;align-items:center;justify-content:center;
+  border:1px dashed var(--cyan);color:var(--cyan);
+  font-family:var(--mono);font-size:13px;letter-spacing:.05em;
+  background:rgba(90,200,220,.06);
+}
+
+.filelist{width:100%;border-collapse:collapse}
+.filelist th{
+  padding:8px 12px;
+  text-align:left;
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--dim);
+  border-bottom:1px solid var(--line);
+  background:rgba(0,0,0,0.2);
+  user-select:none;
+}
+.filelist td{padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
+.filelist tr:last-child td{border-bottom:none}
+.filelist tr.row:hover{background:rgba(255,255,255,.02)}
+.filelist tr.selected{background:rgba(90,200,220,0.05)}
+
+.f-chk{width:28px;text-align:center}
+.f-chk input{cursor:pointer;accent-color:var(--cyan)}
+.f-icon{width:26px;color:var(--dim);font-family:var(--mono);text-align:center}
+.f-icon.dir{color:var(--amber)}
+.f-icon.txt{color:var(--cyan)}
+.f-name{cursor:pointer;color:var(--fg);word-break:break-all}
+.f-name.dir{color:var(--amber);font-weight:600}
+.f-name:hover{color:var(--cyan)}
+.f-meta{color:var(--faint);font-family:var(--mono);font-size:12px;white-space:nowrap;text-align:right}
+.f-actions{text-align:right;white-space:nowrap;width:1%}
+.f-actions button{
+  background:none;border:1px solid transparent;color:var(--faint);
+  font-family:var(--mono);font-size:12px;padding:4px 7px;cursor:pointer;margin-left:3px;
+  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
+}
+.f-actions button:hover{color:var(--fg);border-color:var(--line)}
+.f-actions button.danger:hover{color:var(--red);border-color:var(--red)}
+
+.empty-state{
+  padding:50px 16px;text-align:center;color:var(--faint);
+  font-family:var(--mono);font-size:13px;letter-spacing:.03em;
+}
+
+/* ---------- details modal ---------- */
+.details-grid{
+  display:grid;
+  grid-template-columns:120px 1fr;
+  gap:8px 12px;
+  font-family:var(--mono);
+  font-size:12px;
+}
+.details-grid .lbl{color:var(--dim);text-align:right}
+.details-grid .val{color:var(--fg);word-break:break-all}
+
+/* ---------- modal ---------- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(4,5,7,.85);
+  backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;
+}
+.modal{
+  background:var(--panel);border:1px solid var(--cyan-dim);width:100%;max-width:480px;
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
+  box-shadow:0 10px 30px rgba(0,0,0,0.5);
+}
+.modal-header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 16px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:13px;color:var(--cyan);
+}
+.modal-header button{background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;line-height:1}
+.modal-header button:hover{color:var(--fg)}
+.modal-body{padding:16px}
+.modal-body input[type=text]{
+  width:100%;background:var(--bg);border:1px solid var(--line);color:var(--fg);
+  font-family:var(--mono);font-size:14px;padding:9px 10px;
+}
+.modal-body input[type=text]:focus{outline:1px solid var(--cyan);border-color:var(--cyan)}
+.modal-body label{display:block;font-size:12px;color:var(--dim);margin-bottom:6px;font-family:var(--mono)}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+.modal-footer button,.modal-footer .primary{
+  font-family:var(--sans);font-size:13px;padding:8px 14px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px);
+  transition:background .15s, border-color .15s, color .15s;
+}
+.modal-footer .primary{border-color:var(--cyan);color:var(--cyan)}
+.modal-footer .primary:hover{background:rgba(90,200,220,.12)}
+.err-msg{color:var(--red);font-size:12px;font-family:var(--mono);min-height:16px;margin-top:8px}
+
+.editor-modal{max-width:720px}
+#editorArea{
+  width:100%;min-height:340px;background:var(--bg);border:1px solid var(--line);
+  color:var(--fg);font-family:var(--mono);font-size:13px;padding:12px;resize:vertical;
+}
+#editorArea:focus{outline:1px solid var(--cyan)}
+#editorFilename{color:var(--fg)}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+  background:var(--panel);border:1px solid var(--green);color:var(--green);
+  font-family:var(--mono);font-size:13px;padding:10px 18px;z-index:200;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.4);
+}
+.toast.err{border-color:var(--red);color:var(--red)}
+
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+
+@media (max-width:720px){
+  .basestation-card{flex-direction:column;align-items:flex-start}
+  .bs-actions{width:100%;justify-content:flex-start}
+  .bs-btn{flex:1;justify-content:center}
+  .toolbar{flex-direction:column;align-items:stretch}
+  .actions{justify-content:flex-start}
+  .search-box input{width:100%}
+  .search-box input:focus{width:100%}
+  .f-meta{display:none}
+  .main-title{font-size:18px}
+}
+@media (prefers-reduced-motion:reduce){
+  .led-dot{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hero Header -->
+  <header class="hero-banner">
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <div class="hero-top-bar">
+        <div class="lab-tag">
+          <img src="https://i.ibb.co/zHfgwY1t/spdwfactory-logo.png" alt="SPDW Factory Logo" class="factory-logo">
+          <span>SPDW Factory Lab</span>
+        </div>
+        <div class="hero-symbols">
+          <img src="https://i.ibb.co/3y8mvcLG/spdw-symbol.png" alt="SPDW Symbol" class="sym-img" title="SPDW Symbol">
+          <img src="https://i.ibb.co/xq9H5Fqd/minoru-symbol.png" alt="Minoru Symbol" class="sym-img" title="Minoru Symbol">
+        </div>
+      </div>
+
+      <h1 class="main-title">VOID <span class="accent">//</span> "Direct Link" <span class="sub-rt">Rt:SERVER</span></h1>
+
+      <div class="status-indicator">
+        <span class="led-dot green" id="ledDot"></span>
+        <span class="status-text green" id="statusText">ONLINE</span>
+        <span class="status-ping" id="statusPing">(LATENCY: --ms)</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="barcode" id="barcode"></div>
+
+  <!-- Companions Section -->
+  <div class="companions-container">
+    
+    <!-- VOID BaseStation (PC) -->
+    <div class="basestation-card">
+      <div class="bs-left">
+        <div class="bs-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </div>
+        <div class="bs-info">
+          <div class="bs-title">
+            VOID BaseStation
+            <span class="badge">DESKTOP COMPANION</span>
+          </div>
+          <div class="bs-desc">
+            Download the official desktop tool to connect your handheld device and PC workstation seamlessly.
+          </div>
+        </div>
+      </div>
+      <div class="bs-actions">
+        <a class="bs-btn" href="/basestation.py" download>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Direct Download (.py)
+        </a>
+      </div>
+    </div>
+
+    <!-- AndroidStation (Android) -->
+    <div class="basestation-card android-card">
+      <div class="bs-left">
+        <div class="bs-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+          </svg>
+        </div>
+        <div class="bs-info">
+          <div class="bs-title">
+            AndroidStation
+            <span class="badge">ANDROID COMPANION</span>
+          </div>
+          <div class="bs-desc">
+            Download the Android companion to bridge handhelds and mobile devices to the VOID environment.
+          </div>
+        </div>
+      </div>
+      <div class="bs-actions">
+        <a class="bs-btn apk-btn" href="/androidstation.apk" download>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Download APK
+        </a>
+        <a class="bs-btn py-btn" href="/androidstation.py" download>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          Download PY Script
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Single File Management Panel -->
+  <div class="panel">
+    <div class="panel-header-title">
+      <span>FILES FROM THE VOID</span>
+      <span id="fileCountBadge" style="font-size:11px;color:var(--dim);font-weight:normal">0 items</span>
+    </div>
+
+    <div class="toolbar">
+      <div class="breadcrumb" id="breadcrumb"></div>
+      
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search files...">
+      </div>
+
+      <div class="actions">
+        <button id="btnUp" title="Parent Folder">↑</button>
+        <button id="btnNewFolder">+ Folder</button>
+        <button id="btnNewFile">+ File</button>
+        <label class="upload-btn">Upload
+          <input type="file" id="fileInput" multiple hidden>
+        </label>
+        <button id="btnBatchDelete" class="btn-danger" disabled title="Delete selected items">
+          Delete (<span id="selectedCount">0</span>)
+        </button>
+      </div>
+    </div>
+
+    <div class="batch-bar" id="batchBar" hidden>
+      <span><strong id="batchSelectedText">0</strong> items selected</span>
+      <div>
+        <button id="btnDeselectAll" style="background:none;border:none;color:var(--dim);cursor:pointer;font-family:var(--mono);font-size:11px;">Deselect All</button>
+      </div>
+    </div>
+
+    <div class="dropzone" id="dropzone">
+      <table class="filelist">
+        <thead>
+          <tr>
+            <th class="f-chk"><input type="checkbox" id="chkSelectAll" title="Select All"></th>
+            <th style="width: 30px;"></th>
+            <th>NAME</th>
+            <th style="text-align: right;">INFO / MODIFIED</th>
+            <th style="text-align: right;">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="filelistBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" hidden></div>
+    </div>
+  </div>
+</div>
+
+<!-- Prompt Modal -->
+<div class="modal-overlay" id="promptOverlay" hidden role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header"><span id="promptTitle">New</span>
+      <button id="promptClose" aria-label="Close">&times;</button></div>
+    <div class="modal-body">
+      <label id="promptLabel" for="promptInput">Name</label>
+      <input type="text" id="promptInput" autocomplete="off">
+      <div class="err-msg" id="promptErr"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="promptCancel">Cancel</button>
+      <button class="primary" id="promptOk">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal-overlay" id="detailsOverlay" hidden role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <span>FILE DETAILS</span>
+      <button id="detailsClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="details-grid" id="detailsGrid"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="detailsOk" class="primary">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Editor Modal -->
+<div class="modal-overlay" id="editorOverlay" hidden role="dialog" aria-modal="true">
+  <div class="modal editor-modal">
+    <div class="modal-header"><span id="editorFilename"></span>
+      <button id="editorClose" aria-label="Close">&times;</button></div>
+    <div class="modal-body">
+      <textarea id="editorArea" spellcheck="false"></textarea>
+      <div class="err-msg" id="editorErr"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="editorCancel">Close</button>
+      <button class="primary" id="editorSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+
+var state = { area: "in", path: "", selected: new Set(), currentEntries: [], filterQuery: "" };
+var editing = null;
+
+function $(id){ return document.getElementById(id); }
+
+function buildBarcode(){
+  var el = $("barcode"); var seed = Date.now();
+  var bars = [];
+  for (var i = 0; i < 75; i++){
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    var w = 1 + (seed % 3);
+    var h = 5 + (seed % 12);
+    bars.push('<span style="width:'+w+'px;height:'+h+'px"></span>');
+  }
+  el.innerHTML = bars.join("");
+}
+
+function updateServerStatus(online, latency){
+  var dot = $("ledDot");
+  var txt = $("statusText");
+  var ping = $("statusPing");
+  
+  if (online){
+    dot.className = "led-dot green";
+    txt.className = "status-text green";
+    txt.textContent = "ONLINE";
+    ping.textContent = "(LATENCY: " + (latency || 0) + "ms)";
+  } else {
+    dot.className = "led-dot red";
+    txt.className = "status-text red";
+    txt.textContent = "DISCONNECTED";
+    ping.textContent = "(NO RESPONSE)";
+  }
+}
+
+function toast(msg, isErr){
+  var t = $("toast");
+  t.textContent = msg;
+  t.className = "toast" + (isErr ? " err" : "");
+  t.hidden = false;
+  clearTimeout(t._h);
+  t._h = setTimeout(function(){ t.hidden = true; }, isErr ? 5500 : 2600);
+}
+
+window.addEventListener("error", function(e){
+  toast("Script error: " + (e.message || "Unknown"), true);
+});
+window.addEventListener("unhandledrejection", function(e){
+  var m = (e.reason && e.reason.message) ? e.reason.message : String(e.reason);
+  toast("Error: " + m, true);
+});
+
+function api(method, url, body){
+  var startTime = Date.now();
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 12000) : null;
+  return fetch(url, {
+    method: method,
+    headers: body ? {"Content-Type":"application/x-www-form-urlencoded"} : undefined,
+    body: body,
+    signal: ctrl ? ctrl.signal : undefined
+  }).catch(function(err){
+    updateServerStatus(false);
+    if (err && err.name === "AbortError"){
+      throw new Error("Device non-responsive (request timed out after 12s)");
+    }
+    throw new Error("Connection failed: " + err.message);
+  }).then(function(r){
+    var latency = Date.now() - startTime;
+    updateServerStatus(true, latency);
+    return r.json().catch(function(){ return {}; }).then(function(j){
+      if (!r.ok || j.error) throw new Error(j.error || ("Error " + r.status));
+      return j;
+    });
+  }).finally(function(){ if (timer) clearTimeout(timer); });
+}
+
+function fmtSize(n){
+  if (n === undefined || n === null) return "N/A";
+  if (n < 1024) return n + " B";
+  if (n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+  return (n/1024/1024).toFixed(1) + " MB";
+}
+
+function fmtTime(ts){
+  if (!ts) return "N/A";
+  var d = new Date(ts * 1000);
+  var p = function(n){ return (n < 10 ? "0" : "") + n; };
+  return d.getFullYear() + "-" + p(d.getMonth()+1) + "-" + p(d.getDate()) +
+    " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+
+var TXT_ICON = "≡", DIR_ICON = "▸", BIN_ICON = "•";
+
+function renderBreadcrumb(){
+  var el = $("breadcrumb");
+  var parts = state.path ? state.path.split("/") : [];
+  var html = '<button data-p="">VOID</button>';
+  var acc = "";
+  for (var i = 0; i < parts.length; i++){
+    acc = acc ? acc + "/" + parts[i] : parts[i];
+    html += '<span class="sep">/</span><button data-p="'+acc.replace(/"/g,"&quot;")+'">'+parts[i]+'</button>';
+  }
+  el.innerHTML = html;
+  Array.prototype.forEach.call(el.querySelectorAll("button"), function(b){
+    b.onclick = function(){ state.path = b.getAttribute("data-p"); load(); };
+  });
+}
+
+function updateSelectionUI(){
+  var count = state.selected.size;
+  $("selectedCount").textContent = count;
+  $("btnBatchDelete").disabled = count === 0;
+  $("batchBar").hidden = count === 0;
+  $("batchSelectedText").textContent = count;
+  
+  var visibleRows = state.currentEntries.filter(matchesFilter);
+  var allSelected = visibleRows.length > 0 && visibleRows.every(function(e){ return state.selected.has(e.name); });
+  $("chkSelectAll").checked = allSelected;
+}
+
+function matchesFilter(entry){
+  if (!state.filterQuery) return true;
+  return entry.name.toLowerCase().indexOf(state.filterQuery.toLowerCase()) !== -1;
+}
+
+function renderList(entries){
+  state.currentEntries = entries || [];
+  var body = $("filelistBody");
+  body.innerHTML = "";
+  
+  var filtered = state.currentEntries.filter(matchesFilter);
+  
+  $("fileCountBadge").textContent = filtered.length + " items";
+  $("emptyState").hidden = filtered.length > 0;
+  
+  if (!filtered.length){
+    $("emptyState").textContent = state.filterQuery ? 
+      "No matching files found" : 
+      "Folder is empty — drag files here or create new content";
+  }
+
+  filtered.forEach(function(e){
+    var tr = document.createElement("tr");
+    tr.className = "row" + (state.selected.has(e.name) ? " selected" : "");
+    var iconCls = e.type === "dir" ? "dir" : (e.editable ? "txt" : "");
+    var icon = e.type === "dir" ? DIR_ICON : (e.editable ? TXT_ICON : BIN_ICON);
+    var nameCls = e.type === "dir" ? "f-name dir" : "f-name";
+    
+    tr.innerHTML =
+      '<td class="f-chk"><input type="checkbox" class="row-chk" '+(state.selected.has(e.name) ? 'checked' : '')+'></td>' +
+      '<td class="f-icon '+iconCls+'">'+icon+'</td>' +
+      '<td class="'+nameCls+'"></td>' +
+      '<td class="f-meta">'+(e.type==="dir" ? "DIR" : fmtSize(e.size))+' &middot; '+fmtTime(e.mtime)+'</td>' +
+      '<td class="f-actions"></td>';
+      
+    tr.querySelector(".f-name").textContent = e.name;
+
+    var chk = tr.querySelector(".row-chk");
+    chk.onclick = function(ev){
+      ev.stopPropagation();
+      if (chk.checked) state.selected.add(e.name);
+      else state.selected.delete(e.name);
+      tr.classList.toggle("selected", chk.checked);
+      updateSelectionUI();
+    };
+
+    var nameEl = tr.querySelector(".f-name");
+    nameEl.onclick = function(){
+      if (e.type === "dir"){
+        state.path = joinPath(e.name);
+        load();
+      } else if (e.editable){
+        openEditor(e.name);
+      } else {
+        downloadEntry(e.name);
+      }
+    };
+
+    var actions = tr.querySelector(".f-actions");
+
+    var infoBtn = document.createElement("button");
+    infoBtn.textContent = "ℹ";
+    infoBtn.title = "Details";
+    infoBtn.onclick = function(ev){
+      ev.stopPropagation();
+      showDetails(e);
+    };
+    actions.appendChild(infoBtn);
+
+    if (e.type !== "dir"){
+      var dl = document.createElement("button");
+      dl.textContent = "download";
+      dl.onclick = function(ev){ ev.stopPropagation(); downloadEntry(e.name); };
+      actions.appendChild(dl);
+    }
+
+    var del = document.createElement("button");
+    del.textContent = "delete";
+    del.className = "danger";
+    del.onclick = function(ev){
+      ev.stopPropagation();
+      if (!confirm('Delete "' + e.name + '"?')) return;
+      deleteSingle(e.name);
+    };
+    actions.appendChild(del);
+
+    body.appendChild(tr);
+  });
+
+  updateSelectionUI();
+}
+
+function showDetails(entry){
+  var grid = $("detailsGrid");
+  var ext = entry.name.indexOf(".") !== -1 ? entry.name.split(".").pop().toUpperCase() : "None";
+  grid.innerHTML =
+    '<div class="lbl">Name:</div><div class="val">'+entry.name+'</div>' +
+    '<div class="lbl">Path:</div><div class="val">'+(joinPath(entry.name) || '/')+'</div>' +
+    '<div class="lbl">Type:</div><div class="val">'+(entry.type === 'dir' ? 'Folder' : 'File (' + ext + ')')+'</div>' +
+    '<div class="lbl">Size:</div><div class="val">'+(entry.type === 'dir' ? 'N/A' : entry.size + ' B (' + fmtSize(entry.size) + ')')+'</div>' +
+    '<div class="lbl">Modified:</div><div class="val">'+fmtTime(entry.mtime)+'</div>' +
+    '<div class="lbl">Editable:</div><div class="val">'+(entry.editable ? 'Yes (Text File)' : 'No (Binary)')+'</div>';
+  $("detailsOverlay").hidden = false;
+}
+$("detailsClose").onclick = function(){ $("detailsOverlay").hidden = true; };
+$("detailsOk").onclick = function(){ $("detailsOverlay").hidden = true; };
+
+function deleteSingle(name){
+  var body = new URLSearchParams({area: state.area, path: joinPath(name)});
+  api("POST", "/api/delete", body).then(function(){
+    state.selected.delete(name);
+    toast("Item deleted"); 
+    load(); 
+  }).catch(function(e){ toast(e.message, true); });
+}
+
+function batchDelete(){
+  var items = Array.from(state.selected);
+  if (!items.length) return;
+  if (!confirm('Are you sure you want to delete ' + items.length + ' selected item(s)?')) return;
+
+  var chain = Promise.resolve();
+  var count = 0;
+  items.forEach(function(name){
+    chain = chain.then(function(){
+      var body = new URLSearchParams({area: state.area, path: joinPath(name)});
+      return api("POST", "/api/delete", body).then(function(){
+        count++;
+        state.selected.delete(name);
+      });
+    });
+  });
+
+  chain.then(function(){
+    toast("Successfully deleted " + count + " items");
+    load();
+  }).catch(function(e){
+    toast("Deletion error: " + e.message, true);
+    load();
+  });
+}
+
+$("btnBatchDelete").onclick = batchDelete;
+
+$("chkSelectAll").onclick = function(ev){
+  var checked = ev.target.checked;
+  state.currentEntries.filter(matchesFilter).forEach(function(e){
+    if (checked) state.selected.add(e.name);
+    else state.selected.delete(e.name);
+  });
+  renderList(state.currentEntries);
+};
+
+$("btnDeselectAll").onclick = function(){
+  state.selected.clear();
+  renderList(state.currentEntries);
+};
+
+$("searchInput").oninput = function(ev){
+  state.filterQuery = ev.target.value.trim();
+  renderList(state.currentEntries);
+};
+
+function joinPath(name){
+  return state.path ? state.path + "/" + name : name;
+}
+
+function downloadEntry(name){
+  var url = "/api/download?area=" + encodeURIComponent(state.area) +
+    "&path=" + encodeURIComponent(joinPath(name));
+  window.location = url;
+}
+
+function load(){
+  renderBreadcrumb();
+  api("GET", "/api/list?area=" + encodeURIComponent(state.area) +
+    "&path=" + encodeURIComponent(state.path))
+    .then(function(j){ renderList(j.entries || []); })
+    .catch(function(e){ toast(e.message, true); });
+}
+
+$("btnUp").onclick = function(){
+  if (!state.path) return;
+  var parts = state.path.split("/"); parts.pop();
+  state.path = parts.join("/"); load();
+};
+
+/* ---- upload ---- */
+function uploadFiles(files){
+  var list = Array.prototype.slice.call(files);
+  if (!list.length) return;
+  var label = document.querySelector(".upload-btn");
+  var prevLabel = label.textContent;
+  var chain = Promise.resolve();
+  list.forEach(function(file, idx){
+    chain = chain.then(function(){
+      label.textContent = "Uploading " + (idx + 1) + "/" + list.length + "…";
+      var fd = new FormData();
+      fd.append("file", file, file.name);
+      var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 20000) : null;
+      return fetch("/api/upload?area=" + encodeURIComponent(state.area) +
+        "&path=" + encodeURIComponent(state.path),
+        { method:"POST", body:fd, signal: ctrl ? ctrl.signal : undefined })
+        .catch(function(err){
+          throw new Error(err.name === "AbortError" ?
+            "Upload of \"" + file.name + "\" timed out" : err.message);
+        })
+        .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){
+          if (!r.ok || j.error) throw new Error((j.error || "Upload failed") + ": " + file.name);
+        }); })
+        .finally(function(){ if (timer) clearTimeout(timer); });
+    });
+  });
+  chain.then(function(){ toast("Upload complete"); load(); })
+    .catch(function(e){ toast(e.message, true); })
+    .finally(function(){ label.textContent = prevLabel; });
+}
+$("fileInput").onchange = function(ev){ uploadFiles(ev.target.files); ev.target.value = ""; };
+
+var dz = $("dropzone");
+["dragenter","dragover"].forEach(function(ev){
+  dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add("drag"); });
+});
+["dragleave","drop"].forEach(function(ev){
+  dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.remove("drag"); });
+});
+dz.addEventListener("drop", function(e){
+  if (e.dataTransfer && e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
+});
+
+/* ---- name prompt ---- */
+var promptMode = null;
+function openPrompt(mode){
+  promptMode = mode;
+  $("promptTitle").textContent = mode === "dir" ? "New Folder" : "New File";
+  $("promptLabel").textContent = mode === "dir" ? "Folder Name" : "File Name (e.g., notes.txt)";
+  $("promptOk").textContent = "Create";
+  $("promptInput").value = "";
+  $("promptErr").textContent = "";
+  $("promptOverlay").hidden = false;
+  setTimeout(function(){ $("promptInput").focus(); }, 50);
+}
+function closePrompt(){ $("promptOverlay").hidden = true; }
+$("promptClose").onclick = closePrompt;
+$("promptCancel").onclick = closePrompt;
+$("promptOverlay").addEventListener("click", function(e){ if (e.target === this) closePrompt(); });
+$("btnNewFolder").onclick = function(){ openPrompt("dir"); };
+$("btnNewFile").onclick = function(){ openPrompt("file"); };
+$("promptInput").addEventListener("keydown", function(e){ if (e.key === "Enter") $("promptOk").click(); });
+$("promptOk").onclick = function(){
+  var name = $("promptInput").value.trim();
+  if (!name){ $("promptErr").textContent = "Please enter a valid name"; return; }
+  var btn = $("promptOk");
+  btn.disabled = true;
+  btn.textContent = "Creating…";
+  var endpoint = promptMode === "dir" ? "/api/mkdir" : "/api/newfile";
+  var body = new URLSearchParams({area: state.area, path: state.path, name: name, content: ""});
+  api("POST", endpoint, body).then(function(j){
+    closePrompt();
+    load();
+    if (promptMode === "file") openEditor(j.name);
+    else toast("Folder created");
+  }).catch(function(e){ $("promptErr").textContent = e.message; })
+    .finally(function(){ btn.disabled = false; btn.textContent = "Create"; });
+};
+
+/* ---- text editor ---- */
+function openEditor(name){
+  var p = joinPath(name);
+  editing = null;
+  $("editorFilename").textContent = name + " (Loading…)";
+  $("editorArea").value = "";
+  $("editorArea").disabled = true;
+  $("editorErr").textContent = "";
+  $("editorOverlay").hidden = false;
+  api("GET", "/api/read?area=" + encodeURIComponent(state.area) +
+    "&path=" + encodeURIComponent(p))
+    .then(function(j){
+      editing = { area: state.area, path: p };
+      $("editorFilename").textContent = name;
+      $("editorArea").value = j.content || "";
+      $("editorArea").disabled = false;
+      setTimeout(function(){ $("editorArea").focus(); }, 50);
+    })
+    .catch(function(e){
+      $("editorFilename").textContent = name;
+      $("editorErr").textContent = e.message;
+      $("editorArea").disabled = false;
+    });
+}
+function closeEditor(){ $("editorOverlay").hidden = true; editing = null; }
+$("editorClose").onclick = closeEditor;
+$("editorCancel").onclick = closeEditor;
+$("editorOverlay").addEventListener("click", function(e){ if (e.target === this) closeEditor(); });
+$("editorSave").onclick = function(){
+  if (!editing){
+    $("editorErr").textContent = "File not ready yet, please wait";
+    return;
+  }
+  var btn = $("editorSave");
+  btn.disabled = true;
+  var prevLabel = btn.textContent;
+  btn.textContent = "Saving…";
+  var body = new URLSearchParams({
+    area: editing.area, path: editing.path, content: $("editorArea").value
+  });
+  api("POST", "/api/write", body).then(function(){
+    toast("File saved"); closeEditor(); load();
+  }).catch(function(e){
+    $("editorErr").textContent = e.message;
+  }).finally(function(){
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  });
+};
+
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape"){ 
+    closePrompt(); 
+    closeEditor(); 
+    $("detailsOverlay").hidden = true; 
+  }
+});
+
+buildBarcode();
+load();
+})();
+</script>
+</body>
+</html>
