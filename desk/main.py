@@ -1,7 +1,171 @@
+# ============================================================================
+#  VOID DESK 10-NEXUS — INDEX
+#  Navigation Map: every section tagged by Hub + NEXUS subsystem
+#  Legend: [CODE] Title  //  HUB: Name  |  NEXUS subsystem
+# ============================================================================
+#
+#  [00  ] HEADER & METADATA
+#  [A   ] IMPORTS & MODULE LOADING
+#  [B   ] GLOBAL CONSTANTS & COLOR PALETTES
+#      └── [B1   ] Screen Dimensions & Base Colors
+#      └── [B2   ] CLI Accent Palettes
+#      └── [B3   ] Theme Accents & Secondary Tints
+#      └── [B4   ] NEXUS Node Colors & Rail Codes  [NEXUS]
+#      └── [B5   ] NEXUS Ring Radii, Orbit Speeds, Tilts  [NEXUS]
+#      └── [B6   ] NEXUS Node Decorations (Dust/Signal/Moonlet)  [NEXUS]
+#  [C   ] DATA STRUCTURES & CONFIGURATION TABLES
+#      └── [C1   ] HUBS Definition (FORGE, UPLINK, MEDIA, WORKSHOP, TOOLBOX, INFO, SETTINGS)
+#      └── [C2   ] CYCLES (User-togglable Settings)
+#      └── [C3   ] Keyboard Layouts & OSK Pages
+#      └── [C4   ] Home Styles & Clock Layouts
+#      └── [C5   ] NEXUS Planet Asset Files  [NEXUS]
+#      └── [C6   ] Radio Stations & URL Migrations  [MEDIA VAULT]
+#      └── [C7   ] Notification Kinds & Colors
+#      └── [C8   ] RSS Categories & Feed Library  [RT:TOOLBOX]
+#      └── [C9   ] Weather WMO Codes & Country Mapping  [RT:TOOLBOX]
+#      └── [C10  ] Catalog Components (Void Installer APT Catalogue)  [FORGE]
+#      └── [C11  ] Feature Dependencies & CLI Tools Registry  [FORGE]
+#  [D   ] UTILITY FUNCTIONS
+#      └── [D1   ] Theme Secondary Color Calculator
+#      └── [D2   ] Chroot Path Resolver (symlink-aware)
+#      └── [D3   ] Human-readable Sizes & Disk Free
+#      └── [D4   ] Battery & System Info Helpers
+#      └── [D5   ] Doppel-Defender Normalization Engine  [WORKSHOP]
+#      └── [D6   ] Terminal ID Generator
+#  [E   ] CLASS APP — CORE APPLICATION
+#      └── [E1   ] __init__ — Initialization, Config Loading, Boot Sequence
+#      └── [E2   ] i18n — Translation Engine (t/tx)
+#      └── [E3   ] Menu Rebuilder (Home / MUOS Apps / Media / Forge / Toolbox / Uplink / Workshop / Settings / Info / Exit)
+#  [F   ] SPDW/BLAME! VISUAL SYSTEM & NEXUS RENDERER
+#      └── [F1   ] Font Builder (4 Scales)
+#      └── [F2   ] Forge Background (Hot Metal Grid + Embers)  [FORGE]
+#      └── [F3   ] CLI Background (Phosphor Green Grid)  [FORGE]
+#      └── [F4   ] Main Megastructure Background (BLAME! Style)
+#      └── [F5   ] NEXUS Orbit Renderer (Rings, Nodes, Planets, Zoom, Pan)  [NEXUS]
+#      └── [F6   ] NEXUS Node Decorations (Rings, Dust, Signal Pulses, Moonlets)  [NEXUS]
+#      └── [F7   ] NEXUS Selection Zone & Hover Detection  [NEXUS]
+#      └── [F8   ] NEXUS Background Animation (Orbital Drift)  [NEXUS]
+#      └── [F9   ] NEXUS Text Panels & Node Labels  [NEXUS]
+#      └── [F10  ] Scanlines, Vignette, Grain Overlay
+#      └── [F11  ] Hazard Stripes & Cable Decorations
+#  [G   ] AUDIO ENGINE & SFX
+#      └── [G1   ] Boot Jingle Synthesizer
+#      └── [G2   ] UI Sound Effects (Open/Back/Move/Snap/Click/Off)
+#      └── [G3   ] Hub Entry Sounds
+#  [H   ] STATE MANAGEMENT & TRANSITIONS
+#      └── [H1   ] Push State (Window Open Animation)
+#      └── [H2   ] Pop State (Window Close Animation)
+#      └── [H3   ] CRT Power-Off Sequence  [END SESSION]
+#      └── [H4   ] Home Scroll & Selection Visibility  [NEXUS]
+#  [I   ] HUB ACTION ROUTER
+#      └── [I1   ] FORGE Hub — Installer, Autostart, Update, CLI Tools  [FORGE]
+#      └── [I2   ] WORKSHOP Hub — Stats, Diag, Monitor, Storage, Boost, CHD, Doppel, Logs, Backup  [WORKSHOP]
+#      └── [I3   ] UPLINK Hub — WiFi, Hotspot, BT, PC Uplink, BaseStation, Tailscale, NetDiag  [UPLINK]
+#      └── [I4   ] MEDIA VAULT Hub — Radio, VoidCast, Library, BGM Normalizer  [MEDIA VAULT]
+#      └── [I5   ] CONTROLLER HUB — Mapping, Devices, Profiles, External Controllers  [UPLINK]
+#      └── [I6   ] RT:TOOLBOX Hub — Shell, Clock, Calc, Calendar, Notes, RSS, Weather, FileMan, FTP, Sync, Editor, Python  [RT:TOOLBOX]
+#      └── [I7   ] INFO & ABOUT Hub — About, Manual, Guide, Manifesto, Update  [INFO & ABOUT]
+#  [J   ] FORGE: VOID INSTALLER & PACKAGE MANAGER  //  HUB: FORGE
+#      └── [J1   ] Component Status Scanner  [FORGE]
+#      └── [J2   ] Install / Remove / Autostart / Update Actions  [FORGE]
+#      └── [J3   ] Apt Cache Cleaner  [FORGE]
+#      └── [J4   ] CHD Batch Converter  [WORKSHOP]
+#  [K   ] UPLINK: CONNECTIVITY SUITE  //  HUB: UPLINK
+#      └── [K1   ] WiFi Manager (wpa_cli + iw fallback)  [UPLINK]
+#      └── [K2   ] Hotspot Manager (hostapd + dnsmasq)  [UPLINK]
+#      └── [K3   ] Bluetooth Manager (bluetoothctl + hci)  [UPLINK]
+#      └── [K4   ] PC Uplink Client (PcClient, auto-connect, stats)  [UPLINK]
+#      └── [K5   ] BaseStation Web Server (HTTP upload/download/file manager)  [UPLINK]
+#      └── [K6   ] Tailscale Native Panel (ts_cli, netcheck, status, QR login)  [UPLINK]
+#      └── [K7   ] Network Probe (internet test, IP, gateway)  [UPLINK]
+#  [L   ] MEDIA VAULT: AUDIO/VIDEO SYSTEM  //  HUB: MEDIA VAULT
+#      └── [L1   ] Void Radio — Built-in Stations, Favorites, Search, mpv Backend  [MEDIA VAULT]
+#      └── [L2   ] VoidCast IPTV Launcher  [MEDIA VAULT]
+#      └── [L3   ] Media Library Browser  [MEDIA VAULT]
+#      └── [L4   ] BGM Normalizer (ffmpeg loudnorm, 2-pass/1-pass/simple)  [MEDIA VAULT]
+#  [M   ] WORKSHOP: MAINTENANCE & DIAGNOSTICS  //  HUB: WORKSHOP
+#      └── [M1   ] Device Stats (CPU, RAM, Temp, Net, Storage)  [WORKSHOP]
+#      └── [M2   ] Void Diag — Image & Session Health Scanner  [WORKSHOP]
+#      └── [M3   ] Void Monitor — Live CPU/RAM/Net/Temp Graphs  [WORKSHOP]
+#      └── [M4   ] Storage Analysis (Partitions, Usage)  [WORKSHOP]
+#      └── [M5   ] Chou Henka — Swap & Governor Boost  [WORKSHOP]
+#      └── [M6   ] Disc Crusher — CHD Image Conversion (cue/gdi -> chd)  [WORKSHOP]
+#      └── [M7   ] Doppel-Defender — Duplicate ROM Finder  [WORKSHOP]
+#      └── [M8   ] Log Registry & Viewer  [WORKSHOP]
+#      └── [M9   ] Image Backup (gzip compress/restore)  [WORKSHOP]
+#  [N   ] RT:TOOLBOX: UTILITIES  //  HUB: RT:TOOLBOX
+#      └── [N1   ] Calculator (Basic / Scientific / Rintro)  [RT:TOOLBOX]
+#      └── [N2   ] Clock (Classic / Minimal / Segmented / Analog / Skeleton / Pilot)  [RT:TOOLBOX]
+#      └── [N3   ] Calendar & Events  [RT:TOOLBOX]
+#      └── [N4   ] Notes (Pinned Cards, 3-Column Layout)  [RT:TOOLBOX]
+#      └── [N5   ] RSS Reader (Built-in + Custom Feeds, ENG/ITA)  [RT:TOOLBOX]
+#      └── [N6   ] Weather (WMO codes, Weekly Forecast, City Search)  [RT:TOOLBOX]
+#      └── [N7   ] File Grid-Diver (File Manager)  [RT:TOOLBOX]
+#      └── [N8   ] FTP Client (Profiles, Download, Upload)  [RT:TOOLBOX]
+#      └── [N9   ] Syncthing Panel (REST API)  [RT:TOOLBOX]
+#      └── [N10  ] Rt:Shell (PTY Terminal with On-Screen Keyboard)  [RT:TOOLBOX]
+#      └── [N11  ] Python REPL (Host muOS)  [RT:TOOLBOX]
+#      └── [N12  ] Text Editor (VOID EDIT)  [RT:TOOLBOX]
+#  [O   ] MUOS APPS LAUNCHER  //  HUB: MUOS APPS
+#      └── [O1   ] App Discovery & Grid View  [MUOS APPS]
+#      └── [O2   ] Governor Per-App Override  [MUOS APPS]
+#      └── [O3   ] Glyph Manager & Archiver  [MUOS APPS]
+#  [P   ] SETTINGS HUB  //  HUB: SETTINGS
+#      └── [P1   ] Theme Color & Home Style  [SETTINGS]
+#      └── [P2   ] Font Scale & Text Size  [SETTINGS]
+#      └── [P3   ] VFX — Animated BG, Transitions, Screen FX  [SETTINGS]
+#      └── [P4   ] Language (App + Desktop)  [SETTINGS]
+#      └── [P5   ] Controller Profile & Button Mapping  [SETTINGS]
+#      └── [P6   ] Status Bar Icons (Battery, WiFi, BT, Volume, USB, Hotspot)  [SETTINGS]
+#      └── [P7   ] Boot Animation Toggle  [SETTINGS]
+#  [Q   ] INFO & ABOUT HUB  //  HUB: INFO & ABOUT
+#      └── [Q1   ] Project Info, Version, Credits  [INFO & ABOUT]
+#      └── [Q2   ] Technical Manual (Chapters)  [INFO & ABOUT]
+#      └── [Q3   ] Quick Controls Guide  [INFO & ABOUT]
+#      └── [Q4   ] Manifesto  [INFO & ABOUT]
+#      └── [Q5   ] Void-Desk Update Checker (GitHub Releases)  [INFO & ABOUT]
+#  [R   ] END SESSION / SHUTDOWN HUB  //  HUB: END SESSION
+#      └── [R1   ] Shutdown Menu (Close, Restart App, Reboot, Poweroff)  [END SESSION]
+#      └── [R2   ] CRT Off Animation  [END SESSION]
+#  [S   ] OVERLAY PANELS
+#      └── [S1   ] TERMINAL ID PANEL (R2 Tablet — Device Identity, Operator, Theme, Version)
+#      └── [S2   ] NET-SPHERE MONITOR (L2 Panel — WiFi, BT, Hotspot, PC Link, USB Status)  [UPLINK]
+#      └── [S3   ] Notification System (Queue, Cards, Cables, Icons)
+#      └── [S4   ] Media Panel (M — Controller Multimedia, Radio Controls)  [MEDIA VAULT]
+#  [T   ] CONTROLLER HUB  //  HUB: UPLINK
+#      └── [T1   ] Internal Controller — QJoyPad Mapping, Button Assignment, Stick Mouse  [UPLINK]
+#      └── [T2   ] External Controllers — USB HID & MIDI Device Discovery  [UPLINK]
+#      └── [T3   ] Controller Diagnostics (lsusb, ALSA, dmesg, modprobe)  [UPLINK]
+#      └── [T4   ] Binding Engine — Signal Capture, Command Execution, Presets  [UPLINK]
+#      └── [T5   ] Profile Save/Load/Delete  [UPLINK]
+#      └── [T6   ] Controller Listen Pump (Real-time Signal Processing)  [UPLINK]
+#  [U   ] HUB COLOR THEMING ENGINE
+#      └── [U1   ] NEXUS-to-Hub Color Mapping
+#      └── [U2   ] Per-Hub Accent & Secondary Color Assignment
+#      └── [U3   ] Environment Secondary Colors (XFCE / IceWM / LXDE)
+#  [V   ] MAIN LOOP & INPUT HANDLER
+#      └── [V1   ] Render Loop (60fps cap)
+#      └── [V2   ] Input Dispatcher (D-Pad, A/B/X/Y, L1/R1, L2/R2, SELECT, START, MENU, POWER)
+#      └── [V3   ] State-Specific Draw & Event Handlers
+#      └── [V4   ] NEXUS Home Draw & Input (Orbit Navigation, Node Selection)  [NEXUS]
+#      └── [V5   ] R2 / L2 Panel Triggers
+#      └── [V6   ] Notification & Media Panel Pump
+#      └── [V7   ] Auto-connect Background Threads (PC Link, BaseStation)  [UPLINK]
+#
+# ============================================================================
+
+
+# ============================================================================
+#  [00] HEADER & METADATA
+# ============================================================================
 # -*- coding: utf-8 -*-
 # ============================================================================
 #  VOIDDESK v10.0.0 "NEXUS" — pannello di controllo della suite Void per muOS
 #  Estetica SPDW FACTORY: cyberpunk manga grezzo, megastruttura alla BLAME!
+# ============================================================================
+
+# ============================================================================
+#  [A] IMPORTS & MODULE LOADING
 # ============================================================================
 import math
 import os
@@ -37,6 +201,8 @@ import jsmap           # noqa: E402
 import shell           # noqa: E402
 import sysinfo         # noqa: E402
 
+
+# --- [B1] Screen Dimensions & Base Colors ---
 W, H = 640, 480
 BG = (7, 8, 11)            # nero megastruttura
 PANEL = (18, 20, 26)       # lastra scura
@@ -44,6 +210,8 @@ LINE = (34, 38, 47)        # nervature della struttura
 INK = (2, 2, 4)            # china: piu' nero del fondo
 STEEL = (78, 86, 98)       # acciaio strutturale: mai un accento, sempre struttura
 STEEL_HI = (128, 138, 150) # riflesso freddo sull'acciaio, per il bevel
+
+# --- [B2] CLI Accent Palettes ---
 GRN = (60, 255, 110)        # fosforo verde: terminale retro, mondo a parte
 DGRN = (20, 90, 45)
 CLI_ACCENTS = {
@@ -53,6 +221,8 @@ CLI_ACCENTS = {
     "bianco": ((228, 228, 222), (86, 86, 82)),
 }
 FG = (233, 233, 226)       # bianco osso
+
+# --- [B3] Theme Accents & Secondary Tints ---
 DIM = (148, 150, 152)
 FAINT = (100, 103, 110)
 OK_G = (96, 225, 120)      # spunta: verde acceso
@@ -109,6 +279,8 @@ MUOS_TASK_ROOTS = os.environ.get(
 # v6.0: architettura a sezioni. Ogni hub e' dati puri: un solo gestore.
 # kind: push=apre stato, act=azione, cycle=valore ciclico, info=schermata info
 # --------------------------------------------------------------------------
+
+# --- [C1] HUBS Definition (FORGE, UPLINK, MEDIA, WORKSHOP, TOOLBOX, INFO, SETTINGS) ---
 HUBS = {
  "forge": ("forge", "h_forge", [
     ("installer", "pkg",     "f_inst",  "f_inst_s",  "act"),
@@ -175,6 +347,8 @@ HUBS = {
     ("voidupdate", "gear", "i_update", "i_update_s", "act"),
  ]),
 }
+
+# --- [C2] CYCLES (User-togglable Settings) ---
 CYCLES = {
     "dlang": ("desk_lang", ["system", "en_US", "it_IT", "de_DE",
                             "fr_FR", "es_ES", "pt_BR"]),
@@ -232,6 +406,8 @@ NEXUS_NODE_COLOR = {
     0: (255, 205, 120),    # START SESSION -- bianco/ambra
     3: (240, 90, 60),      # FORGE -- rosso/ambra
     5: (80, 205, 255),     # UPLINK -- ciano
+
+# --- [C3] Keyboard Layouts & OSK Pages ---
     2: (230, 80, 190),     # MEDIA VAULT -- magenta/teal
     6: (175, 110, 240),    # WORKSHOP -- viola/giallo
     4: (95, 210, 140),     # TOOLBOX -- verde/acciaio
@@ -256,6 +432,8 @@ NEXUS_PLANET_FILES = {
     "workshop": "workshop.png", "gear": "settings.png",
     "book": "info.png", "power": "end.png",
 }
+
+# --- [C4] Home Styles & Clock Layouts ---
 # fattore di schiacciamento verticale delle orbite per l'inquadratura
 # a 3/4: 1.0 sarebbe un cerchio piatto visto dritto dall'alto, piu'
 # si abbassa piu' il "tavolo" si inclina verso chi guarda
@@ -318,6 +496,8 @@ NOTIF_KINDS = {
                 "CRITICAL ALARM"),
     "system": ((170, 110, 220), "gear", "SISTEMA VOID", "VOID SYSTEM"),
 }
+
+# --- [C6] Radio Stations & URL Migrations // HUB: MEDIA VAULT ---
 RADIO_BUILTIN = [
     {"name": "SomaFM Groove Salad", "url":
      "https://ice1.somafm.com/groovesalad-128-mp3",
@@ -550,6 +730,8 @@ BT_MODULE = os.environ.get("VD_BT_MODULE", "rtl_btlpm")
 BTD_BIN = os.environ.get("VD_BTD_BIN",
                          "/usr/libexec/bluetooth/bluetoothd")
 
+
+# --- [C7] Notification Kinds & Colors ---
 def comp_color(c):
     """Complementare del tema, alzato se troppo scuro su fondo nero."""
     r, g, b = 255 - c[0], 255 - c[1], 255 - c[2]
@@ -594,6 +776,8 @@ WMO_CODES = {
 }
 WX_SEGMENTS = ["09", "15", "21"]
 
+
+# --- [C8] RSS Categories & Feed Library // HUB: RT:TOOLBOX ---
 RSS_CATS = {
     "news":    ("globe",    (196, 200, 208)),
     "tech":    ("gear",     (74, 206, 224)),
@@ -717,6 +901,8 @@ EXIT_XTERM = 17
 # Catalogo componenti: categorie -> voci
 #   (nome, pacchetti apt, descrizione, percorsi-prova nel chroot)
 # ---------------------------------------------------------------------------
+
+# --- [C9] Weather WMO Codes & Country Mapping // HUB: RT:TOOLBOX ---
 CATEGORIES = [
  ("BASE / DRIVER", [
   ("Server X (Xorg)", "xserver-xorg-core", "il server grafico",
@@ -934,6 +1120,8 @@ CATEGORIES = [
 # partono gia' da soli: metterli qui li fa partire DOPPI e sfascia il
 # desktop (era il bug "le app non si avviano piu'", terminale incluso).
 # ---------------------------------------------------------------------------
+
+# --- [C10] Catalog Components (Void Installer APT Catalogue) // HUB: FORGE ---
 FEATURE_DEPS = {
     "hotspot": ["Hotspot (hostapd+dnsmasq)"],
     "real_terminal": ["xterm", "matchbox-window-manager",
@@ -1964,7 +2152,13 @@ def terminal_id_generate():
         t.tm_year, t.tm_mday, t.tm_min, t.tm_sec, t.tm_hour, t.tm_mon)
 
 
+
+# ============================================================================
+#  [E] CLASS APP — CORE APPLICATION
+# ============================================================================
 class App(object):
+
+# --- [E1] __init__ — Initialization, Config Loading, Boot Sequence ---
     def __init__(self):
         pygame.display.init()
         pygame.font.init()
@@ -2366,6 +2560,8 @@ class App(object):
             threading.Thread(target=bg_bstation, daemon=True).start()
 
     # ---------------------------------------------------------------- i18n
+
+# --- [E2] i18n — Translation Engine (t/tx) ---
     def t(self, k):
         return TR.get(self.lang, TR["it"]).get(k, k)
 
@@ -2375,6 +2571,8 @@ class App(object):
             return txt
         return table.get(txt, txt)
 
+
+# --- [E3] Menu Rebuilder (Home / MUOS Apps / Media / Forge / Toolbox / Uplink / Workshop / Settings / Info / Exit) ---
     def rebuild_menu(self):
         xfce_ok = os.path.exists(os.path.join(DATA, ".xfce_ready"))
         t = self.t
@@ -2395,6 +2593,8 @@ class App(object):
                            "book", "power"]
 
     # ---------------------------------------------------- stile SPDW/BLAME!
+
+# --- [F11] Hazard Stripes & Cable Decorations ---
     def build_fonts(self):
         """Le quattro taglie di font dell'app, scalate secondo la
         preferenza dell'utente (Impostazioni > Dimensione testo).
@@ -2614,6 +2814,8 @@ class App(object):
         self.stripe_img = st
         self.sel_bg = sel_tint(self.accent)
 
+
+# --- [G3] Hub Entry Sounds ---
     def build_intro_jingle(self):
         """Il colpo sonoro sincronizzato con l'impatto del logo nella
         sigla d'avvio: una rincorsa che sale, poi un accordo pieno
@@ -2707,6 +2909,8 @@ class App(object):
             except (KeyError, pygame.error):
                 pass
 
+
+# --- [H4] Home Scroll & Selection Visibility // HUB: NEXUS ---
     def push(self, state, color=None, shape="rect"):
         """Apre uno stato come una finestra di un OS cyberpunk: blip,
         cattura del frame corrente, esplosione dal rettangolo (o cerchio,
@@ -2894,6 +3098,8 @@ class App(object):
         finally:
             pygame.display.flip = real_flip
 
+
+# --- [I7] INFO & ABOUT Hub — About, Manual, Guide, Manifesto, Update // HUB: INFO & ABOUT ---
     def hub_action(self, hub, key, kind):
         if kind == "cycle":
             ck, vals = CYCLES[key]
@@ -3210,6 +3416,8 @@ class App(object):
             self.scroll = 0
             self.push("info")
 
+
+# --- [J4] CHD Batch Converter // HUB: WORKSHOP ---
     def tool_open(self, key):
         label, pkgs = TOOL_PKGS[key]
         self.ensure_status()
@@ -3250,6 +3458,8 @@ class App(object):
         self.running = False
 
     # ================== VOID FTP: client nativo ==================
+
+# --- [K7] Network Probe (internet test, IP, gateway) // HUB: UPLINK ---
     def ftp_connect(self, prof):
         it = (self.lang == "it")
 
@@ -3368,6 +3578,8 @@ class App(object):
         except Exception:
             pass
 
+
+# --- [L4] BGM Normalizer (ffmpeg loudnorm, 2-pass/1-pass/simple) // HUB: MEDIA VAULT ---
     def _chd_disc(self, surface, cx, cy, r, spin_a, alpha=255):
         s = pygame.Surface((W, H), pygame.SRCALPHA)
         pygame.draw.circle(s, (40, 32, 14, alpha), (cx, cy), r)
@@ -4020,6 +4232,8 @@ class App(object):
         finally:
             pygame.display.flip = real_flip
 
+
+# --- [M9] Image Backup (gzip compress/restore) // HUB: WORKSHOP ---
     def draw_clock_face(self, layout):
         it = (self.lang == "it")
         lt = time.localtime()
@@ -4458,6 +4672,8 @@ class App(object):
         finally:
             pygame.display.flip = real_flip
 
+
+# --- [N12] Text Editor (VOID EDIT) // HUB: RT:TOOLBOX ---
     def rtsh_open(self):
         cols, rows = self.rtsh_cols, self.rtsh_rows
         try:
@@ -4775,6 +4991,8 @@ class App(object):
         finally:
             pygame.display.flip = real_flip
 
+
+# --- [O3] Glyph Manager & Archiver // HUB: MUOS APPS ---
     def basestation_serve_start(self):
         import http.server
         import threading
@@ -5380,6 +5598,8 @@ class App(object):
                 rows.append(("item", it))
         return rows
 
+
+# --- [P7] Boot Animation Toggle // HUB: SETTINGS ---
     def pcup_setup(self):
         """Aggiunge un server PC manualmente -- ripiego per quando la
         scansione automatica non trova qualcosa (rete diversa, PC
@@ -5609,6 +5829,8 @@ class App(object):
                 self.notify(msg.get("title", "Basestation"),
                            msg.get("body", ""), "message")
 
+
+# --- [Q5] Void-Desk Update Checker (GitHub Releases) // HUB: INFO & ABOUT ---
     def ctrl_bindings(self, dev_name):
         all_b = self.cfg.setdefault("controller_bindings", {})
         return all_b.setdefault(dev_name, {})
@@ -6040,6 +6262,8 @@ class App(object):
         except Exception:
             pass
 
+
+# --- [R2] CRT Off Animation // HUB: END SESSION ---
     def notify(self, title, body="", kind="standard"):
         """Mette in coda una notifica cyberpunk. Richiamabile da
         qualunque punto dell'app: messaggi dal Basestation, eventi
@@ -6416,6 +6640,8 @@ class App(object):
             self.text(n["body"], (x + 15, y + 56), self.f_tiny,
                       DIM, maxw=card_w - 30)
 
+
+# --- [S4] Media Panel (M — Controller Multimedia, Radio Controls) // HUB: MEDIA VAULT ---
     def radio_favorites(self):
         return self.cfg.get("radio_favorites", [])
 
@@ -6603,6 +6829,8 @@ class App(object):
         self.ftpc = None
 
     # ================== CALENDARIO ==================
+
+# --- [T6] Controller Listen Pump (Real-time Signal Processing) // HUB: UPLINK ---
     def cal_path(self):
         return os.path.join(DATA, "calendar.json")
 
@@ -6739,6 +6967,8 @@ class App(object):
         return out
 
     # ================== RSS READER ==================
+
+# --- [U3] Environment Secondary Colors (XFCE / IceWM / LXDE) ---
     def rss_custom_path(self):
         return os.path.join(DATA, "rss_custom.json")
 
@@ -7044,6 +7274,8 @@ class App(object):
                     items.append({"title": t, "link": link, "ts": ts})
         return items
 
+
+# --- [V7] Auto-connect Background Threads (PC Link, BaseStation) // HUB: UPLINK ---
     def update_latest(self):
         """La release piu' recente vera, o None se non ce ne sono
         ancora pubblicate -- stato onesto, non un errore."""
