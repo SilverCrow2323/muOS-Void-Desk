@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 # ============================================================================
-#  VOIDDESK v8.5 — pannello di controllo della suite Void per muOS
+#  VOIDDESK v10.0.0 "NEXUS" — pannello di controllo della suite Void per muOS
 #  Estetica SPDW FACTORY: cyberpunk manga grezzo, megastruttura alla BLAME!
 # ============================================================================
 import math
 import os
 import calendar as calmod
+import collections
 import datetime as dtmod
 import ftplib
 import random
@@ -132,9 +133,9 @@ HUBS = {
     ("wifi",    "wifi",    "u_wifi",  "u_wifi_s",  "push"),
     ("hotspot", "uplink",  "u_hot",   "u_hot_s",   "push"),
     ("bt",      "bt",      "u_bt",    "u_bt_s",    "push"),
-    ("ctrlhub", "keyboard","u_cthub", "u_cthub_s", "push"),
     ("pcup",    "monitor", "u_pcup",  "u_pcup_s",  "push"),
     ("basestation", "remote", "u_base", "u_base_s", "push"),
+    ("ctrlhub", "keyboard","u_cthub", "u_cthub_s", "push"),
     ("tsgui",   "uplink",  "u_ts",    "u_ts_s",    "act"),
     ("netdiag", "globe",   "u_netdiag", "u_netdiag_s", "act"),
     ("dlang",   "lang",    "u_dlang", "u_dlang_s", "cycle"),
@@ -211,17 +212,22 @@ OSK_PAGES = [
 CLOCK_LAYOUTS = ["classic", "minimal", "segmented", "analog", "skeleton",
                  "pilot"]
 HOME_STYLES = ["blame", "hud", "terminal", "orbit", "nexus"]
-# VOIDDESK V10 -- Net-Sphere: come sono raggruppati i 9 nodi del menu
+DEFAULT_HOME_STYLE = "nexus"  # v10.0.0 "Nexus": vista di default del menu
+# VOIDDESK V10 -- Net-Sphere: come sono raggruppati i 10 nodi del menu
 # principale sulle 3 orbite concentriche. Gli indici sono quelli di
-# self.menu/self.menu_icons (rebuild_menu). L'anello esterno del
-# progetto originale prevedeva SHUTDOWN al posto di INFO & ABOUT, ma
-# spegnimento non e' mai stato un nodo di primo livello in questa app
-# (si apre da un percorso separato) -- ho tenuto INFO & ABOUT cosi'
-# com'e' invece di dargli un'etichetta "SHUTDOWN" che premuta con A
-# non spegnerebbe nulla. Vedi nota nella risposta.
-NEXUS_RING_INNER = [0]                # START SESSION
-NEXUS_RING_MID = [3, 5, 2, 6]          # FORGE, UPLINK, MEDIA, WORKSHOP
-NEXUS_RING_OUT = [4, 1, 8, 7]          # TOOLBOX, MUOS APPS, SYSTEM, INFO
+# self.menu/self.menu_icons. SHUTDOWN (indice 9) e' un nodo vero
+# sull'anello esterno, non solo un tasto di scelta rapida: usa la
+# chiave di traduzione "h_exit" che esisteva gia' nel dizionario ma
+# non era mai stata agganciata a nulla.
+NEXUS_RING_INNER = [0]                    # START SESSION
+NEXUS_RING_MID = [3, 5, 2, 6]              # FORGE, UPLINK, MEDIA, WORKSHOP
+NEXUS_RING_OUT = [4, 1, 7, 8]              # TOOLBOX, MUOS APPS, SYSTEM,
+                                           # INFO
+# v10.6: END NODE (SHUTDOWN) non e' piu' un nodo eccentrico
+# sull'anello esterno -- ha una quarta orbita tutta sua, la piu'
+# lontana di tutte: il gesto di chiudere la sessione merita un
+# distacco vero dal resto del planetario, non solo un offset.
+NEXUS_RING_FAR = [9]                       # SHUTDOWN / END NODE, da solo
 NEXUS_NODE_COLOR = {
     0: (255, 205, 120),    # START SESSION -- bianco/ambra
     3: (240, 90, 60),      # FORGE -- rosso/ambra
@@ -230,13 +236,76 @@ NEXUS_NODE_COLOR = {
     6: (175, 110, 240),    # WORKSHOP -- viola/giallo
     4: (95, 210, 140),     # TOOLBOX -- verde/acciaio
     1: (225, 225, 235),    # MUOS APPS -- bianco/argento
-    8: (100, 130, 210),    # SETTINGS ("SYSTEM") -- blu scuro/grigio
-    7: (150, 160, 180),    # INFO & ABOUT
+    7: (100, 130, 210),    # SETTINGS ("SYSTEM") -- blu scuro/grigio
+    8: (150, 160, 180),    # INFO & ABOUT
+    9: (215, 80, 35),      # SHUTDOWN -- rosso scuro/arancione
 }
 NEXUS_NODE_CODE = {
-    0: "RAIL-0α", 3: "RAIL-1α", 5: "RAIL-2α", 2: "RAIL-3α",
-    6: "RAIL-4α", 4: "RAIL-5β", 1: "RAIL-6β", 8: "RAIL-7β",
-    7: "RAIL-8β",
+    0: "RAIL-00", 3: "RAIL-01α", 5: "RAIL-01β", 2: "RAIL-01γ",
+    6: "RAIL-01δ", 4: "RAIL-02α", 1: "RAIL-02β", 7: "RAIL-02γ",
+    8: "RAIL-02δ", 9: "RAIL-999",
+}
+# v10.3: illustrazioni SPDW per i nodi Nexus, una per icon_key
+# (stessa chiave di self.menu_icons / icons.draw). File in
+# assets/nexus_planets/. Se un file manca si torna al glifo
+# procedurale di icons.draw -- nessun crash, solo meno bello.
+NEXUS_PLANET_FILES = {
+    "start": "start.png", "window": "muos.png",
+    "speaker": "media_vault.png", "forge": "the_forge.png",
+    "toolbox": "rt_toolbox.png", "uplink": "net_sphere.png",
+    "workshop": "workshop.png", "gear": "settings.png",
+    "book": "info.png", "power": "end.png",
+}
+# fattore di schiacciamento verticale delle orbite per l'inquadratura
+# a 3/4: 1.0 sarebbe un cerchio piatto visto dritto dall'alto, piu'
+# si abbassa piu' il "tavolo" si inclina verso chi guarda
+NEXUS_SQUASH = 0.46
+# VOIDDESK 9.300 "Net-Sphere" -- planetario navigabile: le orbite
+# (il sole/START SESSION all'origine, non orbita) sono SEMPRE tutte
+# visibili. La zona di selezione resta fissa a sinistra dello
+# schermo: e' tutto il planetario che pan-na e si ridimensiona
+# (NEXUS_ZOOM, per nodo) per portarci dentro il pianeta scelto.
+# NEXUS_ORBIT_SPEED e' in gradi/secondo: piu' vicino al sole, piu'
+# veloce, come Keplero. Le orbite media/esterna/lontana sono
+# inclinate ciascuna sul proprio piano (NEXUS_OUTER_TILT/
+# NEXUS_FAR_TILT) e non sono mai parallele fra loro -- pianeti su
+# piani diversi, mai un disco piatto unico.
+NEXUS_SELECT_ZONE = (155, 235)
+# v10.6: orbite ridistanziate ulteriormente (era 145/235) e nuova
+# terza orbita, la piu' lontana di tutte, riservata a END NODE.
+NEXUS_RING_RADIUS = {1: 155, 2: 270, 3: 350}
+NEXUS_OUTER_TILT = 18
+NEXUS_FAR_TILT = -32     # v10.6: END NODE inclinato in senso opposto
+                         # all'esterna -- un piano tutto suo, non solo
+                         # piu' lontano ma visibilmente storto
+NEXUS_ORBIT_SPEED = {1: 7.0, 2: 3.0, 3: 1.3}     # piu' lontano, piu' lento
+NEXUS_NODE_R = {
+    # orbita media (RAIL-01): RAIL-01 MEDIA e' il pianeta piu'
+    # grande dell'orbita, WORKSHOP il piu' piccolo, UPLINK a meta'
+    # strada fra i due, FORGE un filo sotto UPLINK
+    3: 18, 5: 21, 2: 26, 6: 13,
+    4: 15, 1: 14, 7: 13, 8: 13,              # orbita esterna
+    9: 6,                                    # END NODE: minuscolo, isolato
+}
+NEXUS_ZOOM = {                               # v10: zoom aumentato su tutti i nodi
+    0: 0.95,                                 # sole: zoom fuori un filo
+    3: 1.28, 5: 1.05, 6: 1.75, 2: 1.02,      # orbita media
+    4: 1.45, 1: 1.50, 7: 1.55, 8: 1.55,      # orbita esterna, piu' piccoli
+    9: 2.10,                                 # END NODE: zoom deciso, e' minuscolo
+}
+# v10.6: decori orbitali sui pianeti di RAIL-01 -- non solo sfere
+# colorate, ognuno si porta dietro qualcosa che gli orbita attorno.
+# kind: "dust" = anello pieno (come quelli di Saturno), "signal" =
+# stesso anello ma a impulsi/trattini (per UPLINK: un segnale
+# trasmesso, non detriti), "moonlet" = una piccola luna compagna al
+# posto dell'anello (per i nodi troppo piccoli per portarne uno
+# intero). Formato: idx -> (kind, inclinazione_gradi, n.fasce,
+# tratteggiato).
+NEXUS_NODE_DECO = {
+    3: ("dust", -32, 1, False),   # THE FORGE: anello di detriti, diagonale
+    2: ("dust", 24, 2, False),    # RAIL-01 MEDIA: doppio anello, il piu' vistoso
+    5: ("signal", -14, 1, True),  # UPLINK: anello a impulsi, non polvere
+    6: ("moonlet", 0, 0, False),  # WORKSHOP: piccola luna al posto dell'anello
 }
 NOTIF_KINDS = {
     # tipo: (colore, icona, etichetta_it, etichetta_en)
@@ -397,7 +466,8 @@ BGM_EXTS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma",
 MEDIA_EXTS = BGM_EXTS | {".mkv", ".avi", ".mov", ".m3u", ".m3u8"}
 BGM_SAMPLE_RATE = 44100
 BGM_OGG_QUALITY = "6"
-VERSION = "9.147"
+VERSION = "10.2.1"
+VERSION_CODENAME = "Nexus"
 MENU_DEST_COLORS = [
     (60, 200, 130),   # 0 START SESSION -- verde, avvio
     (230, 190, 50),   # 1 MUOS APPS -- giallo mustard, coerente col brand
@@ -408,6 +478,7 @@ MENU_DEST_COLORS = [
     (165, 105, 215),  # 6 WORKSHOP -- viola, diagnostica
     (195, 180, 155),  # 7 SETTINGS -- beige caldo, neutro
     (215, 215, 225),  # 8 INFO & ABOUT -- argento
+    (210, 75, 35),    # 9 SHUTDOWN -- rosso scuro/arancione
 ]
 # Ogni universo entra con un accento sonoro differente. Non e' solo un
 # click: il suono anticipa il carattere del luogo prima del suo bootanim.
@@ -1388,7 +1459,7 @@ TR = {
   "mapps_t": "MUOS APPS", "mapps_none": "nessuna app in MUOS/application",
   "mapps_scan": "scansione e sistemazione glyph...",
   "mapps_go": "avvia", "mapps_r1": "glyph+scan",
-  "h_forge": "FORGE", "h_forge_s": "installer, avvio al boot, update",
+  "h_forge": "THE FORGE", "h_forge_s": "installer, avvio al boot, update",
   "h_work": "WORKSHOP", "h_work_s": "stats, diagnosi, log, memorie, boost",
   "h_up": "UPLINK", "h_up_s": "rete, PC link, Tailnet e controller esterni",
   "h_media": "MEDIA VAULT",
@@ -1399,7 +1470,7 @@ TR = {
   "h_tool": "Rt:TOOLBOX", "h_tool_s": "terminale, calcolatrice, utility",
   "h_info": "INFO & ABOUT", "h_info_s": "progetto, manuale, guida rapida",
   "h_set": "SETTINGS", "h_set_s": "aspetto, audio, lingua dell'app",
-  "h_exit": "SHUTDOWN", "h_exit_s": "torna a muOS",
+  "h_exit": "END NODE", "h_exit_s": "torna a muOS",
   "f_inst": "Void Installer", "f_inst_s": "installa e rimuovi (L1: tab)",
   "f_auto": "Avvio al boot", "f_auto_s": "app che partono col desktop",
   "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
@@ -1565,7 +1636,7 @@ TR = {
   "mapps_t": "MUOS APPS", "mapps_none": "no apps in MUOS/application",
   "mapps_scan": "scanning and fixing glyphs...",
   "mapps_go": "launch", "mapps_r1": "glyph+scan",
-  "h_forge": "FORGE", "h_forge_s": "installer, startup apps, update",
+  "h_forge": "THE FORGE", "h_forge_s": "installer, startup apps, update",
   "h_work": "WORKSHOP", "h_work_s": "stats, diagnostics, logs, storage",
   "h_up": "UPLINK", "h_up_s": "network, PC link, Tailnet and external controllers",
   "h_media": "MEDIA VAULT",
@@ -1576,7 +1647,7 @@ TR = {
   "h_tool": "Rt:TOOLBOX", "h_tool_s": "terminal, calculator, utilities",
   "h_info": "INFO & ABOUT", "h_info_s": "project, manual, quick guide",
   "h_set": "SETTINGS", "h_set_s": "look, audio, app language",
-  "h_exit": "SHUTDOWN", "h_exit_s": "back to muOS",
+  "h_exit": "END NODE", "h_exit_s": "back to muOS",
   "f_inst": "Void Installer", "f_inst_s": "install & remove (L1: tab)",
   "f_auto": "Startup apps", "f_auto_s": "apps that boot with the desktop",
   "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
@@ -2052,6 +2123,7 @@ class App(object):
         self.nexus_ring = 0
         self.nexus_rot_mid = 0
         self.nexus_rot_out = 0
+        self.nexus_rot_far = 0
         self.home_scroll = 0
         self.sel_log = 0
         self.opt_sel = 0
@@ -2060,6 +2132,14 @@ class App(object):
         self.log_lines = []
         self.info_lines = None
         self._stat = ({}, 0.0)
+        # v10: cache LRU per self.text() -- render() del font e' la
+        # chiamata piu' ripetuta di tutta l'app (500+ call site), e
+        # per la stragrande maggioranza disegna la stessa stringa
+        # identica frame dopo frame. Limite morbido cosi' su un
+        # dispositivo con poca RAM non cresce all'infinito in una
+        # sessione lunga.
+        self._text_cache = collections.OrderedDict()
+        self._text_cache_max = 600
         self._dpad_t = 0.0
         self.map_sel = 0
         self.comp_sel = 0
@@ -2112,8 +2192,10 @@ class App(object):
         self.ctrl_profile_dev = None
         self.shutdown_sel = 0
         self.info_title = None
-        self.r1_tablet_phase = None
-        self.r1_tablet_t0 = 0.0
+        self.r2_tablet_phase = None
+        self.r2_tablet_t0 = 0.0
+        self.l2_panel_phase = None
+        self.l2_panel_t0 = 0.0
         self.bstation_srv = None
         self.ts_netcheck_data = {}
         self.ts_login_url = ""
@@ -2271,9 +2353,17 @@ class App(object):
             def bg_scan():
                 try:
                     self.pcup_scan()
+                    self.pc_link_connect_default()
                 except Exception:
                     pass
             threading.Thread(target=bg_scan, daemon=True).start()
+        if self.cfg.get("bstation_always_on", False):
+            def bg_bstation():
+                try:
+                    self.basestation_serve_start()
+                except Exception:
+                    pass
+            threading.Thread(target=bg_bstation, daemon=True).start()
 
     # ---------------------------------------------------------------- i18n
     def t(self, k):
@@ -2298,10 +2388,11 @@ class App(object):
             (t("h_work"), t("h_work_s")),
             (t("h_set"), t("h_set_s")),
             (t("h_info"), t("h_info_s")),
+            (t("h_exit"), t("h_exit_s")),
         ]
         self.menu_icons = ["start", "window", "speaker", "forge",
                            "toolbox", "uplink", "workshop", "gear",
-                           "book"]
+                           "book", "power"]
 
     # ---------------------------------------------------- stile SPDW/BLAME!
     def build_fonts(self):
@@ -2616,14 +2707,16 @@ class App(object):
             except (KeyError, pygame.error):
                 pass
 
-    def push(self, state, color=None):
+    def push(self, state, color=None, shape="rect"):
         """Apre uno stato come una finestra di un OS cyberpunk: blip,
-        cattura del frame corrente, esplosione dal rettangolo selezionato."""
+        cattura del frame corrente, esplosione dal rettangolo (o cerchio,
+        per i nodi orbitali) selezionato."""
         self.play("open")
         self.prev_frame = self.surface.copy()
         r = self.last_sel_rect or (W // 2 - 60, H // 2 - 40, 120, 80)
         lvl = self.cfg.get("vfx_trans", 3)
         self.trans = ({"t0": time.time(), "rect": r, "color": color,
+                      "shape": shape,
                       "dur": 0.1 + lvl * 0.048} if lvl > 0 else None)
         self.stack.append(state)
 
@@ -4686,14 +4779,66 @@ class App(object):
         import http.server
         import threading
         import json
+        import mimetypes
+        import urllib.parse
         bpath = os.path.join(APP_DIR, "assets", "basestation",
                              "basestation.py")
         if not os.path.exists(bpath):
             return False
         with open(bpath, "rb") as f:
             bdata = f.read()
-        incoming_dir = os.path.join(DATA, "incoming")
-        os.makedirs(incoming_dir, exist_ok=True)
+        page_path = os.path.join(APP_DIR, "assets", "basestation",
+                                 "index.html")
+        try:
+            with open(page_path, "rb") as f:
+                page_data = f.read()
+        except OSError:
+            page_data = (b"<html><body style='background:#0a0b0e;"
+                        b"color:#e7ecef;font-family:monospace;"
+                        b"padding:2em'>index.html mancante in "
+                        b"assets/basestation/</body></html>")
+
+        # due aree separate e indipendenti: "in" = quello che PC o
+        # altri device caricano verso la console, "out" = quello che
+        # la console mette a disposizione per chi si collega.
+        areas = {
+            "in": os.path.join(DATA, "incoming"),
+            "out": os.path.join(DATA, "outgoing"),
+        }
+        for d in areas.values():
+            os.makedirs(d, exist_ok=True)
+
+        TEXT_EXTS = {".txt", ".md", ".py", ".json", ".cfg", ".ini",
+                    ".sh", ".csv", ".log", ".yaml", ".yml", ".conf",
+                    ".xml", ".js", ".css", ".html"}
+        BAD_CHARS = '<>:"/\\|?*'
+
+        def clean_name(name):
+            """Nome sicuro sia per attraversamento path sia per
+            exFAT (niente due punti, niente separatori, niente
+            spazi/punti finali)."""
+            name = os.path.basename((name or "").strip())
+            for ch in BAD_CHARS:
+                name = name.replace(ch, "_")
+            name = name.strip(" .")
+            if name in ("", ".", ".."):
+                return ""
+            return name[:120]
+
+        def safe_dir(root, rel):
+            """Risolve rel dentro root e rifiuta qualunque cosa che
+            scappi fuori (../../ ecc). root/rel possono anche NON
+            esistere ancora (mkdir); qui si valida solo il percorso,
+            non la sua esistenza."""
+            rel = (rel or "").replace("\\", "/").strip("/")
+            parts = [p for p in rel.split("/")
+                    if p not in ("", ".", "..")]
+            cand = os.path.normpath(os.path.join(root, *parts))
+            rroot = os.path.normpath(root)
+            if cand != rroot and not cand.startswith(
+                    rroot + os.sep):
+                return None
+            return cand
 
         def parse_multipart(body, boundary):
             """Analisi minima e vera di multipart/form-data per un
@@ -4720,92 +4865,238 @@ class App(object):
             return None, None
 
         class Handler(http.server.BaseHTTPRequestHandler):
+            def _send(self, code, ctype, body, extra=None):
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                for k, v in (extra or {}).items():
+                    self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def _json(self, obj, code=200):
+                self._send(code, "application/json",
+                          json.dumps(obj).encode("utf-8"))
+
+            def _qs(self):
+                p = urllib.parse.urlparse(self.path)
+                return p.path, urllib.parse.parse_qs(
+                    p.query, keep_blank_values=True)
+
+            def _post_form(self):
+                length = int(self.headers.get(
+                    "Content-Length", 0) or 0)
+                raw = self.rfile.read(length) if length else b""
+                data = urllib.parse.parse_qs(
+                    raw.decode("utf-8", errors="replace"),
+                    keep_blank_values=True)
+                return dict((k, v[0]) for k, v in data.items())
+
+            def _resolve(self, area, relpath):
+                root = areas.get(area)
+                if not root:
+                    return None, None
+                return root, safe_dir(root, relpath)
+
             def do_GET(self):
-                if self.path == "/basestation.py":
-                    self.send_response(200)
-                    self.send_header("Content-Type",
-                                     "text/x-python")
-                    self.send_header(
-                        "Content-Disposition",
-                        "attachment; filename=basestation.py")
-                    self.send_header("Content-Length",
-                                     str(len(bdata)))
-                    self.end_headers()
-                    self.wfile.write(bdata)
-                elif self.path == "/list":
-                    names = sorted(os.listdir(incoming_dir))
-                    body = json.dumps(names).encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type",
-                                     "application/json")
-                    self.send_header("Content-Length",
-                                     str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
-                elif self.path == "/":
-                    html = ("<html><body style='font-family:"
-                           "sans-serif;background:#111;color:#eee;"
-                           "padding:2em'>"
-                           "<h2>VOID DESK &mdash; Basestation</h2>"
-                           "<p><a href='/basestation.py' "
-                           "style='color:#6cd'>Scarica "
-                           "basestation.py</a></p><hr>"
-                           "<form method='POST' action='/upload' "
-                           "enctype='multipart/form-data'>"
-                           "<p>Carica un file sul dispositivo:</p>"
-                           "<input type='file' name='file'>"
-                           "<button type='submit'>Carica</button>"
-                           "</form></body></html>")
-                    body = html.encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html")
-                    self.send_header("Content-Length",
-                                     str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
+                path, q = self._qs()
+                g1 = (lambda k, d="": q.get(k, [d])[0])
+                if path == "/":
+                    self._send(200, "text/html; charset=utf-8",
+                              page_data)
+                elif path == "/basestation.py":
+                    self._send(200, "text/x-python", bdata, {
+                        "Content-Disposition":
+                            "attachment; filename=basestation.py"})
+                elif path == "/api/list":
+                    root, sub = self._resolve(g1("area", "in"),
+                                              g1("path"))
+                    if sub is None or not os.path.isdir(sub):
+                        self._json({"error": "percorso non "
+                                   "valido"}, 400)
+                        return
+                    entries = []
+                    try:
+                        for nm in sorted(os.listdir(sub),
+                                        key=str.lower):
+                            full = os.path.join(sub, nm)
+                            try:
+                                st = os.stat(full)
+                            except OSError:
+                                continue
+                            is_dir = os.path.isdir(full)
+                            ext = os.path.splitext(nm)[1].lower()
+                            entries.append({
+                                "name": nm,
+                                "type": "dir" if is_dir else "file",
+                                "size": 0 if is_dir else st.st_size,
+                                "mtime": int(st.st_mtime),
+                                "editable": (not is_dir) and
+                                    ext in TEXT_EXTS,
+                            })
+                    except OSError:
+                        pass
+                    entries.sort(key=lambda e: (e["type"] != "dir",
+                                                e["name"].lower()))
+                    self._json({"entries": entries})
+                elif path == "/api/read":
+                    root, sub = self._resolve(g1("area", "in"),
+                                              g1("path"))
+                    if sub is None or not os.path.isfile(sub):
+                        self._json({"error": "file non "
+                                   "trovato"}, 404)
+                        return
+                    if os.path.getsize(sub) > 2 * 1024 * 1024:
+                        self._json({"error": "file troppo grande "
+                                   "per l'editor (oltre 2MB)"}, 400)
+                        return
+                    try:
+                        with open(sub, "r", encoding="utf-8",
+                                 errors="replace") as f:
+                            content = f.read()
+                    except OSError as e:
+                        self._json({"error": str(e)}, 500)
+                        return
+                    self._json({"content": content})
+                elif path == "/api/download":
+                    root, sub = self._resolve(g1("area", "in"),
+                                              g1("path"))
+                    if sub is None or not os.path.isfile(sub):
+                        self._send(404, "text/plain",
+                                  b"non trovato")
+                        return
+                    ctype = mimetypes.guess_type(sub)[0] or \
+                        "application/octet-stream"
+                    try:
+                        with open(sub, "rb") as f:
+                            data = f.read()
+                    except OSError:
+                        self._send(500, "text/plain",
+                                  b"errore di lettura")
+                        return
+                    self._send(200, ctype, data, {
+                        "Content-Disposition":
+                            "attachment; filename=\"%s\"" %
+                            os.path.basename(sub)})
                 else:
-                    self.send_response(404)
-                    self.end_headers()
+                    self._send(404, "text/plain", b"non trovato")
 
             def do_POST(self):
-                if self.path != "/upload":
-                    self.send_response(404)
-                    self.end_headers()
+                path, _ = self._qs()
+                if path == "/api/upload":
+                    _, q = self._qs()
+                    g1 = (lambda k, d="": q.get(k, [d])[0])
+                    root, sub = self._resolve(g1("area", "in"),
+                                              g1("path"))
+                    if sub is None or not os.path.isdir(sub):
+                        self._json({"error": "percorso non "
+                                   "valido"}, 400)
+                        return
+                    ctype = self.headers.get("Content-Type", "")
+                    if "boundary=" not in ctype:
+                        self._json({"error": "richiesta non "
+                                   "valida"}, 400)
+                        return
+                    boundary = ctype.split(
+                        "boundary=")[1].strip('"').encode("utf-8")
+                    length = int(self.headers.get(
+                        "Content-Length", 0) or 0)
+                    body = self.rfile.read(length)
+                    fn, content = parse_multipart(body, boundary)
+                    safe_fn = clean_name(fn) if fn else ""
+                    if not safe_fn or content is None:
+                        self._json({"error": "nessun file"}, 400)
+                        return
+                    try:
+                        with open(os.path.join(sub, safe_fn),
+                                 "wb") as f:
+                            f.write(content)
+                    except OSError as e:
+                        self._json({"error": str(e)}, 500)
+                        return
+                    self._json({"ok": True, "name": safe_fn})
                     return
-                ctype = self.headers.get("Content-Type", "")
-                if "boundary=" not in ctype:
-                    self.send_response(400)
-                    self.end_headers()
-                    return
-                boundary = ctype.split("boundary=")[1].strip(
-                    '"').encode("utf-8")
-                length = int(self.headers.get(
-                    "Content-Length", 0))
-                body = self.rfile.read(length)
-                fn, content = parse_multipart(body, boundary)
-                if not fn or content is None:
-                    self.send_response(400)
-                    self.end_headers()
-                    return
-                safe_fn = os.path.basename(fn)
-                with open(os.path.join(incoming_dir, safe_fn),
-                         "wb") as f:
-                    f.write(content)
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html")
-                self.end_headers()
-                self.wfile.write(
-                    ("<html><body style='font-family:sans-serif;"
-                    "background:#111;color:#eee;padding:2em'>"
-                    "<p>Caricato: %s</p><a href='/' "
-                    "style='color:#6cd'>Torna indietro</a>"
-                    "</body></html>" % safe_fn).encode("utf-8"))
+                data = self._post_form()
+                area = data.get("area", "in")
+                root, sub = self._resolve(area, data.get("path", ""))
+                if path == "/api/mkdir":
+                    name = clean_name(data.get("name", ""))
+                    if sub is None or not os.path.isdir(sub) or \
+                            not name:
+                        self._json({"error": "dati non validi"},
+                                  400)
+                        return
+                    target = os.path.join(sub, name)
+                    if os.path.exists(target):
+                        self._json({"error": "esiste gia'"}, 409)
+                        return
+                    try:
+                        os.makedirs(target)
+                    except OSError as e:
+                        self._json({"error": str(e)}, 500)
+                        return
+                    self._json({"ok": True, "name": name})
+                elif path == "/api/newfile":
+                    name = clean_name(data.get("name", ""))
+                    content = data.get("content", "")
+                    if sub is None or not os.path.isdir(sub) or \
+                            not name:
+                        self._json({"error": "dati non validi"},
+                                  400)
+                        return
+                    target = os.path.join(sub, name)
+                    if os.path.exists(target):
+                        self._json({"error": "esiste gia'"}, 409)
+                        return
+                    try:
+                        with open(target, "w", encoding="utf-8") \
+                                as f:
+                            f.write(content)
+                    except OSError as e:
+                        self._json({"error": str(e)}, 500)
+                        return
+                    self._json({"ok": True, "name": name})
+                elif path == "/api/write":
+                    content = data.get("content", "")
+                    if sub is None or not os.path.isfile(sub):
+                        self._json({"error": "file non "
+                                   "trovato"}, 404)
+                        return
+                    try:
+                        with open(sub, "w", encoding="utf-8") as f:
+                            f.write(content)
+                    except OSError as e:
+                        self._json({"error": str(e)}, 500)
+                        return
+                    self._json({"ok": True})
+                elif path == "/api/delete":
+                    if sub is None or not os.path.exists(sub) or \
+                            sub == os.path.normpath(root):
+                        self._json({"error": "non trovato"}, 404)
+                        return
+                    try:
+                        if os.path.isdir(sub):
+                            if os.listdir(sub):
+                                self._json({"error": "cartella "
+                                           "non vuota"}, 400)
+                                return
+                            os.rmdir(sub)
+                        else:
+                            os.remove(sub)
+                    except OSError as e:
+                        self._json({"error": str(e)}, 500)
+                        return
+                    self._json({"ok": True})
+                else:
+                    self._send(404, "text/plain", b"non trovato")
 
             def log_message(self, fmt, *args):
                 pass
 
         try:
-            srv = http.server.HTTPServer(("0.0.0.0", 8765), Handler)
+            srv = http.server.ThreadingHTTPServer(
+                ("0.0.0.0", 8765), Handler)
+            srv.daemon_threads = True
         except OSError:
             return False
         self.bstation_srv = srv
@@ -5134,23 +5425,96 @@ class App(object):
     def pcup_scan(self):
         """Scansione vera della sottorete: fonde i risultati con
         quanto gia' presente (i manuali restano, gli auto-scoperti si
-        aggiornano) invece di ripartire da zero ogni volta."""
+        aggiornano) invece di ripartire da zero ogni volta. Se un
+        server auto-scoperto ha gia' un client collegato, il
+        collegamento vero non si perde nel merge -- prima veniva
+        silenziosamente sostituito da un dict nuovo con client=None,
+        e il thread di quel client restava acceso per sempre senza
+        che nessuno potesse piu' fermarlo o vederlo dall'interfaccia."""
         ip = self.own_ip()
         if not ip:
             return
         found = pcuplink.scan_for_servers(ip)
         manual = [s for s in self.pc_servers if not s.get("auto")]
         manual_hosts = {(s["host"], s["port"]) for s in manual}
+        existing_auto = {(s["host"], s["port"]): s
+                         for s in self.pc_servers if s.get("auto")}
+        found_keys = set()
         auto_new = []
         for f in found:
-            if (f["host"], f["port"]) in manual_hosts:
+            key = (f["host"], f["port"])
+            if key in manual_hosts:
                 continue
+            found_keys.add(key)
+            prev = existing_auto.get(key)
             auto_new.append({"host": f["host"], "port": f["port"],
                             "token": "", "name": f["name"],
-                            "auto": True, "client": None})
+                            "auto": True,
+                            "client": prev["client"] if prev
+                            else None})
+        # un auto-scoperto che non risponde piu' ed era collegato:
+        # chiudo il client per bene invece di abbandonarlo
+        for key, s in existing_auto.items():
+            if key not in found_keys and s.get("client"):
+                try:
+                    s["client"].stop()
+                except Exception:
+                    pass
         self.pc_servers = manual + auto_new
         self.pc_srv_sel = min(self.pc_srv_sel,
                               max(0, len(self.pc_servers) - 1))
+
+    def pc_link_ensure_client(self, s):
+        """Crea e avvia il client per il server s se non esiste
+        ancora -- stessa identica logica gia' usata quando si apre
+        un server dalla lista, estratta qui cosi' la puo' richiamare
+        anche la riconnessione automatica di 'PC Link sempre
+        attivo' senza duplicare nulla."""
+        if s.get("client") is not None:
+            return s["client"]
+        dev_id = self.cfg.get("termid_id") or "voiddesk-unknown"
+        dev_name = self.cfg.get("termid_name") or "VoidDesk"
+        s["client"] = pcuplink.PcClient(
+            s["host"], s["port"], s.get("token", ""),
+            device_id=dev_id, device_name=dev_name,
+            stats_fn=self.uplink_device_stats,
+            screenshot_fn=self.uplink_device_screenshot)
+        s["client"].start()
+        self.pcup_auto_upload(s["client"], dev_id)
+        return s["client"]
+
+    def pc_link_connect_default(self):
+        """Per 'PC Link sempre attivo': si ricollega da solo al
+        server giusto senza che l'utente debba rientrare nella
+        schermata e riselezionarlo a mano. Preferisce l'ultimo
+        server usato (salvato in pc_last_server); se non c'e' ancora
+        una preferenza salvata ma c'e' un solo server in lista, usa
+        quello -- con piu' di un server e nessuna preferenza aspetta
+        una scelta esplicita invece di indovinare."""
+        last = self.cfg.get("pc_last_server")
+        target = None
+        if last:
+            for s in self.pc_servers:
+                if s["host"] == last.get("host") and \
+                        s["port"] == last.get("port"):
+                    target = s
+                    break
+        if target is None and len(self.pc_servers) == 1:
+            target = self.pc_servers[0]
+        if target is not None:
+            self.pc_link_ensure_client(target)
+
+    def pc_link_disconnect_all(self):
+        """Spegne davvero tutte le connessioni attive -- prima
+        disattivare 'sempre attivo' salvava solo la preferenza senza
+        fermare nulla che fosse gia' in corso."""
+        for s in self.pc_servers:
+            if s.get("client"):
+                try:
+                    s["client"].stop()
+                except Exception:
+                    pass
+                s["client"] = None
 
     def updset_rows(self):
         it = (self.lang == "it")
@@ -5801,30 +6165,30 @@ class App(object):
             self.notif_active = None
             self.notif_phase = None
 
-    def _r1_tablet_update(self):
-        if self.r1_tablet_phase is None:
+    def _r2_tablet_update(self):
+        if self.r2_tablet_phase is None:
             return
-        el = time.time() - self.r1_tablet_t0
-        if self.r1_tablet_phase == "in" and el >= 0.38:
-            self.r1_tablet_phase = "show"
-        elif self.r1_tablet_phase == "out" and el >= 0.3:
-            self.r1_tablet_phase = None
+        el = time.time() - self.r2_tablet_t0
+        if self.r2_tablet_phase == "in" and el >= 0.38:
+            self.r2_tablet_phase = "show"
+        elif self.r2_tablet_phase == "out" and el >= 0.3:
+            self.r2_tablet_phase = None
 
-    def _r1_tablet_draw(self):
-        self._r1_tablet_update()
-        if self.r1_tablet_phase is None:
+    def _r2_tablet_draw(self):
+        self._r2_tablet_update()
+        if self.r2_tablet_phase is None:
             return
-        tw, th = int(W * 0.42), int(H * 0.62)
+        tw, th = int(W * 0.42), int(H * 0.65)
         rest_x = W - tw - 14
         ty = (H - th) // 2
-        el = time.time() - self.r1_tablet_t0
-        if self.r1_tablet_phase == "in":
+        el = time.time() - self.r2_tablet_t0
+        if self.r2_tablet_phase == "in":
             k = min(1.0, el / 0.38)
             c1, c3 = 1.70158, 2.70158
             kk = k - 1
             ease = 1 + c3 * kk ** 3 + c1 * kk ** 2
             tx = int(W - (W - rest_x) * ease)
-        elif self.r1_tablet_phase == "out":
+        elif self.r2_tablet_phase == "out":
             k = min(1.0, el / 0.3)
             tx = int(rest_x + (W - rest_x) * (k * k))
         else:
@@ -5833,9 +6197,9 @@ class App(object):
             return
         acc = self.accent
         panel = pygame.Surface((tw, th), pygame.SRCALPHA)
-        pygame.draw.rect(panel, (8, 10, 12, 235), (0, 0, tw, th),
+        pygame.draw.rect(panel, (20, 22, 26, 250), (0, 0, tw, th),
                          border_radius=16)
-        pygame.draw.rect(panel, acc, (0, 0, tw, th), 2,
+        pygame.draw.rect(panel, STEEL, (0, 0, tw, th), 4,
                          border_radius=16)
         for sy in range(0, th, 3):
             pygame.draw.line(panel, (255, 255, 255, 6), (0, sy),
@@ -5856,7 +6220,7 @@ class App(object):
         rows = [
             ("TERMINAL ID", str(self.cfg.get("termid_id") or "?")),
             ("VERSIONE" if self.lang == "it" else "VERSION",
-            "v" + VERSION),
+            "v" + VERSION + " " + VERSION_CODENAME),
             ("TEMA" if self.lang == "it" else "THEME",
             self.cfg.get("theme", "ambra").upper()),
             ("AMBIENTE" if self.lang == "it" else "ENVIRONMENT",
@@ -5886,6 +6250,96 @@ class App(object):
             pygame.draw.line(self.surface, STEEL,
                              (cable_x0 + seg, yy),
                              (cable_x0 + seg + 5, yy), 3)
+
+    def _l2_panel_update(self):
+        if self.l2_panel_phase is None:
+            return
+        el = time.time() - self.l2_panel_t0
+        if self.l2_panel_phase == "in" and el >= 0.38:
+            self.l2_panel_phase = "show"
+        elif self.l2_panel_phase == "out" and el >= 0.3:
+            self.l2_panel_phase = None
+
+    def _l2_panel_indicators(self):
+        """Righe di stato per il Net-Sphere Monitor -- stessa fonte
+        throttled di status_snapshot() (8s) gia' usata dall'header, e
+        bstation_srv e' solo un attributo: nessuna chiamata bloccante
+        aggiunta al loop di render."""
+        st = self.status_snapshot()
+        it = (self.lang == "it")
+        on_txt = "Attivo" if it else "On"
+        off_txt = "Spento" if it else "Off"
+        na_txt = "N/D" if it else "N/A"
+        wifi_on = bool(st.get("conn"))
+        wifi_detail = (st.get("ssid") or on_txt) if wifi_on else off_txt
+        bt_val = st.get("bt")
+        bt_detail = na_txt if bt_val is None else (
+            on_txt if bt_val else off_txt)
+        hot_on = bool(st.get("hot"))
+        pc_on = self.bstation_srv is not None
+        usb_val = st.get("usb")
+        usb_detail = usb_val.upper() if usb_val else off_txt
+        return [
+            ("wifi", "Wi-Fi", wifi_on, wifi_detail),
+            ("bt", "Bluetooth", bool(bt_val), bt_detail),
+            ("uplink", "Hotspot", hot_on, on_txt if hot_on else off_txt),
+            ("monitor", "PC Link", pc_on, "Online" if pc_on else off_txt),
+            ("usb", "USB", bool(usb_val), usb_detail),
+        ]
+
+    def _l2_panel_draw(self):
+        self._l2_panel_update()
+        if self.l2_panel_phase is None:
+            return
+        tw, th = int(W * 0.42), int(H * 0.62)
+        rest_x = 14
+        ty = (H - th) // 2
+        el = time.time() - self.l2_panel_t0
+        if self.l2_panel_phase == "in":
+            k = min(1.0, el / 0.38)
+            c1, c3 = 1.70158, 2.70158
+            kk = k - 1
+            ease = 1 + c3 * kk ** 3 + c1 * kk ** 2
+            tx = int(-tw + (rest_x + tw) * ease)
+        elif self.l2_panel_phase == "out":
+            k = min(1.0, el / 0.3)
+            tx = int(rest_x - (rest_x + tw) * (k * k))
+        else:
+            tx = rest_x
+        if tx <= -tw:
+            return
+        acc = self.accent
+        panel = pygame.Surface((tw, th), pygame.SRCALPHA)
+        pygame.draw.rect(panel, (20, 22, 26, 250), (0, 0, tw, th),
+                         border_radius=16)
+        pygame.draw.rect(panel, STEEL, (0, 0, tw, th), 4,
+                         border_radius=16)
+        for sy in range(0, th, 3):
+            pygame.draw.line(panel, (255, 255, 255, 6), (0, sy),
+                             (tw, sy), 1)
+        title = "NET-SPHERE MONITOR"
+        tsize = self.f_small.size(title)[0]
+        panel.blit(self.f_small.render(title, True, acc),
+                  ((tw - tsize) // 2, 16))
+        pygame.draw.line(panel, LINE, (20, 40), (tw - 20, 40), 1)
+        rows = self._l2_panel_indicators()
+        ry = 56
+        row_h = max(30, (th - ry - 16) // len(rows))
+        for key, label, active, detail in rows:
+            led = OK_G if active else FAINT
+            icons.draw(panel, key, 18, ry, 22, acc if active else FAINT)
+            pygame.draw.circle(panel, led, (tw - 24, ry + 11), 5)
+            panel.blit(self.f_small.render(label, True, FG), (48, ry))
+            panel.blit(self.f_tiny.render(str(detail)[:20], True, DIM),
+                      (48, ry + 17))
+            ry += row_h
+        self.surface.blit(panel, (tx, ty))
+        cable_x0 = tx
+        for seg in range(0, cable_x0, 8):
+            xx = cable_x0 - seg
+            yy = ty + th // 2 + int(3 * math.sin(seg * 0.5))
+            pygame.draw.line(self.surface, STEEL, (xx, yy),
+                             (xx - 5, yy), 3)
 
     def _notif_draw(self):
         self._notif_update()
@@ -6094,16 +6548,10 @@ class App(object):
 
     def pcup_open_detail(self, idx):
         s = self.pc_servers[idx]
-        if s["client"] is None:
-            dev_id = self.cfg.get("termid_id") or "voiddesk-unknown"
-            dev_name = self.cfg.get("termid_name") or "VoidDesk"
-            s["client"] = pcuplink.PcClient(
-                s["host"], s["port"], s.get("token", ""),
-                device_id=dev_id, device_name=dev_name,
-                stats_fn=self.uplink_device_stats,
-                screenshot_fn=self.uplink_device_screenshot)
-            s["client"].start()
-            self.pcup_auto_upload(s["client"], dev_id)
+        self.pc_link_ensure_client(s)
+        self.cfg["pc_last_server"] = {"host": s["host"],
+                                      "port": s["port"]}
+        save_cfg(self.cfg)
         self.pc_active_idx = idx
         self.push("pcuplink")
 
@@ -9599,7 +10047,7 @@ class App(object):
              if it else "Remove environment: only IceWM/LXDE, never "
              "XFCE which is the shared base. Frees space without "
              "touching the others.", DIM)]),
-          "forge": ("FORGE", [
+          "forge": ("THE FORGE", [
             ("__sec__", "APPS INSTALLER", "pkg"),
             ("L1 e' la tab installer, R1 la tab uninstaller: colori "
              "invertiti (complementare al tema), liste speculari. X "
@@ -10442,10 +10890,34 @@ class App(object):
         perp = rnd.uniform(-54, 54)
         return mx + nx * perp, my + ny * perp
 
-    def _nexus_sphere(self, cx, cy, r, col, icon_key, t_now, pulse_extra=0.0):
+    def _nexus_sphere(self, cx, cy, r, col, icon_key, t_now, pulse_extra=0.0,
+                      spin=False, seed=0, selected=False, idx=None):
         """La sfera-nodo con un effetto di profondità un po' piu'
         marcato: bordo in ombra, corpo pieno, riflesso freddo in alto
-        a sinistra, piccola aura esterna pulsante."""
+        a sinistra, piccola aura esterna pulsante, contorno spesso e
+        un po' irregolare (stile inchiostro manga a mano libera,
+        stabile nel tempo grazie a seed invece di tremolare ad ogni
+        fotogramma). Con spin=True aggiunge meridiani che spazzano
+        il globo per dare davvero l'impressione di rotazione.
+        v10.6: se idx ha un decoro orbitale (NEXUS_NODE_DECO) lo
+        disegno PRIMA della sfera, cosi' il corpo opaco del pianeta
+        copre da solo la parte centrale dell'anello -- niente
+        maschere o clip circolari, solo ordine di disegno. Una
+        eventuale moonlet "davanti" (behind=False) va invece disegnata
+        DOPO, quindi il metodo ritorna a fine funzione per farlo."""
+        deco = NEXUS_NODE_DECO.get(idx) if idx is not None else None
+        moon = None
+        if deco is not None:
+            if deco[0] == "moonlet":
+                moon = self._nexus_moonlet_pos(cx, cy, r, t_now, seed)
+                if moon[0]:                       # dietro: disegno subito
+                    self._nexus_draw_moonlet(moon, col)
+            else:
+                ring_surf = self._nexus_ring_surf(deco, r, col)
+                if ring_surf is not None:
+                    rw, rh = ring_surf.get_size()
+                    self.surface.blit(ring_surf,
+                                      (int(cx - rw / 2), int(cy - rh / 2)))
         pulse = 0.75 + 0.25 * abs(math.sin(t_now * 2.2)) + pulse_extra
         glow = tuple(min(255, int(c * pulse)) for c in col)
         pygame.draw.circle(self.surface, tuple(min(255, int(c * 0.5))
@@ -10454,15 +10926,141 @@ class App(object):
         pygame.draw.circle(self.surface, (8, 9, 16), (int(cx), int(cy)),
                            r + 4, 2)
         pygame.draw.circle(self.surface, glow, (int(cx), int(cy)), r)
+        if spin and r > 14:
+            prev_clip = self.surface.get_clip()
+            self.surface.set_clip(pygame.Rect(int(cx - r), int(cy - r),
+                                              r * 2, r * 2))
+            for k in range(3):
+                phase = (t_now * 0.5 + k / 3.0) % 1.0
+                ang = phase * 2 * math.pi
+                mx = r * math.cos(ang)
+                if abs(mx) >= r - 1:
+                    continue
+                mw = max(2, int(r * abs(math.sin(ang)) * 0.85))
+                clip_h = int(2 * math.sqrt(max(0, r * r - mx * mx)))
+                if clip_h < 2:
+                    continue
+                shade = 0.78 if math.cos(ang) > 0 else 1.16
+                band = tuple(max(0, min(255, int(c * shade)))
+                            for c in glow)
+                pygame.draw.ellipse(self.surface, band,
+                                   (int(cx + mx - mw / 2),
+                                    int(cy - clip_h / 2), mw, clip_h))
+            self.surface.set_clip(prev_clip)
         for k, (off, sz, add) in enumerate(((0.32, 0.42, 90),
                                             (0.15, 0.18, 140))):
             hi = tuple(min(255, c + add) for c in glow)
             pygame.draw.circle(self.surface, hi,
                                (int(cx - r * off), int(cy - r * off)),
                                max(2, int(r * sz) - k * 2))
-        pygame.draw.circle(self.surface, INK, (int(cx), int(cy)), r, 1)
-        icons.draw(self.surface, icon_key, int(cx - r * 0.55),
-                  int(cy - r * 0.55), max(10, int(r * 1.1)), INK)
+        n_pts = 26
+        pts = []
+        for k in range(n_pts):
+            a = 2 * math.pi * k / n_pts
+            jitter = (1.6 * math.sin(k * 2.7 + seed * 1.3) +
+                     1.0 * math.sin(k * 5.1 + seed * 0.6))
+            rr = r + jitter
+            pts.append((int(cx + rr * math.cos(a)),
+                       int(cy + rr * math.sin(a))))
+        pygame.draw.polygon(self.surface, INK, pts, 3)
+        if selected:
+            # v10.4: nel planetario il nodo a fuoco e' il pianeta
+            # INTERO, mai un'icona -- deve leggersi chiaramente piu'
+            # grande della sua stessa icona nella targhetta (44px),
+            # altrimenti sembra un'icona anche qui. Cura in piu' per
+            # MUOS APPS: il suo artwork e' un satellite, non una
+            # sfera, e serve piu' spazio per restare leggibile.
+            psize = max(64, int(r * 2.4))
+        else:
+            # v10.5: anche i pianeti sullo sfondo (non a fuoco)
+            # restano pianeti interi, mai icone -- solo piu' piccoli
+            # per la prospettiva orbitale. Pavimento e moltiplicatore
+            # alzati rispetto a prima (era 12 / 1.3, taglia da icona).
+            psize = max(28, int(r * 1.9))
+        planet_img = self.nexus_planet_icon(icon_key, psize)
+        if planet_img:
+            self.surface.blit(planet_img,
+                              (int(cx - psize / 2), int(cy - psize / 2)))
+        else:
+            icons.draw(self.surface, icon_key, int(cx - r * 0.55),
+                      int(cy - r * 0.55), max(10, int(r * 1.1)), INK)
+        if moon is not None and not moon[0]:      # davanti: disegno ora
+            self._nexus_draw_moonlet(moon, col)
+
+    def _nexus_dust_tone(self, col):
+        """Tinta 'polvere/segnale' condivisa da tutti i decori
+        orbitali: il colore del pianeta mescolato a meta' con un
+        grigio-sabbia neutro, cosi' ogni anello sembra fatto dello
+        stesso detrito reale invece che di puro accento acceso --
+        la differenza fra un pianeta e l'altro resta nella tinta di
+        fondo, non in un colore sparato a piena saturazione."""
+        sand = (150, 140, 122)
+        return tuple(int(c * 0.5 + s * 0.5) for c, s in zip(col, sand))
+
+    def _nexus_ring_surf(self, deco, r, col):
+        """Superficie dell'anello orbitale di un pianeta (dust o
+        signal), ricostruita solo la prima volta per ogni
+        combinazione nodo/raggio-approssimato e poi solo blittata --
+        MAI ridisegnata pixel per pixel ad ogni fotogramma. r viene
+        arrotondato a multipli di 4px prima di entrare nella chiave
+        di cache: il raggio del pianeta oscilla di continuo con la
+        prospettiva orbitale (depth) e una cache esatta non farebbe
+        mai un solo hit, questa si'."""
+        kind, tilt, bands, dashed = deco
+        cache = getattr(self, "_nexus_ring_cache", None)
+        if cache is None:
+            cache = {}
+            self._nexus_ring_cache = cache
+        r_key = max(4, (int(r) // 4) * 4)
+        key = (kind, tilt, bands, dashed, r_key, col)
+        surf = cache.get(key)
+        if surf is not None:
+            return surf
+        squash = 0.34
+        outer = max(6, int(r_key * 2.0))
+        pad = 6
+        size = outer * 2 + pad * 2
+        base = pygame.Surface((size, size), pygame.SRCALPHA)
+        ccx = ccy = size // 2
+        dust = self._nexus_dust_tone(col)
+        widths = (outer, int(outer * 0.72)) if bands == 2 else (outer,)
+        for rw in widths:
+            rh = max(2, int(rw * squash))
+            rect = pygame.Rect(ccx - rw, ccy - rh, rw * 2, rh * 2)
+            if dashed:
+                n = 20
+                for k in range(0, n, 2):
+                    a0 = math.radians(360.0 * k / n)
+                    a1 = math.radians(360.0 * (k + 1) / n)
+                    pygame.draw.arc(base, dust, rect, a0, a1, 3)
+            else:
+                pygame.draw.ellipse(base, (6, 7, 12), rect, 4)
+                pygame.draw.ellipse(base, dust, rect.inflate(-3, -3), 2)
+        rotated = pygame.transform.rotate(base, tilt)
+        cache[key] = rotated
+        return rotated
+
+    def _nexus_moonlet_pos(self, cx, cy, r, t_now, seed):
+        """Posizione della piccola luna compagna (usata al posto di
+        un anello sui nodi troppo piccoli per portarne uno, es.
+        WORKSHOP): orbita propria attorno al pianeta, con uno
+        sfasamento per seed cosi' non gira in sincrono col pianeta
+        stesso. behind=True quando passa dietro -- va disegnata
+        prima della sfera anziche' dopo."""
+        orb_r = r * 2.2
+        ang = t_now * 0.6 + seed * 1.7
+        mx = cx + orb_r * math.cos(ang)
+        my = cy + orb_r * NEXUS_SQUASH * 1.4 * math.sin(ang)
+        behind = math.sin(ang) < 0
+        mr = max(2, int(r * 0.24))
+        return behind, mx, my, mr
+
+    def _nexus_draw_moonlet(self, moon, col):
+        _behind, mx, my, mr = moon
+        dust = self._nexus_dust_tone(col)
+        pygame.draw.circle(self.surface, (5, 6, 10),
+                           (int(mx), int(my)), mr + 1)
+        pygame.draw.circle(self.surface, dust, (int(mx), int(my)), mr)
 
     def _nexus_stars_surf(self):
         """Le posizioni sono fisse (seme 77), solo lo scintillio
@@ -10488,9 +11086,33 @@ class App(object):
         self._nexus_star_cache_t = now
         return surf
 
+    def _nexus_nebula_surf(self):
+        """Macchia di nebulosa con gradiente radiale dietro alle
+        orbite, colorata sul nodo selezionato -- ricostruita solo
+        quando cambia la selezione o ogni mezzo secondo per un
+        leggero respiro, non ad ogni fotogramma."""
+        now = time.time()
+        col = NEXUS_NODE_COLOR.get(self.sel, self.accent)
+        cache = getattr(self, "_nexus_neb_cache", None)
+        cache_key = getattr(self, "_nexus_neb_cache_key", None)
+        if cache is not None and cache_key == col and \
+                now - getattr(self, "_nexus_neb_cache_t", 0) < 0.5:
+            return cache
+        surf = pygame.Surface((W, H), pygame.SRCALPHA)
+        cx, cy, maxr = NEXUS_SELECT_ZONE[0], NEXUS_SELECT_ZONE[1], 220
+        for rr in range(maxr, 0, -6):
+            a = int(14 * (1 - rr / float(maxr)) ** 1.6)
+            if a > 0:
+                pygame.draw.circle(surf, col + (a,), (cx, cy), rr)
+        self._nexus_neb_cache = surf
+        self._nexus_neb_cache_key = col
+        self._nexus_neb_cache_t = now
+        return surf
+
     def _nexus_bg(self):
         pygame.draw.rect(self.surface, (4, 5, 10), (0, 44, W, H - 44))
         t_now = time.time()
+        self.surface.blit(self._nexus_nebula_surf(), (0, 0))
         self.surface.blit(self._nexus_stars_surf(), (0, 0))
         for gy in range(H - 90, H, 18):
             fade = (gy - (H - 90)) / 90.0
@@ -10511,13 +11133,24 @@ class App(object):
             pygame.draw.line(self.surface, gcol, (0, gy2), (W, gy2), 1)
 
     def _nexus_ring_list(self, ring):
-        return (NEXUS_RING_INNER, NEXUS_RING_MID, NEXUS_RING_OUT)[ring]
+        return (NEXUS_RING_INNER, NEXUS_RING_MID, NEXUS_RING_OUT,
+                NEXUS_RING_FAR)[ring]
+
+    def _nexus_ring_step(self, ring):
+        """Gradi tra un nodo e il successivo su quell'anello -- NON
+        e' sempre 90: dipende da quanti nodi ci sono su
+        quell'orbita (l'esterna ne ha 4, la lontana di END NODE
+        uno solo)."""
+        n = len(self._nexus_ring_list(ring))
+        return 360.0 / n if n else 0.0
 
     def _nexus_ring_rot(self, ring):
         if ring == 1:
             return self.nexus_rot_mid
         if ring == 2:
             return self.nexus_rot_out
+        if ring == 3:
+            return self.nexus_rot_far
         return 0
 
     def _nexus_set_ring_rot(self, ring, rot):
@@ -10525,6 +11158,8 @@ class App(object):
             self.nexus_rot_mid = rot
         elif ring == 2:
             self.nexus_rot_out = rot
+        elif ring == 3:
+            self.nexus_rot_far = rot
 
     def _nexus_sync_sel(self):
         """Il resto dell'app (activate(), ecc.) ragiona ancora su un
@@ -10534,162 +11169,345 @@ class App(object):
         rot = self._nexus_ring_rot(self.nexus_ring)
         self.sel = ring_list[rot % len(ring_list)]
 
-    def _nexus_dashed_ring(self, cx, cy, r, col, active):
-        steps = max(24, int(r / 3))
-        w = 2 if active else 1
-        for s in range(steps):
-            if s % 3 == 0:
-                continue
-            a0 = math.radians(s * 360.0 / steps)
-            a1 = math.radians((s + 1) * 360.0 / steps)
-            p0 = (cx + r * math.cos(a0), cy + r * math.sin(a0))
-            p1 = (cx + r * math.cos(a1), cy + r * math.sin(a1))
-            pygame.draw.line(self.surface, col, p0, p1, w)
+    def _nexus_orbit_point(self, ring, angle_deg, radius):
+        """Punto nel piano orbitale (prima di pan/zoom) per un dato
+        angolo e raggio. L'orbita esterna e' inclinata di
+        NEXUS_OUTER_TILT gradi sul proprio piano rispetto a quella
+        media, e la lontana (END NODE) di NEXUS_FAR_TILT -- in senso
+        opposto e piu' netto -- cosi' ogni orbita vive sul proprio
+        piano, mai tutte sullo stesso disco piatto."""
+        ang = math.radians(angle_deg)
+        x = radius * math.cos(ang)
+        y = radius * NEXUS_SQUASH * math.sin(ang)
+        tilt = NEXUS_OUTER_TILT if ring == 2 else (
+               NEXUS_FAR_TILT if ring == 3 else None)
+        if tilt is not None:
+            tr = math.radians(tilt)
+            x, y = (x * math.cos(tr) - y * math.sin(tr),
+                    x * math.sin(tr) + y * math.cos(tr))
+        return x, y
 
-    def _nexus_draw_scene(self, cx, cy, mid_phase=None, out_phase=None):
-        """Disegna l'intera scena Net-Sphere: le 3 orbite (RAIL
-        SYSTEM), i 9 nodi, i raggi di collegamento verso il centro.
-        mid_phase/out_phase (gradi) forzano la fase di rotazione di
-        quell'anello durante un'animazione; se None uso la rotazione
-        salvata."""
+    def _nexus_to_screen(self, wx, wy, sel_wx, sel_wy, zoom):
+        """Da coordinate di mondo a schermo: la zona di selezione
+        resta fissa a sinistra, e' il mondo che pan-na e si
+        ridimensiona per portarci dentro il nodo scelto -- il
+        pianeta selezionato finisce sempre esattamente li', qualunque
+        sia la sua posizione orbitale in quel momento."""
+        sx = NEXUS_SELECT_ZONE[0] + (wx - sel_wx) * zoom
+        sy = NEXUS_SELECT_ZONE[1] + (wy - sel_wy) * zoom
+        return sx, sy
+
+    def _nexus_select_zone_marker(self):
+        """Segna il punto fisso a sinistra dove il nodo selezionato
+        atterra sempre -- un mirino leggero, non un pannello, cosi'
+        non compete visivamente col pianeta che ci sta sopra."""
+        x, y = NEXUS_SELECT_ZONE
+        r = 8
+        col = self.accent
+        pygame.draw.circle(self.surface, col, (x, y), r, 1)
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            p0 = (x + dx * (r + 3), y + dy * (r + 3))
+            p1 = (x + dx * (r + 8), y + dy * (r + 8))
+            pygame.draw.line(self.surface, col, p0, p1, 1)
+
+    def _nexus_dashed_ring(self, ring, r, active, sel_wx, sel_wy, zoom):
+        """Orbita sottilissima bianca semi-trasparente, sempre
+        visibile, disegnata punto per punto (serve per far reggere
+        sia l'inclinazione dell'esterna sia il pan/zoom della
+        camera, cosa che un'ellisse dritta di pygame non saprebbe
+        fare da sola)."""
+        n_pts = 72
+        pts = [self._nexus_to_screen(
+                  *self._nexus_orbit_point(ring, 360.0 * k / n_pts, r),
+                  sel_wx, sel_wy, zoom)
+              for k in range(n_pts + 1)]
+        minx = min(p[0] for p in pts)
+        maxx = max(p[0] for p in pts)
+        miny = min(p[1] for p in pts)
+        maxy = max(p[1] for p in pts)
+        pad = 4
+        w = max(2, int(maxx - minx) + pad * 2)
+        h = max(2, int(maxy - miny) + pad * 2)
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        local = [(px - minx + pad, py - miny + pad) for px, py in pts]
+        alpha = 110 if active else 55
+        pygame.draw.lines(surf, (255, 255, 255, alpha), False, local, 1)
+        self.surface.blit(surf, (minx - pad, miny - pad))
+
+    def _nexus_world_angle(self, ring, i, t_now):
+        """Angolo di mondo dello slot i su quell'anello: posizione di
+        partenza fissa + deriva orbitale continua -- piu' vicino al
+        sole, piu' veloce, alla Keplero."""
+        step = self._nexus_ring_step(ring)
+        drift = NEXUS_ORBIT_SPEED.get(ring, 0.0) * t_now
+        return step * i + drift
+
+    def _nexus_camera_target_pos(self, ring, i_frac, t_now):
+        """Dove si trova, in coordinate di mondo, lo slot i_frac
+        (puo' essere frazionario durante un'animazione) in questo
+        istante -- il punto che la camera insegue per tenerlo fermo
+        nella zona di selezione. Usa il raggio vero dell'anello:
+        v10.6, END NODE ha una sua orbita dedicata (ring 3) quindi
+        non serve piu' nessun offset speciale per separarlo dal
+        resto -- atterra comunque esattamente dove il pianeta viene
+        davvero disegnato."""
+        if ring == 0:
+            return (0.0, 0.0)
+        angle = self._nexus_world_angle(ring, i_frac, t_now)
+        r = NEXUS_RING_RADIUS[ring]
+        return self._nexus_orbit_point(ring, angle, r)
+
+    def _nexus_draw_scene(self, sel_pos_override=None, zoom_override=None):
+        """Il planetario Net-Sphere: le orbite SEMPRE tutte e tre
+        visibili (media, esterna e la lontana di END NODE, ciascuna
+        inclinata sul proprio piano), i pianeti in moto continuo. La
+        zona di selezione resta fissa a sinistra -- e' tutto il
+        planetario che pan-na e si ridimensiona (in base a quanto e'
+        piccolo il nodo scelto) per portarcelo dentro, non il
+        contrario. Gli override sono usati solo dalle animazioni di
+        navigazione per uno spostamento continuo invece di uno
+        scatto."""
         t_now = time.time()
-        node_r = {0: 32, 1: 24, 2: 19}
-        sel_r = {0: 39, 1: 30, 2: 24}
-        radii = {0: 50, 1: 98, 2: 148}
-        phases = {
-            0: 0.0,
-            1: mid_phase if mid_phase is not None else
-               self.nexus_rot_mid * 90.0,
-            2: out_phase if out_phase is not None else
-               self.nexus_rot_out * 90.0,
-        }
-        ring_cols = {0: (150, 150, 165), 1: (110, 110, 130),
-                    2: (75, 75, 95)}
-        for ring in (2, 1, 0):
-            active = (ring == self.nexus_ring)
-            col = self.accent if active else ring_cols[ring]
-            self._nexus_dashed_ring(cx, cy, radii[ring], col, active)
-        rings = ((0, NEXUS_RING_INNER), (1, NEXUS_RING_MID),
-                 (2, NEXUS_RING_OUT))
+        if sel_pos_override is not None:
+            sel_wx, sel_wy = sel_pos_override
+        else:
+            sel_wx, sel_wy = self._nexus_camera_target_pos(
+                self.nexus_ring, self._nexus_ring_rot(self.nexus_ring),
+                t_now)
+        zoom = (zoom_override if zoom_override is not None else
+               NEXUS_ZOOM.get(self.sel, 1.0))
+        self._nexus_dashed_ring(1, NEXUS_RING_RADIUS[1],
+                                self.nexus_ring == 1, sel_wx, sel_wy, zoom)
+        self._nexus_dashed_ring(2, NEXUS_RING_RADIUS[2],
+                                self.nexus_ring == 2, sel_wx, sel_wy, zoom)
+        self._nexus_dashed_ring(3, NEXUS_RING_RADIUS[3],
+                                self.nexus_ring == 3, sel_wx, sel_wy, zoom)
         positions = {}
-        for ring, ring_list in rings:
-            n = len(ring_list)
+        for ring, ring_list in ((1, NEXUS_RING_MID), (2, NEXUS_RING_OUT),
+                                (3, NEXUS_RING_FAR)):
             for i, idx in enumerate(ring_list):
-                ang = math.radians(-90 + (360.0 / n) * i -
-                                   phases[ring]) if n > 1 else \
-                    math.radians(-90)
-                nx = cx + radii[ring] * math.cos(ang)
-                ny = cy + radii[ring] * math.sin(ang)
-                positions[idx] = (nx, ny, ring)
-        for idx, (nx, ny, ring) in positions.items():
-            spoke_col = tuple(max(18, c - ring * 22)
-                              for c in (68, 68, 88))
-            pygame.draw.line(self.surface, spoke_col, (cx, cy),
-                             (nx, ny), 1)
-        for idx, (nx, ny, ring) in positions.items():
+                r_node = NEXUS_RING_RADIUS[ring]
+                angle = self._nexus_world_angle(ring, i, t_now)
+                wx, wy = self._nexus_orbit_point(ring, angle, r_node)
+                sx, sy = self._nexus_to_screen(wx, wy, sel_wx, sel_wy,
+                                               zoom)
+                depth = (math.sin(math.radians(angle)) + 1) / 2
+                positions[idx] = (sx, sy, depth)
+        sun_sx, sun_sy = self._nexus_to_screen(0.0, 0.0, sel_wx, sel_wy,
+                                               zoom)
+        order = sorted(positions.items(), key=lambda kv: kv[1][2])
+        for idx, (sx, sy, depth) in order:
             sel = (idx == self.sel)
-            r = sel_r[ring] if sel else node_r[ring]
-            col = NEXUS_NODE_COLOR.get(idx, self.accent)
+            base_r = NEXUS_NODE_R.get(idx, 18)
+            r = max(4, int(base_r * zoom * (0.75 + 0.32 * depth) *
+                          (1.12 if sel else 1.0)))
+            raw_col = NEXUS_NODE_COLOR.get(idx, self.accent)
+            shade = 0.60 + 0.40 * depth
+            col = tuple(min(255, int(c * shade)) for c in raw_col)
             if sel:
-                halo_a = int(50 * (0.5 + 0.5 * math.sin(t_now * 3.4)))
-                for gr in (r + 11, r + 5):
+                halo_a = int(55 * (0.5 + 0.5 * math.sin(t_now * 3.0)))
+                for gr in (r + 12, r + 5):
                     s = pygame.Surface((gr * 2 + 4, gr * 2 + 4),
                                        pygame.SRCALPHA)
                     pygame.draw.circle(s, col + (halo_a,),
                                        (gr + 2, gr + 2), gr)
-                    self.surface.blit(s, (nx - gr - 2, ny - gr - 2))
-            tn = t_now * 1.8 if sel else t_now
-            self._nexus_sphere(nx, ny, r, col, self.menu_icons[idx],
-                               tn, 0.18 if sel else 0.0)
+                    self.surface.blit(s, (sx - gr - 2, sy - gr - 2))
+            spin_speed = 0.28 + (idx * 37 % 97) / 97.0 * 0.8
+            self._nexus_sphere(sx, sy, r, col, self.menu_icons[idx],
+                               t_now * spin_speed, 0.15 if sel else 0.0,
+                               spin=True, seed=idx, selected=sel, idx=idx)
             if sel:
-                self.last_sel_rect = (nx - r, ny - r, r * 2, r * 2)
+                self.last_sel_rect = (sx - r, sy - r, r * 2, r * 2)
+        self._nexus_sun(sun_sx, sun_sy, t_now, zoom)
+        self._nexus_select_zone_marker()
         return positions
 
-    def _nexus_side_panels(self, cx, cy):
+    def _nexus_sun(self, cx, cy, t_now, zoom=1.0):
+        """START SESSION come una piccola stella, non un pianeta: la
+        piu' grande di tutte, aura calda pulsante, corona di piccoli
+        brillamenti -- il centro attorno a cui gli altri girano
+        davvero (anche se sullo schermo si sposta pure lei, quando
+        il focus e' altrove, esattamente come il resto del
+        planetario)."""
+        col = NEXUS_NODE_COLOR.get(0, (255, 205, 120))
+        sel = (self.sel == 0)
+        r = max(6, int((46 if sel else 40) * zoom))
+        pulse = 0.85 + 0.15 * math.sin(t_now * 1.3)
+        for gr, a in ((r + 30, 22), (r + 18, 38), (r + 8, 58)):
+            s = pygame.Surface((gr * 2 + 4, gr * 2 + 4), pygame.SRCALPHA)
+            glow = tuple(min(255, int(c * pulse)) for c in col)
+            pygame.draw.circle(s, glow + (a,), (gr + 2, gr + 2), gr)
+            self.surface.blit(s, (cx - gr - 2, cy - gr - 2))
+        core = tuple(min(255, int(c * (pulse + 0.12))) for c in col)
+        for k in range(10):
+            fa = math.radians(k * 36 + t_now * 26)
+            fl = r + 5 + int(6 * abs(math.sin(t_now * 2.2 + k)))
+            pygame.draw.line(self.surface, core,
+                            (cx + r * 0.82 * math.cos(fa),
+                             cy + r * 0.82 * math.sin(fa)),
+                            (cx + fl * math.cos(fa),
+                             cy + fl * math.sin(fa)), 2)
+        pygame.draw.circle(self.surface, core, (int(cx), int(cy)), r)
+        hi = tuple(min(255, c + 60) for c in core)
+        pygame.draw.circle(self.surface, hi,
+                          (int(cx - r * 0.3), int(cy - r * 0.3)),
+                          max(3, int(r * 0.3)))
+        n_pts = 26
+        pts = []
+        for k in range(n_pts):
+            a = 2 * math.pi * k / n_pts
+            jitter = (1.6 * math.sin(k * 2.7) + 1.0 * math.sin(k * 5.1))
+            rr = r + jitter
+            pts.append((int(cx + rr * math.cos(a)),
+                       int(cy + rr * math.sin(a))))
+        pygame.draw.polygon(self.surface, INK, pts, 3)
+        pygame.draw.polygon(self.surface, INK, pts, 3)
+        sun_size = max(12, int(r * 1.3))
+        sun_img = self.nexus_planet_icon(self.menu_icons[0], sun_size)
+        if sun_img:
+            self.surface.blit(sun_img, (int(cx - sun_size / 2),
+                                        int(cy - sun_size / 2)))
+        else:
+            icons.draw(self.surface, self.menu_icons[0],
+                      int(cx - r * 0.5), int(cy - r * 0.5),
+                      max(10, int(r)), INK)
+        if sel:
+            self.last_sel_rect = (cx - r, cy - r, r * 2, r * 2)
+
+    def _nexus_side_panels(self, bx0=360):
+        """Targhetta e report del nodo. v10.3: icona del pianeta
+        nella targhetta, riquadro report piu' staccato e alto quanto
+        serve, voci separate da virgola come elenco puntato invece
+        di una riga sola troncata."""
         idx = self.sel
         label, sub = self.menu[idx]
         col = NEXUS_NODE_COLOR.get(idx, self.accent)
-        bx = cx + 148 + 30
-        bw = max(120, W - bx - 14)
-        by = 54
-        self.npanel(bx, by, bw, 50, border=col, fill=INK, cut=8)
-        self.text(NEXUS_NODE_CODE.get(idx, "RAIL-?α"), (bx + 10,
-                 by + 3), self.f_tiny, col)
+        icon_key = self.menu_icons[idx]
+        bx = bx0
+        bw = max(140, W - bx - 14)
+        by = 50
+        self.npanel(bx, by, bw, 62, border=col, fill=INK, cut=10)
+        picon = self.nexus_planet_icon(icon_key, 44)
+        text_x0 = bx + 12
+        if picon:
+            self.surface.blit(picon, (bx + 10, by + 9))
+            text_x0 = bx + 10 + 44 + 10
+        self.text(NEXUS_NODE_CODE.get(idx, "RAIL-?α"), (text_x0,
+                 by + 6), self.f_small, col)
+        avail_w = max(20, bx + bw - 12 - text_x0)
         lw = self.f_med_b.size(label)[0]
-        self.text(label, (bx + max(10, (bw - lw) // 2), by + 20),
-                 self.f_med_b, FG, maxw=bw - 20)
-        by2 = by + 58
-        self.npanel(bx, by2, bw, 78, border=LINE, fill=INK, cut=6)
-        self.text("NODE REPORT", (bx + 10, by2 + 3), self.f_tiny,
+        self.text(label, (text_x0 + max(0, (avail_w - lw) // 2),
+                 by + 28), self.f_med_b, FG, maxw=avail_w)
+
+        by2 = by + 62 + 28   # v10.3: box piu' staccato (era +16)
+        raw_items = [p.strip() for p in sub.split(",") if p.strip()]
+        for pre in ("e ", "and "):
+            raw_items = [it[len(pre):] if it.lower().startswith(pre)
+                        else it for it in raw_items]
+        bullets = len(raw_items) > 1
+        rows = raw_items if bullets else self.note_wrap(
+            sub, bw - 24, self.f_med, 4)
+        line_h = 20
+        ph = 30 + max(1, len(rows)) * line_h + 8
+        self.npanel(bx, by2, bw, ph, border=LINE, fill=INK, cut=8)
+        self.text("NODE REPORT", (bx + 12, by2 + 6), self.f_small,
                  self.accent)
-        self.text(sub, (bx + 10, by2 + 22), self.f_small, FAINT,
-                 maxw=bw - 20)
+        ty = by2 + 30
+        for row in rows:
+            if bullets:
+                self.text("•", (bx + 12, ty), self.f_med, self.accent)
+                self.text(row, (bx + 28, ty), self.f_med, FAINT,
+                         maxw=bw - 40)
+            else:
+                self.text(row, (bx + 12, ty), self.f_med, FAINT,
+                         maxw=bw - 24)
+            ty += line_h
 
     def render_home_nexus(self):
-        """VOIDDESK V10 -- Net-Sphere: tre orbite concentriche
-        attorno a un centro comune, nove nodi (RAIL SYSTEM). Su/Giu'
-        cambia l'orbita attiva, Sinistra/Destra la fa ruotare
-        portando il nodo successivo/precedente al punto di aggancio
-        in alto."""
+        """VOIDDESK 9.300 'Net-Sphere' -- planetario navigabile: le
+        tre orbite sono SEMPRE tutte visibili attorno al sole
+        (START SESSION), i pianeti in moto continuo -- inclusa
+        quella lontanissima e inclinata a se' di END NODE. La zona
+        di selezione resta fissa a sinistra: e' il planetario che si
+        sposta e si ridimensiona in base al nodo scelto. Sinistra/
+        Destra sposta il focus su un'altra orbita, Su/Giu' al
+        pianeta successivo/precedente su quella attiva."""
         self.header("__brand__")
         self._nexus_bg()
-        cx, cy = 175, 250
-        self._nexus_draw_scene(cx, cy)
-        self._nexus_side_panels(cx, cy)
+        self._nexus_draw_scene()
+        self._nexus_side_panels()
         updown = "SU/GIÙ" if self.lang == "it" else "UP/DOWN"
         orbita = "orbita" if self.lang == "it" else "orbit"
         self.footer([("Y", self.t("view")),
-                     ("SX/DX", self.t("change")),
-                     (updown, orbita),
-                     ("A", self.t("open"))])
+                     ("SX/DX", orbita),
+                     ("A", self.t("open")),
+                     ("SU/GIÙ", self.t("change")),
+                     ("R2", "USER ID")])
 
     def nexus_ring_rotate(self, direction):
-        """Ruota di uno scatto l'orbita attiva (RAIL SYSTEM),
-        animando la transizione -- stesso principio di prima
-        (nexus_travel) ma su un intero anello invece di un salto
-        singolo tra due nodi."""
+        """Sposta il focus di uno scatto sull'orbita attiva (Su/
+        Giu'): il planetario pan-na e si ridimensiona con continuita'
+        dalla posizione del pianeta attuale a quella del successivo/
+        precedente -- niente scatti, e la deriva orbitale continua a
+        scorrere sotto durante il movimento."""
         ring_list = self._nexus_ring_list(self.nexus_ring)
         if len(ring_list) < 2:
             return
         self.play("nexus")
-        rot0 = self._nexus_ring_rot(self.nexus_ring)
-        cx, cy = 175, 250
+        i0 = self._nexus_ring_rot(self.nexus_ring)
+        zoom0 = NEXUS_ZOOM.get(self.sel, 1.0)
+        i1 = (i0 + direction) % len(ring_list)
+        self._nexus_set_ring_rot(self.nexus_ring, i1)
+        self._nexus_sync_sel()
+        zoom1 = NEXUS_ZOOM.get(self.sel, 1.0)
         frames = 10
         for f in range(frames):
             k = (f + 1) / float(frames)
-            shift = direction * 90.0 * k
-            mid_ph = (rot0 * 90.0 + shift) if self.nexus_ring == 1 \
-                else None
-            out_ph = (rot0 * 90.0 + shift) if self.nexus_ring == 2 \
-                else None
+            t_now = time.time()
+            pos = self._nexus_camera_target_pos(
+                self.nexus_ring, i0 + direction * k, t_now)
+            zoom = zoom0 + (zoom1 - zoom0) * k
             self.header("__brand__")
             self._nexus_bg()
-            self._nexus_draw_scene(cx, cy, mid_ph, out_ph)
-            self._nexus_side_panels(cx, cy)
-            self.footer([("SX/DX", self.t("change"))])
+            self._nexus_draw_scene(pos, zoom)
+            self._nexus_side_panels()
+            self.footer([("SU/GIÙ", self.t("change"))])
             pygame.display.flip()
             self.clock.tick(40)
-        rot1 = (rot0 + direction) % len(ring_list)
-        self._nexus_set_ring_rot(self.nexus_ring, rot1)
-        self._nexus_sync_sel()
         self.render()
 
     def nexus_ring_switch(self, direction):
-        """Passa all'orbita interna/esterna successiva (Su/Giu')."""
+        """Sposta il focus sull'orbita interna/esterna successiva
+        (Sinistra/Destra): il planetario pan-na dalla posizione del
+        pianeta attivo dell'orbita attuale a quello dell'orbita
+        nuova -- tutte le orbite restano visibili per tutto il
+        tempo, e' solo l'inquadratura (e lo zoom) che cambia. v10.6:
+        il limite arriva a 3, la nuova orbita lontana di END NODE."""
         new_ring = self.nexus_ring + direction
-        if new_ring < 0 or new_ring > 2:
+        if new_ring < 0 or new_ring > 3:
             return
         self.play("nexus")
+        old_ring = self.nexus_ring
+        old_i = self._nexus_ring_rot(old_ring)
+        zoom0 = NEXUS_ZOOM.get(self.sel, 1.0)
         self.nexus_ring = new_ring
         self._nexus_sync_sel()
-        cx, cy = 175, 250
-        updown = "SU/GIÙ" if self.lang == "it" else "UP/DOWN"
-        for f in range(6):
+        new_i = self._nexus_ring_rot(new_ring)
+        zoom1 = NEXUS_ZOOM.get(self.sel, 1.0)
+        for f in range(8):
+            k = (f + 1) / 8.0
+            t_now = time.time()
+            wx0, wy0 = self._nexus_camera_target_pos(old_ring, old_i,
+                                                      t_now)
+            wx1, wy1 = self._nexus_camera_target_pos(new_ring, new_i,
+                                                      t_now)
+            pos = (wx0 + (wx1 - wx0) * k, wy0 + (wy1 - wy0) * k)
+            zoom = zoom0 + (zoom1 - zoom0) * k
             self.header("__brand__")
             self._nexus_bg()
-            self._nexus_draw_scene(cx, cy)
-            self._nexus_side_panels(cx, cy)
-            self.footer([(updown, self.t("change"))])
+            self._nexus_draw_scene(pos, zoom)
+            self._nexus_side_panels()
+            self.footer([("SX/DX", self.t("change"))])
             pygame.display.flip()
             self.clock.tick(40)
         self.render()
@@ -10964,7 +11782,17 @@ class App(object):
         if maxw:
             while s and f.size(s)[0] > maxw:
                 s = s[:-1]
-        self.surface.blit(f.render(s, True, color), pos)
+        key = (id(f), s, color)
+        cache = self._text_cache
+        img = cache.get(key)
+        if img is None:
+            img = f.render(s, True, color)
+            cache[key] = img
+            if len(cache) > self._text_cache_max:
+                cache.popitem(last=False)
+        else:
+            cache.move_to_end(key)
+        self.surface.blit(img, pos)
 
     def mark(self, x, y, state):
         """Spunta verde / croce rossa / trattino grigio, disegnate a mano
@@ -11144,6 +11972,43 @@ class App(object):
             pts.append((x, yy))
         pygame.draw.lines(self.surface, (200, 30, 30), False, pts, 2)
         self.surface.set_clip(None)
+
+    def nexus_planet_icon(self, icon_key, size):
+        """Illustrazione del pianeta per un nodo Nexus, in cache per
+        (icon_key, size arrotondata) -- stesso pattern di
+        brand_symbol(). Ritorna None se l'asset manca o la chiave
+        non e' mappata, cosi' il chiamante puo' ripiegare sul glifo
+        procedurale di icons.draw() senza mai bloccarsi. v10.4:
+        contain-fit che mantiene le proporzioni originali su tela
+        trasparente size x size, invece di stirare l'immagine in un
+        quadrato -- gli altri pianeti sono dischi e non se ne
+        accorgono, ma MUOS APPS ha un artwork da satellite (non
+        rotondo) che altrimenti uscirebbe deformato sia in
+        targhetta che nel planetario."""
+        size = max(8, int(round(size / 2.0) * 2))
+        if not hasattr(self, "_nexus_planet_cache"):
+            self._nexus_planet_cache = {}
+        key = (icon_key, size)
+        if key in self._nexus_planet_cache:
+            return self._nexus_planet_cache[key]
+        img = None
+        fname = NEXUS_PLANET_FILES.get(icon_key)
+        if fname:
+            path = os.path.join(APP_DIR, "assets", "nexus_planets",
+                                fname)
+            try:
+                src = pygame.image.load(path).convert_alpha()
+                sw, sh = src.get_size()
+                fit = min(size / float(sw), size / float(sh))
+                nw = max(1, int(round(sw * fit)))
+                nh = max(1, int(round(sh * fit)))
+                scaled = pygame.transform.smoothscale(src, (nw, nh))
+                img = pygame.Surface((size, size), pygame.SRCALPHA)
+                img.blit(scaled, ((size - nw) // 2, (size - nh) // 2))
+            except Exception:
+                img = None
+        self._nexus_planet_cache[key] = img
+        return img
 
     def brand_symbol(self, h):
         """Simbolo Void Desk per l'header, in cache per altezza --
@@ -12024,18 +12889,29 @@ class App(object):
             self._media_panel_button(btn)
             return
         if top == "home":
-            style = self.cfg.get("home_style", "blame")
-            if btn == "R1":
-                if self.r1_tablet_phase is None:
-                    self.r1_tablet_phase = "in"
-                    self.r1_tablet_t0 = time.time()
+            style = self.cfg.get("home_style", DEFAULT_HOME_STYLE)
+            if btn == "R2" and self.l2_panel_phase is None:
+                if self.r2_tablet_phase is None:
+                    self.r2_tablet_phase = "in"
+                    self.r2_tablet_t0 = time.time()
                     self.play("click")
-                elif self.r1_tablet_phase == "show":
-                    self.r1_tablet_phase = "out"
-                    self.r1_tablet_t0 = time.time()
+                elif self.r2_tablet_phase == "show":
+                    self.r2_tablet_phase = "out"
+                    self.r2_tablet_t0 = time.time()
                     self.play("click")
                 return
-            if self.r1_tablet_phase is not None:
+            if btn == "L2" and self.r2_tablet_phase is None:
+                if self.l2_panel_phase is None:
+                    self.l2_panel_phase = "in"
+                    self.l2_panel_t0 = time.time()
+                    self.play("click")
+                elif self.l2_panel_phase == "show":
+                    self.l2_panel_phase = "out"
+                    self.l2_panel_t0 = time.time()
+                    self.play("click")
+                return
+            if self.r2_tablet_phase is not None or \
+                    self.l2_panel_phase is not None:
                 return
             if btn == "Y":
                 idx = (HOME_STYLES.index(style) + 1) % len(HOME_STYLES)
@@ -12045,6 +12921,7 @@ class App(object):
                 self.nexus_ring = 0
                 self.nexus_rot_mid = 0
                 self.nexus_rot_out = 0
+                self.nexus_rot_far = 0
                 self.play("snap")
                 return
             if style == "blame":
@@ -12096,13 +12973,13 @@ class App(object):
                     self.crt_off()
             elif style == "nexus":
                 if btn == "LEFT":
-                    self.nexus_ring_rotate(-1)
-                elif btn == "RIGHT":
-                    self.nexus_ring_rotate(1)
-                elif btn == "UP":
                     self.nexus_ring_switch(-1)
-                elif btn == "DOWN":
+                elif btn == "RIGHT":
                     self.nexus_ring_switch(1)
+                elif btn == "UP":
+                    self.nexus_ring_rotate(-1)
+                elif btn == "DOWN":
+                    self.nexus_ring_rotate(1)
                 elif btn == "A":
                     self.activate(self.sel)
                 elif btn == "START":
@@ -12859,10 +13736,24 @@ class App(object):
                     self.hub_action("uplink", k, kind)
                 elif btn == "B":
                     self.pop_state()
+            elif self.hub_sel < 5:
+                if btn == "LEFT":
+                    self.hub_sel = 3 + (self.hub_sel - 3 - 1) % 2
+                elif btn == "RIGHT":
+                    self.hub_sel = 3 + (self.hub_sel - 3 + 1) % 2
+                elif btn == "UP":
+                    self.hub_sel = 0
+                elif btn == "DOWN":
+                    self.hub_sel = 5
+                elif btn == "A":
+                    k, ic, lk, sk, kind = items[self.hub_sel]
+                    self.hub_action("uplink", k, kind)
+                elif btn == "B":
+                    self.pop_state()
             else:
                 if btn == "UP":
-                    self.hub_sel = self.hub_sel - 1 if self.hub_sel > 3 \
-                        else 0
+                    self.hub_sel = self.hub_sel - 1 if \
+                        self.hub_sel > 5 else 3
                 elif btn == "DOWN":
                     self.hub_sel = self.hub_sel + 1 if \
                         self.hub_sel < n - 1 else 0
@@ -14177,9 +15068,20 @@ class App(object):
                 self.run_busy(self.t("checking"), self.pcup_scan)
                 self.pc_scanning = False
             elif btn == "SELECT":
-                self.cfg["pc_link_always_on"] = not self.cfg.get(
-                    "pc_link_always_on", False)
+                new_val = not self.cfg.get("pc_link_always_on", False)
+                self.cfg["pc_link_always_on"] = new_val
                 save_cfg(self.cfg)
+                if new_val:
+                    def bg_connect():
+                        try:
+                            self.pcup_scan()
+                            self.pc_link_connect_default()
+                        except Exception:
+                            pass
+                    threading.Thread(target=bg_connect,
+                                     daemon=True).start()
+                else:
+                    self.pc_link_disconnect_all()
             elif btn == "R1":
                 self.push("bstationsend")
             elif btn == "B":
@@ -14190,8 +15092,15 @@ class App(object):
                     self.basestation_serve_start()
                 else:
                     self.basestation_serve_stop()
+            elif btn == "SELECT":
+                new_val = not self.cfg.get("bstation_always_on", False)
+                self.cfg["bstation_always_on"] = new_val
+                save_cfg(self.cfg)
+                if new_val and self.bstation_srv is None:
+                    self.basestation_serve_start()
+                elif not new_val and self.bstation_srv is not None:
+                    self.basestation_serve_stop()
             elif btn == "B":
-                self.basestation_serve_stop()
                 self.pop_state()
         elif top == "ctrldevices":
             n = len(self.ctrl_devices)
@@ -15374,6 +16283,8 @@ class App(object):
         identica su tutti e 5 gli stili home."""
         if self.cfg.get("vfx_trans", 3) <= 0:
             return
+        round_frame = self.cfg.get("home_style", DEFAULT_HOME_STYLE) in (
+            "orbit", "nexus")
         real_flip = pygame.display.flip
         try:
             evinput.poll()
@@ -15413,8 +16324,11 @@ class App(object):
                         pygame.draw.line(s2, (*col, a), (sxp, syp),
                                         (cx, cy), 1)
                         frame.blit(s2, (0, 0))
-                pygame.draw.rect(frame, col, (rx, ry, rw, rh), 2,
-                                 border_radius=6)
+                if round_frame:
+                    pygame.draw.ellipse(frame, col, (rx, ry, rw, rh), 2)
+                else:
+                    pygame.draw.rect(frame, col, (rx, ry, rw, rh), 2,
+                                     border_radius=6)
                 # il nome dentro il riquadro si illumina insieme al
                 # resto -- fascia bassa del riquadro, dove il nome
                 # siede in tutti gli stili home
@@ -15528,28 +16442,36 @@ class App(object):
             except Exception as e:
                 sys.stderr.write(
                     "transizione menu non riuscita: %s\n" % e)
+        # nelle viste orbitali (orbit/nexus) i nodi sono sfere: la
+        # transizione di apertura deve "esplodere" da un cerchio, non
+        # da un rettangolo, per restare coerente con la loro forma.
+        shape = "circle" if self.cfg.get("home_style", DEFAULT_HOME_STYLE) in (
+            "orbit", "nexus") else "rect"
         if i == 0:
             cur = self.cfg.get("desk_env", "xfce")
             self.env_sel = next((j for j, e in enumerate(ENVS)
                                  if e[0] == cur), 0)
-            self.push("session")
+            self.push("session", shape=shape)
         elif i == 1:
             self.mapp_sel = 0
             self.mapps = self.scan_muos()
-            self.push("muosapps")
+            self.push("muosapps", shape=shape)
         elif i == 2:
             self.hub_sel = 0
-            self.push("hub:mediahub")
+            self.push("hub:mediahub", shape=shape)
         elif i in (3, 4, 5, 6):
             hub = ("forge", "toolbox", "uplink", "workshop")[i - 3]
             self.hub_sel = 0
-            self.push("hub:" + hub)
+            self.push("hub:" + hub, shape=shape)
         elif i == 7:
             self.opt_sel = 0
-            self.push("options")
+            self.push("options", shape=shape)
         elif i == 8:
             self.hub_sel = 0
-            self.push("hub:infohub")
+            self.push("hub:infohub", shape=shape)
+        elif i == 9:
+            self.shutdown_sel = 0
+            self.push("shutdownmenu", shape=shape)
 
     # -------------------------------------------------------------- render
     def render_home_hud(self):
@@ -15617,7 +16539,7 @@ class App(object):
                       self.f_tiny, self.accent if sel else FAINT)
             y += rh
         self.footer([("Y", self.t("view")), ("A", self.t("open")),
-                     ("M", "MEDIA"), ("R1", "USER ID")])
+                     ("M", "MEDIA"), ("R2", "USER ID")])
 
     def render_home_terminal(self):
         """Terminal retrocomputing: fosforo verde, elenco numerato,
@@ -15648,7 +16570,7 @@ class App(object):
         self.text("root@voiddesk:~$ " + ("_" if blink2 else ""),
                   (12, H - 44), self.f_small, GRN)
         self.footer([("Y", self.t("view")), ("A", self.t("open")),
-                     ("M", "MEDIA"), ("R1", "USER ID")])
+                     ("M", "MEDIA"), ("R2", "USER ID")])
 
     def render_home_orbit(self):
         """Menu radiale: gli hub orbitano attorno al marchio centrale,
@@ -15701,11 +16623,11 @@ class App(object):
         self.f_small.set_italic(False)
         self.footer([("Y", self.t("view")),
                      ("SX/DX", self.t("change")), ("A", self.t("open")),
-                     ("M", "MEDIA"), ("R1", "USER ID")])
+                     ("M", "MEDIA"), ("R2", "USER ID")])
 
     def render_state(self):
         top = self.stack[-1]
-        home_style = self.cfg.get("home_style", "blame")
+        home_style = self.cfg.get("home_style", DEFAULT_HOME_STYLE)
         if top == "home" and home_style == "hud":
             self.render_home_hud()
         elif top == "home" and home_style == "terminal":
@@ -15852,7 +16774,7 @@ class App(object):
                 pygame.draw.rect(self.surface, self.accent, (W - 5, bar_y,
                                  3, bar_h))
             self.footer([("Y", self.t("view")), ("A", self.t("open")),
-                         ("M", "MEDIA"), ("R1", "USER ID")])
+                         ("M", "MEDIA"), ("R2", "USER ID")])
         elif top == "comp":
             it = (self.lang == "it")
             rm = (self.mode == "remove")
@@ -17578,14 +18500,50 @@ class App(object):
                 ow = self.f_tiny.size(onoff)[0]
                 self.text(onoff, (x + rw // 2 + 10, y + 62), self.f_tiny,
                           OK_G if on else FAINT)
-            y = 150
-            avail = (H - 40) - 150
+            # riquadri PC Uplink / Basestation -- stesso trattamento
+            # visivo della riga sopra, sotto wifi/hotspot/bt. Restano
+            # attivi finche' non li spegni tu (v10: fix del bug che
+            # fermava basestation all'uscita dalla schermata).
+            pcup_on = any(s.get("client") and
+                         s["client"].snapshot().get("online")
+                         for s in self.pc_servers)
+            base_on = self.bstation_srv is not None
+            row2_defs = [("pcup", "monitor", pcup_on),
+                        ("basestation", "remote", base_on)]
+            rw2 = (W - 24) // 2
+            y2 = 50 + 84 + 8
+            for i, (key, ic, on) in enumerate(row2_defs):
+                x = 8 + i * (rw2 + 4)
+                idx = 3 + i
+                sel = (self.hub_sel == idx)
+                lk = items[idx][2]
+                if sel:
+                    self.sel_frame(x, y2, rw2, 76)
+                else:
+                    self.npanel(x, y2, rw2, 76, border=LINE, fill=INK,
+                                cut=10)
+                icons.draw(self.surface, ic, x + 14, y2 + 14, 26,
+                          self.accent if sel else
+                          (OK_G if on else FAINT))
+                lab = self.t(lk)
+                self.text(lab, (x + 50, y2 + 12), self.f_small,
+                          FG if sel else DIM)
+                dot_col = OK_G if on else (70, 72, 78)
+                pygame.draw.circle(self.surface, dot_col,
+                                   (x + 56, y2 + 48), 5)
+                pygame.draw.circle(self.surface, INK,
+                                   (x + 56, y2 + 48), 5, 1)
+                onoff = ("ON" if on else "OFF")
+                self.text(onoff, (x + 66, y2 + 42), self.f_tiny,
+                          OK_G if on else FAINT)
+            y = y2 + 76 + 12
+            avail = (H - 40) - y
             per = max(1, avail // 44)
-            list_items = items[3:]
-            first = max(0, min(self.hub_sel - 3 - per // 2,
+            list_items = items[5:]
+            first = max(0, min(self.hub_sel - 5 - per // 2,
                                len(list_items) - per))
             for j in range(first, min(first + per, len(list_items))):
-                real_j = j + 3
+                real_j = j + 5
                 k, ic, lk, sk, kind = items[real_j]
                 sel = (real_j == self.hub_sel)
                 if sel:
@@ -19741,47 +20699,58 @@ class App(object):
             it = (self.lang == "it")
             bs_col = (90, 200, 220)
             self.header("VOID BASESTATION", icon="monitor")
-            self.content_panel(46, H - 40)
+            always_on = self.cfg.get("bstation_always_on", False)
+            self.npanel(8, 46, W - 16, 30, border=LINE, fill=INK,
+                       cut=6)
+            self.switch(16, 52, always_on, w=36, h=18)
+            atxt = ("Basestation sempre attiva" if it else
+                   "Basestation always on")
+            self.text(atxt, (60, 53), self.f_tiny,
+                     self.accent if always_on else FAINT)
+            self.content_panel(80, H - 40)
             running = self.bstation_srv is not None
-            self.npanel(30, 60, W - 60, 240, border=bs_col,
+            self.npanel(30, 92, W - 60, 208, border=bs_col,
                        fill=(8, 14, 16), cut=12)
-            icons.draw(self.surface, "monitor", 46, 76, 26,
+            icons.draw(self.surface, "monitor", 46, 108, 26,
                       OK_G if running else DIM)
             status_s = (("server attivo" if it else "server "
                        "running") if running else
                        ("server fermo" if it else "server "
                         "stopped"))
-            self.text(status_s, (84, 78), self.f_med,
+            self.text(status_s, (84, 110), self.f_med,
                      OK_G if running else DIM)
             if running:
                 ip = self.own_ip() or "?"
                 url = "http://%s:8765/" % ip
                 self.text(("apri questo indirizzo su un browser "
                           "del PC:" if it else "open this address "
-                          "on a PC browser:"), (46, 112),
+                          "on a PC browser:"), (46, 144),
                          self.f_tiny, DIM)
-                self.text(url, (46, 132), self.f_small, bs_col,
+                self.text(url, (46, 164), self.f_small, bs_col,
                          maxw=W - 92)
-                self.text(("scarica basestation.py o carica file "
-                          "sul dispositivo, dalla stessa pagina" if
-                          it else "download basestation.py or "
-                          "upload files to the device, from the "
-                          "same page"), (46, 160),
-                         self.f_tiny, FAINT, maxw=W - 92)
+                self.text(("gestisci file, cartelle e download "
+                          "dalla pagina" if it else "manage files, "
+                          "folders and downloads from the page"),
+                         (46, 192), self.f_tiny, FAINT,
+                         maxw=W - 92)
                 incoming_dir = os.path.join(DATA, "incoming")
+                outgoing_dir = os.path.join(DATA, "outgoing")
                 try:
-                    incoming = sorted(os.listdir(incoming_dir))
+                    n_in = len(os.listdir(incoming_dir))
                 except OSError:
-                    incoming = []
-                self.text(("file ricevuti dal PC (%d):" % len(
-                          incoming)) if it else ("received from "
-                          "PC (%d):" % len(incoming)), (46, 198),
-                         self.f_small, FG)
-                iy = 220
-                for fn in incoming[:4]:
-                    self.text(fn, (56, iy), self.f_tiny, DIM,
-                             maxw=W - 100)
-                    iy += 17
+                    n_in = 0
+                try:
+                    n_out = len(os.listdir(outgoing_dir))
+                except OSError:
+                    n_out = 0
+                self.text(("ricevuti da PC: %d elementi" % n_in)
+                         if it else ("received from PC: %d "
+                         "items" % n_in), (46, 226), self.f_small,
+                         FG)
+                self.text(("condivisi da console: %d elementi" %
+                          n_out) if it else ("shared from "
+                          "console: %d items" % n_out),
+                         (46, 248), self.f_small, FG)
             else:
                 for wl in self.note_wrap(
                         "avvia il server per scaricare il "
@@ -19791,11 +20760,12 @@ class App(object):
                         "PC companion (basestation.py) from this "
                         "device, no internet needed", W - 92,
                         self.f_small, 4):
-                    self.text(wl, (46, 112), self.f_small, DIM,
+                    self.text(wl, (46, 144), self.f_small, DIM,
                              maxw=W - 92)
             a_label = ("ferma" if running else "avvia") if it else \
                 ("stop" if running else "start")
             self.footer([("A", a_label),
+                        ("SELECT", "auto" if it else "auto"),
                         ("B", self.t("back"))])
         elif top == "ctrldevices":
             it = (self.lang == "it")
@@ -20910,16 +21880,19 @@ class App(object):
                 self.surface.blit(cur, (0, 0))
                 self.surface.set_clip(None)
                 c = self.trans.get("color") or self.accent
-                pygame.draw.rect(self.surface, c, r, 1)
-                for cx, cy, dx, dy in ((r.left, r.top, 1, 1),
-                                       (r.right - 1, r.top, -1, 1),
-                                       (r.left, r.bottom - 1, 1, -1),
-                                       (r.right - 1, r.bottom - 1,
-                                        -1, -1)):
-                    pygame.draw.line(self.surface, c, (cx, cy),
-                                     (cx + 10 * dx, cy), 2)
-                    pygame.draw.line(self.surface, c, (cx, cy),
-                                     (cx, cy + 8 * dy), 2)
+                if self.trans.get("shape") == "circle":
+                    pygame.draw.ellipse(self.surface, c, r, 2)
+                else:
+                    pygame.draw.rect(self.surface, c, r, 1)
+                    for cx, cy, dx, dy in ((r.left, r.top, 1, 1),
+                                           (r.right - 1, r.top, -1, 1),
+                                           (r.left, r.bottom - 1, 1, -1),
+                                           (r.right - 1, r.bottom - 1,
+                                            -1, -1)):
+                        pygame.draw.line(self.surface, c, (cx, cy),
+                                         (cx + 10 * dx, cy), 2)
+                        pygame.draw.line(self.surface, c, (cx, cy),
+                                         (cx, cy + 8 * dy), 2)
                 if 1 < r.top < H and r.h > 8:
                     band = self.surface.subsurface(
                         (0, max(0, r.top - 1), W, 2)).copy()
@@ -20932,7 +21905,8 @@ class App(object):
         self._radio_health_update()
         self._notif_draw()
         self._media_panel_draw()
-        self._r1_tablet_draw()
+        self._r2_tablet_draw()
+        self._l2_panel_draw()
         if flip:
             pygame.display.flip()
 
