@@ -282,19 +282,6 @@ Every subsystem that can fail writes its own log. If something's wrong, the **Lo
 
 ---
 
-## 🗺️ Roadmap
-
-VoidDesk is under active, genuinely relentless development. Core functionality is stable and in daily use; the visual layer is being reworked screen by screen, and several larger features are in progress:
-
-- **v10.0.0** — Nexus 3D planetarium menu *(current)*
-- **v10.1.0** — Enhanced package installer with dependency resolution
-- **v10.2.0** — App drawer redesign
-- **v10.3.0** — Deeper networking detail views
-
-See [`ROADMAP.md`](ROADMAP.md) for the current state of things in detail.
-
----
-
 ## ⚖️ Credits & Philosophy
 
 **Part of the SPDW Factory ecosystem** — built alongside `VoidCast` (IPTV/PVR) and `VoidDiag` (zero-dependency diagnostics), somewhere in the ß universe.
