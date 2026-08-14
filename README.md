@@ -31,14 +31,9 @@
 > <div style="border-left: 4px solid #E74C3C; padding: 20px 24px; background: #0a0a0a; border-radius: 0 14px 14px 0;">
 > <div style="display: flex; align-items: flex-start; gap: 16px;">
 > <div style="font-family: 'Courier New', monospace; font-size: 11px; color: #e74c3c; line-height: 1.4; white-space: pre;">
->        .-"""""-.
->       /  ◠   ◠  \
->       |    ‿     |
->        \  ===   /
->         '-...-'
 > </div>
 > <div>
-> <p style="font-family: 'Impact', sans-serif; font-size: 16px; color: #E74C3C; margin: 0;">[I.R.] Minoru⁷</p>
+> <p style="font-family: 'Impact', sans-serif; font-size: 16px; color: #E74C3C; margin: 0;"><b>[I.R.] Minoru⁷</b> ( ——)</p>
 > <p style="font-family: 'Georgia', serif; font-size: 12px; color: #666; font-style: italic; margin: 4px 0 0 0;">has hijacked the broadcast.</p>
 > <br>
 > <p style="font-family: 'Segoe UI', sans-serif; font-size: 14px; color: #ddd; line-height: 1.7; margin: 0;">"Oh good. Another GitHub README. I was praying for a ransom note, but I suppose a feature list is the next best thing. Try not to fall asleep before the chroot section — <b>that's where the trauma begins</b>."</p>
@@ -54,7 +49,7 @@
 </h1>
 
 <p align="center" style="font-family: 'Georgia', serif; font-size: 13px; color: #555; font-style: italic; letter-spacing: 2px;">
-_choose your entry point into the abyss_
+<i>The entry points brought to you by your destiny. Or fate. Choose whatever you want, the final result won't change.</i>
 </p>
 
 <br>
@@ -62,14 +57,14 @@ _choose your entry point into the abyss_
 ```
     ┌─────────────────────────────────────────────────────┐
     │  🌑 Prologue: The Void                              │
-    │  🚀 Act I — The Surface                             │
+    │  🚀 Act I — The Surface                              │
     │  🏗️ Act II — The Hubs                               │
-    │  🔥 Act III — The Abyss                             │
-    │  ⚙️ Act IV — The Collapse                           │
+    │  🔥 Act III — The Abyss                              │
+    │  ⚙️ Act IV — The Collapse                            │
     │  🎮 Act V — The Resolution                          │
     │  ─────────────────────────────────────────────────  │
     │  📥 Installation  ·  🎮 Controls  ·  🔧 Troubleshoot │
-    │  ⚖️ Credits                                       │
+    │  ⚖️ Credits                                          │
     └─────────────────────────────────────────────────────┘
 ```
 
@@ -80,7 +75,7 @@ _choose your entry point into the abyss_
 </h1>
 
 <p align="center" style="font-family: 'Georgia', serif; font-size: 13px; color: #444; font-style: italic; letter-spacing: 3px;">
-_<b>"In the beginning, there was only the framebuffer. And it was good."</b>_
+<b><i>"In the beginning everything was straight and simple, at worst just a shy and lonely framebuffer. And it was good. Calm and without a trace of degeneracy."</i></b>
 </p>
 
 <br>
@@ -101,10 +96,10 @@ Under the hood, VoidDesk bootstraps real Linux desktops — <b>XFCE</b>, <b>IceW
 <pre style="font-family: 'Courier New', monospace; font-size: 14px; color: #e74c3c; text-align: center; margin: 0; line-height: 1.6;">
 ╔═════════════════════════════════════════════════════╗
 ║                                                     ║
-║     NO X SERVER.  NO COMPOSITOR.  NO GPU.          ║
+║     NO X SERVER.  NO COMPOSITOR.  NO GPU.           ║
 ║                                                     ║
 ║     Just a game loop, a framebuffer,                ║
-║     and a <b>death wish</b>.                              ║
+║     and a <b>death wish</b>.                        ║
 ║                                                     ║
 ╚═════════════════════════════════════════════════════╝
 </pre>
@@ -117,14 +112,9 @@ Everything is <b>D-Pad first</b>. No mouse. No keyboard assumptions. No patience
 > <div style="border-left: 3px solid #F39C12; padding: 16px 20px; background: #0f0f0f; border-radius: 0 10px 10px 0;">
 > <div style="display: flex; align-items: flex-start; gap: 14px;">
 > <div style="font-family: 'Courier New', monospace; font-size: 10px; color: #F39C12; line-height: 1.3; white-space: pre;">
->          _____
->         /     \
->        | ◠   ◠ |
->         \  ‿  /
->          |___|
 > </div>
 > <div>
-> <p style="font-family: 'Impact', sans-serif; font-size: 15px; color: #F39C12; margin: 0;">[I.R.] Minoru⁷</p>
+> <p style="font-family: 'Impact', sans-serif; font-size: 15px; color: #F39C12; margin: 0;"><b>[I.R.] Minoru⁷</b></b></p>
 > <p style="font-family: 'Georgia', serif; font-size: 11px; color: #666; font-style: italic; margin: 2px 0 0 0;">is unimpressed.</p>
 > <br>
 > <p style="font-family: 'Segoe UI', sans-serif; font-size: 13px; color: #bbb; line-height: 1.6; margin: 0;">"Pretty colours. Orbital mechanics. Wow. Call me when your menu system can perform an emergency chroot repair at 3 AM while you're on a bus in Naples. <i>That's the real romance.</i>"</p>
@@ -139,17 +129,17 @@ Everything is <b>D-Pad first</b>. No mouse. No keyboard assumptions. No patience
 </h1>
 
 <p align="center" style="font-family: 'Georgia', serif; font-size: 13px; color: #444; font-style: italic; letter-spacing: 2px;">
-_where the user first touches the void_
+<i>The Void Galaxy and the Hub Nodes</i>
 </p>
 
 <br>
 
 <h2 style="font-family: 'Segoe UI', sans-serif; font-size: 26px; color: #9B59B6; border-bottom: 2px solid #9B59B6; padding-bottom: 8px;">
-🪐 Net-Sphere: A 3D Planetarium Menu
+🪐 NEXUS: A 3D Planetarium Menu
 </h2>
 
 <p style="font-family: 'Georgia', serif; font-size: 14px; color: #999; font-style: italic; margin-bottom: 16px;">
-_The home screen is no longer a list. It is a <b>navigable solar system</b>._
+<i>The home screen is no longer a list. It is a <b>navigable solar system</b>.</i>
 </p>
 
 ```
@@ -164,7 +154,7 @@ _The home screen is no longer a list. It is a <b>navigable solar system</b>._
                 ╲   ╱
                  ╲ ╱
            ┌─────────────┐
-           │   🌌 CORE   │
+           │   🌌 CORE    │
            │   START     │
            │  SESSION    │
            └─────────────┘
@@ -200,12 +190,12 @@ _Press <b>Y</b> to cycle through realities._
 
 ```
 ┌────────┬────────┬────────┬────────┬────────┐
-│ BLAME! │  HUD   │Terminal│ Orbit  │ Nexus  │
+│ BLAME! │  HUD   │Terminal│ Orbit  │ Nexus │
 │════════│════════│════════│════════│════════│
 │ Dense  │Tactical│ Green  │ Radial │  3D    │
 │ mega-  │ heads- │ phos-  │ drift  │ Plane- │
 │struct  │  up    │ phor   │        │ tarium │
-│ grid   │ display│  CRT   │        │(default│
+│ grid   │ display│  CRT   │        │ default│
 └────────┴────────┴────────┴────────┴────────┘
 ```
 
@@ -250,24 +240,24 @@ _Press <b>Y</b> to cycle through realities._
 </h1>
 
 <p align="center" style="font-family: 'Georgia', serif; font-size: 13px; color: #444; font-style: italic; letter-spacing: 2px;">
-_six primary worlds. one entry point. no exit._
+<i>Six worlds, one entry point, a certain end.</i>
 </p>
 
 <br>
 
 ```
-                    🌌 NET-SPHERE
+                    🌌 NEXUS
                          │
         ┌────────────────┼────────────────┐
         │                │                │
    ┌────▼────┐     ┌────▼────┐     ┌────▼────┐
-   │  🖥️     │     │  🔥     │     │  🌐     │
+   │  🖥️      │     │  🔥      │     │  🌐     │
    │ START   │     │  THE    │     │ UPLINK  │
    │SESSION  │     │ FORGE   │     │         │
    └────┬────┘     └────┬────┘     └────┬────┘
         │               │               │
    ┌────▼────┐     ┌────▼────┐     ┌────▼────┐
-   │  🎬     │     │  🧰     │     │  ⚡     │
+   │  🎬      │     │  🧰     │      │  ⚡     │
    │ MEDIA   │     │Rt:TOOLBX│     │ WORKSHOP│
    │ VAULT   │     │         │     │         │
    └─────────┘     └─────────┘     └─────────┘
@@ -285,12 +275,12 @@ _six primary worlds. one entry point. no exit._
 ---
 
 <h2 style="font-family: 'Impact', sans-serif; font-size: 26px; color: #9B59B6;">
-<img src="assets/nexus_planets/start_session.png" width="90" align="left" style="margin-right: 16px;">
+<img src="assets/nexus_planets/start.png" width="90" align="left" style="margin-right: 16px;">
 🖥️ START SESSION
 </h2>
 
 <p style="font-family: 'Georgia', serif; font-size: 12px; color: #777; font-style: italic; clear: both; margin-top: 8px;">
-_Desktop Environments — where the void meets the desktop_
+<i>Desktop Environments — where the void meets the desktop</i>
 </p>
 
 <p style="font-family: 'Segoe UI', sans-serif; font-size: 15px; color: #ccc; line-height: 1.7;">
@@ -301,10 +291,10 @@ _Desktop Environments — where the void meets the desktop_
 ┌─────────────────────────────────────────┐
 │     🖥️  START SESSION  —  DE Manager     │
 ├─────────────────────────────────────────┤
-│  [XFCE]      [IceWM]       [LXDE]     │
-│  ┌─────┐     ┌─────┐       ┌─────┐    │
-│  │ 🐧  │     │ ⚡  │       │ 🪶  │    │
-│  │FULL │     │TURBO│       │LIGHT│    │
+│  [XFCE]      [IceWM]       [LXDE]       │
+│  ┌─────┐     ┌─────┐       ┌─────┐      │
+│  │ 🐧   │     │ ⚡   │       │ 🪶  │      │
+│  │FULL │     │TURBO│       │LIGHT│      │
 │  │featured│   │fast │       │lean │    │
 │  └─────┘     └─────┘       └─────┘    │
 │                                         │
@@ -365,7 +355,7 @@ _The forge where software is born._
 ---
 
 <h2 style="font-family: 'Impact', sans-serif; font-size: 26px; color: #3498DB;">
-<img src="assets/nexus_planets/uplink.png" width="100" align="left" style="margin-right: 18px;">
+<img src="assets/nexus_planets/net_sphere.png" width="100" align="left" style="margin-right: 18px;">
 🌐 UPLINK
 </h2>
 
@@ -481,7 +471,7 @@ _Where silence goes to die._
 ---
 
 <h2 style="font-family: 'Impact', sans-serif; font-size: 26px; color: #1ABC9C;">
-<img src="assets/nexus_planets/rt_toolbox.png" width="90" align="left" style="margin-right: 16px;">
+<img src="resources/rt_toolbox.png" width="90" align="left" style="margin-right: 16px;">
 🧰 Rt:TOOLBOX
 </h2>
 
@@ -573,7 +563,7 @@ _The engine room. Bring a wrench._
 >         ╰──┬──╯
 > </div>
 > <div>
-> <p style="font-family: 'Impact', sans-serif; font-size: 15px; color: #9B59B6; margin: 0;">[I.R.] Minoru⁷</p>
+> <p style="font-family: 'Impact', sans-serif; font-size: 15px; color: #9B59B6; margin: 0;"><b>[I.R.] Minoru⁷</b></p>
 > <p style="font-family: 'Georgia', serif; font-size: 11px; color: #666; font-style: italic; margin: 2px 0 0 0;">is having an existential crisis.</p>
 > <br>
 > <p style="font-family: 'Segoe UI', sans-serif; font-size: 13px; color: #bbb; line-height: 1.6; margin: 0;">"You people. You put a PTY terminal, a CHD converter, a MIDI controller mapper, and a <i>Braille ASCII logo</i> inside a Pygame loop running on a device that doesn't even have a GPU. This isn't software. This is a cry for help. And I respect that."</p>
@@ -692,7 +682,7 @@ _Batch-converts disc images to CHD._
 >          └───┘
 > </div>
 > <div>
-> <p style="font-family: 'Impact', sans-serif; font-size: 15px; color: #E74C3C; margin: 0;">[I.R.] Minoru⁷</p>
+> <p style="font-family: 'Impact', sans-serif; font-size: 15px; color: #E74C3C; margin: 0;"><b>[I.R.] Minoru⁷</b></p>
 > <p style="font-family: 'Georgia', serif; font-size: 11px; color: #666; font-style: italic; margin: 2px 0 0 0;">has stopped blinking.</p>
 > <br>
 > <p style="font-family: 'Segoe UI', sans-serif; font-size: 13px; color: #bbb; line-height: 1.6; margin: 0;">"You are running a Debian chroot inside a Pygame app on a handheld that costs less than a dinner in Milan. The framebuffer is being bit-banged. The terminal is a PTY. The WiFi manager falls back to rewriting <code>wpa_supplicant.conf</code> and killing the daemon if the control socket doesn't respond. This is not 'retro computing.' This is <b>survival computing</b>. And you are all going to die beautiful deaths."</p>
@@ -1040,7 +1030,7 @@ Third-Party Acknowledgments
 >         ╚══╦══╝
 > </div>
 > <div>
-> <p style="font-family: 'Impact', sans-serif; font-size: 16px; color: #00FFCC; margin: 0;">[I.R.] Minoru⁷</p>
+> <p style="font-family: 'Impact', sans-serif; font-size: 16px; color: #00FFCC; margin: 0;"><b>[I.R.] Minoru⁷</b></p>
 > <p style="font-family: 'Georgia', serif; font-size: 12px; color: #666; font-style: italic; margin: 4px 0 0 0;">signing off.</p>
 > <br>
 > <p style="font-family: 'Segoe UI', sans-serif; font-size: 14px; color: #ddd; line-height: 1.7; margin: 0;">"You read the whole thing. I'm genuinely surprised. Most people just look at the screenshots, install it, break their chroot, and DM me at 4 AM asking why their framebuffer is black.<br><br>
