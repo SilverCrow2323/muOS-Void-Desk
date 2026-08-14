@@ -3,24 +3,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VOID // "Direct Link" Rt:SERVER</title>
+<title>VOID // "Direct Link" Rt:SERVER [UNDERGROUND HUD]</title>
 <style>
+/* --- NUOVI VARIABILI E TINTI --- */
 :root{
-  --bg:#0a0b0e;
+  --bg:#050608; /* Più scuro */
   --panel:#0d1013;
   --panel2:#10151a;
   --line:#232a33;
+  
   --cyan:#5ac8dc;
   --cyan-dim:#2e5860;
   --amber:#ffb443;
   --green:#33ff55;
+  --green-dim:#1a581e;
   --red:#ff4d4d;
+  --red-dim:#602e2e;
+  
   --fg:#e7ecef;
   --dim:#8993a1;
   --faint:#4d5661;
   --mono:ui-monospace,"SF Mono","Cascadia Code","Courier New",monospace;
   --sans:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+
+  /* NUOVE TINTI PER I COMPANIONS */
+  --basestation-tint: var(--cyan);
+  --basestation-bg-tint: rgba(90,200,220,0.06);
+  --android-tint: var(--green);
+  --android-bg-tint: rgba(51,255,85,0.06);
+  
+  /* Animazione Holographic */
+  --hologram-anim-time: 0.35s;
 }
+
 *{box-sizing:border-box}
 
 /* Modals fix */
@@ -40,31 +55,175 @@ body{
   position:relative;
   overflow-x:hidden;
 }
+
+/* --- SFONDO ARCHITETTONICO CUPO E OPPRIMENTE (STILE BLAME!) --- */
+/* Simulazione con pseudo-elementi e gradienti. Sostituire con immagine se preferisci. */
 body::before{
   content:"";
   position:fixed;inset:0;
   pointer-events:none;
-  z-index:50;
-  background:repeating-linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.018) 0px,
-    rgba(255,255,255,0.018) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  mix-blend-mode:screen;
+  z-index:1;
+  background: 
+    /* Scanlines */
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.015) 0px,
+      rgba(255,255,255,0.015) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    /* Gradiente cupo opprimente */
+    radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.85) 100%);
+  mix-blend-mode:multiply; /* Post-process per scurire tutto */
 }
 body::after{
   content:"";
   position:fixed;inset:0;
   pointer-events:none;
-  z-index:49;
-  background:radial-gradient(ellipse at 50% 0%, rgba(90,200,220,0.05), transparent 60%);
+  z-index:2;
+  /* Illuminazione superiore simulative di monitor */
+  background:radial-gradient(ellipse at 50% 0%, rgba(90,200,220,0.03), transparent 60%);
 }
+
+/* --- SFONDO ARCHITETTONICO CSS --- */
+/* Simula la densità di strutture metalliche con pseudoelementi. */
+#main-wrap::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 0;
+    opacity: 0.25;
+    pointer-events: none;
+    background: 
+        repeating-linear-gradient(135deg, transparent, transparent 15px, rgba(35,42,51,0.2) 15px, rgba(35,42,51,0.2) 16px),
+        repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(35,42,51,0.2) 15px, rgba(35,42,51,0.2) 16px);
+}
+
 a{color:var(--cyan);text-decoration:none}
 
 /* ---------- layout shell ---------- */
-.wrap{max-width:980px;margin:0 auto;padding:18px 16px 60px}
+#main-wrap{
+    max-width:1080px; /* Un po' più largo per il nuovo layout */
+    margin:0 auto;
+    padding:18px 16px 60px;
+    position: relative;
+    z-index: 10;
+}
+
+/* ---------- ANIMAZIONE OLOGRAFICA HUD ---------- */
+@keyframes holographicAppear {
+    0% { transform: scale(0.9) translateY(20px); opacity: 0; }
+    30% { opacity: 1; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* Classe per applicare l'animazione */
+.hologram-animate {
+    opacity: 0; /* Nascondi inizialmente */
+    animation: holographicAppear var(--hologram-anim-time) ease-out forwards;
+}
+
+/* Definizione dei frame di bootanim */
+#bootanim-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--cyan);
+    font-family: var(--mono);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    text-align: center;
+    overflow: hidden;
+}
+
+#bootanim-overlay::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: 
+        repeating-linear-gradient(0deg, var(--bg), var(--bg) 2px, transparent 2px, transparent 4px);
+    pointer-events: none;
+}
+
+#bootanim-overlay .boot-frame {
+    display: none;
+}
+
+#bootanim-overlay .boot-frame.active {
+    display: block;
+}
+
+/* ---------- CARTELLO SFONDO 48C E GRAFFITI ---------- */
+/* Posizionati su pseudo-elementi dello wrap principale o body */
+#main-wrap::after {
+    content: "";
+    position: fixed;
+    top: 50px;
+    right: 50px;
+    width: 250px;
+    height: 100px;
+    pointer-events: none;
+    z-index: 1;
+    font-family: var(--mono);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* 48C Neon Sfarfallante */
+#main-wrap .neon-sign {
+    position: fixed;
+    top: 150px; /* Allineato in alto a destra */
+    right: 50px;
+    font-family: var(--mono);
+    color: var(--red);
+    text-transform: uppercase;
+    font-size: 40px;
+    font-weight: 700;
+    background: rgba(0,0,0,0.5);
+    padding: 10px 15px;
+    border: 1px solid var(--red-dim);
+    clip-path: polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+    user-select: none;
+    display: flex; gap: 5px;
+}
+
+/* Sfarfallio della C */
+@keyframes neonFlicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; text-shadow: 0 0 10px var(--red), 0 0 20px var(--red); }
+  20%, 22%, 24%, 55%, 57% { opacity: 0.1; text-shadow: none; }
+}
+
+#main-wrap .neon-sign .flicker-char {
+  animation: neonFlicker 3s infinite linear;
+}
+
+/* Graffiti Spray */
+@font-face {
+    font-family: 'SprayPaint';
+    src: local('Avenir Next'), local('Helvetica'), local('Impact'), local('Verdana'); /* Placeholder per font spray se non presente */
+    font-style: normal; font-weight: normal; font-variant: normal; text-transform: uppercase;
+}
+
+#main-wrap .graffiti-tag {
+    position: fixed;
+    top: 250px; /* Sotto il cartello neon */
+    right: 150px;
+    font-family: 'SprayPaint', sans-serif;
+    color: rgba(255,180,67,0.7); /* Giallo sporco */
+    text-transform: uppercase;
+    font-size: 28px;
+    font-weight: 700;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.2);
+    padding: 5px 10px;
+    border-radius: 4px;
+    user-select: none;
+    transform: rotate(-10deg);
+}
 
 /* ---------- Header Hero Banner ---------- */
 .hero-banner{
@@ -137,6 +296,11 @@ a{color:var(--cyan);text-decoration:none}
 .main-title .sub-rt{color:var(--amber);font-size:18px;font-weight:400}
 
 /* Status Indicator / LED */
+.status-indicator-wrap {
+    display: flex; flex-direction: column; gap: 6px;
+    margin-top: 10px;
+}
+
 .status-indicator{
   display:inline-flex;
   align-items:center;
@@ -147,6 +311,7 @@ a{color:var(--cyan);text-decoration:none}
   font-family:var(--mono);
   font-size:11px;
   clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
+  width: max-content;
 }
 .led-dot{
   width:8px;height:8px;border-radius:50%;
@@ -170,56 +335,104 @@ a{color:var(--cyan);text-decoration:none}
 .status-text.red{color:var(--red)}
 .status-ping{color:var(--dim);margin-left:4px;font-size:10px}
 
+/* NUOVI DATI CONNESSONE - HUD INFO */
+.connection-info-grid {
+    display: grid;
+    grid-template-columns: auto max-content max-content auto auto auto;
+    gap: 15px;
+    margin-top: 15px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    padding: 10px;
+    background: rgba(0,0,0,0.25);
+    border: 1px dashed var(--cyan-dim);
+}
+.connection-info-grid .lbl {
+    color: var(--faint); text-align: right; text-transform: uppercase;
+}
+.connection-info-grid .val {
+    color: var(--cyan); word-break: break-all; font-weight: 600;
+}
+.connection-info-grid .val-port {
+    color: var(--amber); font-weight: 700;
+}
+
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
 .barcode{display:flex;align-items:flex-end;gap:1px;height:16px;margin:10px 4px 18px;opacity:.4}
 .barcode span{display:block;width:2px;background:var(--green)}
 
-/* ---------- Companion Cards (BaseStation & AndroidStation) ---------- */
-.companions-container{
+/* ---------- Companions Section (UNICA STRISCIA ORIZZONTALE) ---------- */
+.companions-strip-container{
   display:flex;
-  flex-direction:column;
+  flex-direction:row;
   gap:12px;
   margin-bottom:22px;
+  overflow: hidden;
+  position: relative;
 }
 
+/* Card base per la striscia */
 .basestation-card{
   background:var(--panel2);
   border:1px solid var(--line);
-  border-left:3px solid var(--cyan);
+  border-left:3px solid var(--basestation-tint);
   padding:14px 18px;
   display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:16px;
+  flex-direction: column; /* Cambiato per layout striscia */
+  align-items: flex-start;
+  gap:12px;
   clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
   position:relative;
+  flex: 1; /* Divise a metà */
+}
+
+/* Tinte e sfondi separati */
+.basestation-card.basestation-pc {
+    border-left-color: var(--basestation-tint);
+    background: linear-gradient(135deg, var(--basestation-bg-tint) 0%, var(--panel2) 60%);
 }
 .basestation-card.android-card{
-  border-left-color:var(--green);
+    border-left-color: var(--android-tint);
+    background: linear-gradient(135deg, var(--android-bg-tint) 0%, var(--panel2) 60%);
 }
-.basestation-card::before{
-  content:"";
-  position:absolute;
-  top:0; right:0;
-  width:50px; height:50px;
-  background:linear-gradient(135deg, transparent 50%, rgba(90,200,220,0.04) 50%);
-  pointer-events:none;
+
+/* --- WATERMARK ICONE --- */
+/* Posizionate in background in trasparenza grande */
+.basestation-card::before {
+    content: "";
+    position: absolute;
+    top: 5px; right: 5px;
+    width: 150px; height: 150px;
+    opacity: 0.05; /* Molto trasparente */
+    background-size: contain; background-repeat: no-repeat;
+    pointer-events: none;
+    z-index: -1;
 }
-.bs-left{display:flex;align-items:center;gap:14px}
+
+/* Placeholder icone watermark se non fornite. Usiamo SVG */
+.basestation-card.basestation-pc::before {
+    background-image: url('data:image/svg+xml;utf8,<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>');
+}
+.basestation-card.android-card::before {
+    background-image: url('data:image/svg+xml;utf8,<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>');
+}
+
+.bs-content { width: 100%; display: flex; align-items: flex-start; gap: 14px; }
 .bs-icon{
   width:40px;height:40px;
   background:rgba(90,200,220,0.08);
   border:1px solid var(--cyan-dim);
   display:flex;align-items:center;justify-content:center;
-  color:var(--cyan);
+  color:var(--basestation-tint);
   flex-shrink:0;
   clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
 }
 .android-card .bs-icon{
   background:rgba(51,255,85,0.08);
   border-color:rgba(51,255,85,0.3);
-  color:var(--green);
+  color:var(--android-tint);
 }
 .bs-info .bs-title{
   font-family:var(--mono);
@@ -367,6 +580,15 @@ a{color:var(--cyan);text-decoration:none}
 .actions button:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line) !important;color:var(--dim) !important}
 .actions button.btn-danger{border-color:rgba(255,77,77,0.4);color:var(--red)}
 .actions button.btn-danger:hover:not(:disabled){border-color:var(--red);background:rgba(255,77,77,0.1)}
+
+/* NUOVE FUNZIONALITÀ TOOLBAR (Copia, Taglia, Incolla, Rinomina) */
+.toolbar-ops {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+.toolbar-ops button {
+    font-family: var(--sans); font-size: 13px; padding: 7px 12px; cursor: pointer;
+}
+
 .upload-btn{display:inline-block}
 #btnUp{padding:7px 10px}
 
@@ -411,9 +633,13 @@ a{color:var(--cyan);text-decoration:none}
 
 .f-chk{width:28px;text-align:center}
 .f-chk input{cursor:pointer;accent-color:var(--cyan)}
-.f-icon{width:26px;color:var(--dim);font-family:var(--mono);text-align:center}
-.f-icon.dir{color:var(--amber)}
-.f-icon.txt{color:var(--cyan)}
+
+/* --- NUOVE ICONE PER CARTELLE E FILE --- */
+.f-icon{width:26px;color:var(--dim);font-family:var(--mono);text-align:center; font-size: 16px;}
+.f-icon.dir{color:var(--amber); font-weight: 700;}
+.f-icon.txt{color:var(--cyan); }
+.f-icon.bin{color:var(--red); opacity: 0.8;}
+
 .f-name{cursor:pointer;color:var(--fg);word-break:break-all}
 .f-name.dir{color:var(--amber);font-weight:600}
 .f-name:hover{color:var(--cyan)}
@@ -497,10 +723,27 @@ a{color:var(--cyan);text-decoration:none}
 }
 .toast.err{border-color:var(--red);color:var(--red)}
 
+/* --- HUD INFO CONSOLE AREA --- */
+.console-area {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--green-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--green);
+    overflow-y: scroll;
+    height: 80px;
+}
+.console-area p { margin: 0 0 4px 0; }
+.console-area .cmd { color: var(--fg); opacity: 0.8; }
+.console-area .err { color: var(--red); }
+
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
 
 @media (max-width:720px){
-  .basestation-card{flex-direction:column;align-items:flex-start}
+  .companions-strip-container{flex-direction:column;}
+  .basestation-card{flex-direction:row;align-items:flex-start}
   .bs-actions{width:100%;justify-content:flex-start}
   .bs-btn{flex:1;justify-content:center}
   .toolbar{flex-direction:column;align-items:stretch}
@@ -509,17 +752,48 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
   .search-box input:focus{width:100%}
   .f-meta{display:none}
   .main-title{font-size:18px}
+  .connection-info-grid { grid-template-columns: auto max-content auto auto; gap: 8px; font-size: 10px;}
+  .neon-sign { display: none !important; }
+  .graffiti-tag { display: none !important; }
 }
 @media (prefers-reduced-motion:reduce){
   .led-dot{animation:none}
+  .hologram-animate { animation: none; opacity: 1;}
 }
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<!-- BOOT ANIMATION OVERLAY -->
+<div id="bootanim-overlay">
+    <div class="boot-frame active" data-frame="0">
+        <p>[ ESTABLISHING LINK ]</p>
+        <p>Rt:SERVER >> HANDHELD UNIT</p>
+    </div>
+    <div class="boot-frame" data-frame="1">
+        <p>...[ INIT. UNDERGROUND HUD MODULES ]...</p>
+        <p>VOID BaseStation / AndroidStation</p>
+    </div>
+    <div class="boot-frame" data-frame="2">
+        <p>FILE VOID-DIVER (RT/SERVER)</p>
+        <p>_loading_assets_</p>
+    </div>
+    <div class="boot-frame" data-frame="3">
+        <p>CONNECTION STABLE.</p>
+        <p>VOID BaseStation ONLINE</p>
+    </div>
+</div>
+
+<div id="main-wrap">
+
+  <!-- CARTELLO E GRAFFITI (Simulazione sfondi) -->
+  <div class="neon-sign">
+    <span class="fix-char">4</span><span class="fix-char">8</span><span class="flicker-char">C</span>
+  </div>
+  <div class="graffiti-tag">High LiMBO</div>
 
   <!-- Hero Header -->
-  <header class="hero-banner">
+  <header class="hero-banner hologram-animate" style="animation-delay: 0.1s;">
     <div class="hero-overlay"></div>
     <div class="hero-content">
       <div class="hero-top-bar">
@@ -535,38 +809,56 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 
       <h1 class="main-title">VOID <span class="accent">//</span> "Direct Link" <span class="sub-rt">Rt:SERVER</span></h1>
 
-      <div class="status-indicator">
-        <span class="led-dot green" id="ledDot"></span>
-        <span class="status-text green" id="statusText">ONLINE</span>
-        <span class="status-ping" id="statusPing">(LATENCY: --ms)</span>
+      <div class="status-indicator-wrap">
+          <div class="status-indicator">
+            <span class="led-dot green" id="ledDot"></span>
+            <span class="status-text green" id="statusText">ONLINE</span>
+            <span class="status-ping" id="statusPing">(LATENCY: --ms)</span>
+          </div>
+
+          <!-- NUOVA CONSOLE INFO AREA -->
+          <div class="console-area" id="consoleLog">
+              <p>[INIT] Rt:SERVER Direct Link established.</p>
+              <p>[LOG] AndroidStation companion discovered at 192.168.1.15.</p>
+          </div>
+      </div>
+
+      <!-- NUOVO CONNECTION INFO HUD -->
+      <div class="connection-info-grid">
+          <span class="lbl">IFACE:</span><span class="val" id="iface">VOID-WLAN</span>
+          <span class="lbl">NETWORK:</span><span class="val" id="ssid">"UGC-BaseNet"</span>
+          <span class="lbl">LOCAL IP:</span><span class="val" id="ip">192.168.1.12</span>
+          <span class="lbl">PORT:</span><span class="val val-port" id="port">8080</span>
+          <span class="lbl">PROTO:</span><span class="val">HTTP/TCP</span>
+          <span class="lbl">TX/RX:</span><span class="val">2.1MB/8.7MB</span>
       </div>
     </div>
   </header>
 
   <div class="barcode" id="barcode"></div>
 
-  <!-- Companions Section -->
-  <div class="companions-container">
+  <!-- Companions Section (UNICA STRISCIA) -->
+  <div class="companions-strip-container hologram-animate" style="animation-delay: 0.2s;">
     
     <!-- VOID BaseStation (PC) -->
-    <div class="basestation-card">
-      <div class="bs-left">
-        <div class="bs-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-            <line x1="8" y1="21" x2="16" y2="21"></line>
-            <line x1="12" y1="17" x2="12" y2="21"></line>
-          </svg>
-        </div>
-        <div class="bs-info">
-          <div class="bs-title">
-            VOID BaseStation
-            <span class="badge">DESKTOP COMPANION</span>
+    <div class="basestation-card basestation-pc">
+      <div class="bs-content">
+          <div class="bs-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
           </div>
-          <div class="bs-desc">
-            Download the official desktop tool to connect your handheld device and PC workstation seamlessly.
+          <div class="bs-info">
+            <div class="bs-title">
+              VOID BaseStation
+              <span class="badge">DESKTOP COMPANION</span>
+            </div>
+            <div class="bs-desc">
+              Connect handheld devices and PC workstation seamlessly.
+            </div>
           </div>
-        </div>
       </div>
       <div class="bs-actions">
         <a class="bs-btn" href="/basestation.py" download>
@@ -575,29 +867,29 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
             <polyline points="7 10 12 15 17 10"></polyline>
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
-          Direct Download (.py)
+          Download .py
         </a>
       </div>
     </div>
 
     <!-- AndroidStation (Android) -->
     <div class="basestation-card android-card">
-      <div class="bs-left">
-        <div class="bs-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-            <line x1="12" y1="18" x2="12.01" y2="18"></line>
-          </svg>
-        </div>
-        <div class="bs-info">
-          <div class="bs-title">
-            AndroidStation
-            <span class="badge">ANDROID COMPANION</span>
+      <div class="bs-content">
+          <div class="bs-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
           </div>
-          <div class="bs-desc">
-            Download the Android companion to bridge handhelds and mobile devices to the VOID environment.
+          <div class="bs-info">
+            <div class="bs-title">
+              AndroidStation
+              <span class="badge">ANDROID COMPANION</span>
+            </div>
+            <div class="bs-desc">
+              Bridge mobile devices to the VOID environment.
+            </div>
           </div>
-        </div>
       </div>
       <div class="bs-actions">
         <a class="bs-btn apk-btn" href="/androidstation.apk" download>
@@ -606,24 +898,24 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
             <polyline points="7 10 12 15 17 10"></polyline>
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
-          Download APK
+          APK
         </a>
         <a class="bs-btn py-btn" href="/androidstation.py" download>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="16 18 22 12 16 6"></polyline>
             <polyline points="8 6 2 12 8 18"></polyline>
           </svg>
-          Download PY Script
+          PY Script
         </a>
       </div>
     </div>
 
   </div>
 
-  <!-- Single File Management Panel -->
-  <div class="panel">
+  <!-- Single File Management Panel (NUOVO NOME) -->
+  <div class="panel hologram-animate" style="animation-delay: 0.3s;">
     <div class="panel-header-title">
-      <span>FILES FROM THE VOID</span>
+      <span>FILES FROM THE VOID-DIVER</span>
       <span id="fileCountBadge" style="font-size:11px;color:var(--dim);font-weight:normal">0 items</span>
     </div>
 
@@ -646,6 +938,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
           Delete (<span id="selectedCount">0</span>)
         </button>
       </div>
+    </div>
+
+    <!-- NUOVA TOOLBAR OPERAZIONI (Copia, Taglia, Incolla, Rinomina) -->
+    <div class="toolbar batch-bar" style="border-top: none; padding-top: 0;">
+        <div class="toolbar-ops actions">
+            <button id="btnCopy" disabled title="Copy selected">Copia</button>
+            <button id="btnCut" disabled title="Cut selected">Taglia</button>
+            <button id="btnPaste" disabled title="Paste from clipboard">Incolla</button>
+            <button id="btnRename" disabled title="Rename single item">Rinomina</button>
+        </div>
     </div>
 
     <div class="batch-bar" id="batchBar" hidden>
@@ -730,8 +1032,52 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 
 var state = { area: "in", path: "", selected: new Set(), currentEntries: [], filterQuery: "" };
 var editing = null;
+var clipboard = { action: null, entries: [] }; // NUOVO STATO CLIPBOARD
 
 function $(id){ return document.getElementById(id); }
+
+// Boot Animation Logic
+function startBootAnim() {
+    var bootOverlay = $("bootanim-overlay");
+    var frames = bootOverlay.querySelectorAll(".boot-frame");
+    var currentFrame = 0;
+    
+    bootOverlay.style.display = "flex"; // Show initially
+
+    var frameInterval = setInterval(function() {
+        frames[currentFrame].classList.remove("active");
+        currentFrame++;
+        
+        if (currentFrame >= frames.length) {
+            clearInterval(frameInterval);
+            hideBootAnim();
+        } else {
+            frames[currentFrame].classList.add("active");
+            logToConsole("[BOOT] Loaded Frame: " + currentFrame, true); // Log to Console area
+        }
+    }, 1000); // 1 second per frame
+}
+
+function hideBootAnim() {
+    var bootOverlay = $("bootanim-overlay");
+    bootOverlay.style.opacity = '0';
+    bootOverlay.style.transition = 'opacity 0.5s ease-out';
+    setTimeout(function() {
+        bootOverlay.hidden = true;
+        bootOverlay.style.display = 'none'; // Ensure fully gone
+        logToConsole("[SYS] Underground HUD Interface Loaded.", true);
+    }, 500);
+}
+
+// Log to Console Area Logic
+function logToConsole(msg, isSystem = false) {
+    var consoleArea = $("consoleLog");
+    var p = document.createElement("p");
+    if(isSystem) p.classList.add("cmd");
+    p.textContent = msg;
+    consoleArea.appendChild(p);
+    consoleArea.scrollTop = consoleArea.scrollHeight; // Auto-scroll
+}
 
 function buildBarcode(){
   var el = $("barcode"); var seed = Date.now();
@@ -780,6 +1126,7 @@ window.addEventListener("unhandledrejection", function(e){
   toast("Error: " + m, true);
 });
 
+// Aggiungi un log quando una richiesta API fallisce
 function api(method, url, body){
   var startTime = Date.now();
   var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
@@ -791,6 +1138,7 @@ function api(method, url, body){
     signal: ctrl ? ctrl.signal : undefined
   }).catch(function(err){
     updateServerStatus(false);
+    logToConsole("[ERR] Connection failed: " + err.message, false, true); // Log to console
     if (err && err.name === "AbortError"){
       throw new Error("Device non-responsive (request timed out after 12s)");
     }
@@ -820,12 +1168,13 @@ function fmtTime(ts){
     " " + p(d.getHours()) + ":" + p(d.getMinutes());
 }
 
-var TXT_ICON = "≡", DIR_ICON = "▸", BIN_ICON = "•";
+// NUOVE ICONE SVG PER CARTELLE E FILE
+var TXT_ICON = "📄", DIR_ICON = "📂", BIN_ICON = "⚙️", OTHER_ICON = "📎";
 
 function renderBreadcrumb(){
   var el = $("breadcrumb");
   var parts = state.path ? state.path.split("/") : [];
-  var html = '<button data-p="">VOID</button>';
+  var html = '<button data-p="">VOID-DIVER</button>'; // Aggiornato
   var acc = "";
   for (var i = 0; i < parts.length; i++){
     acc = acc ? acc + "/" + parts[i] : parts[i];
@@ -841,12 +1190,20 @@ function updateSelectionUI(){
   var count = state.selected.size;
   $("selectedCount").textContent = count;
   $("btnBatchDelete").disabled = count === 0;
+  
+  // Abilita/Disabilita Copia, Taglia, Rinomina basandosi sulla selezione
+  $("btnCopy").disabled = count === 0;
+  $("btnCut").disabled = count === 0;
+  $("btnRename").disabled = count !== 1; // Rinomina solo singola
+
   $("batchBar").hidden = count === 0;
   $("batchSelectedText").textContent = count;
   
   var visibleRows = state.currentEntries.filter(matchesFilter);
   var allSelected = visibleRows.length > 0 && visibleRows.every(function(e){ return state.selected.has(e.name); });
   $("chkSelectAll").checked = allSelected;
+
+  updatePasteButton(); // Verifica stato clipboard
 }
 
 function matchesFilter(entry){
@@ -873,8 +1230,8 @@ function renderList(entries){
   filtered.forEach(function(e){
     var tr = document.createElement("tr");
     tr.className = "row" + (state.selected.has(e.name) ? " selected" : "");
-    var iconCls = e.type === "dir" ? "dir" : (e.editable ? "txt" : "");
-    var icon = e.type === "dir" ? DIR_ICON : (e.editable ? TXT_ICON : BIN_ICON);
+    var iconCls = e.type === "dir" ? "dir" : (e.editable ? "txt" : (e.mimetype === "application/octet-stream" ? "bin" : ""));
+    var icon = e.type === "dir" ? DIR_ICON : (e.editable ? TXT_ICON : (e.mimetype === "application/octet-stream" ? BIN_ICON : OTHER_ICON));
     var nameCls = e.type === "dir" ? "f-name dir" : "f-name";
     
     tr.innerHTML =
@@ -948,6 +1305,7 @@ function showDetails(entry){
     '<div class="lbl">Name:</div><div class="val">'+entry.name+'</div>' +
     '<div class="lbl">Path:</div><div class="val">'+(joinPath(entry.name) || '/')+'</div>' +
     '<div class="lbl">Type:</div><div class="val">'+(entry.type === 'dir' ? 'Folder' : 'File (' + ext + ')')+'</div>' +
+    '<div class="lbl">MIME Type:</div><div class="val">'+(entry.mimetype || 'N/A')+'</div>' +
     '<div class="lbl">Size:</div><div class="val">'+(entry.type === 'dir' ? 'N/A' : entry.size + ' B (' + fmtSize(entry.size) + ')')+'</div>' +
     '<div class="lbl">Modified:</div><div class="val">'+fmtTime(entry.mtime)+'</div>' +
     '<div class="lbl">Editable:</div><div class="val">'+(entry.editable ? 'Yes (Text File)' : 'No (Binary)')+'</div>';
@@ -960,6 +1318,7 @@ function deleteSingle(name){
   var body = new URLSearchParams({area: state.area, path: joinPath(name)});
   api("POST", "/api/delete", body).then(function(){
     state.selected.delete(name);
+    logToConsole("[SYS] Deleted single item: " + name, true);
     toast("Item deleted"); 
     load(); 
   }).catch(function(e){ toast(e.message, true); });
@@ -983,6 +1342,7 @@ function batchDelete(){
   });
 
   chain.then(function(){
+    logToConsole("[SYS] Batch deleted " + count + " items.", true);
     toast("Successfully deleted " + count + " items");
     load();
   }).catch(function(e){
@@ -1063,7 +1423,9 @@ function uploadFiles(files){
         .finally(function(){ if (timer) clearTimeout(timer); });
     });
   });
-  chain.then(function(){ toast("Upload complete"); load(); })
+  chain.then(function(){ 
+    logToConsole("[SYS] Uploaded " + list.length + " files.", true);
+    toast("Upload complete"); load(); })
     .catch(function(e){ toast(e.message, true); })
     .finally(function(){ label.textContent = prevLabel; });
 }
@@ -1082,12 +1444,12 @@ dz.addEventListener("drop", function(e){
 
 /* ---- name prompt ---- */
 var promptMode = null;
-function openPrompt(mode){
+function openPrompt(mode, title, label, okLabel, defaultValue, currentName){
   promptMode = mode;
-  $("promptTitle").textContent = mode === "dir" ? "New Folder" : "New File";
-  $("promptLabel").textContent = mode === "dir" ? "Folder Name" : "File Name (e.g., notes.txt)";
-  $("promptOk").textContent = "Create";
-  $("promptInput").value = "";
+  $("promptTitle").textContent = title;
+  $("promptLabel").textContent = label;
+  $("promptOk").textContent = okLabel;
+  $("promptInput").value = defaultValue || "";
   $("promptErr").textContent = "";
   $("promptOverlay").hidden = false;
   setTimeout(function(){ $("promptInput").focus(); }, 50);
@@ -1096,25 +1458,126 @@ function closePrompt(){ $("promptOverlay").hidden = true; }
 $("promptClose").onclick = closePrompt;
 $("promptCancel").onclick = closePrompt;
 $("promptOverlay").addEventListener("click", function(e){ if (e.target === this) closePrompt(); });
-$("btnNewFolder").onclick = function(){ openPrompt("dir"); };
-$("btnNewFile").onclick = function(){ openPrompt("file"); };
+
+// Modifiche prompt per Rinomina
+$("btnNewFolder").onclick = function(){ openPrompt("dir", "New Folder", "Folder Name", "Create", ""); };
+$("btnNewFile").onclick = function(){ openPrompt("file", "New File", "File Name (e.g., notes.txt)", "Create", ""); };
+
 $("promptInput").addEventListener("keydown", function(e){ if (e.key === "Enter") $("promptOk").click(); });
+
 $("promptOk").onclick = function(){
   var name = $("promptInput").value.trim();
   if (!name){ $("promptErr").textContent = "Please enter a valid name"; return; }
+  
   var btn = $("promptOk");
   btn.disabled = true;
-  btn.textContent = "Creating…";
-  var endpoint = promptMode === "dir" ? "/api/mkdir" : "/api/newfile";
-  var body = new URLSearchParams({area: state.area, path: state.path, name: name, content: ""});
-  api("POST", endpoint, body).then(function(j){
-    closePrompt();
-    load();
-    if (promptMode === "file") openEditor(j.name);
-    else toast("Folder created");
-  }).catch(function(e){ $("promptErr").textContent = e.message; })
-    .finally(function(){ btn.disabled = false; btn.textContent = "Create"; });
+  var prevBtnLabel = btn.textContent;
+  
+  if (promptMode === "rename") {
+      btn.textContent = "Renaming…";
+      var currentItem = Array.from(state.selected)[0];
+      renameItem(currentItem, name).finally(function(){
+          btn.disabled = false; btn.textContent = prevBtnLabel;
+      });
+  } else {
+      btn.textContent = "Creating…";
+      var endpoint = promptMode === "dir" ? "/api/mkdir" : "/api/newfile";
+      var body = new URLSearchParams({area: state.area, path: state.path, name: name, content: ""});
+      api("POST", endpoint, body).then(function(j){
+        closePrompt();
+        load();
+        if (promptMode === "file") openEditor(j.name);
+        else {
+            logToConsole("[SYS] Created folder: " + name, true);
+            toast("Folder created");
+        }
+      }).catch(function(e){ $("promptErr").textContent = e.message; })
+        .finally(function(){ btn.disabled = false; btn.textContent = prevBtnLabel; });
+  }
 };
+
+/* --- CLIPBOARD OPERAZIONI (Copia, Taglia, Incolla) --- */
+function updatePasteButton() {
+    $("btnPaste").disabled = clipboard.entries.length === 0;
+}
+
+$("btnCopy").onclick = function(){
+    clipboard.action = "copy";
+    clipboard.entries = Array.from(state.selected).map(name => joinPath(name));
+    clipboard.srcArea = state.area;
+    toast(clipboard.entries.length + " items copied to clipboard");
+    logToConsole("[SYS] Copied " + clipboard.entries.length + " items to clipboard.", true);
+    state.selected.clear();
+    updateSelectionUI();
+}
+
+$("btnCut").onclick = function(){
+    clipboard.action = "cut";
+    clipboard.entries = Array.from(state.selected).map(name => joinPath(name));
+    clipboard.srcArea = state.area;
+    toast(clipboard.entries.length + " items cut to clipboard");
+    logToConsole("[SYS] Cut " + clipboard.entries.length + " items to clipboard.", true);
+    state.selected.clear();
+    updateSelectionUI();
+}
+
+$("btnPaste").onclick = function(){
+    if (!clipboard.entries.length) return;
+    var pasteBtn = $("btnPaste");
+    pasteBtn.disabled = true;
+    
+    var endpoint = (clipboard.action === "cut") ? "/api/paste_move" : "/api/paste_copy";
+    var count = 0;
+    
+    logToConsole("[SYS] Starting Paste operation (" + clipboard.action + ")...", true);
+
+    var chain = Promise.resolve();
+    clipboard.entries.forEach(function(srcPath){
+        chain = chain.then(function(){
+            var name = srcPath.split('/').pop();
+            var body = new URLSearchParams({
+                srcArea: clipboard.srcArea, srcPath: srcPath,
+                destArea: state.area, destPath: state.path, name: name
+            });
+            return api("POST", endpoint, body).then(function(){
+                count++;
+                logToConsole("[LOG] Pasted " + name, true);
+            });
+        });
+    });
+
+    chain.then(function(){
+        logToConsole("[SYS] Paste complete. " + count + " items.", true);
+        toast("Successfully pasted " + count + " items");
+        
+        if (clipboard.action === "cut") clipboard.entries = []; // Pulisci dopo cut
+        load();
+    }).catch(function(e){
+        logToConsole("[ERR] Paste failed: " + e.message, false, true);
+        toast("Paste error: " + e.message, true);
+        load();
+    }).finally(function(){
+        updateSelectionUI();
+    });
+}
+
+/* --- RINOMINA (Rename) --- */
+$("btnRename").onclick = function(){
+    if (state.selected.size !== 1) return;
+    var currentItem = Array.from(state.selected)[0];
+    openPrompt("rename", "Rename", "New Name", "Rename", currentItem, currentItem);
+}
+
+function renameItem(currentItem, newName) {
+  var body = new URLSearchParams({area: state.area, path: joinPath(currentItem), newName: newName});
+  return api("POST", "/api/rename", body).then(function(){
+    closePrompt();
+    state.selected.clear();
+    logToConsole("[SYS] Renamed item: " + currentItem + " -> " + newName, true);
+    toast("Item renamed"); 
+    load(); 
+  }).catch(function(e){ $("promptErr").textContent = e.message; });
+}
 
 /* ---- text editor ---- */
 function openEditor(name){
@@ -1157,6 +1620,7 @@ $("editorSave").onclick = function(){
     area: editing.area, path: editing.path, content: $("editorArea").value
   });
   api("POST", "/api/write", body).then(function(){
+    logToConsole("[SYS] Saved file: " + editing.path, true);
     toast("File saved"); closeEditor(); load();
   }).catch(function(e){
     $("editorErr").textContent = e.message;
@@ -1175,7 +1639,17 @@ document.addEventListener("keydown", function(e){
 });
 
 buildBarcode();
+startBootAnim(); // Start boot animation on load
 load();
+
+// Simulazione di ricezione info console dopo il caricamento
+setTimeout(function() {
+    logToConsole("[LOG] Periodic check: WiFi Signal optimal.", true);
+}, 15000);
+setTimeout(function() {
+    logToConsole("[MSG] Handheld connection requesting sync.", false);
+}, 25000);
+
 })();
 </script>
 </body>
