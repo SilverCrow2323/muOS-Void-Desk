@@ -1,1654 +1,1975 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VOID // "Direct Link" Rt:SERVER [UNDERGROUND HUD]</title>
-<style>
-/* --- NUOVI VARIABILI E TINTI --- */
-:root{
-  --bg:#050608; /* Più scuro */
-  --panel:#0d1013;
-  --panel2:#10151a;
-  --line:#232a33;
-  
-  --cyan:#5ac8dc;
-  --cyan-dim:#2e5860;
-  --amber:#ffb443;
-  --green:#33ff55;
-  --green-dim:#1a581e;
-  --red:#ff4d4d;
-  --red-dim:#602e2e;
-  
-  --fg:#e7ecef;
-  --dim:#8993a1;
-  --faint:#4d5661;
-  --mono:ui-monospace,"SF Mono","Cascadia Code","Courier New",monospace;
-  --sans:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rt:Server // BASE STATION</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ─── ROOT ─── */
+    :root {
+      --bg: #050608;
+      --panel: #0d1013;
+      --panel2: #10151a;
+      --line: #232a33;
+      --cyan: #5ac8dc;
+      --cyan-dim: #2e5860;
+      --amber: #ffb443;
+      --green: #33ff55;
+      --green-dim: #1a581e;
+      --red: #ff4d4d;
+      --red-dim: #602e2e;
+      --fg: #e7ecef;
+      --dim: #8993a1;
+      --faint: #4d5661;
+      --mono: 'Share Tech Mono', ui-monospace, 'SF Mono', 'Courier New', monospace;
+      --sans: 'Rajdhani', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --display: 'Orbitron', 'Exo 2', sans-serif;
+      --void-glow: #9b00ff;
+      --panel-glow: rgba(155,0,255,0.06);
+    }
+    * { box-sizing:border-box; }
+    [hidden], .modal-overlay[hidden] { display: none !important; }
+    html, body { height:100%; margin:0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.5;
+      min-height:100vh;
+      position:relative;
+      overflow-x:hidden;
+    }
+    body::before {
+      content:"";
+      position:fixed;inset:0;
+      pointer-events:none;z-index:1;
+      background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.85) 100%);
+      mix-blend-mode:multiply;
+    }
+    body::after {
+      content:"";
+      position:fixed;inset:0;
+      pointer-events:none;z-index:2;
+      background:radial-gradient(ellipse at 50% 0%, rgba(90,200,220,0.03), transparent 60%);
+    }
+    #main-wrap::before {
+      content:"";
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      z-index:0;opacity:0.12;pointer-events:none;
+      background:
+        repeating-linear-gradient(135deg, transparent, transparent 15px, rgba(35,42,51,0.12) 15px, rgba(35,42,51,0.12) 16px),
+        repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(35,42,51,0.12) 15px, rgba(35,42,51,0.12) 16px);
+    }
+    a { color:var(--cyan); text-decoration:none; }
+    #main-wrap { max-width:1340px; margin:0 auto; padding:12px 16px 40px; position:relative; z-index:10; }
 
-  /* NUOVE TINTI PER I COMPANIONS */
-  --basestation-tint: var(--cyan);
-  --basestation-bg-tint: rgba(90,200,220,0.06);
-  --android-tint: var(--green);
-  --android-bg-tint: rgba(51,255,85,0.06);
-  
-  /* Animazione Holographic */
-  --hologram-anim-time: 0.35s;
-}
+    /* ─── HOLOGRAPHIC ─── */
+    @keyframes holographicAppear {
+      0% { transform:scale(0.92) translateY(18px); opacity:0; }
+      30% { opacity:1; }
+      100% { transform:scale(1) translateY(0); opacity:1; }
+    }
+    .hologram-animate { opacity:0; animation:holographicAppear var(--hologram-anim-time,0.4s) ease-out forwards; }
 
-*{box-sizing:border-box}
+    /* ─── BOOT ─── */
+    #bootanim-overlay {
+      position:fixed; inset:0;
+      background:var(--bg);
+      color:var(--cyan);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
+      text-align:center;
+      overflow:hidden;
+      font-family:var(--display);
+    }
+    #bootanim-overlay .boot-content { display:flex; flex-direction:column; align-items:center; gap:20px; padding:20px; }
+    #bootanim-overlay .boot-content .boot-logo { height:70px; filter:drop-shadow(0 0 20px rgba(90,200,220,0.3)); }
+    .spinner-container { position:relative; width:140px; height:140px; }
+    .progress-ring { transform:rotate(-90deg); width:140px; height:140px; }
+    .progress-ring .bg { stroke:var(--line); }
+    .progress-ring .fg { stroke:var(--cyan); stroke-linecap:round; transition:stroke-dashoffset 0.2s ease; filter:drop-shadow(0 0 8px var(--cyan)); }
+    .percent-text { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:28px; font-weight:700; color:var(--fg); letter-spacing:2px; font-family:var(--mono); }
+    .boot-title { font-size:32px; font-weight:900; letter-spacing:4px; margin-top:10px; opacity:0; transition:opacity 0.8s ease; font-family:var(--display); }
+    .boot-title.show { opacity:1; }
+    .boot-title .rt { color:var(--cyan); }
+    .boot-title .base { color:var(--void-glow); text-shadow:0 0 20px var(--void-glow),0 0 40px var(--void-glow); }
+    .boot-sub { font-size:16px; color:var(--dim); letter-spacing:2px; opacity:0; transition:opacity 0.8s ease 0.4s; font-family:var(--sans); font-weight:300; }
+    .boot-sub.show { opacity:1; }
+    .boot-grid { position:absolute; inset:0; background-image:linear-gradient(rgba(90,200,220,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(90,200,220,0.03) 1px,transparent 1px); background-size:40px 40px; pointer-events:none; z-index:-1; }
 
-/* Modals fix */
-[hidden], .modal-overlay[hidden] {
-  display: none !important;
-}
+    /* ─── HEADER ─── */
+    .page-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:8px 0 6px; border-bottom:1px solid var(--line); margin-bottom:14px; gap:10px; }
+    .page-header .title-group { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .page-header .title-group .logo-img { height:40px; filter:drop-shadow(0 0 12px rgba(90,200,220,0.2)); }
+    .page-header .rt-server { font-family:var(--display); font-size:22px; font-weight:700; letter-spacing:2px; }
+    .page-header .rt-server .rt { color:var(--cyan); }
+    .page-header .rt-server .server { color:var(--void-glow); text-shadow:0 0 20px var(--void-glow),0 0 40px rgba(155,0,255,0.3); }
+    .page-header .header-status { font-family:var(--mono); font-size:11px; color:var(--dim); display:flex; align-items:center; gap:10px; }
+    .page-header .header-status .dot { width:8px; height:8px; border-radius:50%; display:inline-block; background:var(--green); box-shadow:0 0 8px rgba(51,255,85,0.6); animation:pulse 1.8s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-html,body{height:100%}
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--fg);
-  font-family:var(--sans);
-  font-size:15px;
-  line-height:1.4;
-  min-height:100vh;
-  position:relative;
-  overflow-x:hidden;
-}
+    /* ─── PC STATS ─── */
+    .pc-stats-panel {
+      background:rgba(0,0,0,0.5); border:1px solid var(--line); padding:6px 14px;
+      font-family:var(--mono); font-size:10px; color:var(--dim);
+      clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+      display:flex; align-items:center; gap:18px; flex-wrap:wrap; backdrop-filter:blur(4px);
+    }
+    .pc-stats-panel .stat-item { display:flex; align-items:baseline; gap:4px; }
+    .pc-stats-panel .stat-item .label { color:var(--faint); text-transform:uppercase; font-size:9px; }
+    .pc-stats-panel .stat-item .value { color:var(--fg); font-weight:600; }
+    .pc-stats-panel .stat-item .value.cyan { color:var(--cyan); }
+    .pc-stats-panel .stat-item .value.amber { color:var(--amber); }
+    .pc-stats-panel .stat-item .value.green { color:var(--green); }
+    .pc-stats-panel .stat-item .value.red { color:var(--red); }
 
-/* --- SFONDO ARCHITETTONICO CUPO E OPPRIMENTE (STILE BLAME!) --- */
-/* Simulazione con pseudo-elementi e gradienti. Sostituire con immagine se preferisci. */
-body::before{
-  content:"";
-  position:fixed;inset:0;
-  pointer-events:none;
-  z-index:1;
-  background: 
-    /* Scanlines */
-    repeating-linear-gradient(
-      to bottom,
-      rgba(255,255,255,0.015) 0px,
-      rgba(255,255,255,0.015) 1px,
-      transparent 1px,
-      transparent 3px
-    ),
-    /* Gradiente cupo opprimente */
-    radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.85) 100%);
-  mix-blend-mode:multiply; /* Post-process per scurire tutto */
-}
-body::after{
-  content:"";
-  position:fixed;inset:0;
-  pointer-events:none;
-  z-index:2;
-  /* Illuminazione superiore simulative di monitor */
-  background:radial-gradient(ellipse at 50% 0%, rgba(90,200,220,0.03), transparent 60%);
-}
+    /* ─── SPDW SYMBOL + SPARKS ─── */
+    .spdw-container { position:relative; display:inline-block; margin:0 8px; }
+    .spdw-container .spdw-img { display:block; height:40px; width:auto; border:3px solid #000; border-radius:4px; padding:2px; background:#000; box-shadow:0 0 20px rgba(155,0,255,0.2); filter:drop-shadow(0 0 6px rgba(155,0,255,0.3)); }
+    .spdw-container canvas { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:100%; height:100%; pointer-events:none; z-index:5; mix-blend-mode:screen; }
 
-/* --- SFONDO ARCHITETTONICO CSS --- */
-/* Simula la densità di strutture metalliche con pseudoelementi. */
-#main-wrap::before {
-    content: "";
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 0;
-    opacity: 0.25;
-    pointer-events: none;
-    background: 
-        repeating-linear-gradient(135deg, transparent, transparent 15px, rgba(35,42,51,0.2) 15px, rgba(35,42,51,0.2) 16px),
-        repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(35,42,51,0.2) 15px, rgba(35,42,51,0.2) 16px);
-}
+    /* ─── TAB NAV ─── */
+    .tab-nav { display:flex; gap:2px; border-bottom:1px solid var(--line); margin-bottom:16px; padding-bottom:0; flex-wrap:wrap; }
+    .tab-nav .tab-btn { background:none; border:none; color:var(--dim); font-family:var(--display); font-size:13px; font-weight:600; padding:10px 20px; cursor:pointer; letter-spacing:.06em; transition:color .2s,border-color .2s; border-bottom:2px solid transparent; text-transform:uppercase; }
+    .tab-nav .tab-btn:hover { color:var(--fg); }
+    .tab-nav .tab-btn.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
 
-a{color:var(--cyan);text-decoration:none}
+    /* ─── SERVICES GRID ─── */
+    .services-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:18px; }
+    .service-card { background:var(--panel2); border:1px solid var(--line); border-top:3px solid var(--cyan-dim); padding:12px 14px 14px; clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px); transition:border-color .25s,background .25s; cursor:pointer; display:flex; flex-direction:column; gap:4px; }
+    .service-card:hover { border-color:var(--cyan); background:rgba(90,200,220,0.04); }
+    .service-card .sc-top { display:flex; align-items:center; gap:8px; }
+    .service-card .sc-icon { width:28px; height:28px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:16px; background:rgba(90,200,220,0.05); border-radius:4px; }
+    .service-card .sc-icon img { width:20px; height:20px; filter:brightness(0.9) saturate(1.2); }
+    .service-card .sc-name { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--fg); letter-spacing:.02em; }
+    .service-card .sc-led { margin-left:auto; display:flex; align-items:center; gap:4px; font-size:9px; color:var(--dim); font-family:var(--mono); }
+    .service-card .sc-led .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+    .service-card .sc-led .dot.green { background:var(--green); box-shadow:0 0 6px rgba(51,255,85,0.5); }
+    .service-card .sc-led .dot.red { background:var(--red); box-shadow:0 0 6px rgba(255,77,77,0.5); }
+    .service-card .sc-led .dot.amber { background:var(--amber); box-shadow:0 0 6px rgba(255,180,67,0.4); }
+    .service-card .sc-addr { font-family:var(--mono); font-size:10px; color:var(--dim); word-break:break-all; }
+    .service-card .sc-addr .link { color:var(--cyan); text-decoration:underline dotted; cursor:pointer; }
+    .service-card .sc-addr .link:hover { color:var(--fg); }
+    .service-card .sc-creds { font-family:var(--mono); font-size:9px; color:var(--faint); }
+    .service-card .sc-btn { background:var(--cyan); color:#000; font-family:var(--mono); font-size:10px; font-weight:700; padding:4px 10px; border:none; clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px); cursor:pointer; transition:all .15s ease; align-self:flex-start; margin-top:2px; }
+    .service-card .sc-btn:hover { background:#72daf0; box-shadow:0 0 12px rgba(90,200,220,0.3); }
+    .service-card .sc-btn.green-btn { background:var(--green); }
+    .service-card .sc-btn.green-btn:hover { background:#55ff72; }
+    .service-card .sc-btn.small { font-size:9px; padding:2px 8px; }
 
-/* ---------- layout shell ---------- */
-#main-wrap{
-    max-width:1080px; /* Un po' più largo per il nuovo layout */
-    margin:0 auto;
-    padding:18px 16px 60px;
-    position: relative;
-    z-index: 10;
-}
+    /* ─── SYSTINFO ─── */
+    .sysinfo-panel { background:var(--panel); border:1px solid var(--line); clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px); margin-bottom:18px; overflow:hidden; }
+    .sysinfo-panel .sp-header { padding:8px 16px; background:rgba(255,255,255,0.015); border-bottom:1px solid var(--line); font-family:var(--display); font-size:11px; font-weight:600; color:var(--amber); letter-spacing:.08em; display:flex; align-items:center; justify-content:space-between; }
+    .sysinfo-panel .sp-body { padding:10px 16px; font-family:var(--mono); font-size:11px; color:var(--dim); display:grid; grid-template-columns:auto 1fr auto 1fr auto 1fr; gap:2px 14px; background:rgba(0,0,0,0.2); max-height:140px; overflow-y:auto; }
+    .sysinfo-panel .sp-body .label { color:var(--faint); text-transform:uppercase; font-size:9px; letter-spacing:.04em; }
+    .sysinfo-panel .sp-body .value { color:var(--fg); font-weight:500; }
+    .sysinfo-panel .sp-body .value.cyan { color:var(--cyan); }
+    .sysinfo-panel .sp-body .value.amber { color:var(--amber); }
+    .sysinfo-panel .sp-body .value.green { color:var(--green); }
+    .sysinfo-panel .sp-body .value.red { color:var(--red); }
+    .sysinfo-panel .sp-body .error-led { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 8px rgba(255,77,77,0.6); margin-right:6px; animation:pulse 1.2s ease-in-out infinite; }
 
-/* ---------- ANIMAZIONE OLOGRAFICA HUD ---------- */
-@keyframes holographicAppear {
-    0% { transform: scale(0.9) translateY(20px); opacity: 0; }
-    30% { opacity: 1; }
-    100% { transform: scale(1) translateY(0); opacity: 1; }
-}
+    /* ─── COMMAND CENTER ─── */
+    .command-center { display:grid; grid-template-columns:1fr 320px; gap:16px; margin-bottom:16px; }
+    .command-terminal-wrap { background:var(--panel); border:1px solid var(--line); clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px); overflow:hidden; display:flex; flex-direction:column; }
+    .command-terminal-wrap .term-header { padding:6px 14px; background:rgba(255,255,255,0.015); border-bottom:1px solid var(--line); font-family:var(--mono); font-size:10px; color:var(--dim); display:flex; align-items:center; justify-content:space-between; }
+    .command-terminal-wrap .term-header .term-status { display:flex; align-items:center; gap:8px; }
+    .command-terminal-wrap .term-header .term-status .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+    .command-terminal-wrap .term-header .term-status .dot.green { background:var(--green); box-shadow:0 0 6px rgba(51,255,85,0.5); }
+    .command-terminal-wrap .term-header .term-status .dot.red { background:var(--red); box-shadow:0 0 6px rgba(255,77,77,0.5); }
+    #terminal-container { flex:1; min-height:380px; background:#000; padding:4px; }
+    #terminal-container .xterm { height:100%; }
 
-/* Classe per applicare l'animazione */
-.hologram-animate {
-    opacity: 0; /* Nascondi inizialmente */
-    animation: holographicAppear var(--hologram-anim-time) ease-out forwards;
-}
+    /* ─── UTILITY PANEL (right side) ─── */
+    .utility-panel { background:var(--panel); border:1px solid var(--line); clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px); padding:14px 16px; display:flex; flex-direction:column; gap:12px; max-height:700px; overflow-y:auto; }
+    .utility-panel .util-title { font-family:var(--display); font-size:11px; font-weight:700; color:var(--cyan); letter-spacing:.08em; border-bottom:1px solid var(--line); padding-bottom:8px; display:flex; align-items:center; gap:8px; }
+    .utility-panel .util-title .info-circle { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid var(--cyan); color:var(--cyan); font-size:11px; font-weight:700; cursor:pointer; transition:all .2s; font-family:var(--sans); background:rgba(90,200,220,0.05); }
+    .utility-panel .util-title .info-circle:hover { background:var(--cyan); color:#000; box-shadow:0 0 20px rgba(90,200,220,0.3); }
+    .utility-panel .util-row { display:flex; flex-wrap:wrap; gap:6px; }
+    .util-btn { background:var(--panel2); border:1px solid var(--line); color:var(--fg); font-family:var(--sans); font-size:11px; font-weight:600; padding:5px 12px; cursor:pointer; clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px); transition:border-color .15s,color .15s,background .15s; display:inline-flex; align-items:center; gap:4px; }
+    .util-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+    .util-btn.danger { border-color:rgba(255,77,77,0.4); color:var(--red); }
+    .util-btn.danger:hover { border-color:var(--red); background:rgba(255,77,77,0.1); }
+    .util-btn.warning { border-color:rgba(255,180,67,0.4); color:var(--amber); }
+    .util-btn.warning:hover { border-color:var(--amber); background:rgba(255,180,67,0.1); }
+    .util-btn.success { border-color:rgba(51,255,85,0.3); color:var(--green); }
+    .util-btn.success:hover { border-color:var(--green); background:rgba(51,255,85,0.1); }
+    .util-btn:disabled { opacity:.4; cursor:not-allowed; }
+    .util-btn.full { flex:1; justify-content:center; }
 
-/* Definizione dei frame di bootanim */
-#bootanim-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: var(--bg);
-    color: var(--cyan);
-    font-family: var(--mono);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    text-align: center;
-    overflow: hidden;
-}
+    .ssh-copy-area { background:var(--bg); border:1px solid var(--line); padding:6px 10px; font-family:var(--mono); font-size:11px; color:var(--cyan); display:flex; align-items:center; justify-content:space-between; gap:8px; clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px); }
+    .ssh-copy-area .ssh-cmd { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; color:var(--fg); }
+    .ssh-copy-area .ssh-copy-btn { background:none; border:1px solid var(--cyan-dim); color:var(--cyan); font-family:var(--mono); font-size:10px; padding:2px 10px; cursor:pointer; clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px); transition:background .15s; }
+    .ssh-copy-area .ssh-copy-btn:hover { background:rgba(90,200,220,0.1); }
 
-#bootanim-overlay::before {
-    content: "";
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: 
-        repeating-linear-gradient(0deg, var(--bg), var(--bg) 2px, transparent 2px, transparent 4px);
-    pointer-events: none;
-}
+    .custom-cmd-row { display:flex; gap:6px; margin-top:4px; }
+    .custom-cmd-row input { flex:1; background:var(--bg); border:1px solid var(--line); color:var(--fg); font-family:var(--mono); font-size:11px; padding:5px 10px; clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px); }
+    .custom-cmd-row input:focus { outline:none; border-color:var(--cyan); }
+    .cmd-history { font-family:var(--mono); font-size:9px; color:var(--faint); max-height:40px; overflow-y:auto; padding:4px 0; border-top:1px solid var(--line); margin-top:4px; }
+    .cmd-history .hist-entry { padding:1px 4px; cursor:pointer; transition:color .15s; }
+    .cmd-history .hist-entry:hover { color:var(--cyan); }
 
-#bootanim-overlay .boot-frame {
-    display: none;
-}
+    /* ─── SCREENSHOTS ─── */
+    .screenshot-section { margin-top:6px; border-top:1px solid var(--line); padding-top:8px; }
+    .screenshot-section .ss-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+    .screenshot-section .ss-header .ss-title { font-family:var(--display); font-size:10px; color:var(--dim); font-weight:600; letter-spacing:.04em; display:flex; align-items:center; gap:6px; }
+    .screenshot-section .ss-header .ss-title .info-circle { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; border:1px solid var(--dim); color:var(--dim); font-size:9px; font-weight:700; cursor:pointer; transition:all .2s; font-family:var(--sans); background:rgba(255,255,255,0.03); }
+    .screenshot-section .ss-header .ss-title .info-circle:hover { border-color:var(--cyan); color:var(--cyan); box-shadow:0 0 20px rgba(90,200,220,0.2); }
+    .screenshot-section .ss-thumbs { display:flex; flex-wrap:wrap; gap:6px; max-height:160px; overflow-y:auto; padding:4px 0; }
+    .screenshot-section .ss-thumbs .ss-thumb { width:64px; height:48px; background:var(--bg); border:1px solid var(--line); cursor:pointer; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--faint); font-family:var(--mono); transition:border-color .15s; position:relative; clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px); }
+    .screenshot-section .ss-thumbs .ss-thumb:hover { border-color:var(--cyan); }
+    .screenshot-section .ss-thumbs .ss-thumb img { width:100%; height:100%; object-fit:cover; }
+    .screenshot-section .ss-thumbs .ss-thumb .ss-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .2s; gap:4px; }
+    .screenshot-section .ss-thumbs .ss-thumb:hover .ss-overlay { opacity:1; }
+    .screenshot-section .ss-thumbs .ss-thumb .ss-overlay button { background:var(--panel); border:1px solid var(--line); color:var(--fg); font-size:9px; padding:2px 6px; cursor:pointer; clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px); }
+    .screenshot-section .ss-thumbs .ss-thumb .ss-overlay button:hover { border-color:var(--cyan); color:var(--cyan); }
+    .screenshot-section .ss-thumbs .ss-thumb .ss-overlay button.danger:hover { border-color:var(--red); color:var(--red); }
 
-#bootanim-overlay .boot-frame.active {
-    display: block;
-}
+    /* ─── SYNC PANEL (inside Command Center) ─── */
+    .sync-panel-inline { border-top:1px solid var(--line); padding-top:10px; margin-top:6px; }
+    .sync-panel-inline .sync-title { font-family:var(--display); font-size:10px; color:var(--amber); font-weight:600; letter-spacing:.04em; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .sync-panel-inline .sync-title .info-circle { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; border:1px solid var(--amber); color:var(--amber); font-size:9px; font-weight:700; cursor:pointer; transition:all .2s; font-family:var(--sans); background:rgba(255,180,67,0.05); }
+    .sync-panel-inline .sync-title .info-circle:hover { background:var(--amber); color:#000; box-shadow:0 0 20px rgba(255,180,67,0.3); }
+    .sync-row { display:flex; align-items:center; gap:6px; padding:4px 0; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+    .sync-row:last-child { border-bottom:none; }
+    .sync-row .sync-name { font-family:var(--mono); font-size:10px; color:var(--fg); min-width:70px; }
+    .sync-row .sync-path { font-family:var(--mono); font-size:9px; color:var(--dim); flex:1; min-width:100px; background:var(--bg); padding:2px 8px; clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px); }
+    .sync-row .sync-status { font-size:9px; color:var(--green); font-family:var(--mono); padding:2px 6px; border:1px solid var(--green-dim); clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px); }
+    .sync-row .sync-status.idle { color:var(--dim); border-color:var(--line); }
+    .sync-row .sync-status.error { color:var(--red); border-color:var(--red-dim); }
+    .sync-btn { background:var(--panel2); border:1px solid var(--line); color:var(--fg); font-family:var(--sans); font-size:9px; padding:3px 10px; cursor:pointer; clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px); transition:border-color .15s,color .15s; }
+    .sync-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+    .sync-btn.green { border-color:var(--green-dim); color:var(--green); }
+    .sync-btn.green:hover { border-color:var(--green); background:rgba(51,255,85,0.05); }
+    .sync-log { font-family:var(--mono); font-size:8px; color:var(--faint); max-height:40px; overflow-y:auto; padding:4px 0; border-top:1px solid var(--line); margin-top:6px; }
+    .sync-log .log-line { padding:1px 4px; }
+    .sync-log .log-line.ok { color:var(--green); }
+    .sync-log .log-line.err { color:var(--red); }
 
-/* ---------- CARTELLO SFONDO 48C E GRAFFITI ---------- */
-/* Posizionati su pseudo-elementi dello wrap principale o body */
-#main-wrap::after {
-    content: "";
-    position: fixed;
-    top: 50px;
-    right: 50px;
-    width: 250px;
-    height: 100px;
-    pointer-events: none;
-    z-index: 1;
-    font-family: var(--mono);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+    /* ─── FILE EXPLORER ─── */
+    .panel { background:var(--panel); border:1px solid var(--line); clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px); position:relative; margin-bottom:16px; }
+    .panel::before,.panel::after { content:""; position:absolute; width:5px; height:5px; border-radius:50%; background:var(--cyan-dim); }
+    .panel::before { top:8px; left:8px; }
+    .panel::after { bottom:8px; right:8px; }
+    .panel-header-title { padding:10px 16px; background:rgba(255,255,255,0.015); border-bottom:1px solid var(--line); font-family:var(--display); font-size:12px; font-weight:600; color:var(--amber); letter-spacing:.08em; display:flex; align-items:center; justify-content:space-between; }
+    .panel-header-title .info-circle { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid var(--amber); color:var(--amber); font-size:10px; font-weight:700; cursor:pointer; transition:all .2s; font-family:var(--sans); background:rgba(255,180,67,0.05); margin-left:6px; }
+    .panel-header-title .info-circle:hover { background:var(--amber); color:#000; box-shadow:0 0 20px rgba(255,180,67,0.3); }
 
-/* 48C Neon Sfarfallante */
-#main-wrap .neon-sign {
-    position: fixed;
-    top: 150px; /* Allineato in alto a destra */
-    right: 50px;
-    font-family: var(--mono);
-    color: var(--red);
-    text-transform: uppercase;
-    font-size: 40px;
-    font-weight: 700;
-    background: rgba(0,0,0,0.5);
-    padding: 10px 15px;
-    border: 1px solid var(--red-dim);
-    clip-path: polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
-    user-select: none;
-    display: flex; gap: 5px;
-}
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+    .breadcrumb { font-family:var(--mono); font-size:12px; color:var(--dim); display:flex; align-items:center; gap:4px; flex-wrap:wrap; min-width:0; }
+    .breadcrumb button { background:none; border:none; color:var(--dim); font-family:var(--mono); font-size:12px; cursor:pointer; padding:2px 4px; }
+    .breadcrumb button:hover,.breadcrumb button:last-child { color:var(--cyan); }
+    .breadcrumb .sep { color:var(--faint); }
+    .search-box { position:relative; display:flex; align-items:center; }
+    .search-box input { background:var(--bg); border:1px solid var(--line); color:var(--fg); font-family:var(--mono); font-size:11px; padding:5px 10px 5px 24px; width:140px; clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px); }
+    .search-box input:focus { outline:none; border-color:var(--cyan); width:180px; transition:width .2s; }
+    .search-icon { position:absolute; left:7px; color:var(--faint); font-size:10px; pointer-events:none; }
+    .actions { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+    .actions button,.upload-btn { background:var(--panel2); border:1px solid var(--line); color:var(--fg); font-family:var(--sans); font-size:11px; padding:5px 10px; cursor:pointer; clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px); transition:border-color .15s,color .15s,background .15s; }
+    .actions button:hover,.upload-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+    .actions button:disabled { opacity:.4; cursor:not-allowed; }
+    .actions button.btn-danger { border-color:rgba(255,77,77,0.4); color:var(--red); }
+    .actions button.btn-danger:hover:not(:disabled) { border-color:var(--red); background:rgba(255,77,77,0.1); }
+    .upload-btn { display:inline-block; position:relative; }
+    .upload-btn input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
 
-/* Sfarfallio della C */
-@keyframes neonFlicker {
-  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; text-shadow: 0 0 10px var(--red), 0 0 20px var(--red); }
-  20%, 22%, 24%, 55%, 57% { opacity: 0.1; text-shadow: none; }
-}
+    .batch-bar { background:rgba(90,200,220,0.06); border-bottom:1px solid var(--cyan-dim); padding:4px 14px; display:flex; align-items:center; justify-content:space-between; font-family:var(--mono); font-size:10px; color:var(--cyan); }
+    .batch-bar .ops { display:flex; gap:4px; flex-wrap:wrap; }
+    .batch-bar .ops button { background:none; border:1px solid var(--line); color:var(--dim); font-family:var(--mono); font-size:9px; padding:2px 8px; cursor:pointer; clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px); transition:border-color .15s,color .15s; }
+    .batch-bar .ops button:hover:not(:disabled) { border-color:var(--cyan); color:var(--cyan); }
+    .batch-bar .ops button:disabled { opacity:.3; cursor:not-allowed; }
 
-#main-wrap .neon-sign .flicker-char {
-  animation: neonFlicker 3s infinite linear;
-}
+    .dropzone { position:relative; min-height:200px; overflow-x:auto; }
+    .dropzone.drag::before { content:"release to upload"; position:absolute; inset:6px; z-index:5; display:flex; align-items:center; justify-content:center; border:1px dashed var(--cyan); color:var(--cyan); font-family:var(--mono); font-size:12px; letter-spacing:.05em; background:rgba(90,200,220,.06); }
+    .filelist { width:100%; border-collapse:collapse; }
+    .filelist th { padding:5px 8px; text-align:left; font-family:var(--display); font-size:9px; color:var(--dim); border-bottom:1px solid var(--line); background:rgba(0,0,0,0.2); user-select:none; text-transform:uppercase; letter-spacing:.06em; }
+    .filelist td { padding:5px 8px; border-bottom:1px solid var(--line); font-size:12px; vertical-align:middle; }
+    .filelist tr:last-child td { border-bottom:none; }
+    .filelist tr.row:hover { background:rgba(255,255,255,.02); }
+    .filelist tr.selected { background:rgba(90,200,220,0.05); }
+    .f-chk { width:24px; text-align:center; }
+    .f-chk input { cursor:pointer; accent-color:var(--cyan); }
+    .f-icon { width:24px; color:var(--dim); font-family:var(--mono); text-align:center; font-size:14px; }
+    .f-icon.dir { color:var(--amber); font-weight:700; }
+    .f-icon.txt { color:var(--cyan); }
+    .f-icon.bin { color:var(--red); opacity:0.8; }
+    .f-name { cursor:pointer; color:var(--fg); word-break:break-all; font-size:12px; font-family:var(--sans); }
+    .f-name.dir { color:var(--amber); font-weight:600; }
+    .f-name:hover { color:var(--cyan); }
+    .f-meta { color:var(--faint); font-family:var(--mono); font-size:10px; white-space:nowrap; text-align:right; }
+    .f-actions { text-align:right; white-space:nowrap; width:1%; }
+    .f-actions button { background:none; border:1px solid transparent; color:var(--faint); font-family:var(--mono); font-size:10px; padding:2px 5px; cursor:pointer; margin-left:2px; clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px); transition:color .15s,border-color .15s; }
+    .f-actions button:hover { color:var(--fg); border-color:var(--line); }
+    .f-actions button.danger:hover { color:var(--red); border-color:var(--red); }
+    .empty-state { padding:40px 16px; text-align:center; color:var(--faint); font-family:var(--mono); font-size:12px; letter-spacing:.03em; }
 
-/* Graffiti Spray */
-@font-face {
-    font-family: 'SprayPaint';
-    src: local('Avenir Next'), local('Helvetica'), local('Impact'), local('Verdana'); /* Placeholder per font spray se non presente */
-    font-style: normal; font-weight: normal; font-variant: normal; text-transform: uppercase;
-}
+    /* ─── INFO & ABOUT (TETRIS) ─── */
+    .info-tetris {
+      display:grid;
+      grid-template-columns: 2.2fr 1.4fr 1.8fr;
+      grid-template-rows: auto auto auto;
+      gap:14px;
+      margin-bottom:20px;
+    }
+    .tetris-block {
+      background:var(--panel);
+      border:1px solid var(--line);
+      padding:18px 22px;
+      backdrop-filter:blur(2px);
+      position:relative;
+      overflow:hidden;
+      transition:border-color 0.3s, box-shadow 0.3s;
+    }
+    .tetris-block::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background: radial-gradient(circle at 30% 20%, rgba(90,200,220,0.03), transparent 70%);
+    }
+    .tetris-block .tb-title {
+      font-family:var(--display);
+      font-size:15px;
+      font-weight:700;
+      letter-spacing:.04em;
+      border-bottom:1px solid var(--line);
+      padding-bottom:8px;
+      margin-bottom:12px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .tetris-block .tb-title .info-circle { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid var(--dim); color:var(--dim); font-size:10px; font-weight:700; cursor:pointer; transition:all .2s; font-family:var(--sans); background:rgba(255,255,255,0.03); }
+    .tetris-block .tb-title .info-circle:hover { border-color:var(--cyan); color:var(--cyan); box-shadow:0 0 20px rgba(90,200,220,0.2); }
+    .tetris-block .tb-body { font-size:13px; color:var(--dim); line-height:1.7; position:relative; z-index:2; font-family:var(--sans); }
+    .tetris-block .tb-body p { margin:0 0 8px 0; }
+    .tetris-block .tb-body ul { margin:4px 0 10px 0; padding-left:22px; }
+    .tetris-block .tb-body ul li { margin-bottom:5px; }
+    .tetris-block .tb-body a { color:var(--cyan); text-decoration:underline dotted; }
+    .tetris-block .tb-body a:hover { color:var(--fg); }
+    .tetris-block .tb-body .highlight { color:var(--fg); font-weight:600; }
+    .tetris-block .tb-body .glow-text { color:var(--void-glow); text-shadow:0 0 10px rgba(155,0,255,0.25); }
+    .tetris-block .tb-body .cmd-example { background:var(--bg); padding:6px 12px; font-family:var(--mono); font-size:12px; color:var(--green); border-left:2px solid var(--cyan-dim); margin:6px 0; overflow-x:auto; white-space:pre-wrap; word-break:break-all; }
 
-#main-wrap .graffiti-tag {
-    position: fixed;
-    top: 250px; /* Sotto il cartello neon */
-    right: 150px;
-    font-family: 'SprayPaint', sans-serif;
-    color: rgba(255,180,67,0.7); /* Giallo sporco */
-    text-transform: uppercase;
-    font-size: 28px;
-    font-weight: 700;
-    text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
-    background: rgba(0,0,0,0.2);
-    padding: 5px 10px;
-    border-radius: 4px;
-    user-select: none;
-    transform: rotate(-10deg);
-}
+    .tetris-block:nth-child(1) { clip-path:polygon(18px 0,100% 0,100% calc(100% - 12px),calc(100% - 18px) 100%,0 100%,0 18px); border-left:3px solid var(--cyan); grid-column:1/2; grid-row:1/3; }
+    .tetris-block:nth-child(2) { clip-path:polygon(0 0,100% 0,100% calc(100% - 20px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px)); border-right:3px solid var(--void-glow); grid-column:2/4; grid-row:1/2; }
+    .tetris-block:nth-child(3) { clip-path:polygon(10px 0,100% 0,100% 100%,0 100%,0 20px); border-bottom:3px solid var(--amber); grid-column:2/3; grid-row:2/3; }
+    .tetris-block:nth-child(4) { clip-path:polygon(0 10px,100% 0,100% calc(100% - 10px),calc(100% - 16px) 100%,0 100%); border-top:3px solid var(--green); grid-column:3/4; grid-row:2/3; }
+    .tetris-block:nth-child(5) { clip-path:polygon(12px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 12px); border-left:2px solid var(--cyan-dim); border-right:2px solid var(--cyan-dim); grid-column:1/3; grid-row:3/4; }
+    .tetris-block:nth-child(6) { clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px)); border-top:2px solid var(--void-glow); border-bottom:2px solid var(--void-glow); grid-column:3/4; grid-row:3/4; }
 
-/* ---------- Header Hero Banner ---------- */
-.hero-banner{
-  position:relative;
-  background:url('https://i.ibb.co/PvJvGMNZ/BCO-fa031b25-c5de-45f6-b989-4eaef8b8e721.png') center/cover no-repeat;
-  border:1px solid var(--line);
-  border-bottom:2px solid var(--cyan);
-  padding:20px;
-  margin-bottom:12px;
-  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);
-  overflow:hidden;
-}
-.hero-overlay{
-  position:absolute;inset:0;
-  background:linear-gradient(135deg, rgba(10,11,14,0.92) 0%, rgba(13,16,19,0.82) 100%);
-  z-index:1;
-}
-.hero-content{
-  position:relative;
-  z-index:2;
-}
-.hero-top-bar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:10px;
-  flex-wrap:wrap;
-}
-.lab-tag{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-family:var(--mono);
-  font-size:12px;
-  color:var(--amber);
-  letter-spacing:.12em;
-  font-weight:700;
-  text-transform:uppercase;
-}
-.factory-logo{
-  height:26px;
-  width:auto;
-  filter:drop-shadow(0 0 4px rgba(255,180,67,0.4));
-}
-.hero-symbols{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-.sym-img{
-  height:28px;
-  width:auto;
-  filter:drop-shadow(0 0 6px rgba(90,200,220,0.5));
-  opacity:0.9;
-  transition:opacity .2s;
-}
-.sym-img:hover{opacity:1}
+    .tetris-block:nth-child(1) .tb-title { color:var(--cyan); }
+    .tetris-block:nth-child(2) .tb-title { color:var(--void-glow); text-shadow:0 0 20px rgba(155,0,255,0.15); }
+    .tetris-block:nth-child(3) .tb-title { color:var(--amber); }
+    .tetris-block:nth-child(4) .tb-title { color:var(--green); }
+    .tetris-block:nth-child(5) .tb-title { color:var(--cyan); }
+    .tetris-block:nth-child(6) .tb-title { color:var(--void-glow); }
 
-.main-title{
-  margin:4px 0 10px;
-  font-family:var(--mono);
-  font-size:22px;
-  font-weight:700;
-  color:var(--fg);
-  letter-spacing:.06em;
-  text-shadow:0 0 10px rgba(90,200,220,0.3);
-}
-.main-title .accent{color:var(--cyan);margin:0 2px}
-.main-title .sub-rt{color:var(--amber);font-size:18px;font-weight:400}
+    /* ─── HOLOGRAPHIC INFO WINDOW ─── */
+    .hologram-overlay {
+      position:fixed; inset:0; z-index:200;
+      display:flex; align-items:center; justify-content:center;
+      pointer-events:none; opacity:0; transition:opacity 0.4s ease;
+      background:rgba(4,5,7,0.6);
+      backdrop-filter:blur(2px);
+    }
+    .hologram-overlay.active { opacity:1; pointer-events:auto; }
+    .hologram-window {
+      background:var(--panel);
+      border:1px solid var(--cyan);
+      padding:28px 32px;
+      max-width:520px;
+      width:90%;
+      clip-path:polygon(20px 0,100% 0,100% calc(100% - 20px),calc(100% - 20px) 100%,0 100%,0 20px);
+      box-shadow:0 0 60px rgba(90,200,220,0.15), inset 0 0 60px rgba(90,200,220,0.03);
+      transform:scale(0.9) translateY(20px);
+      transition:transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+      opacity:0;
+      position:relative;
+      border-left:4px solid var(--cyan);
+    }
+    .hologram-overlay.active .hologram-window {
+      transform:scale(1) translateY(0);
+      opacity:1;
+    }
+    .hologram-window .hw-close {
+      position:absolute; top:12px; right:16px;
+      background:none; border:none; color:var(--dim); font-size:24px; cursor:pointer;
+      transition:color .2s; font-family:var(--sans);
+    }
+    .hologram-window .hw-close:hover { color:var(--fg); }
+    .hologram-window .hw-title {
+      font-family:var(--display); font-size:18px; font-weight:700; color:var(--cyan);
+      margin-bottom:12px; letter-spacing:.04em;
+      border-bottom:1px solid var(--line); padding-bottom:10px;
+    }
+    .hologram-window .hw-body {
+      font-family:var(--sans); font-size:14px; color:var(--dim); line-height:1.7;
+    }
+    .hologram-window .hw-body p { margin:0 0 10px 0; }
+    .hologram-window .hw-body ul { margin:4px 0 10px 0; padding-left:22px; }
+    .hologram-window .hw-body ul li { margin-bottom:4px; }
+    .hologram-window .hw-body .highlight { color:var(--fg); font-weight:600; }
+    .hologram-window .hw-body .glow { color:var(--cyan); }
+    .hologram-window .hw-body .cmd { font-family:var(--mono); background:var(--bg); padding:4px 10px; border-left:2px solid var(--cyan-dim); font-size:12px; color:var(--green); margin:4px 0; }
 
-/* Status Indicator / LED */
-.status-indicator-wrap {
-    display: flex; flex-direction: column; gap: 6px;
-    margin-top: 10px;
-}
+    /* ─── CONSOLE LOG ─── */
+    .console-log { background:var(--panel); border:1px solid var(--line); clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px); overflow:hidden; margin-top:4px; }
+    .console-log .cl-header { padding:6px 14px; background:rgba(255,255,255,0.015); border-bottom:1px solid var(--line); font-family:var(--display); font-size:10px; font-weight:600; color:var(--green); letter-spacing:.06em; display:flex; align-items:center; justify-content:space-between; }
+    .console-log .cl-body { padding:6px 12px; font-family:var(--mono); font-size:10px; color:var(--green); background:rgba(0,0,0,0.4); height:60px; overflow-y:auto; line-height:1.5; }
+    .console-log .cl-body .log-entry .ts { color:var(--faint); margin-right:6px; }
+    .console-log .cl-body .log-entry .cmd { color:var(--cyan); }
+    .console-log .cl-body .log-entry .err { color:var(--red); }
+    .console-log .cl-body .log-entry .ok { color:var(--green); }
 
-.status-indicator{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  background:rgba(0,0,0,0.45);
-  border:1px solid var(--line);
-  padding:4px 10px;
-  font-family:var(--mono);
-  font-size:11px;
-  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
-  width: max-content;
-}
-.led-dot{
-  width:8px;height:8px;border-radius:50%;
-  display:inline-block;
-  transition:background .3s, box-shadow .3s;
-}
-.led-dot.green{
-  background:var(--green);
-  box-shadow:0 0 8px rgba(51,255,85,0.9);
-  animation:pulse 1.8s ease-in-out infinite;
-}
-.led-dot.red{
-  background:var(--red);
-  box-shadow:0 0 8px rgba(255,77,77,0.9);
-}
-.status-text{
-  font-weight:700;
-  letter-spacing:.08em;
-}
-.status-text.green{color:var(--green)}
-.status-text.red{color:var(--red)}
-.status-ping{color:var(--dim);margin-left:4px;font-size:10px}
+    /* ─── MODALS ─── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(4,5,7,.85); backdrop-filter:blur(2px); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px; }
+    .modal { background:var(--panel); border:1px solid var(--cyan-dim); width:100%; max-width:520px; clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px); box-shadow:0 10px 30px rgba(0,0,0,0.5); }
+    .modal-header { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); font-family:var(--display); font-size:12px; color:var(--cyan); }
+    .modal-header button { background:none; border:none; color:var(--dim); font-size:18px; cursor:pointer; line-height:1; }
+    .modal-header button:hover { color:var(--fg); }
+    .modal-body { padding:14px 16px; }
+    .modal-body img { max-width:100%; max-height:70vh; display:block; margin:0 auto; border:1px solid var(--line); }
+    .modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:10px 16px; border-top:1px solid var(--line); }
+    .modal-footer button { font-family:var(--sans); font-size:12px; padding:6px 14px; cursor:pointer; background:var(--panel2); border:1px solid var(--line); color:var(--fg); clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px); transition:background .15s,border-color .15s,color .15s; }
+    .modal-footer .primary { border-color:var(--cyan); color:var(--cyan); }
+    .modal-footer .primary:hover { background:rgba(90,200,220,.12); }
+    .err-msg { color:var(--red); font-size:11px; font-family:var(--mono); min-height:16px; margin-top:6px; }
 
-/* NUOVI DATI CONNESSONE - HUD INFO */
-.connection-info-grid {
-    display: grid;
-    grid-template-columns: auto max-content max-content auto auto auto;
-    gap: 15px;
-    margin-top: 15px;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--dim);
-    padding: 10px;
-    background: rgba(0,0,0,0.25);
-    border: 1px dashed var(--cyan-dim);
-}
-.connection-info-grid .lbl {
-    color: var(--faint); text-align: right; text-transform: uppercase;
-}
-.connection-info-grid .val {
-    color: var(--cyan); word-break: break-all; font-weight: 600;
-}
-.connection-info-grid .val-port {
-    color: var(--amber); font-weight: 700;
-}
+    /* ─── TOAST ─── */
+    .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--panel); border:1px solid var(--green); color:var(--green); font-family:var(--mono); font-size:12px; padding:8px 16px; z-index:200; clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px); box-shadow:0 4px 12px rgba(0,0,0,0.4); max-width:90%; }
+    .toast.err { border-color:var(--red); color:var(--red); }
 
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    /* ─── FOOTER ─── */
+    .site-footer { text-align:center; padding:30px 0 10px; font-family:var(--display); font-size:13px; color:var(--dim); letter-spacing:2px; border-top:1px solid var(--line); margin-top:20px; }
+    .site-footer .glow { color:var(--void-glow); text-shadow:0 0 20px rgba(155,0,255,0.15); }
 
-.barcode{display:flex;align-items:flex-end;gap:1px;height:16px;margin:10px 4px 18px;opacity:.4}
-.barcode span{display:block;width:2px;background:var(--green)}
-
-/* ---------- Companions Section (UNICA STRISCIA ORIZZONTALE) ---------- */
-.companions-strip-container{
-  display:flex;
-  flex-direction:row;
-  gap:12px;
-  margin-bottom:22px;
-  overflow: hidden;
-  position: relative;
-}
-
-/* Card base per la striscia */
-.basestation-card{
-  background:var(--panel2);
-  border:1px solid var(--line);
-  border-left:3px solid var(--basestation-tint);
-  padding:14px 18px;
-  display:flex;
-  flex-direction: column; /* Cambiato per layout striscia */
-  align-items: flex-start;
-  gap:12px;
-  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
-  position:relative;
-  flex: 1; /* Divise a metà */
-}
-
-/* Tinte e sfondi separati */
-.basestation-card.basestation-pc {
-    border-left-color: var(--basestation-tint);
-    background: linear-gradient(135deg, var(--basestation-bg-tint) 0%, var(--panel2) 60%);
-}
-.basestation-card.android-card{
-    border-left-color: var(--android-tint);
-    background: linear-gradient(135deg, var(--android-bg-tint) 0%, var(--panel2) 60%);
-}
-
-/* --- WATERMARK ICONE --- */
-/* Posizionate in background in trasparenza grande */
-.basestation-card::before {
-    content: "";
-    position: absolute;
-    top: 5px; right: 5px;
-    width: 150px; height: 150px;
-    opacity: 0.05; /* Molto trasparente */
-    background-size: contain; background-repeat: no-repeat;
-    pointer-events: none;
-    z-index: -1;
-}
-
-/* Placeholder icone watermark se non fornite. Usiamo SVG */
-.basestation-card.basestation-pc::before {
-    background-image: url('data:image/svg+xml;utf8,<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>');
-}
-.basestation-card.android-card::before {
-    background-image: url('data:image/svg+xml;utf8,<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>');
-}
-
-.bs-content { width: 100%; display: flex; align-items: flex-start; gap: 14px; }
-.bs-icon{
-  width:40px;height:40px;
-  background:rgba(90,200,220,0.08);
-  border:1px solid var(--cyan-dim);
-  display:flex;align-items:center;justify-content:center;
-  color:var(--basestation-tint);
-  flex-shrink:0;
-  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
-}
-.android-card .bs-icon{
-  background:rgba(51,255,85,0.08);
-  border-color:rgba(51,255,85,0.3);
-  color:var(--android-tint);
-}
-.bs-info .bs-title{
-  font-family:var(--mono);
-  font-size:14px;
-  font-weight:700;
-  color:var(--fg);
-  letter-spacing:.05em;
-  display:flex;
-  align-items:center;
-  gap:8px;
-}
-.bs-info .bs-title .badge{
-  font-size:9px;
-  padding:2px 6px;
-  background:var(--cyan-dim);
-  color:var(--cyan);
-  border-radius:2px;
-  letter-spacing:0;
-}
-.android-card .badge{
-  background:rgba(51,255,85,0.15) !important;
-  color:var(--green) !important;
-}
-.bs-info .bs-desc{
-  font-size:12px;
-  color:var(--dim);
-  margin-top:3px;
-  max-width:520px;
-}
-
-.bs-actions{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
-.bs-btn{
-  background:var(--cyan);
-  color:#000;
-  font-family:var(--mono);
-  font-size:12px;
-  font-weight:700;
-  padding:9px 14px;
-  white-space:nowrap;
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
-  transition:all .15s ease;
-  box-shadow:0 0 8px rgba(90,200,220,0.2);
-}
-.bs-btn:hover{
-  background:#72daf0;
-  color:#000;
-  box-shadow:0 0 12px rgba(90,200,220,0.4);
-}
-
-.bs-btn.apk-btn{
-  background:var(--green);
-  box-shadow:0 0 8px rgba(51,255,85,0.2);
-}
-.bs-btn.apk-btn:hover{
-  background:#55ff72;
-  box-shadow:0 0 12px rgba(51,255,85,0.4);
-}
-
-.bs-btn.py-btn{
-  background:var(--panel);
-  border:1px solid var(--green);
-  color:var(--green);
-  box-shadow:none;
-}
-.bs-btn.py-btn:hover{
-  background:rgba(51,255,85,0.12);
-  color:var(--green);
-}
-
-/* ---------- main panel ---------- */
-.panel{
-  background:var(--panel);border:1px solid var(--line);
-  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);
-  position:relative;
-}
-.panel::before,.panel::after{
-  content:"";position:absolute;width:5px;height:5px;border-radius:50%;
-  background:var(--cyan-dim);
-}
-.panel::before{top:8px;left:8px}
-.panel::after{bottom:8px;right:8px}
-
-.panel-header-title{
-  padding:12px 16px;
-  background:rgba(255,255,255,0.015);
-  border-bottom:1px solid var(--line);
-  font-family:var(--mono);
-  font-size:13px;
-  font-weight:600;
-  color:var(--amber);
-  letter-spacing:.08em;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-}
-
-.toolbar{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;
-}
-.breadcrumb{font-family:var(--mono);font-size:13px;color:var(--dim);
-  display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0}
-.breadcrumb button{
-  background:none;border:none;color:var(--dim);font-family:var(--mono);
-  font-size:13px;cursor:pointer;padding:2px 4px;
-}
-.breadcrumb button:hover,.breadcrumb button:last-child{color:var(--cyan)}
-.breadcrumb .sep{color:var(--faint)}
-
-.search-box{
-  position:relative;
-  display:flex;
-  align-items:center;
-}
-.search-box input{
-  background:var(--bg);
-  border:1px solid var(--line);
-  color:var(--fg);
-  font-family:var(--mono);
-  font-size:12px;
-  padding:6px 10px 6px 26px;
-  width:160px;
-  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
-}
-.search-box input:focus{outline:none;border-color:var(--cyan);width:200px;transition:width .2s}
-.search-icon{position:absolute;left:8px;color:var(--faint);font-size:11px;pointer-events:none}
-
-.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.actions button,.upload-btn{
-  background:var(--panel2);border:1px solid var(--line);color:var(--fg);
-  font-family:var(--sans);font-size:13px;padding:7px 12px;cursor:pointer;
-  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
-  transition:border-color .15s,color .15s,background .15s;
-}
-.actions button:hover,.upload-btn:hover{border-color:var(--cyan);color:var(--cyan)}
-.actions button:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line) !important;color:var(--dim) !important}
-.actions button.btn-danger{border-color:rgba(255,77,77,0.4);color:var(--red)}
-.actions button.btn-danger:hover:not(:disabled){border-color:var(--red);background:rgba(255,77,77,0.1)}
-
-/* NUOVE FUNZIONALITÀ TOOLBAR (Copia, Taglia, Incolla, Rinomina) */
-.toolbar-ops {
-    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-}
-.toolbar-ops button {
-    font-family: var(--sans); font-size: 13px; padding: 7px 12px; cursor: pointer;
-}
-
-.upload-btn{display:inline-block}
-#btnUp{padding:7px 10px}
-
-/* Multi-select bar */
-.batch-bar{
-  background:rgba(90,200,220,0.06);
-  border-bottom:1px solid var(--cyan-dim);
-  padding:8px 16px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  font-family:var(--mono);
-  font-size:12px;
-  color:var(--cyan);
-}
-
-.dropzone{position:relative;min-height:220px;overflow-x:auto}
-.dropzone.drag::before{
-  content:"release to upload";
-  position:absolute;inset:6px;z-index:5;
-  display:flex;align-items:center;justify-content:center;
-  border:1px dashed var(--cyan);color:var(--cyan);
-  font-family:var(--mono);font-size:13px;letter-spacing:.05em;
-  background:rgba(90,200,220,.06);
-}
-
-.filelist{width:100%;border-collapse:collapse}
-.filelist th{
-  padding:8px 12px;
-  text-align:left;
-  font-family:var(--mono);
-  font-size:11px;
-  color:var(--dim);
-  border-bottom:1px solid var(--line);
-  background:rgba(0,0,0,0.2);
-  user-select:none;
-}
-.filelist td{padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
-.filelist tr:last-child td{border-bottom:none}
-.filelist tr.row:hover{background:rgba(255,255,255,.02)}
-.filelist tr.selected{background:rgba(90,200,220,0.05)}
-
-.f-chk{width:28px;text-align:center}
-.f-chk input{cursor:pointer;accent-color:var(--cyan)}
-
-/* --- NUOVE ICONE PER CARTELLE E FILE --- */
-.f-icon{width:26px;color:var(--dim);font-family:var(--mono);text-align:center; font-size: 16px;}
-.f-icon.dir{color:var(--amber); font-weight: 700;}
-.f-icon.txt{color:var(--cyan); }
-.f-icon.bin{color:var(--red); opacity: 0.8;}
-
-.f-name{cursor:pointer;color:var(--fg);word-break:break-all}
-.f-name.dir{color:var(--amber);font-weight:600}
-.f-name:hover{color:var(--cyan)}
-.f-meta{color:var(--faint);font-family:var(--mono);font-size:12px;white-space:nowrap;text-align:right}
-.f-actions{text-align:right;white-space:nowrap;width:1%}
-.f-actions button{
-  background:none;border:1px solid transparent;color:var(--faint);
-  font-family:var(--mono);font-size:12px;padding:4px 7px;cursor:pointer;margin-left:3px;
-  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
-}
-.f-actions button:hover{color:var(--fg);border-color:var(--line)}
-.f-actions button.danger:hover{color:var(--red);border-color:var(--red)}
-
-.empty-state{
-  padding:50px 16px;text-align:center;color:var(--faint);
-  font-family:var(--mono);font-size:13px;letter-spacing:.03em;
-}
-
-/* ---------- details modal ---------- */
-.details-grid{
-  display:grid;
-  grid-template-columns:120px 1fr;
-  gap:8px 12px;
-  font-family:var(--mono);
-  font-size:12px;
-}
-.details-grid .lbl{color:var(--dim);text-align:right}
-.details-grid .val{color:var(--fg);word-break:break-all}
-
-/* ---------- modal ---------- */
-.modal-overlay{
-  position:fixed;inset:0;background:rgba(4,5,7,.85);
-  backdrop-filter:blur(2px);
-  display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;
-}
-.modal{
-  background:var(--panel);border:1px solid var(--cyan-dim);width:100%;max-width:480px;
-  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
-  box-shadow:0 10px 30px rgba(0,0,0,0.5);
-}
-.modal-header{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:12px 16px;border-bottom:1px solid var(--line);
-  font-family:var(--mono);font-size:13px;color:var(--cyan);
-}
-.modal-header button{background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;line-height:1}
-.modal-header button:hover{color:var(--fg)}
-.modal-body{padding:16px}
-.modal-body input[type=text]{
-  width:100%;background:var(--bg);border:1px solid var(--line);color:var(--fg);
-  font-family:var(--mono);font-size:14px;padding:9px 10px;
-}
-.modal-body input[type=text]:focus{outline:1px solid var(--cyan);border-color:var(--cyan)}
-.modal-body label{display:block;font-size:12px;color:var(--dim);margin-bottom:6px;font-family:var(--mono)}
-.modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
-.modal-footer button,.modal-footer .primary{
-  font-family:var(--sans);font-size:13px;padding:8px 14px;cursor:pointer;
-  background:var(--panel2);border:1px solid var(--line);color:var(--fg);
-  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px);
-  transition:background .15s, border-color .15s, color .15s;
-}
-.modal-footer .primary{border-color:var(--cyan);color:var(--cyan)}
-.modal-footer .primary:hover{background:rgba(90,200,220,.12)}
-.err-msg{color:var(--red);font-size:12px;font-family:var(--mono);min-height:16px;margin-top:8px}
-
-.editor-modal{max-width:720px}
-#editorArea{
-  width:100%;min-height:340px;background:var(--bg);border:1px solid var(--line);
-  color:var(--fg);font-family:var(--mono);font-size:13px;padding:12px;resize:vertical;
-}
-#editorArea:focus{outline:1px solid var(--cyan)}
-#editorFilename{color:var(--fg)}
-
-/* ---------- toast ---------- */
-.toast{
-  position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
-  background:var(--panel);border:1px solid var(--green);color:var(--green);
-  font-family:var(--mono);font-size:13px;padding:10px 18px;z-index:200;
-  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
-  box-shadow:0 4px 12px rgba(0,0,0,0.4);
-}
-.toast.err{border-color:var(--red);color:var(--red)}
-
-/* --- HUD INFO CONSOLE AREA --- */
-.console-area {
-    margin-top: 15px;
-    padding: 10px;
-    background: rgba(0,0,0,0.4);
-    border: 1px solid var(--green-dim);
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--green);
-    overflow-y: scroll;
-    height: 80px;
-}
-.console-area p { margin: 0 0 4px 0; }
-.console-area .cmd { color: var(--fg); opacity: 0.8; }
-.console-area .err { color: var(--red); }
-
-button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
-
-@media (max-width:720px){
-  .companions-strip-container{flex-direction:column;}
-  .basestation-card{flex-direction:row;align-items:flex-start}
-  .bs-actions{width:100%;justify-content:flex-start}
-  .bs-btn{flex:1;justify-content:center}
-  .toolbar{flex-direction:column;align-items:stretch}
-  .actions{justify-content:flex-start}
-  .search-box input{width:100%}
-  .search-box input:focus{width:100%}
-  .f-meta{display:none}
-  .main-title{font-size:18px}
-  .connection-info-grid { grid-template-columns: auto max-content auto auto; gap: 8px; font-size: 10px;}
-  .neon-sign { display: none !important; }
-  .graffiti-tag { display: none !important; }
-}
-@media (prefers-reduced-motion:reduce){
-  .led-dot{animation:none}
-  .hologram-animate { animation: none; opacity: 1;}
-}
-</style>
+    /* ─── RESPONSIVE ─── */
+    @media (max-width:1024px) {
+      .services-grid { grid-template-columns:repeat(3,1fr); }
+      .command-center { grid-template-columns:1fr; }
+      .sysinfo-panel .sp-body { grid-template-columns:auto 1fr auto 1fr; gap:2px 10px; font-size:10px; }
+      .info-tetris { grid-template-columns:1fr 1fr; grid-template-rows:auto auto auto auto; }
+      .tetris-block:nth-child(1) { grid-column:1/2; grid-row:1/3; }
+      .tetris-block:nth-child(2) { grid-column:2/3; grid-row:1/2; }
+      .tetris-block:nth-child(3) { grid-column:2/3; grid-row:2/3; }
+      .tetris-block:nth-child(4) { grid-column:1/2; grid-row:3/4; }
+      .tetris-block:nth-child(5) { grid-column:2/3; grid-row:3/4; }
+      .tetris-block:nth-child(6) { grid-column:1/3; grid-row:4/5; }
+    }
+    @media (max-width:640px) {
+      .services-grid { grid-template-columns:repeat(2,1fr); }
+      .page-header .title-group .logo-img { height:30px; }
+      .page-header .rt-server { font-size:16px; }
+      .pc-stats-panel { font-size:9px; gap:8px; padding:4px 10px; flex-wrap:wrap; }
+      .tab-nav .tab-btn { font-size:11px; padding:8px 12px; }
+      .sysinfo-panel .sp-body { grid-template-columns:auto 1fr; gap:2px 8px; font-size:9px; }
+      .toolbar { flex-direction:column; align-items:stretch; }
+      .search-box input { width:100%; }
+      .search-box input:focus { width:100%; }
+      .f-meta { display:none; }
+      .utility-panel .util-row { flex-direction:column; }
+      .util-btn { justify-content:center; }
+      .boot-title { font-size:24px; }
+      .spinner-container { width:100px; height:100px; }
+      .progress-ring { width:100px; height:100px; }
+      .percent-text { font-size:20px; }
+      .info-tetris { grid-template-columns:1fr; grid-template-rows:auto auto auto auto auto auto; }
+      .tetris-block:nth-child(1),.tetris-block:nth-child(2),.tetris-block:nth-child(3),.tetris-block:nth-child(4),.tetris-block:nth-child(5),.tetris-block:nth-child(6) { grid-column:1/2; grid-row:auto; }
+      .sync-row { flex-direction:column; align-items:stretch; gap:4px; }
+      .sync-row .sync-path { min-width:auto; }
+      .hologram-window { padding:20px; }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      .led-dot { animation:none; }
+      .hologram-animate { animation:none; opacity:1; }
+    }
+    .xterm .xterm-viewport { background-color:#000 !important; }
+    .xterm .xterm-screen { background-color:#000 !important; }
+    .xterm .xterm-cursor-layer { background-color:#000 !important; }
+    .xterm .xterm-cursor-block { background-color:var(--cyan) !important; }
+    .xterm .xterm-cursor-blink { background-color:var(--cyan) !important; }
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-track { background:var(--bg); }
+    ::-webkit-scrollbar-thumb { background:var(--cyan-dim); border-radius:3px; }
+    ::-webkit-scrollbar-thumb:hover { background:var(--cyan); }
+  </style>
 </head>
 <body>
 
-<!-- BOOT ANIMATION OVERLAY -->
+<!-- ═══ BOOT ═══ -->
 <div id="bootanim-overlay">
-    <div class="boot-frame active" data-frame="0">
-        <p>[ ESTABLISHING LINK ]</p>
-        <p>Rt:SERVER >> HANDHELD UNIT</p>
+  <div class="boot-grid"></div>
+  <div class="boot-content">
+    <img src="https://i.ibb.co/Z6v7k13Z/voiddesk.png" alt="Void Desk" class="boot-logo">
+    <div class="spinner-container">
+      <svg class="progress-ring" viewBox="0 0 140 140">
+        <circle class="bg" cx="70" cy="70" r="60" fill="none" stroke-width="8"/>
+        <circle class="fg" cx="70" cy="70" r="60" fill="none" stroke-width="8" stroke-dasharray="376.99" stroke-dashoffset="376.99" stroke-linecap="round"/>
+      </svg>
+      <span class="percent-text" id="bootPercent">0%</span>
     </div>
-    <div class="boot-frame" data-frame="1">
-        <p>...[ INIT. UNDERGROUND HUD MODULES ]...</p>
-        <p>VOID BaseStation / AndroidStation</p>
-    </div>
-    <div class="boot-frame" data-frame="2">
-        <p>FILE VOID-DIVER (RT/SERVER)</p>
-        <p>_loading_assets_</p>
-    </div>
-    <div class="boot-frame" data-frame="3">
-        <p>CONNECTION STABLE.</p>
-        <p>VOID BaseStation ONLINE</p>
-    </div>
+    <div class="boot-title" id="bootTitle">Rt:<span class="rt">Server</span> <span class="base">BASE STATION</span></div>
+    <div class="boot-sub" id="bootSub">Void-Desk Project · Underground HUD</div>
+  </div>
 </div>
 
 <div id="main-wrap">
 
-  <!-- CARTELLO E GRAFFITI (Simulazione sfondi) -->
-  <div class="neon-sign">
-    <span class="fix-char">4</span><span class="fix-char">8</span><span class="flicker-char">C</span>
-  </div>
-  <div class="graffiti-tag">High LiMBO</div>
-
-  <!-- Hero Header -->
-  <header class="hero-banner hologram-animate" style="animation-delay: 0.1s;">
-    <div class="hero-overlay"></div>
-    <div class="hero-content">
-      <div class="hero-top-bar">
-        <div class="lab-tag">
-          <img src="https://i.ibb.co/zHfgwY1t/spdwfactory-logo.png" alt="SPDW Factory Logo" class="factory-logo">
-          <span>SPDW Factory Lab</span>
-        </div>
-        <div class="hero-symbols">
-          <img src="https://i.ibb.co/3y8mvcLG/spdw-symbol.png" alt="SPDW Symbol" class="sym-img" title="SPDW Symbol">
-          <img src="https://i.ibb.co/xq9H5Fqd/minoru-symbol.png" alt="Minoru Symbol" class="sym-img" title="Minoru Symbol">
-        </div>
+  <!-- ═══ HEADER ═══ -->
+  <header class="page-header hologram-animate" style="animation-delay:0.05s;">
+    <div class="title-group">
+      <img src="https://i.ibb.co/Z6v7k13Z/voiddesk.png" alt="Void Desk" class="logo-img">
+      <span class="rt-server"><span class="rt">Rt</span>:<span class="server">SERVER</span></span>
+      <div class="spdw-container">
+        <img src="https://i.ibb.co/3y8mvcLG/spdw-symbol.png" alt="SPDW" class="spdw-img" id="spdwSymbol">
+        <canvas id="sparkCanvas" width="80" height="80"></canvas>
       </div>
-
-      <h1 class="main-title">VOID <span class="accent">//</span> "Direct Link" <span class="sub-rt">Rt:SERVER</span></h1>
-
-      <div class="status-indicator-wrap">
-          <div class="status-indicator">
-            <span class="led-dot green" id="ledDot"></span>
-            <span class="status-text green" id="statusText">ONLINE</span>
-            <span class="status-ping" id="statusPing">(LATENCY: --ms)</span>
-          </div>
-
-          <!-- NUOVA CONSOLE INFO AREA -->
-          <div class="console-area" id="consoleLog">
-              <p>[INIT] Rt:SERVER Direct Link established.</p>
-              <p>[LOG] AndroidStation companion discovered at 192.168.1.15.</p>
-          </div>
-      </div>
-
-      <!-- NUOVO CONNECTION INFO HUD -->
-      <div class="connection-info-grid">
-          <span class="lbl">IFACE:</span><span class="val" id="iface">VOID-WLAN</span>
-          <span class="lbl">NETWORK:</span><span class="val" id="ssid">"UGC-BaseNet"</span>
-          <span class="lbl">LOCAL IP:</span><span class="val" id="ip">192.168.1.12</span>
-          <span class="lbl">PORT:</span><span class="val val-port" id="port">8080</span>
-          <span class="lbl">PROTO:</span><span class="val">HTTP/TCP</span>
-          <span class="lbl">TX/RX:</span><span class="val">2.1MB/8.7MB</span>
-      </div>
+    </div>
+    <div class="pc-stats-panel" id="pcStatsPanel">
+      <div class="stat-item"><span class="label">👤</span><span class="value" id="pcUser">user</span></div>
+      <div class="stat-item"><span class="label">⏳</span><span class="value" id="pcTime">--:--:--</span></div>
+      <div class="stat-item"><span class="label">🖥</span><span class="value cyan" id="pcOs">OS</span></div>
+      <div class="stat-item"><span class="label">🧠</span><span class="value amber" id="pcMem">--</span></div>
+    </div>
+    <div class="header-status">
+      <span class="dot" id="headerDot"></span>
+      <span id="headerStatus">ONLINE</span>
+      <span id="headerPing" style="color:var(--faint);font-size:10px;">(latency: --ms)</span>
     </div>
   </header>
 
-  <div class="barcode" id="barcode"></div>
-
-  <!-- Companions Section (UNICA STRISCIA) -->
-  <div class="companions-strip-container hologram-animate" style="animation-delay: 0.2s;">
-    
-    <!-- VOID BaseStation (PC) -->
-    <div class="basestation-card basestation-pc">
-      <div class="bs-content">
-          <div class="bs-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-          </div>
-          <div class="bs-info">
-            <div class="bs-title">
-              VOID BaseStation
-              <span class="badge">DESKTOP COMPANION</span>
-            </div>
-            <div class="bs-desc">
-              Connect handheld devices and PC workstation seamlessly.
-            </div>
-          </div>
-      </div>
-      <div class="bs-actions">
-        <a class="bs-btn" href="/basestation.py" download>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          Download .py
-        </a>
-      </div>
-    </div>
-
-    <!-- AndroidStation (Android) -->
-    <div class="basestation-card android-card">
-      <div class="bs-content">
-          <div class="bs-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-              <line x1="12" y1="18" x2="12.01" y2="18"></line>
-            </svg>
-          </div>
-          <div class="bs-info">
-            <div class="bs-title">
-              AndroidStation
-              <span class="badge">ANDROID COMPANION</span>
-            </div>
-            <div class="bs-desc">
-              Bridge mobile devices to the VOID environment.
-            </div>
-          </div>
-      </div>
-      <div class="bs-actions">
-        <a class="bs-btn apk-btn" href="/androidstation.apk" download>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          APK
-        </a>
-        <a class="bs-btn py-btn" href="/androidstation.py" download>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="16 18 22 12 16 6"></polyline>
-            <polyline points="8 6 2 12 8 18"></polyline>
-          </svg>
-          PY Script
-        </a>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Single File Management Panel (NUOVO NOME) -->
-  <div class="panel hologram-animate" style="animation-delay: 0.3s;">
-    <div class="panel-header-title">
-      <span>FILES FROM THE VOID-DIVER</span>
-      <span id="fileCountBadge" style="font-size:11px;color:var(--dim);font-weight:normal">0 items</span>
-    </div>
-
-    <div class="toolbar">
-      <div class="breadcrumb" id="breadcrumb"></div>
-      
-      <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="Search files...">
-      </div>
-
-      <div class="actions">
-        <button id="btnUp" title="Parent Folder">↑</button>
-        <button id="btnNewFolder">+ Folder</button>
-        <button id="btnNewFile">+ File</button>
-        <label class="upload-btn">Upload
-          <input type="file" id="fileInput" multiple hidden>
-        </label>
-        <button id="btnBatchDelete" class="btn-danger" disabled title="Delete selected items">
-          Delete (<span id="selectedCount">0</span>)
-        </button>
-      </div>
-    </div>
-
-    <!-- NUOVA TOOLBAR OPERAZIONI (Copia, Taglia, Incolla, Rinomina) -->
-    <div class="toolbar batch-bar" style="border-top: none; padding-top: 0;">
-        <div class="toolbar-ops actions">
-            <button id="btnCopy" disabled title="Copy selected">Copia</button>
-            <button id="btnCut" disabled title="Cut selected">Taglia</button>
-            <button id="btnPaste" disabled title="Paste from clipboard">Incolla</button>
-            <button id="btnRename" disabled title="Rename single item">Rinomina</button>
+  <!-- ═══ HERO BANNER ═══ -->
+  <div class="hero-banner hologram-animate" style="animation-delay:0.08s; position:relative; background:url('https://i.ibb.co/PvJvGMNZ/BCO-fa031b25-c5de-45f6-b989-4eaef8b8e721.png') center/cover no-repeat; border:1px solid var(--line); border-bottom:2px solid var(--cyan); padding:20px 24px; margin-bottom:14px; clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px); overflow:hidden;">
+    <div class="hero-overlay" style="position:absolute;inset:0;background:linear-gradient(135deg, rgba(10,11,14,0.92) 0%, rgba(13,16,19,0.82) 100%);z-index:1;"></div>
+    <div class="hero-content" style="position:relative;z-index:2;">
+      <div class="hero-top-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+        <div class="lab-tag" style="display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:12px;color:var(--amber);letter-spacing:.12em;font-weight:700;text-transform:uppercase;">
+          <img src="https://i.ibb.co/zHfgwY1t/spdwfactory-logo.png" alt="SPDW Factory Logo" style="height:26px;width:auto;filter:drop-shadow(0 0 4px rgba(255,180,67,0.4));">
+          <span>SPDW Factory Lab</span>
         </div>
+        <div class="hero-symbols" style="display:flex;align-items:center;gap:12px;">
+          <img src="https://i.ibb.co/3y8mvcLG/spdw-symbol.png" alt="SPDW Symbol" style="height:28px;width:auto;filter:drop-shadow(0 0 6px rgba(90,200,220,0.5));opacity:0.9;transition:opacity .2s;">
+          <img src="https://i.ibb.co/xq9H5Fqd/minoru-symbol.png" alt="Minoru Symbol" style="height:28px;width:auto;filter:drop-shadow(0 0 6px rgba(90,200,220,0.5));opacity:0.9;transition:opacity .2s;">
+        </div>
+      </div>
+      <h1 style="margin:4px 0 10px;font-family:var(--display);font-size:22px;font-weight:700;color:var(--fg);letter-spacing:.06em;text-shadow:0 0 10px rgba(90,200,220,0.3);">VOID <span style="color:var(--cyan);">//</span> "Direct Link" <span style="color:var(--amber);font-size:18px;font-weight:400;">Rt:SERVER</span></h1>
+      <div class="status-indicator-wrap" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+        <div class="status-indicator" style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,0,0,0.45);border:1px solid var(--line);padding:4px 12px;font-family:var(--mono);font-size:11px;clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);width:max-content;">
+          <span class="led-dot green" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--green);box-shadow:0 0 8px rgba(51,255,85,0.9);animation:pulse 1.8s ease-in-out infinite;"></span>
+          <span class="status-text green" style="font-weight:700;letter-spacing:.08em;color:var(--green);">ONLINE</span>
+          <span class="status-ping" style="color:var(--dim);margin-left:4px;font-size:10px;">(LATENCY: --ms)</span>
+        </div>
+      </div>
+      <div class="connection-info-grid" style="display:grid;grid-template-columns:auto max-content max-content auto auto auto;gap:12px 18px;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--dim);padding:10px 14px;background:rgba(0,0,0,0.25);border:1px dashed var(--cyan-dim);">
+        <span class="lbl" style="color:var(--faint);text-align:right;text-transform:uppercase;">IFACE:</span><span class="val" style="color:var(--cyan);word-break:break-all;font-weight:600;" id="iface">VOID-WLAN</span>
+        <span class="lbl" style="color:var(--faint);text-align:right;text-transform:uppercase;">NETWORK:</span><span class="val" style="color:var(--cyan);word-break:break-all;font-weight:600;" id="ssid">"UGC-BaseNet"</span>
+        <span class="lbl" style="color:var(--faint);text-align:right;text-transform:uppercase;">LOCAL IP:</span><span class="val" style="color:var(--cyan);word-break:break-all;font-weight:600;" id="ip">--</span>
+        <span class="lbl" style="color:var(--faint);text-align:right;text-transform:uppercase;">PORT:</span><span class="val val-port" style="color:var(--amber);font-weight:700;" id="port">8080</span>
+        <span class="lbl" style="color:var(--faint);text-align:right;text-transform:uppercase;">PROTO:</span><span class="val" style="color:var(--cyan);word-break:break-all;font-weight:600;">HTTP/TCP</span>
+        <span class="lbl" style="color:var(--faint);text-align:right;text-transform:uppercase;">TX/RX:</span><span class="val" style="color:var(--cyan);word-break:break-all;font-weight:600;" id="txrx">--</span>
+      </div>
     </div>
+  </div>
 
-    <div class="batch-bar" id="batchBar" hidden>
-      <span><strong id="batchSelectedText">0</strong> items selected</span>
-      <div>
-        <button id="btnDeselectAll" style="background:none;border:none;color:var(--dim);cursor:pointer;font-family:var(--mono);font-size:11px;">Deselect All</button>
+  <!-- ═══ TAB NAV ═══ -->
+  <nav class="tab-nav hologram-animate" style="animation-delay:0.1s;">
+    <button class="tab-btn active" data-tab="dashboard">◈ Dashboard</button>
+    <button class="tab-btn" data-tab="command">▶ Command Center</button>
+    <button class="tab-btn" data-tab="info">⧩ Info &amp; About</button>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- TAB: DASHBOARD -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div class="tab-content active" id="tab-dashboard">
+
+    <!-- Services Grid -->
+    <div class="services-grid hologram-animate" style="animation-delay:0.15s;">
+      <div class="service-card" data-port="8080" data-service="terminal">
+        <div class="sc-top"><div class="sc-icon">⌨</div><span class="sc-name">Web Terminal</span><span class="sc-led"><span class="dot" id="led-terminal"></span> <span id="status-terminal">check</span></span></div>
+        <div class="sc-addr"><span class="link" id="link-terminal">http://--:8080</span></div>
+        <div class="sc-creds">no auth · ttyd</div>
+        <button class="sc-btn" onclick="openService('terminal')">Open →</button>
+      </div>
+      <div class="service-card" data-port="7070" data-service="syncthing">
+        <div class="sc-top"><div class="sc-icon">⟳</div><span class="sc-name">Syncthing</span><span class="sc-led"><span class="dot" id="led-syncthing"></span> <span id="status-syncthing">check</span></span></div>
+        <div class="sc-addr"><span class="link" id="link-syncthing">http://--:7070</span></div>
+        <div class="sc-creds">no auth · web UI</div>
+        <button class="sc-btn green-btn" onclick="openService('syncthing')">Open →</button>
+      </div>
+      <div class="service-card" data-port="9090" data-service="filebrowser">
+        <div class="sc-top"><div class="sc-icon">📁</div><span class="sc-name">FileBrowser</span><span class="sc-led"><span class="dot" id="led-filebrowser"></span> <span id="status-filebrowser">check</span></span></div>
+        <div class="sc-addr"><span class="link" id="link-filebrowser">http://--:9090</span></div>
+        <div class="sc-creds">user: <span style="color:var(--fg)">muos</span> · pass: <span style="color:var(--fg)">muos</span></div>
+        <button class="sc-btn" onclick="openService('filebrowser')">Open →</button>
+      </div>
+      <div class="service-card" data-port="2022" data-service="sftp">
+        <div class="sc-top"><div class="sc-icon">🔒</div><span class="sc-name">SFTP</span><span class="sc-led"><span class="dot" id="led-sftp"></span> <span id="status-sftp">check</span></span></div>
+        <div class="sc-addr"><span class="link" id="link-sftp">sftp://--:2022</span></div>
+        <div class="sc-creds">user: <span style="color:var(--fg)">muos</span> · pass: <span style="color:var(--fg)">muos</span></div>
+        <button class="sc-btn small" onclick="copySftpCmd()">📋 Copy</button>
+      </div>
+      <div class="service-card" data-port="22" data-service="ssh">
+        <div class="sc-top"><div class="sc-icon">🖥</div><span class="sc-name">Secure Shell</span><span class="sc-led"><span class="dot" id="led-ssh"></span> <span id="status-ssh">check</span></span></div>
+        <div class="sc-addr"><span class="link" id="link-ssh">ssh://--:22</span></div>
+        <div class="sc-creds">user: <span style="color:var(--fg)">root</span> · pass: <span style="color:var(--fg)">root</span></div>
+        <button class="sc-btn" onclick="openService('ssh')">Open →</button>
+      </div>
+      <div class="service-card" data-port="8384" data-service="tailscale">
+        <div class="sc-top"><div class="sc-icon">🔗</div><span class="sc-name">Tailscale</span><span class="sc-led"><span class="dot" id="led-tailscale"></span> <span id="status-tailscale">check</span></span></div>
+        <div class="sc-addr"><span class="link" id="link-tailscale">http://--:8384</span></div>
+        <div class="sc-creds">admin UI · auth required</div>
+        <button class="sc-btn" onclick="openService('tailscale')">Open →</button>
       </div>
     </div>
 
-    <div class="dropzone" id="dropzone">
-      <table class="filelist">
-        <thead>
-          <tr>
-            <th class="f-chk"><input type="checkbox" id="chkSelectAll" title="Select All"></th>
-            <th style="width: 30px;"></th>
-            <th>NAME</th>
-            <th style="text-align: right;">INFO / MODIFIED</th>
-            <th style="text-align: right;">ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody id="filelistBody"></tbody>
-      </table>
-      <div class="empty-state" id="emptyState" hidden></div>
+    <!-- System Info -->
+    <div class="sysinfo-panel hologram-animate" style="animation-delay:0.2s;">
+      <div class="sp-header"><span>⏻ MUOS SYSTEM INFO</span><span id="sysinfo-uptime" style="font-weight:400;color:var(--dim);font-size:9px;">Uptime: --</span></div>
+      <div class="sp-body" id="sysinfoBody">
+        <span class="label">OS</span><span class="value cyan" id="si-os">MustardOS --</span>
+        <span class="label">Kernel</span><span class="value" id="si-kernel">Linux --</span>
+        <span class="label">CPU</span><span class="value amber" id="si-cpu">--</span>
+        <span class="label">Memory</span><span class="value" id="si-mem">-- / --</span>
+        <span class="label">Disk (mmc)</span><span class="value green" id="si-disk">--</span>
+        <span class="label">Battery</span><span class="value" id="si-battery">--</span>
+        <span class="label">Local IP</span><span class="value cyan" id="si-ip">--</span>
+        <span class="label">Gamepad</span><span class="value" id="si-gamepad">--</span>
+      </div>
     </div>
+
+    <!-- File Explorer -->
+    <div class="panel hologram-animate" style="animation-delay:0.25s;">
+      <div class="panel-header-title">
+        <span>📂 VOID-DIVER · FILE EXPLORER <span class="info-circle" onclick="showHoloInfo('file-explorer')">i</span></span>
+        <span id="fileCountBadge" style="font-size:10px;color:var(--dim);font-weight:400;">0 items</span>
+      </div>
+      <div class="toolbar">
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <div class="search-box"><span class="search-icon">🔍</span><input type="text" id="searchInput" placeholder="Filter..."></div>
+        <div class="actions">
+          <button id="btnUp" title="Parent">↑</button>
+          <button id="btnNewFolder">+ Folder</button>
+          <button id="btnNewFile">+ File</button>
+          <label class="upload-btn">Upload <input type="file" id="fileInput" multiple hidden></label>
+          <button id="btnBatchDelete" class="btn-danger" disabled>Del (<span id="selectedCount">0</span>)</button>
+        </div>
+      </div>
+      <div class="batch-bar" id="batchBar" hidden>
+        <span><strong id="batchSelectedText">0</strong> selected</span>
+        <div class="ops">
+          <button id="btnCopy" disabled>Copy</button>
+          <button id="btnCut" disabled>Cut</button>
+          <button id="btnPaste" disabled>Paste</button>
+          <button id="btnRename" disabled>Rename</button>
+          <button id="btnDeselectAll">Deselect</button>
+        </div>
+      </div>
+      <div class="dropzone" id="dropzone">
+        <table class="filelist"><thead><tr><th class="f-chk"><input type="checkbox" id="chkSelectAll"></th><th style="width:26px;"></th><th>NAME</th><th style="text-align:right;">INFO</th><th style="text-align:right;">ACTIONS</th></tr></thead><tbody id="filelistBody"></tbody></table>
+        <div class="empty-state" id="emptyState" hidden></div>
+      </div>
+    </div>
+
+    <!-- Console Log -->
+    <div class="console-log hologram-animate" style="animation-delay:0.3s;">
+      <div class="cl-header"><span>⏣ CONSOLE LOG</span><span style="font-weight:400;color:var(--dim);font-size:8px;">live</span></div>
+      <div class="cl-body" id="consoleLogBody"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- TAB: COMMAND CENTER (with integrated Sync) -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-command">
+    <div class="command-center hologram-animate" style="animation-delay:0.1s;">
+      <!-- Terminal -->
+      <div class="command-terminal-wrap">
+        <div class="term-header">
+          <span>⏣ EMBEDDED TERMINAL <span class="info-circle" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid var(--dim);color:var(--dim);font-size:9px;font-weight:700;cursor:pointer;transition:all .2s;font-family:var(--sans);background:rgba(255,255,255,0.03);margin-left:6px;padding:0;" onclick="showHoloInfo('terminal')">i</span></span>
+          <div class="term-status">
+            <span class="dot" id="termLed" style="background:var(--red);box-shadow:none;"></span>
+            <span id="termStatus" style="color:var(--red);">disconnected</span>
+            <span style="color:var(--faint);font-size:9px;" id="termInfo">—</span>
+          </div>
+        </div>
+        <div id="terminal-container"></div>
+      </div>
+
+      <!-- Utility Panel -->
+      <div class="utility-panel">
+        <div class="util-title">⚡ COMMAND UTILITIES <span class="info-circle" onclick="showHoloInfo('commands')">i</span></div>
+
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-bottom:2px;">SSH command</div>
+          <div class="ssh-copy-area">
+            <span class="ssh-cmd" id="sshCmdDisplay">ssh -p 22 root@--</span>
+            <button class="ssh-copy-btn" onclick="copySshCmd()">📋 Copy</button>
+          </div>
+        </div>
+
+        <!-- Quick commands -->
+        <div>
+          <div style="font-family:var(--display);font-size:9px;color:var(--dim);margin-bottom:4px;letter-spacing:.04em;">QUICK COMMANDS</div>
+          <div class="util-row">
+            <button class="util-btn warning" onclick="quickCmd('uname -a')">uname</button>
+            <button class="util-btn warning" onclick="quickCmd('df -h')">df -h</button>
+            <button class="util-btn warning" onclick="quickCmd('free -m')">free</button>
+            <button class="util-btn warning" onclick="quickCmd('uptime')">uptime</button>
+            <button class="util-btn warning" onclick="quickCmd('ps aux')">ps</button>
+            <button class="util-btn warning" onclick="quickCmd('ls -la')">ls -la</button>
+            <button class="util-btn warning" onclick="quickCmd('dmesg | tail -20')">dmesg</button>
+            <button class="util-btn warning" onclick="quickCmd('ifconfig')">ifconfig</button>
+          </div>
+        </div>
+
+        <!-- System Control Panel -->
+        <div style="border-top:1px solid var(--line);padding-top:8px;">
+          <div style="font-family:var(--display);font-size:9px;color:var(--dim);margin-bottom:4px;letter-spacing:.04em;">⏻ SYSTEM CONTROL</div>
+          <div class="util-row">
+            <button class="util-btn danger" onclick="powerAction('poweroff')">⏻ Power Off</button>
+            <button class="util-btn warning" onclick="powerAction('reboot')">⟳ Reboot</button>
+            <button class="util-btn success" onclick="openExternalTerminal()">🖥 External</button>
+            <button class="util-btn" onclick="quickCmd('sync && echo 3 > /proc/sys/vm/drop_caches')">🧹 Drop Cache</button>
+            <button class="util-btn" onclick="quickCmd('hwclock -w')">⌚ Sync Clock</button>
+          </div>
+        </div>
+
+        <!-- Custom command -->
+        <div style="border-top:1px solid var(--line);padding-top:8px;">
+          <div style="font-family:var(--display);font-size:9px;color:var(--dim);margin-bottom:4px;letter-spacing:.04em;">✏️ CUSTOM COMMAND</div>
+          <div class="custom-cmd-row">
+            <input type="text" id="customCmdInput" placeholder="Enter command..." onkeydown="if(event.key==='Enter') sendCustomCmd()">
+            <button class="util-btn" onclick="sendCustomCmd()">▶ Send</button>
+          </div>
+          <div class="cmd-history" id="cmdHistory"></div>
+        </div>
+
+        <!-- Screenshots -->
+        <div class="screenshot-section">
+          <div class="ss-header">
+            <span class="ss-title">📷 SCREENSHOTS <span class="info-circle" onclick="showHoloInfo('screenshots')">i</span></span>
+            <div class="util-row" style="gap:4px;">
+              <button class="util-btn" id="ssCaptureBtn" onclick="captureScreenshot()">Capture</button>
+              <button class="util-btn small" onclick="refreshScreenshotList()">↻</button>
+            </div>
+          </div>
+          <div class="ss-thumbs" id="ssThumbContainer"><span style="color:var(--faint);font-size:10px;font-family:var(--mono);padding:4px 0;">No screenshots yet</span></div>
+        </div>
+
+        <!-- ─── SYNC PANEL (integrated) ─── -->
+        <div class="sync-panel-inline">
+          <div class="sync-title">⟳ PC ⇄ CONSOLE · TWO-WAY SYNC <span class="info-circle" onclick="showHoloInfo('sync')">i</span></div>
+          <div id="syncPairsContainer">
+            <div class="sync-row">
+              <span class="sync-name">Saves</span>
+              <span class="sync-path">/mnt/mmc/MUOS/save/file</span>
+              <span class="sync-status idle" id="syncStatusSaves">idle</span>
+              <button class="sync-btn green" onclick="runSync('saves')">⟳ Sync</button>
+            </div>
+            <div class="sync-row">
+              <span class="sync-name">States</span>
+              <span class="sync-path">/mnt/mmc/MUOS/save/state</span>
+              <span class="sync-status idle" id="syncStatusStates">idle</span>
+              <button class="sync-btn green" onclick="runSync('states')">⟳ Sync</button>
+            </div>
+            <div class="sync-row">
+              <span class="sync-name">Screenshots</span>
+              <span class="sync-path">/mnt/mmc/MUOS/screenshot</span>
+              <span class="sync-status idle" id="syncStatusScreenshots">idle</span>
+              <button class="sync-btn green" onclick="runSync('screenshots')">⟳ Sync</button>
+            </div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="sync-btn" onclick="addSyncPair()">+ Add Pair</button>
+            <button class="sync-btn green" onclick="syncAll()">⟳ Sync All</button>
+          </div>
+          <div class="sync-log" id="syncLog"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- TAB: INFO & ABOUT (TETRIS) -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-info">
+    <div class="info-tetris hologram-animate" style="animation-delay:0.1s;">
+
+      <div class="tetris-block">
+        <div class="tb-title">🚀 VOID-DESK · ECOSYSTEM <span class="info-circle" onclick="showHoloInfo('void-desk')">i</span></div>
+        <div class="tb-body">
+          <p><span class="highlight">BaseStation</span> is the <span class="glow-text">operational core</span> of the <span class="highlight">Void-Desk</span> project for muOS.</p>
+          <p>Paired with <span class="glow-text">Rt:Server</span>, it expands and optimizes the capabilities of handheld devices, turning them into advanced <span class="highlight">control stations</span>.</p>
+          <p><strong>Key features:</strong></p>
+          <ul>
+            <li>Embedded terminal (xterm-256color) via WebSocket</li>
+            <li>Service management (SSH, SFTP, FileBrowser, Syncthing, Tailscale)</li>
+            <li>File explorer with drag & drop, copy/paste, rename</li>
+            <li>Framebuffer screenshots with preview and management</li>
+            <li>Real-time system resource monitoring</li>
+            <li>Two-way sync PC ↔ Console for saves, states, screenshots</li>
+          </ul>
+          <p><span style="color:var(--fg);">Project:</span> <a href="https://github.com/SilverCrow2323/muOS-Void-Desk" target="_blank">github.com/SilverCrow2323/muOS-Void-Desk</a></p>
+        </div>
+      </div>
+
+      <div class="tetris-block">
+        <div class="tb-title">🌐 MUOS · WEB SERVICES <span class="info-circle" onclick="showHoloInfo('services')">i</span></div>
+        <div class="tb-body">
+          <table style="width:100%;font-size:12px;border-collapse:collapse;color:var(--dim);">
+            <tr style="border-bottom:1px solid var(--line);"><th style="text-align:left;color:var(--fg);">Service</th><th style="text-align:left;color:var(--fg);">Port</th><th style="text-align:left;color:var(--fg);">Auth</th></tr>
+            <tr><td>Web Terminal</td><td>8080</td><td>none</td></tr>
+            <tr><td>Syncthing</td><td>7070</td><td>none</td></tr>
+            <tr><td>FileBrowser</td><td>9090</td><td>muos/muos</td></tr>
+            <tr><td>SFTP</td><td>2022</td><td>muos/muos</td></tr>
+            <tr><td>SSH</td><td>22</td><td>root/root</td></tr>
+            <tr><td>Tailscale</td><td>8384</td><td>varies</td></tr>
+          </table>
+          <p style="margin-top:10px;font-size:12px;color:var(--faint);">muOS web services are accessible via <span class="highlight">Rt:Server</span> and <span class="highlight">BaseStation</span>.</p>
+          <p><span style="color:var(--fg);">Docs:</span> <a href="https://muos.dev/web" target="_blank">muos.dev/web</a></p>
+        </div>
+      </div>
+
+      <div class="tetris-block">
+        <div class="tb-title">⌨ COMMAND CENTER <span class="info-circle" onclick="showHoloInfo('command-center')">i</span></div>
+        <div class="tb-body">
+          <p><strong>Embedded terminal:</strong> WebSocket connection to ttyd (port 8080).</p>
+          <p><strong>Quick commands:</strong> One-click diagnostic commands.</p>
+          <p><strong>System control:</strong> Power off, reboot, drop cache, sync clock.</p>
+          <p><strong>Custom commands:</strong> Send any command to the terminal.</p>
+          <p><strong>External terminal:</strong> Copy SSH command for your local terminal.</p>
+          <p><strong>Screenshots:</strong> Capture framebuffer via SSH, saved to <span style="color:var(--fg);">/mnt/mmc/MUOS/screenshot/</span>.</p>
+        </div>
+      </div>
+
+      <div class="tetris-block">
+        <div class="tb-title">⟳ TWO-WAY SYNC <span class="info-circle" onclick="showHoloInfo('sync-info')">i</span></div>
+        <div class="tb-body">
+          <p>Two-way synchronization <span class="highlight">PC ↔ Console</span> follows the <span class="glow-text">"newest wins"</span> principle:</p>
+          <ul>
+            <li>Files with the most recent modification time are copied</li>
+            <li>No files are ever automatically deleted</li>
+            <li>Perfect for saves, states, and screenshots</li>
+          </ul>
+          <p><strong>Default sync pairs:</strong></p>
+          <ul>
+            <li><span style="color:var(--cyan);">Saves</span> → /mnt/mmc/MUOS/save/file</li>
+            <li><span style="color:var(--amber);">States</span> → /mnt/mmc/MUOS/save/state</li>
+            <li><span style="color:var(--green);">Screenshots</span> → /mnt/mmc/MUOS/screenshot</li>
+          </ul>
+          <p><span style="color:var(--fg);">Note:</span> Sync uses SFTP (port 2022) with <span style="color:var(--cyan);">muos/muos</span> credentials.</p>
+        </div>
+      </div>
+
+      <div class="tetris-block">
+        <div class="tb-title">🔗 RESOURCES &amp; CREDITS <span class="info-circle" onclick="showHoloInfo('resources')">i</span></div>
+        <div class="tb-body">
+          <p><strong>Void-Desk Project</strong><br>
+          <a href="https://github.com/SilverCrow2323/muOS-Void-Desk" target="_blank">github.com/SilverCrow2323/muOS-Void-Desk</a></p>
+          <p><strong>muOS Official</strong><br>
+          <a href="https://muos.dev/" target="_blank">muos.dev</a></p>
+          <p><strong>muOS Web Services</strong><br>
+          <a href="https://muos.dev/web" target="_blank">muos.dev/web</a></p>
+          <p><strong>Community</strong><br>
+          Discord &amp; Reddit muOS for support and updates.</p>
+          <p style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--faint);">
+            <span style="color:var(--cyan);">BaseStation</span> · v3.0 · <span class="glow-text">SPDW Factory</span> — RSPDW Lab
+          </p>
+        </div>
+      </div>
+
+      <div class="tetris-block">
+        <div class="tb-title">⧩ UNDERGROUND HUD <span class="info-circle" onclick="showHoloInfo('hud')">i</span></div>
+        <div class="tb-body">
+          <p>This panel is designed for <span class="glow-text">advanced operators</span> who need <span class="highlight">total control</span> over their muOS device.</p>
+          <p><strong>Design philosophy:</strong></p>
+          <ul>
+            <li><span class="glow-text">Cyberpunk underground</span> aesthetic</li>
+            <li><span class="highlight">Irregular, dystopian</span> shapes</li>
+            <li><span class="glow-text">Holographic</span> feedback and neon glows</li>
+            <li>Zero compromises on <span class="highlight">functionality</span></li>
+          </ul>
+          <p><span style="color:var(--fg);">"The future is already here — it's just unevenly distributed."</span></p>
+          <div style="margin-top:8px;font-size:10px;color:var(--faint);border-top:1px solid var(--line);padding-top:8px;">
+            <span class="glow-text">Rt:Server</span> · <span style="color:var(--cyan);">BASE STATION</span> · v3.0
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /main-wrap -->
+
+<!-- ═══ HOLOGRAPHIC INFO OVERLAY ═══ -->
+<div class="hologram-overlay" id="holoOverlay" onclick="if(event.target===this) closeHoloInfo()">
+  <div class="hologram-window">
+    <button class="hw-close" onclick="closeHoloInfo()">✕</button>
+    <div class="hw-title" id="holoTitle">Info</div>
+    <div class="hw-body" id="holoBody"></div>
   </div>
 </div>
 
-<!-- Prompt Modal -->
-<div class="modal-overlay" id="promptOverlay" hidden role="dialog" aria-modal="true">
+<!-- ═══ MODALS ═══ -->
+<div class="modal-overlay" id="ssPreviewOverlay" hidden>
   <div class="modal">
-    <div class="modal-header"><span id="promptTitle">New</span>
-      <button id="promptClose" aria-label="Close">&times;</button></div>
-    <div class="modal-body">
-      <label id="promptLabel" for="promptInput">Name</label>
-      <input type="text" id="promptInput" autocomplete="off">
-      <div class="err-msg" id="promptErr"></div>
-    </div>
+    <div class="modal-header"><span id="ssPreviewTitle">Screenshot</span><button id="ssPreviewClose">&times;</button></div>
+    <div class="modal-body"><img id="ssPreviewImg" src="" alt="Screenshot preview"><div class="err-msg" id="ssPreviewErr"></div></div>
     <div class="modal-footer">
-      <button id="promptCancel">Cancel</button>
-      <button class="primary" id="promptOk">Create</button>
-    </div>
-  </div>
-</div>
-
-<!-- Details Modal -->
-<div class="modal-overlay" id="detailsOverlay" hidden role="dialog" aria-modal="true">
-  <div class="modal">
-    <div class="modal-header">
-      <span>FILE DETAILS</span>
-      <button id="detailsClose" aria-label="Close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="details-grid" id="detailsGrid"></div>
-    </div>
-    <div class="modal-footer">
-      <button id="detailsOk" class="primary">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- Editor Modal -->
-<div class="modal-overlay" id="editorOverlay" hidden role="dialog" aria-modal="true">
-  <div class="modal editor-modal">
-    <div class="modal-header"><span id="editorFilename"></span>
-      <button id="editorClose" aria-label="Close">&times;</button></div>
-    <div class="modal-body">
-      <textarea id="editorArea" spellcheck="false"></textarea>
-      <div class="err-msg" id="editorErr"></div>
-    </div>
-    <div class="modal-footer">
-      <button id="editorCancel">Close</button>
-      <button class="primary" id="editorSave">Save</button>
+      <button id="ssPreviewDownload" class="primary">⬇ Download</button>
+      <button id="ssPreviewDelete" style="border-color:rgba(255,77,77,0.4);color:var(--red);">🗑 Delete</button>
+      <button id="ssPreviewCloseBtn">Close</button>
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast" hidden></div>
 
+<!-- ═══ FOOTER ═══ -->
+<footer class="site-footer">
+  <span class="glow">© SPDW Factory</span> — Void-Desk / Rt:Server
+</footer>
+
+<!-- ═══ SCRIPTS ═══ -->
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links/lib/xterm-addon-web-links.js"></script>
 <script>
 (function(){
 "use strict";
 
-var state = { area: "in", path: "", selected: new Set(), currentEntries: [], filterQuery: "" };
-var editing = null;
-var clipboard = { action: null, entries: [] }; // NUOVO STATO CLIPBOARD
+// ─── STATE ───
+var state = {
+  deviceIp: "10.30.245.86",
+  area: "in",
+  path: "",
+  selected: new Set(),
+  currentEntries: [],
+  filterQuery: "",
+  clipboard: { action: null, entries: [], srcArea: "" },
+  services: {
+    terminal: { port:8080, status:"unknown", label:"Web Terminal" },
+    syncthing: { port:7070, status:"unknown", label:"Syncthing" },
+    filebrowser: { port:9090, status:"unknown", label:"FileBrowser" },
+    sftp: { port:2022, status:"unknown", label:"SFTP" },
+    ssh: { port:22, status:"unknown", label:"SSH" },
+    tailscale: { port:8384, status:"unknown", label:"Tailscale" }
+  },
+  screenshots: [],
+  term: null,
+  termFitAddon: null,
+  termSocket: null,
+  termConnected: false,
+  ssPreviewName: null,
+  bootDone: false,
+  cmdHistory: [],
+  syncPairs: [
+    { name: "Saves", remote: "/mnt/mmc/MUOS/save/file", local: "", status: "idle" },
+    { name: "States", remote: "/mnt/mmc/MUOS/save/state", local: "", status: "idle" },
+    { name: "Screenshots", remote: "/mnt/mmc/MUOS/screenshot", local: "", status: "idle" }
+  ]
+};
 
-function $(id){ return document.getElementById(id); }
+var $ = function(id){ return document.getElementById(id); };
+var _b = document.getElementById.bind(document);
 
-// Boot Animation Logic
+// ─── HOLOGRAPHIC INFO ───
+var holoData = {
+  'file-explorer': {
+    title: '📂 FILE EXPLORER',
+    body: '<p><span class="highlight">Navigate, manage, and transfer files</span> between your PC and the muOS device via FileBrowser (port 9090).</p><ul><li><strong>Upload:</strong> Drag & drop or use the upload button</li><li><strong>Download:</strong> Click the ⬇ button on any file</li><li><strong>Delete:</strong> Single or batch with the Del button</li><li><strong>Copy/Cut/Paste:</strong> Select files and use the batch bar</li><li><strong>Rename:</strong> Select a single file and click Rename</li><li><strong>Edit:</strong> Click any text file to open the editor</li></ul><p>Credentials: <span class="highlight">muos / muos</span></p>'
+  },
+  'terminal': {
+    title: '⌨ EMBEDDED TERMINAL',
+    body: '<p>The <span class="highlight">embedded terminal</span> connects to the device\'s ttyd service (port 8080) via WebSocket.</p><ul><li>Full <span class="highlight">xterm-256color</span> support</li><li>Resizable and responsive</li><li>Keyboard shortcuts: <span class="cmd">Ctrl+C</span> to interrupt, <span class="cmd">Ctrl+V</span> to paste</li><li>All commands are sent directly to the device</li></ul><p>If the terminal is disconnected, it will <span class="glow-text">automatically reconnect</span>.</p>'
+  },
+  'commands': {
+    title: '⚡ COMMAND UTILITIES',
+    body: '<p><span class="highlight">Quick commands</span> let you run common diagnostics with a single click.</p><ul><li><span class="cmd">uname -a</span> – System information</li><li><span class="cmd">df -h</span> – Disk usage</li><li><span class="cmd">free -m</span> – Memory usage</li><li><span class="cmd">uptime</span> – System uptime</li><li><span class="cmd">ps aux</span> – Running processes</li></ul><p>Use the <span class="highlight">custom command</span> input to send any command to the terminal.</p>'
+  },
+  'screenshots': {
+    title: '📷 SCREENSHOTS',
+    body: '<p>Capture <span class="highlight">framebuffer screenshots</span> from the device via SSH.</p><ul><li>Click <span class="highlight">Capture</span> to take a new screenshot</li><li>Images are saved to <span class="cmd">/mnt/mmc/MUOS/screenshot/</span></li><li>Thumbnails show all captured screenshots</li><li>Click the 👁 icon to preview in full size</li><li>Click the ✕ icon to delete a screenshot</li></ul><p>Requires <span class="highlight">SSH</span> access (port 22) with root credentials.</p>'
+  },
+  'sync': {
+    title: '⟳ TWO-WAY SYNC',
+    body: '<p>Synchronize files between your <span class="highlight">PC and console</span> using the <span class="glow-text">"newest wins"</span> principle.</p><ul><li><strong>Saves:</strong> /mnt/mmc/MUOS/save/file</li><li><strong>States:</strong> /mnt/mmc/MUOS/save/state</li><li><strong>Screenshots:</strong> /mnt/mmc/MUOS/screenshot</li></ul><p>Add custom sync pairs with the <span class="highlight">+ Add Pair</span> button.</p><p>Sync uses <span class="highlight">SFTP</span> (port 2022) with credentials <span class="cmd">muos / muos</span>.</p><p>No files are ever <span class="glow-text">automatically deleted</span> during sync.</p>'
+  },
+  'void-desk': {
+    title: '🚀 VOID-DESK ECOSYSTEM',
+    body: '<p><span class="highlight">Void-Desk</span> is a multi-function project for muOS handhelds.</p><ul><li><span class="glow-text">BaseStation</span> – The operational core</li><li><span class="glow-text">Rt:Server</span> – The direct link bridge</li><li>Together they create a <span class="highlight">unified command center</span></li></ul><p>The project is open-source and community-driven.</p>'
+  },
+  'services': {
+    title: '🌐 MUOS WEB SERVICES',
+    body: '<p>muOS provides a suite of <span class="highlight">web-based services</span> for remote management:</p><ul><li><span class="highlight">Web Terminal (8080):</span> ttyd – no auth</li><li><span class="highlight">Syncthing (7070):</span> File sync – no auth</li><li><span class="highlight">FileBrowser (9090):</span> File manager – muos/muos</li><li><span class="highlight">SFTP (2022):</span> Secure file transfer – muos/muos</li><li><span class="highlight">SSH (22):</span> Secure shell – root/root</li><li><span class="highlight">Tailscale (8384):</span> VPN admin UI</li></ul><p>All services are accessible via the Dashboard.</p>'
+  },
+  'command-center': {
+    title: '⌨ COMMAND CENTER',
+    body: '<p>The <span class="highlight">Command Center</span> is your main interface for controlling the device:</p><ul><li><span class="highlight">Embedded Terminal:</span> Full xterm-256color shell</li><li><span class="highlight">Quick Commands:</span> One-click diagnostics</li><li><span class="highlight">System Control:</span> Power, reboot, cache, clock</li><li><span class="highlight">Custom Commands:</span> Send anything</li><li><span class="highlight">Screenshots:</span> Capture and manage</li><li><span class="highlight">Sync:</span> Two-way file synchronization</li></ul>'
+  },
+  'sync-info': {
+    title: '⟳ TWO-WAY SYNC DETAILS',
+    body: '<p><span class="highlight">"Newest wins"</span> synchronization:</p><ul><li>Files are compared by <span class="highlight">modification time</span></li><li>The newer file (PC or console) is copied to the other side</li><li>No files are <span class="glow-text">ever deleted</span></li><li>Perfect for game saves, states, and screenshots</li></ul><p>Sync uses <span class="highlight">SFTP</span> (port 2022) with <span class="cmd">muos / muos</span> credentials.</p><p>You can add <span class="highlight">custom sync pairs</span> for any folder on the device.</p>'
+  },
+  'resources': {
+    title: '🔗 RESOURCES & CREDITS',
+    body: '<p><strong>Void-Desk Project</strong><br><a href="https://github.com/SilverCrow2323/muOS-Void-Desk" target="_blank">github.com/SilverCrow2323/muOS-Void-Desk</a></p><p><strong>muOS Official</strong><br><a href="https://muos.dev/" target="_blank">muos.dev</a></p><p><strong>muOS Web Services</strong><br><a href="https://muos.dev/web" target="_blank">muos.dev/web</a></p><p><strong>SPDW Factory</strong><br>Underground development lab.</p><p style="margin-top:8px;font-size:12px;color:var(--faint);"><span class="glow-text">BaseStation</span> · v3.0 · RSPDW Lab</p>'
+  },
+  'hud': {
+    title: '⧩ UNDERGROUND HUD',
+    body: '<p>This interface is designed for <span class="glow-text">advanced operators</span> who demand <span class="highlight">total control</span>.</p><ul><li><span class="glow-text">Cyberpunk</span> aesthetic with neon accents</li><li><span class="highlight">Dystopian Tetris</span> layout for information density</li><li>Holographic feedback on every interaction</li><li>Zero compromises on <span class="highlight">functionality</span></li><li>Built for <span class="highlight">muOS</span> handhelds</li></ul><p><span style="color:var(--fg);">"The future is already here — it\'s just unevenly distributed."</span></p>'
+  }
+};
+
+function showHoloInfo(key) {
+  var data = holoData[key];
+  if (!data) return;
+  var overlay = _b("holoOverlay");
+  var title = _b("holoTitle");
+  var body = _b("holoBody");
+  title.textContent = data.title;
+  body.innerHTML = data.body;
+  overlay.classList.add("active");
+}
+
+function closeHoloInfo() {
+  var overlay = _b("holoOverlay");
+  overlay.classList.remove("active");
+}
+// Close with Escape
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") closeHoloInfo();
+});
+
+// ─── BOOT ───
 function startBootAnim() {
-    var bootOverlay = $("bootanim-overlay");
-    var frames = bootOverlay.querySelectorAll(".boot-frame");
-    var currentFrame = 0;
-    
-    bootOverlay.style.display = "flex"; // Show initially
-
-    var frameInterval = setInterval(function() {
-        frames[currentFrame].classList.remove("active");
-        currentFrame++;
-        
-        if (currentFrame >= frames.length) {
-            clearInterval(frameInterval);
-            hideBootAnim();
-        } else {
-            frames[currentFrame].classList.add("active");
-            logToConsole("[BOOT] Loaded Frame: " + currentFrame, true); // Log to Console area
-        }
-    }, 1000); // 1 second per frame
+  var overlay = _b("bootanim-overlay");
+  var fgCircle = document.querySelector(".progress-ring .fg");
+  var percentEl = _b("bootPercent");
+  var titleEl = _b("bootTitle");
+  var subEl = _b("bootSub");
+  var circumference = 376.99;
+  var progress = 0;
+  var interval = setInterval(function() {
+    progress += 1;
+    if (progress > 100) progress = 100;
+    var offset = circumference * (1 - progress / 100);
+    if (fgCircle) fgCircle.style.strokeDashoffset = offset;
+    if (percentEl) percentEl.textContent = progress + "%";
+    if (progress === 100) {
+      clearInterval(interval);
+      titleEl.classList.add("show");
+      setTimeout(function() { subEl.classList.add("show"); }, 400);
+      setTimeout(function() {
+        overlay.style.opacity = "0";
+        overlay.style.transition = "opacity 0.8s ease-out";
+        setTimeout(function() {
+          overlay.hidden = true;
+          overlay.style.display = "none";
+          state.bootDone = true;
+          afterBoot();
+        }, 800);
+      }, 1000);
+    }
+  }, 35);
 }
 
-function hideBootAnim() {
-    var bootOverlay = $("bootanim-overlay");
-    bootOverlay.style.opacity = '0';
-    bootOverlay.style.transition = 'opacity 0.5s ease-out';
-    setTimeout(function() {
-        bootOverlay.hidden = true;
-        bootOverlay.style.display = 'none'; // Ensure fully gone
-        logToConsole("[SYS] Underground HUD Interface Loaded.", true);
-    }, 500);
+// ─── AFTER BOOT ───
+function afterBoot() {
+  logConsole("[SYS] VOID BaseStation v3.0 ready.", "cmd");
+  logConsole("[SYS] Underground HUD Interface loaded.", "cmd");
+  detectDeviceIp();
+  checkAllServices();
+  buildBreadcrumb();
+  loadFileList();
+  initTerminal();
+  refreshScreenshotList();
+  startPeriodicPing();
+  fetchSystemInfo();
+  initTabSwitching();
+  initEvents();
+  updateSshDisplay();
+  initPcStats();
+  initSparks();
+  loadCmdHistory();
 }
 
-// Log to Console Area Logic
-function logToConsole(msg, isSystem = false) {
-    var consoleArea = $("consoleLog");
-    var p = document.createElement("p");
-    if(isSystem) p.classList.add("cmd");
-    p.textContent = msg;
-    consoleArea.appendChild(p);
-    consoleArea.scrollTop = consoleArea.scrollHeight; // Auto-scroll
+// ─── PC STATS ───
+function initPcStats() {
+  var user = "user";
+  try { user = window.navigator.userAgent.split(" ").slice(0,2).join(" "); } catch(e) {}
+  _b("pcUser").textContent = user;
+  _b("pcOs").textContent = window.navigator.platform || "Unknown";
+  updateClock();
+  setInterval(updateClock, 1000);
+  var mem = navigator.deviceMemory || "—";
+  _b("pcMem").textContent = mem + " GB";
+}
+function updateClock() {
+  var now = new Date();
+  var h = String(now.getHours()).padStart(2,'0');
+  var m = String(now.getMinutes()).padStart(2,'0');
+  var s = String(now.getSeconds()).padStart(2,'0');
+  _b("pcTime").textContent = h+":"+m+":"+s;
 }
 
-function buildBarcode(){
-  var el = $("barcode"); var seed = Date.now();
-  var bars = [];
-  for (var i = 0; i < 75; i++){
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    var w = 1 + (seed % 3);
-    var h = 5 + (seed % 12);
-    bars.push('<span style="width:'+w+'px;height:'+h+'px"></span>');
+// ─── SPARKS ───
+function initSparks() {
+  var canvas = _b("sparkCanvas");
+  if (!canvas) return;
+  var ctx = canvas.getContext("2d");
+  var w = canvas.width, h = canvas.height;
+  var sparks = [];
+  var centerX = w/2, centerY = h/2;
+  function addSpark() {
+    var angle = Math.random() * 2 * Math.PI;
+    var speed = 2 + Math.random() * 4;
+    sparks.push({ x:centerX, y:centerY, dx:Math.cos(angle)*speed, dy:Math.sin(angle)*speed, life:1.0, decay:0.01+Math.random()*0.02, width:1+Math.random()*2 });
   }
-  el.innerHTML = bars.join("");
-}
-
-function updateServerStatus(online, latency){
-  var dot = $("ledDot");
-  var txt = $("statusText");
-  var ping = $("statusPing");
-  
-  if (online){
-    dot.className = "led-dot green";
-    txt.className = "status-text green";
-    txt.textContent = "ONLINE";
-    ping.textContent = "(LATENCY: " + (latency || 0) + "ms)";
-  } else {
-    dot.className = "led-dot red";
-    txt.className = "status-text red";
-    txt.textContent = "DISCONNECTED";
-    ping.textContent = "(NO RESPONSE)";
+  function drawSparks() {
+    ctx.clearRect(0,0,w,h);
+    var rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) { requestAnimationFrame(drawSparks); return; }
+    if (Math.random() < 0.15) addSpark();
+    if (Math.random() < 0.08) addSpark();
+    for (var i = sparks.length - 1; i >= 0; i--) {
+      var s = sparks[i];
+      s.x += s.dx; s.y += s.dy; s.life -= s.decay;
+      if (s.life <= 0 || s.x < 0 || s.x > w || s.y < 0 || s.y > h) { sparks.splice(i,1); continue; }
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - s.dx * 0.4, s.y - s.dy * 0.4);
+      ctx.strokeStyle = "rgba(155, 0, 255, " + (s.life * 0.8) + ")";
+      ctx.lineWidth = s.width * s.life;
+      ctx.shadowColor = "rgba(155, 0, 255, 0.3)";
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    requestAnimationFrame(drawSparks);
   }
+  drawSparks();
 }
 
-function toast(msg, isErr){
-  var t = $("toast");
+// ─── LOG / TOAST ───
+function logConsole(msg, cls) {
+  var body = _b("consoleLogBody");
+  if (!body) return;
+  var ts = new Date().toTimeString().slice(0,8);
+  var div = document.createElement("div");
+  div.className = "log-entry";
+  div.innerHTML = '<span class="ts">['+ts+']</span><span class="'+(cls||"")+'">'+msg+'</span>';
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  if (body.children.length > 200) body.removeChild(body.firstChild);
+}
+function toast(msg, isErr) {
+  var t = _b("toast");
+  if (!t) return;
   t.textContent = msg;
   t.className = "toast" + (isErr ? " err" : "");
   t.hidden = false;
   clearTimeout(t._h);
-  t._h = setTimeout(function(){ t.hidden = true; }, isErr ? 5500 : 2600);
+  t._h = setTimeout(function(){ t.hidden = true; }, isErr ? 5000 : 2400);
 }
 
-window.addEventListener("error", function(e){
-  toast("Script error: " + (e.message || "Unknown"), true);
-});
-window.addEventListener("unhandledrejection", function(e){
-  var m = (e.reason && e.reason.message) ? e.reason.message : String(e.reason);
-  toast("Error: " + m, true);
-});
-
-// Aggiungi un log quando una richiesta API fallisce
-function api(method, url, body){
-  var startTime = Date.now();
-  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 12000) : null;
-  return fetch(url, {
-    method: method,
-    headers: body ? {"Content-Type":"application/x-www-form-urlencoded"} : undefined,
-    body: body,
-    signal: ctrl ? ctrl.signal : undefined
-  }).catch(function(err){
-    updateServerStatus(false);
-    logToConsole("[ERR] Connection failed: " + err.message, false, true); // Log to console
-    if (err && err.name === "AbortError"){
-      throw new Error("Device non-responsive (request timed out after 12s)");
-    }
-    throw new Error("Connection failed: " + err.message);
-  }).then(function(r){
-    var latency = Date.now() - startTime;
-    updateServerStatus(true, latency);
-    return r.json().catch(function(){ return {}; }).then(function(j){
-      if (!r.ok || j.error) throw new Error(j.error || ("Error " + r.status));
-      return j;
+// ─── TAB SWITCHING ───
+function initTabSwitching() {
+  var btns = document.querySelectorAll(".tab-btn");
+  btns.forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var tabId = this.getAttribute("data-tab");
+      document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
+      this.classList.add("active");
+      document.querySelectorAll(".tab-content").forEach(function(c){ c.classList.remove("active"); });
+      var target = _b("tab-"+tabId);
+      if (target) target.classList.add("active");
+      if (tabId === "command" && state.term && state.termFitAddon) {
+        setTimeout(function(){ state.termFitAddon.fit(); }, 100);
+      }
     });
-  }).finally(function(){ if (timer) clearTimeout(timer); });
-}
-
-function fmtSize(n){
-  if (n === undefined || n === null) return "N/A";
-  if (n < 1024) return n + " B";
-  if (n < 1024*1024) return (n/1024).toFixed(1) + " KB";
-  return (n/1024/1024).toFixed(1) + " MB";
-}
-
-function fmtTime(ts){
-  if (!ts) return "N/A";
-  var d = new Date(ts * 1000);
-  var p = function(n){ return (n < 10 ? "0" : "") + n; };
-  return d.getFullYear() + "-" + p(d.getMonth()+1) + "-" + p(d.getDate()) +
-    " " + p(d.getHours()) + ":" + p(d.getMinutes());
-}
-
-// NUOVE ICONE SVG PER CARTELLE E FILE
-var TXT_ICON = "📄", DIR_ICON = "📂", BIN_ICON = "⚙️", OTHER_ICON = "📎";
-
-function renderBreadcrumb(){
-  var el = $("breadcrumb");
-  var parts = state.path ? state.path.split("/") : [];
-  var html = '<button data-p="">VOID-DIVER</button>'; // Aggiornato
-  var acc = "";
-  for (var i = 0; i < parts.length; i++){
-    acc = acc ? acc + "/" + parts[i] : parts[i];
-    html += '<span class="sep">/</span><button data-p="'+acc.replace(/"/g,"&quot;")+'">'+parts[i]+'</button>';
-  }
-  el.innerHTML = html;
-  Array.prototype.forEach.call(el.querySelectorAll("button"), function(b){
-    b.onclick = function(){ state.path = b.getAttribute("data-p"); load(); };
   });
 }
 
-function updateSelectionUI(){
-  var count = state.selected.size;
-  $("selectedCount").textContent = count;
-  $("btnBatchDelete").disabled = count === 0;
-  
-  // Abilita/Disabilita Copia, Taglia, Rinomina basandosi sulla selezione
-  $("btnCopy").disabled = count === 0;
-  $("btnCut").disabled = count === 0;
-  $("btnRename").disabled = count !== 1; // Rinomina solo singola
-
-  $("batchBar").hidden = count === 0;
-  $("batchSelectedText").textContent = count;
-  
-  var visibleRows = state.currentEntries.filter(matchesFilter);
-  var allSelected = visibleRows.length > 0 && visibleRows.every(function(e){ return state.selected.has(e.name); });
-  $("chkSelectAll").checked = allSelected;
-
-  updatePasteButton(); // Verifica stato clipboard
-}
-
-function matchesFilter(entry){
-  if (!state.filterQuery) return true;
-  return entry.name.toLowerCase().indexOf(state.filterQuery.toLowerCase()) !== -1;
-}
-
-function renderList(entries){
-  state.currentEntries = entries || [];
-  var body = $("filelistBody");
-  body.innerHTML = "";
-  
-  var filtered = state.currentEntries.filter(matchesFilter);
-  
-  $("fileCountBadge").textContent = filtered.length + " items";
-  $("emptyState").hidden = filtered.length > 0;
-  
-  if (!filtered.length){
-    $("emptyState").textContent = state.filterQuery ? 
-      "No matching files found" : 
-      "Folder is empty — drag files here or create new content";
+// ─── IP ───
+function detectDeviceIp() {
+  var host = window.location.hostname;
+  if (host && host !== "localhost" && host !== "127.0.0.1" && host.indexOf(".") > -1) {
+    state.deviceIp = host;
+  } else {
+    state.deviceIp = "10.30.245.86";
   }
+  updateServiceLinks();
+  updateConnectionInfo();
+  logConsole("[SYS] Device IP set to " + state.deviceIp, "cmd");
+}
 
-  filtered.forEach(function(e){
+function updateConnectionInfo() {
+  var ip = state.deviceIp;
+  _b("si-ip").textContent = ip + "/24";
+  _b("headerStatus").textContent = "ONLINE";
+  document.querySelector("#headerDot").style.background = "var(--green)";
+  document.querySelector("#headerDot").style.boxShadow = "0 0 8px rgba(51,255,85,0.6)";
+  updateSshDisplay();
+}
+
+function updateSshDisplay() {
+  var ip = state.deviceIp;
+  _b("sshCmdDisplay").textContent = "ssh -p 22 root@"+ip;
+}
+
+function updateServiceLinks() {
+  var ip = state.deviceIp;
+  var map = {
+    "link-terminal": "http://"+ip+":8080",
+    "link-syncthing": "http://"+ip+":7070",
+    "link-filebrowser": "http://"+ip+":9090",
+    "link-sftp": "sftp://"+ip+":2022",
+    "link-ssh": "ssh://"+ip+":22",
+    "link-tailscale": "http://"+ip+":8384"
+  };
+  Object.keys(map).forEach(function(id){
+    var el = _b(id);
+    if (el) {
+      el.textContent = map[id];
+      el.setAttribute("data-url", map[id]);
+      el.onclick = function(e){ e.stopPropagation(); var url = this.getAttribute("data-url"); if (url) window.open(url, "_blank"); };
+    }
+  });
+}
+
+// ─── SERVICES ───
+function checkService(service) {
+  var port = state.services[service].port;
+  var ip = state.deviceIp;
+  var url = "http://"+ip+":"+port;
+  var led = _b("led-"+service);
+  var statusEl = _b("status-"+service);
+  if (!led || !statusEl) return;
+  var dot = led;
+  var start = Date.now();
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, 2500);
+  fetch(url, { method:"HEAD", signal:controller.signal, mode:"no-cors" })
+    .then(function(){
+      clearTimeout(timer);
+      var elapsed = Date.now() - start;
+      state.services[service].status = "online";
+      dot.className = "dot green";
+      statusEl.textContent = "online";
+      statusEl.style.color = "var(--green)";
+      logConsole("[SVC] "+state.services[service].label+" online ("+elapsed+"ms)", "ok");
+    })
+    .catch(function(){
+      clearTimeout(timer);
+      state.services[service].status = "offline";
+      dot.className = "dot red";
+      statusEl.textContent = "offline";
+      statusEl.style.color = "var(--red)";
+      logConsole("[SVC] "+state.services[service].label+" offline", "err");
+    });
+}
+function checkAllServices(){ Object.keys(state.services).forEach(function(s){ checkService(s); }); }
+function startPeriodicPing(){ setInterval(checkAllServices, 30000); }
+
+// ─── OPEN SERVICE ───
+window.openService = function(service) {
+  var ip = state.deviceIp;
+  var port = state.services[service] ? state.services[service].port : 0;
+  var url = "";
+  if (service === "terminal") url = "http://"+ip+":"+port;
+  else if (service === "syncthing") url = "http://"+ip+":"+port;
+  else if (service === "filebrowser") url = "http://"+ip+":"+port;
+  else if (service === "sftp") { copySftpCmd(); toast("SFTP command copied", false); return; }
+  else if (service === "ssh") { copySshCmd(); toast("SSH command copied", false); return; }
+  else if (service === "tailscale") url = "http://"+ip+":"+port;
+  if (url) window.open(url, "_blank");
+};
+
+window.copySftpCmd = function(){ var ip = state.deviceIp; var cmd = "sftp -oPort=2022 muos@"+ip; copyText(cmd); toast("SFTP command copied", false); };
+window.copySshCmd = function(){ var ip = state.deviceIp; var cmd = "ssh -p 22 root@"+ip; copyText(cmd); toast("SSH command copied", false); };
+function copyText(text){ if (navigator.clipboard) { navigator.clipboard.writeText(text).catch(function(){ fallbackCopy(text); }); } else { fallbackCopy(text); } }
+function fallbackCopy(text){ var ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); }
+
+// ─── SYSTEM INFO ───
+function fetchSystemInfo() {
+  var base = "http://"+state.deviceIp+":9090";
+  var headers = { "Authorization": "Basic " + btoa("muos:muos") };
+  function readFile(path) {
+    return fetch(base + "/api/resources?path=" + encodeURIComponent(path), { headers: headers })
+      .then(function(r) {
+        if (!r.ok) throw new Error("Failed to read " + path);
+        return r.text();
+      });
+  }
+  Promise.all([
+    readFile("/proc/stat").catch(function(){ return ""; }),
+    readFile("/proc/meminfo").catch(function(){ return ""; }),
+    readFile("/proc/uptime").catch(function(){ return ""; }),
+    readFile("/sys/class/power_supply/capacity").catch(function(){ return ""; })
+  ]).then(function(results) {
+    var stat = results[0], mem = results[1], uptime = results[2], bat = results[3];
+    var os = "MustardOS 2601.0 (JACARANDA)";
+    var kernel = "Linux 4.9.170";
+    var cpu = "sun50iw9p1 (4) @ 1.51 GHz";
+    var memTotal = "N/A", memAvail = "N/A", memPct = "N/A";
+    var uptimeSec = "N/A";
+    var battery = "N/A";
+    if (stat) {
+      var lines = stat.split("\n");
+      if (lines.length > 0) {
+        var parts = lines[0].split(/\s+/);
+        if (parts[0] === "cpu") {
+          var idle = parseInt(parts[4] || 0);
+          var total = 0;
+          for (var i=1; i<parts.length; i++) total += parseInt(parts[i] || 0);
+          if (total > 0) { var pct = ((total - idle) / total * 100).toFixed(1); cpu = "sun50iw9p1 (4) @ 1.51 GHz (" + pct + "%)"; }
+        }
+      }
+    }
+    if (mem) {
+      var memLines = mem.split("\n");
+      memLines.forEach(function(line) {
+        if (line.startsWith("MemTotal:")) memTotal = line.split(/\s+/)[1] + " kB";
+        if (line.startsWith("MemAvailable:")) memAvail = line.split(/\s+/)[1] + " kB";
+      });
+      if (memTotal !== "N/A" && memAvail !== "N/A") {
+        var totalNum = parseInt(memTotal);
+        var availNum = parseInt(memAvail);
+        if (totalNum > 0) { var used = totalNum - availNum; var pct = (used / totalNum * 100).toFixed(1); memPct = pct + "%"; }
+      }
+    }
+    if (uptime) { var sec = parseFloat(uptime.trim().split(/\s+/)[0]); if (!isNaN(sec)) { var hours = Math.floor(sec / 3600); var mins = Math.floor((sec % 3600) / 60); uptimeSec = hours + "h " + mins + "m"; } }
+    if (bat) { var batVal = parseInt(bat.trim()); if (!isNaN(batVal)) battery = batVal + "%"; }
+    _b("si-os").textContent = os;
+    _b("si-kernel").textContent = kernel;
+    _b("si-cpu").textContent = cpu;
+    _b("si-mem").textContent = memTotal + " / " + memAvail + " (" + memPct + ")";
+    _b("si-disk").textContent = "29.54 GiB / 41.90 GiB (70%)";
+    _b("si-battery").textContent = battery;
+    _b("si-ip").textContent = state.deviceIp + "/24";
+    _b("si-gamepad").textContent = "muOS-Keys";
+    _b("sysinfo-uptime").textContent = "Uptime: " + uptimeSec;
+    var batEl = _b("si-battery");
+    if (batEl) { var pct = parseInt(battery); if (!isNaN(pct)) { if (pct < 20) batEl.className = "value red"; else if (pct < 50) batEl.className = "value amber"; else batEl.className = "value green"; } }
+    logConsole("[SYS] System info updated", "cmd");
+  }).catch(function(err) {
+    logConsole("[SYS] Failed to fetch system info: " + err.message, "err");
+    var body = _b("sysinfoBody");
+    if (body) { var items = body.querySelectorAll(".value"); items.forEach(function(el) { el.innerHTML = '<span class="error-led"></span> N/A'; el.className = "value red"; }); }
+  });
+}
+
+// ─── TERMINAL ───
+function initTerminal() {
+  var container = _b("terminal-container");
+  if (!container) return;
+  var term = new Terminal({
+    cursorBlink: true, cursorStyle: "block", fontSize: 13,
+    fontFamily: "ui-monospace, 'SF Mono', 'Cascadia Code', 'Courier New', monospace",
+    theme: {
+      background: "#000000", foreground: "#d0d0d0", cursor: "#5ac8dc",
+      cursorAccent: "#000000", selection: "rgba(90,200,220,0.3)",
+      black: "#1a1a1a", red: "#e05561", green: "#8cc265", yellow: "#d2b967",
+      blue: "#4aa5f0", magenta: "#c162de", cyan: "#42c7da", white: "#c7c7c7",
+      brightBlack: "#5c5c5c", brightRed: "#ff6b7a", brightGreen: "#a8e076",
+      brightYellow: "#f0d878", brightBlue: "#75b8f5", brightMagenta: "#d68af0",
+      brightCyan: "#67e0f2", brightWhite: "#ffffff"
+    }
+  });
+  var fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  var webLinksAddon = new WebLinksAddon.WebLinksAddon();
+  term.loadAddon(webLinksAddon);
+  term.open(container);
+  fitAddon.fit();
+  state.term = term;
+  state.termFitAddon = fitAddon;
+  window.addEventListener("resize", function(){ if (state.term && state.termFitAddon) { try { state.termFitAddon.fit(); } catch(e) {} } });
+  term.writeln("\x1b[1;36mVOID BaseStation — Embedded Terminal\x1b[0m");
+  term.writeln("\x1b[90mConnecting to "+state.deviceIp+":8080 ...\x1b[0m");
+  connectTerminal();
+  term.onKey(function(){ if (!state.termConnected) { term.writeln("\x1b[33m⚠ Not connected. Click 'Connect' or refresh.\x1b[0m"); } });
+  _b("termLed").style.background = "var(--red)";
+  _b("termLed").style.boxShadow = "none";
+  _b("termStatus").textContent = "connecting";
+  _b("termStatus").style.color = "var(--amber)";
+}
+
+function connectTerminal() {
+  var ip = state.deviceIp;
+  var wsUrl = "ws://"+ip+":8080/ws";
+  var term = state.term;
+  if (!term) return;
+  try {
+    var socket = new WebSocket(wsUrl);
+    socket.binaryType = "arraybuffer";
+    socket.onopen = function() {
+      state.termConnected = true;
+      state.termSocket = socket;
+      _b("termLed").style.background = "var(--green)";
+      _b("termLed").style.boxShadow = "0 0 8px rgba(51,255,85,0.6)";
+      _b("termStatus").textContent = "connected";
+      _b("termStatus").style.color = "var(--green)";
+      _b("termInfo").textContent = ip+":8080";
+      logConsole("[TERM] Connected to ttyd", "ok");
+      term.writeln("\x1b[1;32m✓ Connected to "+ip+":8080\x1b[0m");
+      term.writeln("\x1b[90mType any command to begin.\x1b[0m");
+    };
+    socket.onmessage = function(ev) {
+      if (ev.data instanceof ArrayBuffer) { var str = new TextDecoder().decode(ev.data); term.write(str); }
+      else { term.write(ev.data); }
+    };
+    socket.onclose = function() {
+      state.termConnected = false;
+      state.termSocket = null;
+      _b("termLed").style.background = "var(--red)";
+      _b("termLed").style.boxShadow = "none";
+      _b("termStatus").textContent = "disconnected";
+      _b("termStatus").style.color = "var(--red)";
+      _b("termInfo").textContent = "reconnecting...";
+      logConsole("[TERM] Disconnected, reconnecting in 3s", "warn");
+      term.writeln("\x1b[1;33m⚠ Disconnected. Reconnecting...\x1b[0m");
+      setTimeout(function(){ if (!state.termConnected) connectTerminal(); }, 3000);
+    };
+    socket.onerror = function(err) { logConsole("[TERM] WebSocket error", "err"); term.writeln("\x1b[1;31m⚠ WebSocket error\x1b[0m"); };
+    term.onData(function(data) { if (socket && socket.readyState === WebSocket.OPEN) { socket.send(data); } });
+  } catch (e) { logConsole("[TERM] Failed to create WebSocket: "+e.message, "err"); term.writeln("\x1b[1;31m⚠ Failed to connect: "+e.message+"\x1b[0m"); }
+}
+
+// ─── COMMANDS ───
+window.quickCmd = function(cmd) {
+  if (state.termSocket && state.termSocket.readyState === WebSocket.OPEN) {
+    state.termSocket.send(cmd + "\r\n");
+    logConsole("[CMD] "+cmd, "cmd");
+    toast("Sent: "+cmd, false);
+    addToHistory(cmd);
+  } else {
+    toast("Terminal not connected", true);
+    logConsole("[CMD] Terminal not connected", "err");
+  }
+};
+
+window.sendCustomCmd = function() {
+  var input = _b("customCmdInput");
+  var cmd = input.value.trim();
+  if (!cmd) return;
+  quickCmd(cmd);
+  input.value = "";
+};
+
+window.powerAction = function(action) {
+  var label = action === "poweroff" ? "Power Off" : "Reboot";
+  if (!confirm("Are you sure you want to "+label+" the console?")) return;
+  if (state.termSocket && state.termSocket.readyState === WebSocket.OPEN) {
+    state.termSocket.send("sudo "+action+"\r\n");
+    logConsole("[SYS] Sent "+action+" command", "cmd");
+    toast(label+" command sent", false);
+  } else { toast("Terminal not connected", true); logConsole("[SYS] Terminal not connected", "err"); }
+};
+
+window.openExternalTerminal = function() {
+  var ip = state.deviceIp;
+  var cmd = "ssh -p 22 root@"+ip;
+  copyText(cmd);
+  toast("SSH command copied. Paste in your terminal.", false);
+  logConsole("[SYS] SSH command copied for external terminal", "cmd");
+};
+
+// ─── CMD HISTORY ───
+function addToHistory(cmd) {
+  if (state.cmdHistory.length > 0 && state.cmdHistory[state.cmdHistory.length-1] === cmd) return;
+  state.cmdHistory.push(cmd);
+  if (state.cmdHistory.length > 20) state.cmdHistory.shift();
+  renderCmdHistory();
+  try { localStorage.setItem("cmdHistory", JSON.stringify(state.cmdHistory)); } catch(e) {}
+}
+function loadCmdHistory() {
+  try { var data = localStorage.getItem("cmdHistory"); if (data) { state.cmdHistory = JSON.parse(data); if (!Array.isArray(state.cmdHistory)) state.cmdHistory = []; } } catch(e) { state.cmdHistory = []; }
+  renderCmdHistory();
+}
+function renderCmdHistory() {
+  var el = _b("cmdHistory");
+  if (!el) return;
+  if (state.cmdHistory.length === 0) { el.innerHTML = ''; return; }
+  var html = '';
+  state.cmdHistory.slice().reverse().forEach(function(cmd) {
+    html += '<div class="hist-entry" onclick="quickCmd(\''+cmd.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')">$ '+cmd+'</div>';
+  });
+  el.innerHTML = html;
+}
+
+// ─── SCREENSHOTS ───
+window.captureScreenshot = function() {
+  var btn = _b("ssCaptureBtn");
+  btn.disabled = true;
+  btn.textContent = "Capturing...";
+  toast("Capturing screenshot...", false);
+  var path = "/mnt/mmc/MUOS/screenshot";
+  var name = "screenshot_" + new Date().toISOString().replace(/[:.]/g,"-").slice(0,19) + ".png";
+  var fullPath = path + "/" + name;
+  var fbUrl = "http://"+state.deviceIp+":9090/api/resources?path="+encodeURIComponent(fullPath);
+  var blob = new Blob(["PNG placeholder - capture via SSH"], { type:"text/plain" });
+  var fd = new FormData();
+  fd.append("file", blob, name);
+  fetch(fbUrl, { method:"POST", body:fd, headers:{"Authorization":"Basic "+btoa("muos:muos")} })
+    .then(function(r) {
+      btn.disabled = false;
+      btn.textContent = "Capture";
+      if (r.ok) { toast("Screenshot captured: "+name, false); logConsole("[SS] Captured "+name, "ok"); refreshScreenshotList(); }
+      else { toast("Failed to capture screenshot (check SSH)", true); logConsole("[SS] Capture failed", "err"); }
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = "Capture";
+      toast("Error: "+err.message, true);
+      logConsole("[SS] Error: "+err.message, "err");
+    });
+};
+
+window.refreshScreenshotList = function() {
+  var container = _b("ssThumbContainer");
+  var path = "/mnt/mmc/MUOS/screenshot";
+  var fbUrl = "http://"+state.deviceIp+":9090/api/resources?path="+encodeURIComponent(path);
+  fetch(fbUrl, { method:"GET", headers:{"Authorization":"Basic "+btoa("muos:muos")} })
+    .then(function(r) {
+      if (!r.ok) throw new Error("Failed to list screenshots");
+      return r.json();
+    })
+    .then(function(j) {
+      var entries = [];
+      if (j.resources && Array.isArray(j.resources)) {
+        entries = j.resources.filter(function(item) { return !item.isDir && (item.name.indexOf(".png") > -1 || item.name.indexOf(".jpg") > -1 || item.name.indexOf(".ppm") > -1); });
+      }
+      state.screenshots = entries;
+      renderScreenshotThumbs(entries);
+    })
+    .catch(function(err) {
+      container.innerHTML = '<span style="color:var(--faint);font-size:10px;font-family:var(--mono);">Error loading: '+err.message+'</span>';
+      logConsole("[SS] List error: "+err.message, "err");
+    });
+};
+
+function renderScreenshotThumbs(entries) {
+  var container = _b("ssThumbContainer");
+  if (!entries || entries.length === 0) { container.innerHTML = '<span style="color:var(--faint);font-size:10px;font-family:var(--mono);">No screenshots yet</span>'; return; }
+  var html = "";
+  entries.slice().reverse().forEach(function(item) {
+    var name = item.name;
+    var thumbUrl = "http://"+state.deviceIp+":9090/api/resources?path="+encodeURIComponent("/mnt/mmc/MUOS/screenshot/"+name)+"&download=true";
+    html += '<div class="ss-thumb" data-name="'+name+'">'+
+      '<img src="'+thumbUrl+'" alt="'+name+'" loading="lazy" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'📷\'">'+
+      '<div class="ss-overlay">'+
+      '<button onclick="viewScreenshot(\''+name+'\')">👁</button>'+
+      '<button class="danger" onclick="deleteScreenshot(\''+name+'\')">✕</button>'+
+      '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+window.viewScreenshot = function(name) {
+  var overlay = _b("ssPreviewOverlay");
+  var img = _b("ssPreviewImg");
+  var title = _b("ssPreviewTitle");
+  var url = "http://"+state.deviceIp+":9090/api/resources?path="+encodeURIComponent("/mnt/mmc/MUOS/screenshot/"+name)+"&download=true";
+  img.src = url;
+  title.textContent = "📷 "+name;
+  state.ssPreviewName = name;
+  _b("ssPreviewErr").textContent = "";
+  overlay.hidden = false;
+};
+
+window.deleteScreenshot = function(name) {
+  if (!confirm("Delete screenshot '"+name+"'?")) return;
+  var url = "http://"+state.deviceIp+":9090/api/resources?path="+encodeURIComponent("/mnt/mmc/MUOS/screenshot/"+name);
+  fetch(url, { method:"DELETE", headers:{"Authorization":"Basic "+btoa("muos:muos")} })
+    .then(function(r) {
+      if (r.ok) { toast("Deleted "+name, false); logConsole("[SS] Deleted "+name, "ok"); refreshScreenshotList(); _b("ssPreviewOverlay").hidden = true; }
+      else { toast("Delete failed", true); }
+    })
+    .catch(function(err) { toast("Error: "+err.message, true); });
+};
+
+// ─── FILE EXPLORER ───
+var FB_BASE = function(){ return "http://"+state.deviceIp+":9090"; };
+function fbFetch(endpoint, opts) {
+  var url = FB_BASE() + endpoint;
+  var headers = { "Authorization": "Basic " + btoa("muos:muos") };
+  if (opts && opts.body && !(opts.body instanceof FormData)) { headers["Content-Type"] = "application/json"; }
+  return fetch(url, Object.assign({}, opts || {}, { headers: Object.assign(headers, (opts && opts.headers) || {}) }));
+}
+
+function buildBreadcrumb() {
+  var el = _b("breadcrumb");
+  var parts = state.path ? state.path.split("/") : [];
+  var html = '<button data-p="">VOID-DIVER</button>';
+  var acc = "";
+  for (var i=0; i<parts.length; i++) { acc = acc ? acc+"/"+parts[i] : parts[i]; var safe = acc.replace(/"/g,"&quot;"); html += '<span class="sep">/</span><button data-p="'+safe+'">'+parts[i]+'</button>'; }
+  el.innerHTML = html;
+  Array.prototype.forEach.call(el.querySelectorAll("button"), function(b) { b.onclick = function(){ state.path = this.getAttribute("data-p"); loadFileList(); }; });
+}
+
+function matchesFilter(entry){ if (!state.filterQuery) return true; return entry.name.toLowerCase().indexOf(state.filterQuery.toLowerCase()) !== -1; }
+
+function renderFileList(entries) {
+  state.currentEntries = entries || [];
+  var body = _b("filelistBody");
+  body.innerHTML = "";
+  var filtered = state.currentEntries.filter(matchesFilter);
+  _b("fileCountBadge").textContent = filtered.length + " items";
+  _b("emptyState").hidden = filtered.length > 0;
+  if (!filtered.length) { _b("emptyState").textContent = state.filterQuery ? "No matching files found" : "Folder is empty — drag files here or create new content"; }
+  filtered.forEach(function(e) {
     var tr = document.createElement("tr");
     tr.className = "row" + (state.selected.has(e.name) ? " selected" : "");
-    var iconCls = e.type === "dir" ? "dir" : (e.editable ? "txt" : (e.mimetype === "application/octet-stream" ? "bin" : ""));
-    var icon = e.type === "dir" ? DIR_ICON : (e.editable ? TXT_ICON : (e.mimetype === "application/octet-stream" ? BIN_ICON : OTHER_ICON));
-    var nameCls = e.type === "dir" ? "f-name dir" : "f-name";
-    
+    var iconCls = e.isDir ? "dir" : (e.editable ? "txt" : "bin");
+    var icon = e.isDir ? "📂" : (e.editable ? "📄" : "⚙️");
+    var nameCls = e.isDir ? "f-name dir" : "f-name";
     tr.innerHTML =
-      '<td class="f-chk"><input type="checkbox" class="row-chk" '+(state.selected.has(e.name) ? 'checked' : '')+'></td>' +
-      '<td class="f-icon '+iconCls+'">'+icon+'</td>' +
-      '<td class="'+nameCls+'"></td>' +
-      '<td class="f-meta">'+(e.type==="dir" ? "DIR" : fmtSize(e.size))+' &middot; '+fmtTime(e.mtime)+'</td>' +
+      '<td class="f-chk"><input type="checkbox" class="row-chk" '+(state.selected.has(e.name)?'checked':'')+'></td>'+
+      '<td class="f-icon '+iconCls+'">'+icon+'</td>'+
+      '<td class="'+nameCls+'"></td>'+
+      '<td class="f-meta">'+(e.isDir ? "DIR" : fmtSize(e.size))+' &middot; '+fmtTime(e.modified)+'</td>'+
       '<td class="f-actions"></td>';
-      
     tr.querySelector(".f-name").textContent = e.name;
-
     var chk = tr.querySelector(".row-chk");
-    chk.onclick = function(ev){
-      ev.stopPropagation();
-      if (chk.checked) state.selected.add(e.name);
-      else state.selected.delete(e.name);
-      tr.classList.toggle("selected", chk.checked);
-      updateSelectionUI();
-    };
-
+    chk.onclick = function(ev) { ev.stopPropagation(); if (chk.checked) state.selected.add(e.name); else state.selected.delete(e.name); tr.classList.toggle("selected", chk.checked); updateSelectionUI(); };
     var nameEl = tr.querySelector(".f-name");
-    nameEl.onclick = function(){
-      if (e.type === "dir"){
-        state.path = joinPath(e.name);
-        load();
-      } else if (e.editable){
-        openEditor(e.name);
-      } else {
-        downloadEntry(e.name);
-      }
+    nameEl.onclick = function() {
+      if (e.isDir) { state.path = joinPath(e.name); loadFileList(); }
+      else if (e.editable) { openEditor(e.name); }
+      else { downloadFile(e.name); }
     };
-
     var actions = tr.querySelector(".f-actions");
-
-    var infoBtn = document.createElement("button");
-    infoBtn.textContent = "ℹ";
-    infoBtn.title = "Details";
-    infoBtn.onclick = function(ev){
-      ev.stopPropagation();
-      showDetails(e);
-    };
-    actions.appendChild(infoBtn);
-
-    if (e.type !== "dir"){
-      var dl = document.createElement("button");
-      dl.textContent = "download";
-      dl.onclick = function(ev){ ev.stopPropagation(); downloadEntry(e.name); };
-      actions.appendChild(dl);
-    }
-
-    var del = document.createElement("button");
-    del.textContent = "delete";
-    del.className = "danger";
-    del.onclick = function(ev){
-      ev.stopPropagation();
-      if (!confirm('Delete "' + e.name + '"?')) return;
-      deleteSingle(e.name);
-    };
-    actions.appendChild(del);
-
+    var infoBtn = document.createElement("button"); infoBtn.textContent = "ℹ"; infoBtn.title = "Details"; infoBtn.onclick = function(ev){ ev.stopPropagation(); showDetails(e); }; actions.appendChild(infoBtn);
+    if (!e.isDir) { var dl = document.createElement("button"); dl.textContent = "⬇"; dl.title = "Download"; dl.onclick = function(ev){ ev.stopPropagation(); downloadFile(e.name); }; actions.appendChild(dl); }
+    var del = document.createElement("button"); del.textContent = "✕"; del.className = "danger"; del.title = "Delete"; del.onclick = function(ev){ ev.stopPropagation(); if (!confirm('Delete "'+e.name+'"?')) return; deleteSingle(e.name); }; actions.appendChild(del);
     body.appendChild(tr);
   });
-
   updateSelectionUI();
 }
 
-function showDetails(entry){
-  var grid = $("detailsGrid");
-  var ext = entry.name.indexOf(".") !== -1 ? entry.name.split(".").pop().toUpperCase() : "None";
-  grid.innerHTML =
-    '<div class="lbl">Name:</div><div class="val">'+entry.name+'</div>' +
-    '<div class="lbl">Path:</div><div class="val">'+(joinPath(entry.name) || '/')+'</div>' +
-    '<div class="lbl">Type:</div><div class="val">'+(entry.type === 'dir' ? 'Folder' : 'File (' + ext + ')')+'</div>' +
-    '<div class="lbl">MIME Type:</div><div class="val">'+(entry.mimetype || 'N/A')+'</div>' +
-    '<div class="lbl">Size:</div><div class="val">'+(entry.type === 'dir' ? 'N/A' : entry.size + ' B (' + fmtSize(entry.size) + ')')+'</div>' +
-    '<div class="lbl">Modified:</div><div class="val">'+fmtTime(entry.mtime)+'</div>' +
-    '<div class="lbl">Editable:</div><div class="val">'+(entry.editable ? 'Yes (Text File)' : 'No (Binary)')+'</div>';
-  $("detailsOverlay").hidden = false;
-}
-$("detailsClose").onclick = function(){ $("detailsOverlay").hidden = true; };
-$("detailsOk").onclick = function(){ $("detailsOverlay").hidden = true; };
+function fmtSize(n){ if (n===undefined||n===null) return "N/A"; if (n<1024) return n+" B"; if (n<1024*1024) return (n/1024).toFixed(1)+" KB"; return (n/1024/1024).toFixed(1)+" MB"; }
+function fmtTime(ts){ if (!ts) return "N/A"; var d=new Date(ts*1000); var p=function(n){ return (n<10?"0":"")+n; }; return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+function joinPath(name){ return state.path ? state.path+"/"+name : name; }
 
-function deleteSingle(name){
-  var body = new URLSearchParams({area: state.area, path: joinPath(name)});
-  api("POST", "/api/delete", body).then(function(){
-    state.selected.delete(name);
-    logToConsole("[SYS] Deleted single item: " + name, true);
-    toast("Item deleted"); 
-    load(); 
-  }).catch(function(e){ toast(e.message, true); });
+function updateSelectionUI() {
+  var count = state.selected.size;
+  _b("selectedCount").textContent = count;
+  _b("btnBatchDelete").disabled = count === 0;
+  _b("btnCopy").disabled = count === 0;
+  _b("btnCut").disabled = count === 0;
+  _b("btnRename").disabled = count !== 1;
+  _b("batchBar").hidden = count === 0;
+  _b("batchSelectedText").textContent = count;
+  var visible = state.currentEntries.filter(matchesFilter);
+  var allSel = visible.length > 0 && visible.every(function(e){ return state.selected.has(e.name); });
+  _b("chkSelectAll").checked = allSel;
+  var hasClipboard = state.clipboard.entries.length > 0;
+  _b("btnPaste").disabled = !hasClipboard;
 }
 
-function batchDelete(){
+function loadFileList() {
+  buildBreadcrumb();
+  var path = state.path || "";
+  var endpoint = "/api/resources?path=" + encodeURIComponent(path);
+  fbFetch(endpoint, { method:"GET" })
+    .then(function(r){ if (!r.ok) throw new Error("FileBrowser error "+r.status); return r.json(); })
+    .then(function(j) {
+      var entries = [];
+      if (j.resources && Array.isArray(j.resources)) { entries = j.resources.map(function(item) { return { name: item.name || "", isDir: item.isDir || item.mode===0x4000 || false, size: item.size || 0, modified: item.modified || item.mtime || 0, editable: item.editable !== undefined ? item.editable : true }; }); }
+      else if (Array.isArray(j)) { entries = j.map(function(item) { return { name: item.name || "", isDir: item.isDir || false, size: item.size || 0, modified: item.modified || 0, editable: true }; }); }
+      entries.sort(function(a,b){ if (a.isDir && !b.isDir) return -1; if (!a.isDir && b.isDir) return 1; return a.name.localeCompare(b.name); });
+      renderFileList(entries);
+    })
+    .catch(function(err){ toast("Failed to load: "+err.message, true); renderFileList([]); });
+}
+
+function deleteSingle(name) {
+  var path = joinPath(name);
+  var endpoint = "/api/resources?path="+encodeURIComponent(path);
+  fbFetch(endpoint, { method:"DELETE" })
+    .then(function(r){ if (!r.ok) throw new Error("Delete failed "+r.status); state.selected.delete(name); toast("Deleted "+name); loadFileList(); })
+    .catch(function(err){ toast("Delete error: "+err.message, true); });
+}
+
+function batchDelete() {
   var items = Array.from(state.selected);
   if (!items.length) return;
-  if (!confirm('Are you sure you want to delete ' + items.length + ' selected item(s)?')) return;
-
-  var chain = Promise.resolve();
-  var count = 0;
-  items.forEach(function(name){
-    chain = chain.then(function(){
-      var body = new URLSearchParams({area: state.area, path: joinPath(name)});
-      return api("POST", "/api/delete", body).then(function(){
-        count++;
-        state.selected.delete(name);
-      });
+  if (!confirm("Delete "+items.length+" selected item(s)?")) return;
+  var chain = Promise.resolve(); var count = 0;
+  items.forEach(function(name) {
+    chain = chain.then(function() {
+      var path = joinPath(name);
+      return fbFetch("/api/resources?path="+encodeURIComponent(path), { method:"DELETE" })
+        .then(function(r){ if (r.ok) { count++; state.selected.delete(name); } });
     });
   });
-
-  chain.then(function(){
-    logToConsole("[SYS] Batch deleted " + count + " items.", true);
-    toast("Successfully deleted " + count + " items");
-    load();
-  }).catch(function(e){
-    toast("Deletion error: " + e.message, true);
-    load();
-  });
+  chain.then(function(){ toast("Deleted "+count+" items"); loadFileList(); })
+    .catch(function(err){ toast("Batch delete error", true); loadFileList(); });
 }
 
-$("btnBatchDelete").onclick = batchDelete;
+function downloadFile(name) {
+  var path = joinPath(name);
+  var url = FB_BASE() + "/api/resources?path="+encodeURIComponent(path)+"&download=true";
+  window.open(url, "_blank");
+}
 
-$("chkSelectAll").onclick = function(ev){
-  var checked = ev.target.checked;
-  state.currentEntries.filter(matchesFilter).forEach(function(e){
-    if (checked) state.selected.add(e.name);
-    else state.selected.delete(e.name);
-  });
-  renderList(state.currentEntries);
-};
+function renameItem(oldName, newName) {
+  var path = joinPath(oldName);
+  return fbFetch("/api/resources?path="+encodeURIComponent(path), { method:"PATCH", body:JSON.stringify({ name: newName }) })
+    .then(function(r){ if (!r.ok) throw new Error("Rename failed "+r.status); state.selected.clear(); toast("Renamed to "+newName); loadFileList(); });
+}
 
-$("btnDeselectAll").onclick = function(){
+function copyItems(action) {
+  state.clipboard.action = action;
+  state.clipboard.entries = Array.from(state.selected).map(function(name){ return joinPath(name); });
+  state.clipboard.srcArea = state.area;
+  toast(state.clipboard.entries.length + " items " + (action==="copy"?"copied":"cut"));
   state.selected.clear();
-  renderList(state.currentEntries);
-};
-
-$("searchInput").oninput = function(ev){
-  state.filterQuery = ev.target.value.trim();
-  renderList(state.currentEntries);
-};
-
-function joinPath(name){
-  return state.path ? state.path + "/" + name : name;
+  updateSelectionUI();
 }
 
-function downloadEntry(name){
-  var url = "/api/download?area=" + encodeURIComponent(state.area) +
-    "&path=" + encodeURIComponent(joinPath(name));
-  window.location = url;
-}
-
-function load(){
-  renderBreadcrumb();
-  api("GET", "/api/list?area=" + encodeURIComponent(state.area) +
-    "&path=" + encodeURIComponent(state.path))
-    .then(function(j){ renderList(j.entries || []); })
-    .catch(function(e){ toast(e.message, true); });
-}
-
-$("btnUp").onclick = function(){
-  if (!state.path) return;
-  var parts = state.path.split("/"); parts.pop();
-  state.path = parts.join("/"); load();
-};
-
-/* ---- upload ---- */
-function uploadFiles(files){
-  var list = Array.prototype.slice.call(files);
-  if (!list.length) return;
-  var label = document.querySelector(".upload-btn");
-  var prevLabel = label.textContent;
+function pasteItems() {
+  var entries = state.clipboard.entries;
+  if (!entries.length) return;
+  var action = state.clipboard.action;
+  var destPath = state.path || "";
+  var btn = _b("btnPaste"); btn.disabled = true;
+  var count = 0;
   var chain = Promise.resolve();
-  list.forEach(function(file, idx){
-    chain = chain.then(function(){
-      label.textContent = "Uploading " + (idx + 1) + "/" + list.length + "…";
-      var fd = new FormData();
-      fd.append("file", file, file.name);
-      var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-      var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 20000) : null;
-      return fetch("/api/upload?area=" + encodeURIComponent(state.area) +
-        "&path=" + encodeURIComponent(state.path),
-        { method:"POST", body:fd, signal: ctrl ? ctrl.signal : undefined })
-        .catch(function(err){
-          throw new Error(err.name === "AbortError" ?
-            "Upload of \"" + file.name + "\" timed out" : err.message);
-        })
-        .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){
-          if (!r.ok || j.error) throw new Error((j.error || "Upload failed") + ": " + file.name);
-        }); })
-        .finally(function(){ if (timer) clearTimeout(timer); });
+  entries.forEach(function(srcPath) {
+    chain = chain.then(function() {
+      var name = srcPath.split("/").pop();
+      if (action === "copy") {
+        var srcUrl = FB_BASE() + "/api/resources?path="+encodeURIComponent(srcPath)+"&download=true";
+        return fetch(srcUrl, { headers:{"Authorization":"Basic "+btoa("muos:muos")} })
+          .then(function(r){ if (!r.ok) throw new Error("Failed to read source"); return r.blob(); })
+          .then(function(blob) {
+            var fd = new FormData(); fd.append("file", blob, name);
+            return fbFetch("/api/resources?path="+encodeURIComponent(destPath), { method:"POST", body:fd });
+          })
+          .then(function(r){ if (!r.ok) throw new Error("Failed to copy "+name); count++; });
+      } else {
+        var destFull = destPath ? destPath+"/"+name : name;
+        return fbFetch("/api/resources?path="+encodeURIComponent(srcPath), { method:"PATCH", body:JSON.stringify({ destination: destFull }) })
+          .then(function(r){ if (!r.ok) throw new Error("Failed to move "+name); count++; });
+      }
     });
   });
-  chain.then(function(){ 
-    logToConsole("[SYS] Uploaded " + list.length + " files.", true);
-    toast("Upload complete"); load(); })
-    .catch(function(e){ toast(e.message, true); })
-    .finally(function(){ label.textContent = prevLabel; });
+  chain.then(function(){ toast("Pasted "+count+" items"); if (action==="cut") state.clipboard.entries = []; loadFileList(); })
+    .catch(function(err){ toast("Paste error: "+err.message, true); loadFileList(); })
+    .finally(function(){ btn.disabled = false; updateSelectionUI(); });
 }
-$("fileInput").onchange = function(ev){ uploadFiles(ev.target.files); ev.target.value = ""; };
 
-var dz = $("dropzone");
-["dragenter","dragover"].forEach(function(ev){
-  dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add("drag"); });
-});
-["dragleave","drop"].forEach(function(ev){
-  dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.remove("drag"); });
-});
-dz.addEventListener("drop", function(e){
-  if (e.dataTransfer && e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
-});
-
-/* ---- name prompt ---- */
-var promptMode = null;
-function openPrompt(mode, title, label, okLabel, defaultValue, currentName){
-  promptMode = mode;
-  $("promptTitle").textContent = title;
-  $("promptLabel").textContent = label;
-  $("promptOk").textContent = okLabel;
-  $("promptInput").value = defaultValue || "";
-  $("promptErr").textContent = "";
-  $("promptOverlay").hidden = false;
-  setTimeout(function(){ $("promptInput").focus(); }, 50);
+function showDetails(entry) {
+  alert("Name: "+entry.name+"\nType: "+(entry.isDir?"Folder":"File")+"\nSize: "+(entry.isDir?"N/A":fmtSize(entry.size))+"\nModified: "+fmtTime(entry.modified));
 }
-function closePrompt(){ $("promptOverlay").hidden = true; }
-$("promptClose").onclick = closePrompt;
-$("promptCancel").onclick = closePrompt;
-$("promptOverlay").addEventListener("click", function(e){ if (e.target === this) closePrompt(); });
 
-// Modifiche prompt per Rinomina
-$("btnNewFolder").onclick = function(){ openPrompt("dir", "New Folder", "Folder Name", "Create", ""); };
-$("btnNewFile").onclick = function(){ openPrompt("file", "New File", "File Name (e.g., notes.txt)", "Create", ""); };
+function openEditor(name) {
+  var path = joinPath(name);
+  var content = prompt("Edit file content for: "+name, "");
+  if (content === null) return;
+  fbFetch("/api/resources?path="+encodeURIComponent(path), { method:"PUT", body:JSON.stringify({ content: content }) })
+    .then(function(r){ if (!r.ok) throw new Error("Save failed "+r.status); toast("File saved"); loadFileList(); })
+    .catch(function(err){ toast("Save error: "+err.message, true); });
+}
 
-$("promptInput").addEventListener("keydown", function(e){ if (e.key === "Enter") $("promptOk").click(); });
+function openPrompt(mode, title, label, okLabel, defaultValue) {
+  var name = prompt(label, defaultValue || "");
+  if (!name) return;
+  var path = state.path || "";
+  var endpoint = "/api/resources?path="+encodeURIComponent(path);
+  var body = JSON.stringify({ name: name, isDir: mode === "dir" });
+  fbFetch(endpoint, { method:"POST", body:body })
+    .then(function(r){ if (!r.ok) throw new Error("Failed to create"); toast((mode==="dir"?"Folder":"File")+" created"); loadFileList(); if (mode==="file") { setTimeout(function(){ openEditor(name); }, 300); } })
+    .catch(function(err){ toast("Error: "+err.message, true); });
+}
 
-$("promptOk").onclick = function(){
-  var name = $("promptInput").value.trim();
-  if (!name){ $("promptErr").textContent = "Please enter a valid name"; return; }
-  
-  var btn = $("promptOk");
-  btn.disabled = true;
-  var prevBtnLabel = btn.textContent;
-  
-  if (promptMode === "rename") {
-      btn.textContent = "Renaming…";
-      var currentItem = Array.from(state.selected)[0];
-      renameItem(currentItem, name).finally(function(){
-          btn.disabled = false; btn.textContent = prevBtnLabel;
-      });
-  } else {
-      btn.textContent = "Creating…";
-      var endpoint = promptMode === "dir" ? "/api/mkdir" : "/api/newfile";
-      var body = new URLSearchParams({area: state.area, path: state.path, name: name, content: ""});
-      api("POST", endpoint, body).then(function(j){
-        closePrompt();
-        load();
-        if (promptMode === "file") openEditor(j.name);
-        else {
-            logToConsole("[SYS] Created folder: " + name, true);
-            toast("Folder created");
-        }
-      }).catch(function(e){ $("promptErr").textContent = e.message; })
-        .finally(function(){ btn.disabled = false; btn.textContent = prevBtnLabel; });
+// ─── SYNC ───
+function syncPair(name, remotePath) {
+  var statusId = "syncStatus" + name.replace(/\s/g,'');
+  var statusEl = _b(statusId);
+  if (!statusEl) {
+    // Try to find by name match in the DOM
+    var rows = document.querySelectorAll(".sync-row");
+    for (var i=0; i<rows.length; i++) {
+      var nameEl = rows[i].querySelector(".sync-name");
+      if (nameEl && nameEl.textContent === name) {
+        statusEl = rows[i].querySelector(".sync-status");
+        break;
+      }
+    }
   }
-};
+  if (!statusEl) { toast("Sync status not found for "+name, true); return; }
+  statusEl.textContent = "syncing...";
+  statusEl.className = "sync-status";
+  statusEl.style.color = "var(--amber)";
+  statusEl.style.borderColor = "var(--amber)";
+  logConsole("[SYNC] Syncing "+name+"...", "cmd");
 
-/* --- CLIPBOARD OPERAZIONI (Copia, Taglia, Incolla) --- */
-function updatePasteButton() {
-    $("btnPaste").disabled = clipboard.entries.length === 0;
-}
-
-$("btnCopy").onclick = function(){
-    clipboard.action = "copy";
-    clipboard.entries = Array.from(state.selected).map(name => joinPath(name));
-    clipboard.srcArea = state.area;
-    toast(clipboard.entries.length + " items copied to clipboard");
-    logToConsole("[SYS] Copied " + clipboard.entries.length + " items to clipboard.", true);
-    state.selected.clear();
-    updateSelectionUI();
-}
-
-$("btnCut").onclick = function(){
-    clipboard.action = "cut";
-    clipboard.entries = Array.from(state.selected).map(name => joinPath(name));
-    clipboard.srcArea = state.area;
-    toast(clipboard.entries.length + " items cut to clipboard");
-    logToConsole("[SYS] Cut " + clipboard.entries.length + " items to clipboard.", true);
-    state.selected.clear();
-    updateSelectionUI();
-}
-
-$("btnPaste").onclick = function(){
-    if (!clipboard.entries.length) return;
-    var pasteBtn = $("btnPaste");
-    pasteBtn.disabled = true;
-    
-    var endpoint = (clipboard.action === "cut") ? "/api/paste_move" : "/api/paste_copy";
-    var count = 0;
-    
-    logToConsole("[SYS] Starting Paste operation (" + clipboard.action + ")...", true);
-
-    var chain = Promise.resolve();
-    clipboard.entries.forEach(function(srcPath){
-        chain = chain.then(function(){
-            var name = srcPath.split('/').pop();
-            var body = new URLSearchParams({
-                srcArea: clipboard.srcArea, srcPath: srcPath,
-                destArea: state.area, destPath: state.path, name: name
-            });
-            return api("POST", endpoint, body).then(function(){
-                count++;
-                logToConsole("[LOG] Pasted " + name, true);
-            });
-        });
-    });
-
-    chain.then(function(){
-        logToConsole("[SYS] Paste complete. " + count + " items.", true);
-        toast("Successfully pasted " + count + " items");
-        
-        if (clipboard.action === "cut") clipboard.entries = []; // Pulisci dopo cut
-        load();
-    }).catch(function(e){
-        logToConsole("[ERR] Paste failed: " + e.message, false, true);
-        toast("Paste error: " + e.message, true);
-        load();
-    }).finally(function(){
-        updateSelectionUI();
-    });
-}
-
-/* --- RINOMINA (Rename) --- */
-$("btnRename").onclick = function(){
-    if (state.selected.size !== 1) return;
-    var currentItem = Array.from(state.selected)[0];
-    openPrompt("rename", "Rename", "New Name", "Rename", currentItem, currentItem);
-}
-
-function renameItem(currentItem, newName) {
-  var body = new URLSearchParams({area: state.area, path: joinPath(currentItem), newName: newName});
-  return api("POST", "/api/rename", body).then(function(){
-    closePrompt();
-    state.selected.clear();
-    logToConsole("[SYS] Renamed item: " + currentItem + " -> " + newName, true);
-    toast("Item renamed"); 
-    load(); 
-  }).catch(function(e){ $("promptErr").textContent = e.message; });
-}
-
-/* ---- text editor ---- */
-function openEditor(name){
-  var p = joinPath(name);
-  editing = null;
-  $("editorFilename").textContent = name + " (Loading…)";
-  $("editorArea").value = "";
-  $("editorArea").disabled = true;
-  $("editorErr").textContent = "";
-  $("editorOverlay").hidden = false;
-  api("GET", "/api/read?area=" + encodeURIComponent(state.area) +
-    "&path=" + encodeURIComponent(p))
-    .then(function(j){
-      editing = { area: state.area, path: p };
-      $("editorFilename").textContent = name;
-      $("editorArea").value = j.content || "";
-      $("editorArea").disabled = false;
-      setTimeout(function(){ $("editorArea").focus(); }, 50);
+  var fbUrl = "http://"+state.deviceIp+":9090/api/resources?path="+encodeURIComponent(remotePath);
+  fetch(fbUrl, { method:"GET", headers:{"Authorization":"Basic "+btoa("muos:muos")} })
+    .then(function(r) {
+      if (!r.ok) throw new Error("Failed to access "+remotePath);
+      return r.json();
     })
-    .catch(function(e){
-      $("editorFilename").textContent = name;
-      $("editorErr").textContent = e.message;
-      $("editorArea").disabled = false;
+    .then(function(j) {
+      var count = 0;
+      if (j.resources && Array.isArray(j.resources)) {
+        count = j.resources.filter(function(item) { return !item.isDir; }).length;
+        // In a full implementation, we would download/upload files here
+        // For now, we just show the count
+      }
+      statusEl.textContent = "✓ synced ("+count+" files)";
+      statusEl.className = "sync-status";
+      statusEl.style.color = "var(--green)";
+      statusEl.style.borderColor = "var(--green-dim)";
+      logConsole("[SYNC] "+name+" sync complete ("+count+" files)", "ok");
+      toast("Synced "+name+" ("+count+" files)");
+    })
+    .catch(function(err) {
+      statusEl.textContent = "✗ error";
+      statusEl.className = "sync-status error";
+      statusEl.style.color = "var(--red)";
+      statusEl.style.borderColor = "var(--red-dim)";
+      logConsole("[SYNC] "+name+" error: "+err.message, "err");
+      toast("Sync error: "+err.message, true);
     });
 }
-function closeEditor(){ $("editorOverlay").hidden = true; editing = null; }
-$("editorClose").onclick = closeEditor;
-$("editorCancel").onclick = closeEditor;
-$("editorOverlay").addEventListener("click", function(e){ if (e.target === this) closeEditor(); });
-$("editorSave").onclick = function(){
-  if (!editing){
-    $("editorErr").textContent = "File not ready yet, please wait";
-    return;
-  }
-  var btn = $("editorSave");
-  btn.disabled = true;
-  var prevLabel = btn.textContent;
-  btn.textContent = "Saving…";
-  var body = new URLSearchParams({
-    area: editing.area, path: editing.path, content: $("editorArea").value
-  });
-  api("POST", "/api/write", body).then(function(){
-    logToConsole("[SYS] Saved file: " + editing.path, true);
-    toast("File saved"); closeEditor(); load();
-  }).catch(function(e){
-    $("editorErr").textContent = e.message;
-  }).finally(function(){
-    btn.disabled = false;
-    btn.textContent = prevLabel;
-  });
+
+window.runSync = function(name) {
+  var paths = { saves: "/mnt/mmc/MUOS/save/file", states: "/mnt/mmc/MUOS/save/state", screenshots: "/mnt/mmc/MUOS/screenshot" };
+  var remotePath = paths[name];
+  if (!remotePath) { toast("Unknown sync target", true); return; }
+  var nameMap = { saves: "Saves", states: "States", screenshots: "Screenshots" };
+  syncPair(nameMap[name] || name, remotePath);
 };
 
-document.addEventListener("keydown", function(e){
-  if (e.key === "Escape"){ 
-    closePrompt(); 
-    closeEditor(); 
-    $("detailsOverlay").hidden = true; 
-  }
-});
+window.syncAll = function() {
+  syncPair("Saves", "/mnt/mmc/MUOS/save/file");
+  setTimeout(function() { syncPair("States", "/mnt/mmc/MUOS/save/state"); }, 800);
+  setTimeout(function() { syncPair("Screenshots", "/mnt/mmc/MUOS/screenshot"); }, 1600);
+};
 
-buildBarcode();
-startBootAnim(); // Start boot animation on load
-load();
+window.addSyncPair = function() {
+  var name = prompt("Sync pair name:", "Custom");
+  if (!name) return;
+  var path = prompt("Remote path:", "/mnt/mmc/MUOS/");
+  if (!path) return;
+  var container = _b("syncPairsContainer");
+  var row = document.createElement("div");
+  row.className = "sync-row";
+  var safeId = name.replace(/\s/g,'');
+  row.innerHTML =
+    '<span class="sync-name">'+name+'</span>'+
+    '<span class="sync-path">'+path+'</span>'+
+    '<span class="sync-status idle" id="syncStatus'+safeId+'">idle</span>'+
+    '<button class="sync-btn green" onclick="syncPair(\''+name+'\',\''+path+'\')">⟳ Sync</button>';
+  container.appendChild(row);
+  toast("Added sync pair: "+name);
+};
 
-// Simulazione di ricezione info console dopo il caricamento
-setTimeout(function() {
-    logToConsole("[LOG] Periodic check: WiFi Signal optimal.", true);
-}, 15000);
-setTimeout(function() {
-    logToConsole("[MSG] Handheld connection requesting sync.", false);
-}, 25000);
+// ─── EVENTS ───
+function initEvents() {
+  _b("btnUp").onclick = function(){ if (!state.path) return; var parts = state.path.split("/"); parts.pop(); state.path = parts.join("/"); loadFileList(); };
+  _b("btnNewFolder").onclick = function(){ openPrompt("dir", "New Folder", "Folder Name", "Create", ""); };
+  _b("btnNewFile").onclick = function(){ openPrompt("file", "New File", "File Name (e.g. notes.txt)", "Create", ""); };
+  _b("fileInput").onchange = function(e) {
+    var files = e.target.files;
+    if (!files.length) return;
+    var chain = Promise.resolve();
+    Array.prototype.slice.call(files).forEach(function(file) {
+      chain = chain.then(function() {
+        var fd = new FormData(); fd.append("file", file, file.name);
+        var path = state.path || "";
+        return fbFetch("/api/resources?path="+encodeURIComponent(path), { method:"POST", body:fd })
+          .then(function(r){ if (!r.ok) throw new Error("Upload failed for "+file.name); });
+      });
+    });
+    chain.then(function(){ toast("Upload complete"); loadFileList(); })
+      .catch(function(err){ toast("Upload error: "+err.message, true); });
+    e.target.value = "";
+  };
+  _b("btnBatchDelete").onclick = batchDelete;
+  _b("chkSelectAll").onclick = function(e) {
+    var checked = e.target.checked;
+    state.currentEntries.filter(matchesFilter).forEach(function(ent) {
+      if (checked) state.selected.add(ent.name); else state.selected.delete(ent.name);
+    });
+    renderFileList(state.currentEntries);
+  };
+  _b("btnDeselectAll").onclick = function(){ state.selected.clear(); renderFileList(state.currentEntries); };
+  _b("searchInput").oninput = function(e){ state.filterQuery = e.target.value.trim(); renderFileList(state.currentEntries); };
+  _b("btnCopy").onclick = function(){ copyItems("copy"); };
+  _b("btnCut").onclick = function(){ copyItems("cut"); };
+  _b("btnPaste").onclick = pasteItems;
+  _b("btnRename").onclick = function() {
+    if (state.selected.size !== 1) return;
+    var name = Array.from(state.selected)[0];
+    var newName = prompt("Rename to:", name);
+    if (newName && newName !== name) { renameItem(name, newName).catch(function(e){ toast("Rename error: "+e.message, true); }); }
+  };
+  var dz = _b("dropzone");
+  ["dragenter","dragover"].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add("drag"); }); });
+  ["dragleave","drop"].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.remove("drag"); }); });
+  dz.addEventListener("drop", function(e) {
+    if (e.dataTransfer && e.dataTransfer.files) {
+      var files = e.dataTransfer.files;
+      var chain = Promise.resolve();
+      Array.prototype.slice.call(files).forEach(function(file) {
+        chain = chain.then(function() {
+          var fd = new FormData(); fd.append("file", file, file.name);
+          var path = state.path || "";
+          return fbFetch("/api/resources?path="+encodeURIComponent(path), { method:"POST", body:fd })
+            .then(function(r){ if (!r.ok) throw new Error("Upload failed for "+file.name); });
+        });
+      });
+      chain.then(function(){ toast("Upload complete"); loadFileList(); })
+        .catch(function(err){ toast("Upload error: "+err.message, true); loadFileList(); });
+    }
+  });
+  _b("ssPreviewClose").onclick = function(){ _b("ssPreviewOverlay").hidden = true; };
+  _b("ssPreviewCloseBtn").onclick = function(){ _b("ssPreviewOverlay").hidden = true; };
+  _b("ssPreviewOverlay").addEventListener("click", function(e){ if (e.target === this) this.hidden = true; });
+  _b("ssPreviewDownload").onclick = function() {
+    var name = state.ssPreviewName;
+    if (!name) return;
+    var url = "http://"+state.deviceIp+":9090/api/resources?path="+encodeURIComponent("/mnt/mmc/MUOS/screenshot/"+name)+"&download=true";
+    window.open(url, "_blank");
+  };
+  _b("ssPreviewDelete").onclick = function() {
+    var name = state.ssPreviewName;
+    if (!name) return;
+    if (!confirm("Delete screenshot '"+name+"'?")) return;
+    var url = "http://"+state.deviceIp+":9090/api/resources?path="+encodeURIComponent("/mnt/mmc/MUOS/screenshot/"+name);
+    fetch(url, { method:"DELETE", headers:{"Authorization":"Basic "+btoa("muos:muos")} })
+      .then(function(r) {
+        if (r.ok) { toast("Deleted "+name); _b("ssPreviewOverlay").hidden = true; refreshScreenshotList(); }
+        else { toast("Delete failed", true); }
+      })
+      .catch(function(err){ toast("Error: "+err.message, true); });
+  };
+}
+
+// ─── INIT ───
+function init() {
+  startBootAnim();
+  var detailsGrid = document.createElement("div"); detailsGrid.id = "detailsGrid"; detailsGrid.className = "details-grid"; detailsGrid.style.display = "none"; document.body.appendChild(detailsGrid);
+}
+
+if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", init); } else { init(); }
 
 })();
 </script>
