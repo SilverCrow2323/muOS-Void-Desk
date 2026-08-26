@@ -159,5 +159,3 @@ This runtime packaging is part of the VoidDesk project.
 All third-party libraries (Pygame, etc.) retain their original licenses.
 
 *Last updated: 2026-08-26 — SPDW Factory 🚀*
-
-```
