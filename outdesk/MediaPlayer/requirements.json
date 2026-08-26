@@ -1,0 +1,31 @@
+{
+  "app_name": "Media Player",
+  "app_version": "1.0.0",
+  "categories": [
+    {
+      "name": "MULTIMEDIA",
+      "dependencies": [
+        {
+          "id": "mpv",
+          "name": "mpv",
+          "version": "0.35",
+          "author": "mpv Team",
+          "description": "Player multimediale universale",
+          "in_depth": "mpv e' il backend di riproduzione per audio e video.",
+          "check_command": "which mpv",
+          "install_command": "apt-get install mpv -y"
+        },
+        {
+          "id": "ffmpeg",
+          "name": "ffmpeg",
+          "version": "6.0",
+          "author": "FFmpeg Team",
+          "description": "Libreria e strumenti per audio/video",
+          "in_depth": "ffmpeg fornisce codec e strumenti di conversione.",
+          "check_command": "which ffmpeg",
+          "install_command": "apt-get install ffmpeg -y"
+        }
+      ]
+    }
+  ]
+}

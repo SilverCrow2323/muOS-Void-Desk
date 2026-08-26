@@ -1,0 +1,21 @@
+{
+  "app_name": "My Standalone App",
+  "app_version": "1.0",
+  "categories": [
+    {
+      "name": "STRUMENTI",
+      "dependencies": [
+        {
+          "id": "ffmpeg",
+          "name": "FFmpeg",
+          "version": "4.4",
+          "author": "FFmpeg Team",
+          "description": "Libreria multimediale per audio/video",
+          "in_depth": "FFmpeg permette la conversione e manipolazione di file audio e video.",
+          "check_command": "which ffmpeg",
+          "install_command": "apt-get install ffmpeg -y"
+        }
+      ]
+    }
+  ]
+}

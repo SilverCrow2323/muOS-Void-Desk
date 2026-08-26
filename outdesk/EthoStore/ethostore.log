@@ -1,0 +1,14 @@
+2026-08-17 05:52:02: === EthoStore v2.0 boot ===
+2026-08-17 05:52:02: SDL driver: x11
+2026-08-17 05:52:02: Font: /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf
+2026-08-20 20:30:01: === EthoStore v2.0 boot ===
+2026-08-20 20:30:02: SDL driver: x11
+2026-08-20 20:30:02: Font: /home/sirpips/muos/void desk nexus/outdesk/EthoStore/font.ttf
+2026-08-20 20:30:02: Entering main loop
+2026-08-20 20:31:19: Shutdown complete
+2026-08-20 20:31:21: === EthoStore v2.0 boot ===
+2026-08-20 20:31:21: SDL driver: x11
+2026-08-20 20:31:21: Font: /home/sirpips/muos/void desk nexus/outdesk/EthoStore/font.ttf
+2026-08-20 20:31:21: Entering main loop
+2026-08-20 20:32:09: Download FAILED: https://github.com/nvcuong1312/bltMuos/releases/download/Bluetooth_20250116/Bluetooth_Full_Install_Big_AW_Banana.zip -> [Errno 13] Permission denied: '/mnt/mmc'
+2026-08-20 20:35:06: Shutdown complete

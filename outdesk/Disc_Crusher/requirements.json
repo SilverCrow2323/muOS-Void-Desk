@@ -1,0 +1,31 @@
+{
+  "app_name": "Disc Crusher",
+  "app_version": "1.0",
+  "categories": [
+    {
+      "name": "STRUMENTI",
+      "dependencies": [
+        {
+          "id": "chdman",
+          "name": "CHDMan",
+          "version": "0.1.0",
+          "author": "MAME Team",
+          "description": "Convertitore immagini CD in CHD",
+          "in_depth": "CHDMan comprime immagini cue/bin e gdi in formato CHD.",
+          "check_command": "which chdman",
+          "install_command": "cp /mnt/mmc/MUOS/application/VoidDesk/bin/chdman /usr/local/bin/"
+        },
+        {
+          "id": "ffmpeg",
+          "name": "FFmpeg",
+          "version": "4.4",
+          "author": "FFmpeg Team",
+          "description": "Libreria multimediale per audio/video",
+          "in_depth": "FFmpeg permette la conversione e manipolazione di file audio e video.",
+          "check_command": "which ffmpeg",
+          "install_command": "apt-get install ffmpeg -y"
+        }
+      ]
+    }
+  ]
+}

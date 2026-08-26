@@ -1,0 +1,31 @@
+{
+  "app_name": "Image Viewer",
+  "app_version": "1.0.0",
+  "categories": [
+    {
+      "name": "MULTIMEDIA",
+      "dependencies": [
+        {
+          "id": "ffmpeg",
+          "name": "ffmpeg",
+          "version": "6.0",
+          "author": "FFmpeg Team",
+          "description": "Libreria e strumenti per immagini e video",
+          "in_depth": "ffmpeg fornisce codec per la decodifica di formati immagine.",
+          "check_command": "which ffmpeg",
+          "install_command": "apt-get install ffmpeg -y"
+        },
+        {
+          "id": "python3-pygame",
+          "name": "python3-pygame",
+          "version": "2.5",
+          "author": "Pygame Team",
+          "description": "Libreria grafica per la visualizzazione",
+          "in_depth": "pygame e' usato per il rendering delle immagini.",
+          "check_command": "python3 -c \"import pygame\"",
+          "install_command": "apt-get install python3-pygame -y"
+        }
+      ]
+    }
+  ]
+}

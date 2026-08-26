@@ -14,9 +14,11 @@
 #  timeout, o riceve SIGTERM.
 #
 #  uso: vd_loader.py --title T [--label L] [--progress FILE]
+#                    [--feature F] [--items FILE]
 #                    [--stop FILE ...] [--timeout SEC]
 # ============================================================================
 import json
+import math
 import os
 import sys
 import time
@@ -74,7 +76,6 @@ class Painter(object):
             fb.buf[o:o + len(row)] = row
 
     def frame(self, x, y, w, h, rgb, th=1, cut=0):
-        """Cornice con l'angolo in alto a destra tagliato (stile tavola)."""
         self.fill(x, y, w - cut, th, rgb)
         self.fill(x, y + h - th, w, th, rgb)
         self.fill(x, y, th, h, rgb)
@@ -84,8 +85,6 @@ class Painter(object):
                 self.fill(x + w - cut + i, y + i, th + 1, th, rgb)
 
     def big_text(self, x, y, s, rgb, scale=2):
-        """Glifi del font 10x20 ingranditi a blocchi: il pixel diventa
-        un quadrato scale x scale. Brutale, quindi giusto."""
         fb = self.fb
         for i, ch in enumerate(s):
             c = ord(ch)
@@ -102,9 +101,19 @@ class Painter(object):
                                   scale, scale, rgb)
 
 
+def draw_atom(pt, cx, cy, t, acc, fg):
+    core_r = 5 + int(2 * abs(math.sin(t * 2.5)))
+    pt.fill(cx - core_r, cy - core_r, core_r * 2, core_r * 2, acc)
+    for r, spd, dr in ((22, 1.8, 4), (32, 1.2, 3)):
+        ang = t * spd
+        dx = int(r * math.cos(ang))
+        dy = int(r * math.sin(ang))
+        pt.fill(cx + dx - dr, cy + dy - dr, dr * 2, dr * 2, fg)
+
+
 def parse_args(argv):
-    a = {"title": "VOID", "label": "", "progress": "", "stop": [],
-         "timeout": 600.0}
+    a = {"title": "VOID", "label": "", "progress": "", "feature": "",
+         "items": "", "stop": [], "timeout": 600.0}
     i = 0
     while i < len(argv):
         k = argv[i]
@@ -114,6 +123,10 @@ def parse_args(argv):
             a["label"] = argv[i + 1]; i += 2
         elif k == "--progress" and i + 1 < len(argv):
             a["progress"] = argv[i + 1]; i += 2
+        elif k == "--feature" and i + 1 < len(argv):
+            a["feature"] = argv[i + 1]; i += 2
+        elif k == "--items" and i + 1 < len(argv):
+            a["items"] = argv[i + 1]; i += 2
         elif k == "--stop" and i + 1 < len(argv):
             a["stop"].append(argv[i + 1]); i += 2
         elif k == "--timeout" and i + 1 < len(argv):
@@ -128,10 +141,6 @@ def parse_args(argv):
 
 
 def stop_hit(paths, t0):
-    """Uno stop-file vale solo se e' FRESCO (creato dopo il nostro avvio).
-    Il marker .vd_x_up della sessione precedente resta dentro l'immagine
-    ext4: appena questa viene montata il file "riappare" e ammazzava il
-    loader dopo un secondo. Con il controllo mtime, i fossili non contano."""
     for s in paths:
         try:
             if os.path.getmtime(s) > t0 - 2.0:
@@ -142,7 +151,6 @@ def stop_hit(paths, t0):
 
 
 def read_progress(path, prev):
-    """Ultima riga 'PCT|TESTO' del file; PCT non numerico = indeterminato."""
     if not path:
         return prev
     try:
@@ -161,9 +169,17 @@ def read_progress(path, prev):
         return prev
 
 
+def read_items(path):
+    if not path:
+        return []
+    try:
+        with open(path) as f:
+            return [ln.strip() for ln in f if ln.strip()]
+    except OSError:
+        return []
+
+
 def open_fb():
-    """FB con override d'ambiente (VD_FB_DEV/VD_FB_GEOM): lo usano anche
-    vd_bootanim e i test."""
     kw = {}
     dev = os.environ.get("VD_FB_DEV", "/dev/fb0")
     geom = os.environ.get("VD_FB_GEOM", "")
@@ -180,7 +196,6 @@ def main():
     a = parse_args(sys.argv[1:])
     fb = open_fb()
     if not fb.ok:
-        # senza framebuffer non c'e' niente da animare: aspetto gli stop
         t0 = time.time()
         while time.time() - t0 < a["timeout"]:
             if stop_hit(a["stop"], t0):
@@ -190,28 +205,34 @@ def main():
     pt = Painter(fb)
     acc = theme_accent()
     pct, label = None, a["label"]
+    feature = a.get("feature", "")
+    items = read_items(a.get("items", ""))
     t0 = time.time()
     frame = 0
 
-    # geometria del pannello centrale
-    PW, PH = 520, 168
+    PW, PH = 560, 240
     PX, PY = (fb.w - PW) // 2, (fb.h - PH) // 2
-    BARX, BARY, BARW, BARH = PX + 26, PY + 96, PW - 52, 22
-    SEGS = 26
+    INFO_X = PX + 16
+    INFO_W = PW - 32
+    ANIM_CX = PX + 70
+    ANIM_CY = PY + PH // 2
+    BARX = INFO_X
+    BARY = PY + 70
+    BARW = INFO_W
+    BARH = 32
+    SEGS = 24
     SEGW = BARW // SEGS
 
     while True:
         now = time.time()
         if stop_hit(a["stop"], t0):
-            return 0            # chi di dovere ha preso lo schermo: sparisco
+            return 0
         if now - t0 > a["timeout"]:
             return 0
         pct, label = read_progress(a["progress"], (pct, label))
 
-        # ---- sfondo megastruttura (una volta ogni frame: e' economico) ----
         fb.clear(BG)
         for gx in range(0, fb.w + 40, 64):
-            # nervature oblique approssimate a gradini di 8px
             for step in range(0, fb.h, 8):
                 pt.fill(gx - (step * 28) // fb.h, step, 1, 8, LINE)
         for gy in (118, 430):
@@ -220,20 +241,20 @@ def main():
         for hy in range(60, fb.h - 40, 26):
             pt.fill(fb.w - 4, hy, 3, 7, acc)
 
-        # ---- pannello ----
         pt.fill(PX, PY, PW, PH, INK)
         pt.frame(PX, PY, PW, PH, acc, 2, cut=14)
-        pt.fill(PX, PY + PH + 3, PW, 2, LINE)      # ombra di china
-        # tacche hazard sotto il titolo
-        for hx in range(PX + 24, PX + 150, 12):
-            pt.fill(hx, PY + 44, 7, 3, acc)
-        fb.text((PX + 24) // fbtext.CW, (PY + 18) // fbtext.CH,
-                a["title"][:40], acc)
+        pt.fill(PX, PY + PH + 3, PW, 2, LINE)
 
-        # ---- barra ----
+        draw_atom(pt, ANIM_CX, ANIM_CY, now, acc, FG)
+
+        fb.text((INFO_X + 70) // fbtext.CW, (PY + 18) // fbtext.CH,
+                a["title"][:38], acc)
+        if feature:
+            fb.text((INFO_X + 70) // fbtext.CW, (PY + 36) // fbtext.CH,
+                    feature[:44], DIM)
+
         pt.frame(BARX - 2, BARY - 2, BARW + 4, BARH + 4, LINE, 1)
         if pct is None:
-            # indeterminato: finestra di 5 segmenti che fa la spola
             pos = frame % (SEGS * 2)
             head = pos if pos < SEGS else SEGS * 2 - pos
             for s in range(SEGS):
@@ -245,16 +266,13 @@ def main():
             for s in range(SEGS):
                 pt.fill(BARX + s * SEGW + 1, BARY, SEGW - 2, BARH,
                         acc if s < fill_n else (14, 15, 19))
-            # percentuale gigante a destra del titolo
             ptxt = "%d%%" % pct
             pw_px = len(ptxt) * fbtext.CW * 2
-            pt.big_text(PX + PW - 26 - pw_px, PY + 14, ptxt, FG, 2)
+            pt.big_text(BARX + BARW - pw_px, BARY + 8, ptxt, FG, 2)
 
-        # ---- spinner a blocchi: a SINISTRA della percentuale, in alto,
-        #      ben lontano dalla barra (prima ci finiva sotto) ----
         pw_px = (len("%d%%" % pct) * fbtext.CW * 2) if pct is not None else 0
-        cx = PX + PW - 26 - pw_px - 34
-        cy = PY + 33
+        cx = BARX + BARW - pw_px - 34
+        cy = BARY + 10
         cells = ((-1, -1), (0, -1), (1, -1), (1, 0),
                  (1, 1), (0, 1), (-1, 1), (-1, 0))
         ph = frame % 8
@@ -263,14 +281,19 @@ def main():
             col = acc if d < 2 else (DIM if d == 2 else LINE)
             pt.fill(cx + dx * 11 - 4, cy + dy * 11 - 4, 8, 8, col)
 
-        # ---- etichetta di fase + cronometro ----
         if label:
-            fb.text((BARX) // fbtext.CW, (BARY + BARH + 8) // fbtext.CH,
-                    label[:46], DIM)
-        el = "T+%ds" % int(now - t0)
-        fb.text((PX + PW - 26 - len(el) * fbtext.CW) // fbtext.CW,
-                (BARY + BARH + 8) // fbtext.CH, el, FAINT)
-        fb.text((PX + 24) // fbtext.CW, (PY + PH + 10) // fbtext.CH,
+            fb.text((INFO_X + 70) // fbtext.CW, (BARY + BARH + 10) // fbtext.CH,
+                    label[:42], DIM)
+
+        ty = BARY + BARH + 28
+        for item in items[:5]:
+            if ty + 16 > PY + PH - 8:
+                break
+            fb.text((INFO_X + 70) // fbtext.CW, ty // fbtext.CH, "•", acc)
+            fb.text((INFO_X + 82) // fbtext.CW, ty // fbtext.CH, item[:38], FAINT)
+            ty += 18
+
+        fb.text((INFO_X + 70) // fbtext.CW, (PY + PH + 8) // fbtext.CH,
                 "SPDW FACTORY // vd_loader", FAINT)
 
         fb.flush()

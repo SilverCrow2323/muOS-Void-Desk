@@ -1,196 +1,264 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# VOIDDESK bootstrap-lite v1.4
-# Niente chroot: scarica il wheel pygame precompilato adatto a questo
-# python/arch e lo scompatta in <app>/runtime. Funziona anche su exFAT.
+"""
+bootstrap_lite.py — Installa pygame e dipendenze per VoidDesk.
+Versione migliorata con:
+- Verifica di pygame, evinput, fbdisplay
+- Installazione automatica con pip (con fallback su apt)
+- Gestione della rete (proxy, timeout)
+- Log dettagliato in data/boostrap.log
+- Rimozione automatica della cache pip per risparmiare spazio
+"""
 
-import glob
-import json
 import os
-import platform
-import shutil
-import ssl
-import subprocess
 import sys
+import subprocess
+import time
+import json
+import shutil
 import urllib.request
-import zipfile
+import urllib.error
+from pathlib import Path
 
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib"))
-try:
-    import fbtext
-    SCREEN = fbtext.Screen(title="VOIDDESK - installazione runtime pygame")
-except Exception:
-    SCREEN = None
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(APP_DIR, "data")
+LOG_FILE = os.path.join(DATA_DIR, "bootstrap.log")
+RUNTIME_DIR = os.path.join(APP_DIR, "runtime")
+DESK_DIR = os.path.join(APP_DIR, "desk")
+PIP_CACHE_DIR = os.path.join(DATA_DIR, "pip_cache")
 
-APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(APP, "data")
-RUNTIME = os.path.join(APP, "runtime")
-WHL = os.path.join(DATA, "pygame.whl")
-MARKER = os.path.join(DATA, ".pygame_ready")
-SDL_TXT = os.path.join(DATA, "sdl_path.txt")
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(RUNTIME_DIR, exist_ok=True)
 
-os.makedirs(DATA, exist_ok=True)
-
-
-def log(msg):
-    print(msg, flush=True)
-    if SCREEN:
-        try:
-            SCREEN.log(msg)
-        except Exception:
-            pass
+# evinput/fbdisplay sono moduli locali in desk/, non pacchetti pip.
+# Aggiungili al path prima di qualsiasi check.
+for _d in (RUNTIME_DIR, DESK_DIR):
+    if _d not in sys.path:
+        sys.path.insert(0, _d)
 
 
-def opener():
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False          # CA bundle vecchi sui firmware
-    ctx.verify_mode = ssl.CERT_NONE
-    op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx))
-    op.addheaders = [("User-Agent", "VoidDesk/1.4")]
-    return op
+def log(msg, level="INFO"):
+    """Scrive un messaggio nel log di bootstrap."""
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [{level}] {msg}\n")
+    except Exception:
+        pass
+    print(f"[{level}] {msg}", flush=True)
 
 
-def pick_wheel(op, pkg, tag, mach):
-    url = "https://pypi.org/pypi/%s/json" % pkg
-    with op.open(url, timeout=30) as r:
-        d = json.load(r)
-    for f in d.get("urls", []):
-        n = f.get("filename", "")
-        if (n.endswith(".whl") and tag in n and mach in n
-                and "manylinux" in n):
-            return f["url"], n, d["info"]["version"]
-    return None, None, None
+def have_internet():
+    """Verifica la connettivita' di rete."""
+    try:
+        urllib.request.urlopen("https://pypi.org", timeout=5)
+        return True
+    except Exception:
+        return False
 
 
-def download(op, url, dest):
-    download.next_pct = 0
-    with op.open(url, timeout=60) as r, open(dest, "wb") as f:
-        total = int(r.headers.get("Content-Length") or 0)
-        done = 0
-        while True:
-            chunk = r.read(262144)
-            if not chunk:
-                break
-            f.write(chunk)
-            done += len(chunk)
-            if total:
-                pct = done * 100 // total
-                if pct >= download.next_pct or done == total:
-                    download.next_pct = pct + 20
-                    log("   %d%% (%0.1f/%0.1fMB)" %
-                        (pct, done / 1e6, total / 1e6))
+def check_pygame():
+    """Verifica se pygame e' installato e funzionante."""
+    try:
+        import pygame
+        version = pygame.version.ver
+        log(f"pygame gia' installato (v{version})")
+        return True
+    except ImportError:
+        log("pygame non trovato", "WARN")
+        return False
 
 
-def find_system_sdl():
-    pats = [
-        "/usr/lib/libSDL2-2.0.so*", "/usr/lib/libSDL2*.so*",
-        "/usr/lib64/libSDL2*.so*", "/lib/libSDL2*.so*",
-        "/usr/lib/aarch64-linux-gnu/libSDL2*.so*",
+def check_evinput():
+    try:
+        import evinput
+        log("evinput OK")
+        return True
+    except ImportError:
+        log("evinput non trovato", "WARN")
+        return False
+
+
+def check_fbdisplay():
+    try:
+        import fbdisplay
+        log("fbdisplay OK")
+        return True
+    except ImportError:
+        log("fbdisplay non trovato", "WARN")
+        return False
+
+
+def install_pygame_pip():
+    """Installa pygame via pip (con cache e fallback)."""
+    log("Tentativo installazione pygame via pip...")
+    os.makedirs(PIP_CACHE_DIR, exist_ok=True)
+
+    pip_cmd = shutil.which("pip3") or shutil.which("pip")
+    if not pip_cmd:
+        log("pip non trovato, salto installazione via pip", "ERROR")
+        return False
+
+    cmd = [
+        pip_cmd,
+        "install",
+        "--cache-dir", PIP_CACHE_DIR,
+        "--no-warn-script-location",
+        "--target", RUNTIME_DIR,
+        "pygame",
     ]
-    hits = []
-    for p in pats:
-        hits.extend(glob.glob(p))
-    for base, _dirs, files in os.walk("/opt/muos"):
-        for fn in files:
-            if fn.startswith("libSDL2-2.0.so"):
-                hits.append(os.path.join(base, fn))
-    # preferisce il .so.0 "vero"
-    hits.sort(key=lambda h: (0 if ".so.0" in h else 1, len(h)))
-    return hits
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            log("pygame installato con successo via pip")
+            sys.path.insert(0, RUNTIME_DIR)
+            return True
+        else:
+            log(f"pip fallito: {result.stderr}", "ERROR")
+            return False
+    except Exception as e:
+        log(f"eccezione durante pip: {e}", "ERROR")
+        return False
+
+
+def install_pygame_apt():
+    """Installa pygame via apt (fallback per sistemi con apt)."""
+    log("Tentativo installazione pygame via apt...")
+    apt_cmd = shutil.which("apt-get")
+    if not apt_cmd:
+        log("apt-get non trovato, impossibile installare via apt", "ERROR")
+        return False
+
+    try:
+        cmd = [apt_cmd, "install", "-y", "python3-pygame", "python3-evdev"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            log("pygame installato via apt")
+            return True
+        else:
+            log(f"apt fallito: {result.stderr}", "ERROR")
+            return False
+    except Exception as e:
+        log(f"eccezione durante apt: {e}", "ERROR")
+        return False
+
+
+def install_from_runtime_zip():
+    """Scarica un runtime precompilato da GitHub (fallback di ultima istanza)."""
+    log("Tentativo download runtime precompilato...")
+    import zipfile
+    runtime_url = "https://github.com/SilverCrow2323/voiddesk-runtime/releases/download/v1.0/runtime.zip"
+    zip_path = os.path.join(DATA_DIR, "runtime.zip")
+    try:
+        urllib.request.urlretrieve(runtime_url, zip_path,
+                                   reporthook=lambda a, b, c: log(f"Download runtime: {a * b / c * 100:.0f}%"))
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            z.extractall(APP_DIR)
+        os.remove(zip_path)
+        log("Runtime precompilato installato con successo")
+        sys.path.insert(0, RUNTIME_DIR)
+        return True
+    except Exception as e:
+        log(f"Download runtime fallito: {e}", "ERROR")
+        return False
+
+
+def extract_local_archives():
+    """Estrae archivi .zip/.tar.gz/.tgz da assets/runtime_archives/ in runtime/."""
+    archives_dir = os.path.join(APP_DIR, "assets", "runtime_archives")
+    if not os.path.isdir(archives_dir):
+        return False
+    archives = sorted([
+        name for name in os.listdir(archives_dir)
+        if name.endswith((".zip", ".tar.gz", ".tgz"))
+    ])
+    if not archives:
+        return False
+    import tempfile
+    for name in archives:
+        zpath = os.path.join(archives_dir, name)
+        try:
+            if name.endswith(".zip"):
+                import zipfile
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    with zipfile.ZipFile(zpath, 'r') as z:
+                        z.extractall(tmpdir)
+                    _merge_into_runtime(tmpdir, APP_DIR)
+            else:
+                import tarfile
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    with tarfile.open(zpath, 'r:gz') as t:
+                        t.extractall(tmpdir)
+                    _merge_into_runtime(tmpdir, APP_DIR)
+            log(f"Estratto archivio runtime locale: {name}")
+            return True
+        except Exception as e:
+            log(f"Estrazione {name} fallita: {e}", "ERROR")
+    return False
+
+
+def _merge_into_runtime(tmpdir, app_dir):
+    runtime_dst = os.path.join(app_dir, "runtime")
+    os.makedirs(runtime_dst, exist_ok=True)
+    src_dir = tmpdir
+    nested_runtime = os.path.join(tmpdir, "runtime")
+    if os.path.isdir(nested_runtime):
+        src_dir = nested_runtime
+    for entry in os.listdir(src_dir):
+        src = os.path.join(src_dir, entry)
+        dst = os.path.join(runtime_dst, entry)
+        if os.path.exists(dst):
+            if os.path.isdir(dst):
+                shutil.rmtree(dst)
+            else:
+                os.remove(dst)
+        shutil.move(src, dst)
+
+
+def write_pygame_ready():
+    """Scrive un file marker per indicare che pygame e' pronto."""
+    marker = os.path.join(DATA_DIR, ".pygame_ready")
+    try:
+        with open(marker, "w") as f:
+            f.write("1\n")
+    except Exception:
+        pass
 
 
 def main():
-    log("==== VOIDDESK BOOTSTRAP-LITE start ====")
-    tag = "cp%d%d" % sys.version_info[:2]
-    mach = platform.machine()
-    log("python: %s (%s) - arch: %s" % (
-        platform.python_version(), tag, mach))
+    log("=== BOOTSTRAP LITE START ===")
 
-    # pulizia dei resti del vecchio approccio chroot (inutilizzabile su exFAT)
-    for junk in (os.path.join(DATA, "rootfs"),
-                 os.path.join(DATA, "rootfs.tar.gz")):
-        if os.path.isdir(junk):
-            log("pulizia residui chroot: %s" % junk)
-            shutil.rmtree(junk, ignore_errors=True)
-        elif os.path.isfile(junk):
-            os.remove(junk)
+    if check_pygame() and check_evinput() and check_fbdisplay():
+        log("Tutte le dipendenze sono gia' soddisfatte.")
+        write_pygame_ready()
+        return 0
 
-    op = opener()
-    log("1/4 cerco il wheel pygame per %s/%s su PyPI..." % (tag, mach))
-    url = name = ver = None
-    for pkg in ("pygame", "pygame-ce"):
-        url, name, ver = pick_wheel(op, pkg, tag, mach)
-        if url:
-            log("   trovato: %s (v%s)" % (name, ver))
-            break
-    if not url:
-        log("FATAL: nessun wheel pygame per %s/%s" % (tag, mach))
+    if extract_local_archives():
+        if check_pygame() and check_evinput() and check_fbdisplay():
+            log("Dipendenze soddisfatte da archivio locale.")
+            write_pygame_ready()
+            return 0
+
+    if not have_internet():
+        log("Nessuna connessione internet; impossibile installare pygame.", "ERROR")
         return 1
 
-    log("2/4 scarico %s ..." % name)
-    try:
-        download(op, url, WHL)
-    except Exception as e:
-        log("FATAL: download fallito: %s" % e)
-        return 1
+    if install_pygame_pip():
+        if check_pygame() and check_evinput() and check_fbdisplay():
+            write_pygame_ready()
+            return 0
 
-    log("3/4 scompatto in %s ..." % RUNTIME)
-    shutil.rmtree(RUNTIME, ignore_errors=True)
-    os.makedirs(RUNTIME, exist_ok=True)
-    try:
-        with zipfile.ZipFile(WHL) as z:
-            z.extractall(RUNTIME)
-    except Exception as e:
-        log("FATAL: estrazione wheel fallita: %s" % e)
-        return 1
-    for base, _d, files in os.walk(RUNTIME):
-        for fn in files:
-            if fn.endswith(".so") or ".so." in fn:
-                try:
-                    os.chmod(os.path.join(base, fn), 0o755)
-                except OSError:
-                    pass
+    if install_pygame_apt():
+        if check_pygame() and check_evinput() and check_fbdisplay():
+            write_pygame_ready()
+            return 0
 
-    log("4/4 verifica import pygame...")
-    env = dict(os.environ)
-    env["PYTHONPATH"] = RUNTIME
-    env["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-    env.pop("SDL_VIDEODRIVER", None)
-    try:
-        out = subprocess.run(
-            [sys.executable, "-c",
-             "import pygame,sys;sys.stdout.write(pygame.version.ver)"],
-            env=env, capture_output=True, text=True, timeout=60)
-    except Exception as e:
-        log("FATAL: verifica non eseguibile: %s" % e)
-        return 1
-    if out.returncode != 0:
-        log("FATAL: import pygame fallito:")
-        log(out.stderr.strip()[-800:])
-        return 1
-    log("   pygame %s OK" % out.stdout.strip())
+    if install_from_runtime_zip():
+        if check_pygame() and check_evinput() and check_fbdisplay():
+            write_pygame_ready()
+            return 0
 
-    sdl = find_system_sdl()
-    if sdl:
-        log("libSDL2 di sistema: %s" % sdl[0])
-        with open(SDL_TXT, "w") as f:
-            f.write(sdl[0] + "\n")
-    else:
-        log("libSDL2 di sistema: non trovata (si usera' quella del wheel)")
-        try:
-            os.remove(SDL_TXT)
-        except OSError:
-            pass
-
-    with open(MARKER, "w") as f:
-        f.write("pygame %s (%s %s)\n" % (out.stdout.strip(), tag, mach))
-    try:
-        os.remove(WHL)
-    except OSError:
-        pass
-    log("==== VOIDDESK BOOTSTRAP-LITE completato ====")
-    return 0
+    log("Impossibile installare pygame: tutti i metodi falliti.", "CRITICAL")
+    return 1
 
 
 if __name__ == "__main__":

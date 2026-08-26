@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 
 APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,6 +57,33 @@ def sh(cmd, **kw):
     return subprocess.call(cmd, shell=isinstance(cmd, str), **kw)
 
 
+def is_valid_ext4(path):
+    """Controlla se il file sia un filesystem ext4 reale (magic 0xEF53 all'offset 0x438)."""
+    if not os.path.exists(path):
+        return False
+    if os.path.getsize(path) < 0x5000:
+        return False
+    try:
+        with open(path, "rb") as f:
+            f.seek(0x438)
+            magic = f.read(2)
+        return magic == b"\x53\xef"
+    except Exception:
+        return False
+
+
+def create_blank_ext4(path, size_gb=4, label="voidxfce"):
+    """Crea un'immagine ext4 vuota e formattata da zero usando truncate + mkfs.ext4."""
+    log("   creo immagine ext4 vuota (%dGB)..." % size_gb)
+    sh(["truncate", "-s", "%dG" % size_gb, path])
+    if not is_valid_ext4(path):
+        rc = sh(["mkfs.ext4", "-F", "-L", label, path])
+        if rc != 0:
+            log("FATAL: mkfs.ext4 fallito (rc=%d)" % rc)
+            return False
+    return is_valid_ext4(path)
+
+
 mounted = imgmount.is_mounted
 
 
@@ -97,15 +125,26 @@ def main():
     # ---- 0. preflight -------------------------------------------------
     log("0/5 controlli preliminari...")
     img_ok = (os.path.exists(IMG) and os.path.getsize(IMG) > 3e9
-              and os.path.exists(MARKER + ".img"))
+              and os.path.exists(MARKER + ".img")
+              and is_valid_ext4(IMG))
+    # controlla se l'immagine gzip esiste e contiene dati reali
+    IMG_GZ_VALID = False
+    if os.path.exists(IMG_GZ) and os.path.getsize(IMG_GZ) > 100:
+        try:
+            with gzip.open(IMG_GZ, "rb") as f:
+                sample = f.read(2048)
+            IMG_GZ_VALID = len(sample) > 0 and sample != b"\x00" * len(sample)
+        except Exception:
+            IMG_GZ_VALID = False
     need = 1.0 if img_ok else 5.0
     if free_gb(DATA) < need:
         log("FATAL: servono almeno %.0fGB liberi (ora: %.1fGB)"
             % (need, free_gb(DATA)))
         return 1
     if not os.path.exists(IMG_GZ):
-        log("FATAL: manca assets/xfce.img.gz")
-        return 1
+        log("WARN: assets/xfce.img.gz mancante — creo immagine da zero")
+    if not IMG_GZ_VALID:
+        log("WARN: assets/xfce.img.gz non valido — creo immagine da zero")
     rc = subprocess.call(["curl", "-sI", "--max-time", "8",
                           "https://cdimage.ubuntu.com"],
                          stdout=subprocess.DEVNULL,
@@ -116,26 +155,40 @@ def main():
 
     # ---- 1. immagine ext4 ---------------------------------------------
     if os.path.exists(IMG) and os.path.getsize(IMG) > 3e9 \
-            and os.path.exists(MARKER + ".img"):
-        log("1/5 immagine gia' presente, salto")
+            and os.path.exists(MARKER + ".img") \
+            and is_valid_ext4(IMG):
+        log("1/5 immagine gia' presente e valida, salto")
     else:
-        log("1/5 preparo l'immagine ext4 (4GB, alcuni minuti)...")
-        try:
-            with gzip.open(IMG_GZ, "rb") as src, open(IMG, "wb") as dst:
-                done = 0
-                nxt = 0
-                while True:
-                    chunk = src.read(1 << 22)
-                    if not chunk:
-                        break
-                    dst.write(chunk)
-                    done += len(chunk)
-                    if done >= nxt:
-                        log("   %dMB / 4096MB" % (done >> 20))
-                        nxt += 512 << 20
-        except Exception as e:
-            log("FATAL: creazione immagine fallita: %s" % e)
-            return 1
+        log("1/5 preparo l'immagine ext4 (4GB)...")
+        fresh = False
+        if os.path.exists(IMG_GZ):
+            try:
+                log("   estraggo da assets/xfce.img.gz...")
+                with gzip.open(IMG_GZ, "rb") as src, open(IMG, "wb") as dst:
+                    done = 0
+                    nxt = 0
+                    while True:
+                        chunk = src.read(1 << 22)
+                        if not chunk:
+                            break
+                        dst.write(chunk)
+                        done += len(chunk)
+                        if done >= nxt:
+                            log("   %dMB / 4096MB" % (done >> 20))
+                            nxt += 512 << 20
+            except Exception as e:
+                log("   estrazione gzip fallita: %s" % e)
+            if not is_valid_ext4(IMG):
+                log("   assets/xfce.img.gz non e' un filesystem ext4 valido")
+                os.remove(IMG) if os.path.exists(IMG) else None
+                fresh = True
+        else:
+            fresh = True
+        if fresh or not is_valid_ext4(IMG):
+            if os.path.exists(IMG):
+                os.remove(IMG)
+            if not create_blank_ext4(IMG):
+                return 1
         open(MARKER + ".img", "w").close()
 
     log("   monto l'immagine in loopback...")
@@ -209,15 +262,43 @@ def main():
                  "-o Acquire::https::Verify-Peer=false "
                  "-o Acquire::https::Verify-Host=false "
                  "-o Acquire::Retries=2")
-        if sh("chroot '%s' /bin/bash -c '%s apt-get %s update'"
-              % (MNT, env, aptop)) != 0:
-            log("FATAL: apt-get update fallito")
+        # chroot senza init: i postinst non devono provare a lanciare servizi
+        # (dbus, udev...) o dpkg/apt restano bloccati. policy-rc.d = 101
+        # nega l'avvio servizi; dpkg --configure -a ripara installazioni
+        # a metà di un tentativo precedente.
+        prc = MNT + "/usr/sbin/policy-rc.d"
+        try:
+            with open(prc, "w") as f:
+                f.write("#!/bin/sh\nexit 101\n")
+            os.chmod(prc, 0o755)
+        except OSError:
+            pass
+        log("   riparo configurazioni dpkg precedenti...")
+        sh("chroot '%s' /bin/bash -c '%s dpkg --configure -a'"
+           % (MNT, env))
+        log("   apt-get update...")
+        aptlog = open(os.path.join(DATA, "xfce_bootstrap_apt.log"), "a")
+        aptlog.write("\n==== apt-get update %s ====\n" % time.ctime())
+        aptlog.flush()
+        if subprocess.call(["chroot", MNT, "/bin/bash", "-c",
+                            "%s apt-get %s update" % (env, aptop)],
+                           stdout=aptlog, stderr=subprocess.STDOUT) != 0:
+            aptlog.close()
+            log("FATAL: apt-get update fallito (vedi data/xfce_bootstrap_apt.log)")
             return 1
-        if sh("chroot '%s' /bin/bash -c \"%s apt-get %s install -y "
-              "--no-install-recommends %s && apt-get clean\""
-              % (MNT, env, aptop, PKGS)) != 0:
-            log("FATAL: installazione pacchetti fallita")
+        log("   apt-get install XFCE...")
+        aptlog.write("\n==== apt-get install %s ====\n" % time.ctime())
+        aptlog.flush()
+        if subprocess.call(["chroot", MNT, "/bin/bash", "-c",
+                            "%s apt-get %s install -y --no-install-recommends %s"
+                            % (env, aptop, PKGS)],
+                           stdout=aptlog, stderr=subprocess.STDOUT) != 0:
+            aptlog.close()
+            log("FATAL: installazione pacchetti fallita (vedi data/xfce_bootstrap_apt.log)")
             return 1
+        aptlog.close()
+        log("   pulisco cache apt...")
+        sh("chroot '%s' /bin/bash -c '%s apt-get clean'" % (MNT, env))
 
         # ---- 5. verifica ----------------------------------------------
         log("5/5 verifica...")

@@ -122,11 +122,7 @@ def build(profile, cfg, keys):
                 used.append((qj, bname))
         out.append("}")
         return "\n".join(out) + "\n", used
-    skip_mouse = False
     for func, evs in m.items():
-        if skip_mouse and func in ("click_l", "click_r", "click_m",
-                                   "wheel_up", "wheel_dn"):
-            continue
         act = ACT.get(func)
         if not act:
             continue

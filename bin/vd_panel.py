@@ -756,29 +756,6 @@ class Panel(object):
                     # lo fa vd_hotkey dopo aver ripreso Xorg
                     self.result = "ctrlc"
                     self.running = False
-                elif key == "kbdsize":
-                    # questo invece e' solo un file di configurazione,
-                    # nessun client X coinvolto: sicuro farlo qui
-                    try:
-                        cfgp = os.path.join(os.path.dirname(self.mnt),
-                                            "desk_config.json")
-                        cfgd = json.load(open(cfgp))
-                    except Exception:
-                        cfgd = {}
-                    sizes = [170, 230, 300]
-                    cur = cfgd.get("kbd_h", 230)
-                    nxt = sizes[(sizes.index(cur) + 1) % len(sizes)
-                               if cur in sizes else 1]
-                    cfgd["kbd_h"] = nxt
-                    try:
-                        json.dump(cfgd, open(cfgp, "w"))
-                    except Exception:
-                        pass
-                    self.note = (("tastiera: %dpx (si applica alla "
-                                 "prossima apertura)" % nxt) if
-                                 self.lang == "it" else
-                                 ("keyboard: %dpx (applies next time "
-                                 "it opens)" % nxt))
                 elif key == "launch_clitools":
                     self.stack.append("launch_clitools")
                 elif key == "core_tasks":

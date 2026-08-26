@@ -5,6 +5,7 @@
 # uso: xfce_install.py "<etichetta>" "<pacchetti apt>"
 
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -409,7 +410,6 @@ def main():
                 else:
                     subprocess.call(["mount", "-t", typ, src, MNT + dst])
         try:
-            import shutil
             shutil.copy("/etc/resolv.conf", MNT + "/etc/resolv.conf")
         except OSError:
             pass
