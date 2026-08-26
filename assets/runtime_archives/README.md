@@ -1,51 +1,163 @@
-RUNTIME ARCHIVES
-================
+# 📦 RUNTIME ARCHIVES
+**Precompiled dependencies for VoidDesk — zero internet, zero hassle.**
 
-Questa cartella contiene archivi compressi dei runtime precompilati per VoidDesk.
-Se la cartella `runtime/` è assente o danneggiata, il bootstrap estrarrà
-automaticamente il primo archivio qui presente per ripristinare
-le dipendenze senza connessione internet.
+---
 
-Formati supportati
-------------------
+## 📌 Overview
+This folder contains precompiled runtime archives for VoidDesk. 
+On first boot, the bootstrap extracts them automatically into `runtime/`, ensuring all dependencies are ready without any network connection. 
 
-- `.zip`
-- `.tar.gz`
-- `.tgz`
+If these archives are missing or corrupted, the bootstrap falls back to downloading dependencies via `pip`/`apt` or from GitHub releases.
 
-Struttura attesa
-----------------
+---
 
-Ogni archivio può contenere direttamente i package Python (es.
-`pygame-2.6.1.data/`, `pygame/`, `evinput/`, `fbdisplay/`, ecc.) oppure
-una cartella `runtime/` radice. Il bootstrap posiziona automaticamente
-tutto il contenuto in `runtime/`.
+## 📂 Archive Contents
 
-Come usare
-----------
+| Archive File | Description |
+| :--- | :--- |
+| `pygame-2.6.1.data.tar.gz` | Pygame data files & resources |
+| `pygame-2.6.1.dist-info.tar.gz` | Pygame distribution metadata |
+| `pygame.libs.tar.gz` | Pygame compiled libraries (`.so`) |
+| `pygame.tar.gz` | Pygame Python source modules |
 
-1. Inserisci gli archivi in questa cartella (es. `pygame-2.6.1.tar.gz`).
-2. Al prossimo avvio, se `runtime/` manca o è incompleta, il bootstrap
-   estrarrà automaticamente il primo archivio trovato.
+> ✅ **Note:** These four archives provide a complete, self-contained Pygame runtime — no external dependencies required.
 
-Creare un archivio
-------------------
+---
 
-Se hai già un runtime funzionante in `runtime/`, puoi creare un archivio
-manualmente:
+## 📁 Expected Structure
+Each archive may contain either:
+* Direct Python packages (e.g., `pygame/`, `evinput/`, `fbdisplay/`)
+* A root `runtime/` folder containing all packages
 
-    # ZIP
-    cd /path/to/voiddesk
-    zip -r assets/runtime_archives/mio_runtime.zip runtime/
+The bootstrap merges all archives into the `runtime/` directory, preserving the final structure:
 
-    # TAR.GZ
-    cd /path/to/voiddesk
-    tar -czf assets/runtime_archives/mio_runtime.tar.gz runtime/
+```text
+voiddesk/
+├── runtime/
+│   ├── pygame/
+│   ├── pygame.libs/
+│   ├── pygame-2.6.1.data/
+│   ├── pygame-2.6.1.dist-info/
+│   └── ... (other dependencies)
+├── assets/
+│   └── runtime_archives/
+│       ├── pygame-2.6.1.data.tar.gz
+│       ├── pygame-2.6.1.dist-info.tar.gz
+│       ├── pygame.libs.tar.gz
+│       └── pygame.tar.gz
+└── ...
 
-Priorità bootstrap
-------------------
+```
 
-1. Dipendenze già presenti in `runtime/`
-2. Estrazione da `assets/runtime_archives/` (offline)
-3. Installazione via pip/apt (online)
-4. Download runtime precompilato da GitHub (online)
+---
+
+## 🔄 Bootstrap Priority
+
+The bootstrap follows this ordered fallback chain:
+
+1. **`runtime/` already exists and is complete?**
+* → ✅ SKIP — use existing runtime
+
+
+2. **Archives present in `assets/runtime_archives/`?**
+* → ✅ EXTRACT — offline, zero network
+
+
+3. **Internet available?**
+* → ✅ DOWNLOAD — via `pip`/`apt` (system packages)
+
+
+4. **GitHub releases available?**
+* → ✅ DOWNLOAD — prebuilt runtime from GitHub
+
+
+5. **Nothing works?**
+* → ❌ FAIL — show error and exit
+
+
+
+---
+
+## 🛠️ How to Use
+
+### 🔹 For End Users
+
+Nothing to do. The bootstrap handles everything automatically.
+
+### 🔹 For Developers (Creating Archives)
+
+If you have a working `runtime/` directory and want to package it:
+
+**ZIP format**
+
+```bash
+cd /path/to/voiddesk
+zip -r assets/runtime_archives/mycustom_runtime.zip runtime/
+
+```
+
+**TAR.GZ format**
+
+```bash
+cd /path/to/voiddesk
+tar -czf assets/runtime_archives/mycustom_runtime.tar.gz runtime/
+
+```
+
+> ⚠️ **Note:** Archives are extracted in alphabetical order by filename. Name them carefully if dependency order matters (e.g., `00_pygame.tar.gz`).
+
+---
+
+## 🧪 Verification
+
+After extraction, you can verify the runtime:
+
+```bash
+ls -la runtime/
+python3 -c "import pygame; print(pygame.version.ver)"
+
+```
+
+**Expected output:** `2.6.1` (or your installed version).
+
+---
+
+## 🐛 Troubleshooting
+
+| Symptom | Possible Cause | Solution |
+| --- | --- | --- |
+| **ModuleNotFoundError: No module named 'pygame'** | Runtime not extracted | Check `assets/runtime_archives/` exists and contains archives |
+| **`runtime/` exists but import fails** | Corrupted extraction | Delete `runtime/` and restart VoidDesk |
+| **Archives present but not extracted** | Permission issues | Check write permissions on `runtime/` directory |
+| **Network fallback fails** | No internet or pip missing | Manually install dependencies via `pip install pygame` |
+
+---
+
+## 📊 Archive Size Comparison
+
+| Format | Size (approx) | Speed |
+| --- | --- | --- |
+| **.zip** | 15–20 MB | Fast extraction |
+| **.tar.gz** | 12–18 MB | Slower extraction, smaller size |
+| **.tgz** | 12–18 MB | Same as `.tar.gz` |
+
+> 💡 **Recommendation:** Use `.tar.gz` for smaller package size, `.zip` for faster extraction on low-power devices.
+
+---
+
+## 🔗 Related Resources
+
+* [VoidDesk GitHub Repository](https://www.google.com/search?q=%23)
+* [Pygame Documentation](https://www.google.com/search?q=https://www.pygame.org/docs/)
+* [muOS Firmware](https://www.google.com/search?q=%23)
+
+---
+
+## 📝 License
+
+This runtime packaging is part of the VoidDesk project.
+All third-party libraries (Pygame, etc.) retain their original licenses.
+
+*Last updated: 2026-08-26 — SPDW Factory 🚀*
+
+```
