@@ -173,20 +173,39 @@ import calendar as calmod
 import collections
 import datetime as dtmod
 import ftplib
+import gzip
+import hashlib
+import importlib.util
+import io
+import json
 import random
 import re
+import shutil
+import ssl
 import subprocess
 import sys
 import threading
 import time
+import traceback
+import gc
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+DESK_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Add BOTH directories to sys.path:
+# - APP_DIR for finding the 'desk' package (from desk.hubs import ...)
+# - DESK_DIR for finding local modules (import evinput, jsmap, etc.)
+sys.path.insert(0, DESK_DIR)   # Local modules first
+sys.path.insert(0, APP_DIR)    # Then package parent directory
 
 import pygame          # noqa: E402
+pygame.font.init()
 import evinput         # noqa: E402
 import fbdisplay       # noqa: E402
 import icons           # noqa: E402
@@ -200,6 +219,19 @@ import intro           # noqa: E402
 import jsmap           # noqa: E402
 import shell           # noqa: E402
 import sysinfo         # noqa: E402
+
+from desk.hubs import (ForgeHub, UplinkHub, MediaHub, WorkshopHub,
+                         ToolboxHub, MappsHub, SettingsHub, InfoHub,
+                         ShutdownHub, ControllerHub, GamesHub, DevelopHub,
+                         CommunityHub, OuterdeskHub, LegacyHub)
+from desk.nexus import NexusRenderer
+from desk.const import OUTERDESK_APPS, OUTERDESK_COLOR, OUTER_PANEL_BG, OUTER_PANEL_BORDER, OUTER_PANEL_ACCENT, OUTER_PANEL_TEXT, OUTER_PANEL_DIM, DATA, NEXUS_NODE_SOUND, LOG, LOGS_DIR, RUNTIME_DIR, NEXUS_BG_DEFAULTS, HUBS
+from desk.ui import draw_cyber_quadrant
+from desk.utils.cache import get_texture_cache
+from desk.utils.performance import DirtyRectRenderer, get_free_memory_mb, is_low_memory, memory_guard
+from desk.header import draw_header
+from desk.volume_overlay import VolumeOverlay
+from desk.logging_system import LoggerManager, LogRegistry, LogLevel, LogArchiver
 
 
 # --- [B1] Screen Dimensions & Base Colors ---
@@ -235,6 +267,17 @@ ACCENTS = {
     "verde":   (112, 224, 122),
     "acciaio": (208, 214, 210),
 }
+
+
+NETPROBE_DEFAULTS = {
+    "slide_speed": 0.02,
+    "icon_rotation_speed": 0.03,
+    "neon_intensity": 1.0,
+    "ambient_sounds": True,
+    "scanlines": True,
+    "machines": True,
+}
+
 
 
 def theme_secondary(accent):
@@ -279,74 +322,6 @@ MUOS_TASK_ROOTS = os.environ.get(
 # v6.0: architettura a sezioni. Ogni hub e' dati puri: un solo gestore.
 # kind: push=apre stato, act=azione, cycle=valore ciclico, info=schermata info
 # --------------------------------------------------------------------------
-
-# --- [C1] HUBS Definition (FORGE, UPLINK, MEDIA, WORKSHOP, TOOLBOX, INFO, SETTINGS) ---
-HUBS = {
- "forge": ("forge", "h_forge", [
-    ("installer", "pkg",     "f_inst",  "f_inst_s",  "act"),
-    ("autostart", "start",   "f_auto",  "f_auto_s",  "act"),
-    ("update",    "download","f_upd",   "f_upd_s",   "act"),
-    ("vdupdate",  "forge",   "f_vdupd", "f_vdupd_s", "push"),
-    ("clitools",  "terminal","f_cli",   "f_cli_s",   "push"),
- ]),
- "workshop": ("workshop", "h_work", [
-    ("stats",   "task",    "w_stats", "w_stats_s", "act"),
-    ("diag",    "gear",    "w_diag",  "w_diag_s",  "act"),
-    ("monitor", "task",    "t_mon",   "t_mon_s",   "push"),
-    ("storage", "storage", "w_sto",   "w_sto_s",   "act"),
-    ("boost",   "gauge",   "w_boost", "w_boost_s", "push"),
-    ("chd",     "disk",    "w_chd",   "w_chd_s",   "push"),
-    ("doppel",  "shield",  "w_dop",   "w_dop_s",   "push"),
-    ("clean",   "trash",   "w_clean", "w_clean_s", "act"),
-    ("logs",    "doc",     "w_logs",  "w_logs_s",  "push"),
-    ("backup",  "archive", "w_bak",   "w_bak_s",   "push"),
- ]),
- "uplink": ("uplink", "h_up", [
-    ("wifi",    "wifi",    "u_wifi",  "u_wifi_s",  "push"),
-    ("hotspot", "uplink",  "u_hot",   "u_hot_s",   "push"),
-    ("bt",      "bt",      "u_bt",    "u_bt_s",    "push"),
-    ("pcup",    "monitor", "u_pcup",  "u_pcup_s",  "push"),
-    ("basestation", "remote", "u_base", "u_base_s", "push"),
-    ("ctrlhub", "keyboard","u_cthub", "u_cthub_s", "push"),
-    ("tsgui",   "uplink",  "u_ts",    "u_ts_s",    "act"),
-    ("netdiag", "globe",   "u_netdiag", "u_netdiag_s", "act"),
-    ("dlang",   "lang",    "u_dlang", "u_dlang_s", "cycle"),
- ]),
- "ctrlhub": ("keyboard", "h_cthub", [
-    ("kbdmb",   "keyboard","u_kmb",   "u_kmb_s",   "cycle"),
-    ("kbdx",    "keyboard","u_kx",    "u_kx_s",    "cycle"),
-    ("ctrl",    "gamepad", "u_ctrl",  "u_ctrl_s",  "cycle"),
-    ("map",     "gamepad", "u_map",   "u_map_s",   "push"),
-    ("devices", "keyboard","u_devs",  "u_devs_s",  "act"),
- ]),
- "mediahub": ("speaker", "h_media", [
-    ("radio",    "speaker", "m_radio", "m_radio_s", "push"),
-    ("voidcast", "video",   "m_iptv",  "m_iptv_s",  "act"),
-    ("library",  "folder",  "m_lib",   "m_lib_s",   "act"),
-    ("bgmnorm",  "music",   "m_bgm",   "m_bgm_s",   "act"),
- ]),
- "toolbox": ("toolbox", "h_tool", [
-    ("calc",    "calc",    "t_calc",  "t_calc_s",  "push"),
-    ("clockmain", "clock", "t_clock", "t_clock_s", "push"),
-    ("cal",     "clock",   "t_cal",   "t_cal_s",   "push"),
-    ("notes",   "text",    "t_note",  "t_note_s",  "push"),
-    ("fileman", "folder",  "t_fm",    "t_fm_s",    "act"),
-    ("ftp",     "download","t_ftp",   "t_ftp_s",   "act"),
-    ("sync",    "remote",  "t_sync",  "t_sync_s",  "act"),
-    ("shell",   "terminal","t_sh",    "t_sh_s",    "act"),
-    ("pyrepl",  "terminal","t_py",    "t_py_s",    "push"),
-    ("editor",  "text",    "t_ed",    "t_ed_s",    "act"),
-    ("rss",     "globe",   "t_rss",   "t_rss_s",   "push"),
-    ("weather", "w_partly","t_wx",    "t_wx_s",    "push"),
- ]),
- "infohub": ("book", "h_info", [
-    ("about",   "info",    "i_about", "i_about_s", "act"),
-    ("manual",  "book",    "i_man",   "i_man_s",   "push"),
-    ("guide",   "gamepad", "i_guide", "i_guide_s", "act"),
-    ("manifesto", "terminal", "i_manifesto", "i_manifesto_s", "act"),
-    ("voidupdate", "gear", "i_update", "i_update_s", "act"),
- ]),
-}
 
 # --- [C2] CYCLES (User-togglable Settings) ---
 CYCLES = {
@@ -394,14 +369,14 @@ DEFAULT_HOME_STYLE = "nexus"  # v10.0.0 "Nexus": vista di default del menu
 # chiave di traduzione "h_exit" che esisteva gia' nel dizionario ma
 # non era mai stata agganciata a nulla.
 NEXUS_RING_INNER = [0]                    # START SESSION
-NEXUS_RING_MID = [3, 5, 2, 6]              # FORGE, UPLINK, MEDIA, WORKSHOP
-NEXUS_RING_OUT = [4, 1, 7, 8]              # TOOLBOX, MUOS APPS, SYSTEM,
-                                           # INFO
+NEXUS_RING_MID = [3, 5, 2, 6, 10, 11]      # FORGE, UPLINK, MEDIA, WORKSHOP, GAMES, DEVELOP
+NEXUS_RING_OUT = [4, 1, 7, 8, 12, 13]      # TOOLBOX, MUOS APPS, SYSTEM, INFO, COMMUNITY, OUTERDESK
 # v10.6: END NODE (SHUTDOWN) non e' piu' un nodo eccentrico
 # sull'anello esterno -- ha una quarta orbita tutta sua, la piu'
 # lontana di tutte: il gesto di chiudere la sessione merita un
 # distacco vero dal resto del planetario, non solo un offset.
 NEXUS_RING_FAR = [9]                       # SHUTDOWN / END NODE, da solo
+NEXUS_RING_VOID = [14]                      # QUARTA ORBITA — LEGACY (chiusura)
 NEXUS_NODE_COLOR = {
     0: (255, 205, 120),    # START SESSION -- bianco/ambra
     3: (240, 90, 60),      # FORGE -- rosso/ambra
@@ -413,13 +388,85 @@ NEXUS_NODE_COLOR = {
     4: (95, 210, 140),     # TOOLBOX -- verde/acciaio
     1: (225, 225, 235),    # MUOS APPS -- bianco/argento
     7: (100, 130, 210),    # SETTINGS ("SYSTEM") -- blu scuro/grigio
-    8: (150, 160, 180),    # INFO & ABOUT
-    9: (215, 80, 35),      # SHUTDOWN -- rosso scuro/arancione
+     8: (150, 160, 180),    # INFO & ABOUT
+     9: (215, 80, 35),      # SHUTDOWN -- rosso scuro/arancione
+     10: (255, 180, 50),    # GAMES — oro/ambra
+     11: (60, 230, 200),    # DEVELOP — turchese
+     12: (200, 150, 255),   # COMMUNITY — lavanda
+     13: (255, 120, 160),   # OUTERDESK — rosa/cielo
+     14: (80, 80, 90),      # LEGACY — grigio scuro (chiusura)
+ }
+# v10.7: colore primario dedicato per il menu (e sottomenu) di THE
+# FORGE -- stesso rosso identitario del nodo FORGE nel Nexus, non
+# piu' agganciato al tema globale self.accent.
+FORGE_ACCENT = NEXUS_NODE_COLOR[3]
+# stesso trattamento per UPLINK -- ciano identitario del nodo nel
+# Nexus, usato in tutta la sua sotto-sezione (pannelli sync/ftp,
+# wifi/bt/hotspot/pcup/basestation e lista deviceremapper/wiredcontroller).
+UPLINK_ACCENT = NEXUS_NODE_COLOR[5]
+
+# v10.14: accent mapping per hub — colore identitario del nodo Nexus
+# usato in header, selezione e icone di tutti gli hub. Gli hub non
+# elencati (forge, toolbox, uplinK, etc.) usano self.accent.
+_HUB_ACCENTS = {
+    "ctrlhub":  UPLINK_ACCENT,
+    "infohub":  NEXUS_NODE_COLOR[8],
+    "games":    NEXUS_NODE_COLOR[10],
+    "develop":  NEXUS_NODE_COLOR[11],
+    "community": NEXUS_NODE_COLOR[12],
+    "outerdesk": NEXUS_NODE_COLOR[13],
+    "legacy":   NEXUS_NODE_COLOR[14],
 }
+
+# v10.14: badge key (asset in assets/logos/) per hub — mostrata
+# dopo l'icona vettoriale quando l'asset esiste. Gli hub non elencati
+# non mostrano alcuna badge.
+_HUB_BADGES = {
+    "games": "games",
+    "develop": "develop",
+    "community": "community",
+    "outerdesk": "outerdesk",
+    "legacy": "legacy",
+}
+
+MEDIA_VAULT_COLORS = {
+    "radio": (80, 220, 200),
+    "voidcast": (218, 68, 96),
+    "library": (105, 155, 245),
+    "bgmnorm": (245, 185, 64),
+}
+
+MEDIA_VAULT_SHORT_DESC = {
+    "radio": {"it": "Intercetta frequenze radio dal VOID.", "en": "Tune into radio frequencies from the VOID."},
+    "voidcast": {"it": "Streaming TV e IPTV dal VOID.", "en": "TV and IPTV streaming from the VOID."},
+    "library": {"it": "Esplora la tua collezione multimediale.", "en": "Browse your media collection."},
+    "bgmnorm": {"it": "Normalizza il volume delle tracce BGM.", "en": "Normalize BGM track volume."},
+}
+
+MEDIA_VAULT_BADGE_KEYS = {
+    "radio": "void_radio",
+    "voidcast": "void_cast",
+    "library": "media_lib",
+    "bgmnorm": "bgm_norm",
+}
+
 NEXUS_NODE_CODE = {
     0: "RAIL-00", 3: "RAIL-01α", 5: "RAIL-01β", 2: "RAIL-01γ",
     6: "RAIL-01δ", 4: "RAIL-02α", 1: "RAIL-02β", 7: "RAIL-02γ",
     8: "RAIL-02δ", 9: "RAIL-999",
+    10: "RAIL-01ε", 11: "RAIL-01ζ",
+    12: "RAIL-02ε", 13: "RAIL-02ζ",
+    14: "RAIL-000",
+}
+# v10.7: targhetta propria (assets/logos/) per la scheda nodo del
+# Nexus -- solo i nodi per cui l'asset esiste; gli altri restano con
+# icona+nome come prima (vedi _nexus_side_panels).
+NEXUS_NODE_BADGE = {
+    0: "start", 1: "muosapps", 2: "media", 3: "forge",
+    4: "rttoolbox", 5: "uplink", 6: "workshop",
+    7: "gear", 8: "book", 9: "power",
+    10: "games", 11: "develop", 12: "community",
+    13: "outerdesk", 14: "legacy",
 }
 # v10.3: illustrazioni SPDW per i nodi Nexus, una per icon_key
 # (stessa chiave di self.menu_icons / icons.draw). File in
@@ -431,7 +478,175 @@ NEXUS_PLANET_FILES = {
     "toolbox": "rt_toolbox.png", "uplink": "net_sphere.png",
     "workshop": "workshop.png", "gear": "settings.png",
     "book": "info.png", "power": "end.png",
+    "games": "games.png", "develop": "develop.png",
+    "community": "community.png", "outerdesk": "outerdesk.png",
+    "legacy": "legacy.png",
 }
+# v10.7: targhette/loghi SPDW (assets/logos/) -- badge pronti che
+# sostituiscono icona+scritta ovunque serva (header, targhetta
+# Nexus, tile del toolbox). Se un file manca si torna al vecchio
+# icona+testo, stesso pattern di NEXUS_PLANET_FILES: mai un crash,
+# solo meno bello finche' non arriva l'asset.
+BADGE_FILES = {
+    "start": "r00_start_session.png", "forge": "r01a_forge.png",
+    "uplink": "r01b_uplink.png", "media": "media_vault.png",
+    "workshop": "workshop.png", "muosapps": "r02b_muos_apps.png",
+    "rttoolbox": "r02a_rttoolbox.png", "gear": "settings.png",
+    "book": "info.png", "power": "end.png",
+    "calc": "calc.png", "clock": "clock.png", "notes": "notes.png",
+    "cal": "calendar.png", "officert": "officert.png",
+    "spdw": "spdw_factory.png", "disc_crusher": "disc_crusher.png",
+    "file_grid_diver": "file_grid_diver.png",
+    "void_radio": "void_radio.png", "void_cast": "void_cast.png",
+    "media_lib": "media_lib.png", "bgm_norm": "bgm_norm.png",
+    "cursedev": "cursedev.png", "info": "info.png",
+    "manual": "manual.png", "manifesto": "manifest.png",
+    "guide": "guide.png", "vd_update": "vd_update.png",
+    "games": "games.png", "develop": "develop.png",
+    "community": "community.png", "outerdesk": "outerdesk.png",
+    "legacy": "legacy.png",
+}
+
+MEDIA_VAULT_BADGES = {
+    "radio": "void_radio", "voidcast": "void_cast",
+    "library": "media_lib", "bgmnorm": "bgm_norm",
+}
+
+CURSEDEV_CATEGORIES = {
+    "general": {
+        "name": {"it": "Generali", "en": "General"},
+        "desc": {"it": "Impostazioni generali di sistema", "en": "General system settings"},
+        "icon": "gear",
+        "items": [
+            {"key": "sfx", "label": {"it": "Suoni UI", "en": "UI Sounds"}, "type": "bool", "default": True},
+            {"key": "font_scale", "label": {"it": "Dimensione testo", "en": "Text Size"}, "type": "cycle", "values": ["piccolo", "normale", "grande", "molto grande"], "default": "normale"},
+            {"key": "intro", "label": {"it": "Sigla d'avvio", "en": "Boot Animation"}, "type": "bool", "default": True},
+        ]
+    },
+    "nexus": {
+        "name": {"it": "Nexus", "en": "Nexus"},
+        "desc": {"it": "Aspetto e comportamento del planetario", "en": "Planetarium appearance and behavior"},
+        "icon": "start",
+        "items": [
+            {"key": "nexus_logo_scale", "label": {"it": "Scala logo", "en": "Logo Scale"}, "type": "float", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
+            {"key": "nexus_orbit_distance", "label": {"it": "Distanza orbite", "en": "Orbit Distance"}, "type": "float", "min": 0.8, "max": 1.5, "step": 0.05, "default": 1.0},
+            {"key": "nexus_orbit_tilt", "label": {"it": "Inclinazione orbite", "en": "Orbit Tilt"}, "type": "float", "min": 0.0, "max": 45.0, "step": 1.0, "default": 0.0},
+            {"key": "nexus_node_glow", "label": {"it": "Bagliore nodi", "en": "Node Glow"}, "type": "float", "min": 0.0, "max": 2.0, "step": 0.1, "default": 1.0},
+        ]
+    },
+    "sfx": {
+        "name": {"it": "Suoni", "en": "Sounds"},
+        "desc": {"it": "Personalizzazione dei suoni", "en": "Sound customization"},
+        "icon": "speaker",
+        "items": [
+            {"key": "nexus_sound", "label": {"it": "Suono navigazione Nexus", "en": "Nexus navigation sound"}, "type": "cycle", "values": ["dpad_nexus", "nexus_select", "click", "snap"], "default": "dpad_nexus"},
+            {"key": "orbital_sound", "label": {"it": "Suono cambio orbita", "en": "Orbital switch sound"}, "type": "cycle", "values": ["nexus_switch", "open", "charge"], "default": "nexus_switch"},
+        ]
+    },
+    "vfx": {
+        "name": {"it": "Effetti Visivi", "en": "Visual Effects"},
+        "desc": {"it": "Effetti e interferenze video", "en": "Video effects and interference"},
+        "icon": "shield",
+        "items": [
+            {"key": "vfx_bg", "label": {"it": "Sfondo animato", "en": "Animated Background"}, "type": "range", "min": 0, "max": 5, "step": 1, "default": 3},
+            {"key": "vfx_trans", "label": {"it": "Transizioni", "en": "Transitions"}, "type": "range", "min": 0, "max": 5, "step": 1, "default": 3},
+            {"key": "vfx_fx", "label": {"it": "Effetti schermo", "en": "Screen Effects"}, "type": "range", "min": 0, "max": 5, "step": 1, "default": 3},
+            {"key": "glitch_fx", "label": {"it": "Glitch aggiuntivi", "en": "Extra Glitch"}, "type": "bool", "default": False},
+        ]
+    },
+    "details": {
+        "name": {"it": "Dettagli", "en": "Details"},
+        "desc": {"it": "Informazioni tecniche e debug", "en": "Technical info and debug"},
+        "icon": "info",
+        "items": [
+            {"key": "show_fps", "label": {"it": "Mostra FPS", "en": "Show FPS"}, "type": "bool", "default": False},
+            {"key": "debug_log", "label": {"it": "Log dettagliato", "en": "Detailed Log"}, "type": "bool", "default": False},
+            {"key": "cpu_governor", "label": {"it": "Governor CPU", "en": "CPU Governor"}, "type": "cycle", "values": ["default", "performance", "ondemand", "powersave"], "default": "default"},
+        ]
+    },
+    "user": {
+        "name": {"it": "Utente", "en": "User"},
+        "desc": {"it": "Impostazioni personali", "en": "Personal settings"},
+        "icon": "access",
+        "items": [
+            {"key": "termid_name", "label": {"it": "Nome operatore", "en": "Operator Name"}, "type": "text", "default": "SPDW-07"},
+            {"key": "termid_id", "label": {"it": "Terminal ID", "en": "Terminal ID"}, "type": "text", "default": ""},
+             {"key": "lang", "label": {"it": "Lingua", "en": "Language"}, "type": "cycle", "values": ["it", "en"], "default": "it"},
+         ]
+     },
+     # ===== NUOVO: RADIX VERITAS ===== 
+      "radix": {
+          "name": {"it": "RADIX VERITAS", "en": "RADIX VERITAS"},
+          "desc": {"it": "Editor avanzato del planetario Nexus", "en": "Advanced Nexus planetarium editor"},
+          "icon": "start",
+          "items": [
+              {
+                  "key": "radix_editor",
+                  "label": {"it": "Apri Editor", "en": "Open Editor"},
+                  "type": "action",
+                  "action": "launch_radix"
+              }
+          ]
+      },
+      "zenoh": {
+          "name": {"it": "ZENOH", "en": "ZENOH"},
+          "desc": {"it": "Schema del Nexus: orbite, hub e satelliti", "en": "Nexus schematic: orbits, hubs and satellites"},
+          "icon": "start",
+          "items": [
+              {"key": "zenoh_schema", "label": {"it": "APRI SCHEMA", "en": "OPEN SCHEMATIC"}, "type": "action", "action": "zenoh_schema"}
+          ]
+      },
+      "void_space": {
+          "name": {"it": "VOID SPACE", "en": "VOID SPACE"},
+          "desc": {"it": "Elementi aggiuntivi dell'universo", "en": "Additional universe elements"},
+          "icon": "starfield",
+          "items": [
+              {"key": "void_stars", "label": {"it": "Stelle di sfondo", "en": "Background stars"}, "type": "bool", "default": True},
+              {"key": "void_comets", "label": {"it": "Comete", "en": "Comets"}, "type": "bool", "default": True},
+              {"key": "void_nebula", "label": {"it": "Nebulosa", "en": "Nebula"}, "type": "bool", "default": True},
+              {"key": "void_trails", "label": {"it": "Trail orbitali", "en": "Orbital trails"}, "type": "bool", "default": True},
+              {"key": "void_gravity", "label": {"it": "Attrazione gravitazionale", "en": "Gravity well"}, "type": "bool", "default": True},
+               {"key": "void_glitch", "label": {"it": "Glitch extra", "en": "Extra glitch"}, "type": "bool", "default": False},
+          ]
+      },
+      "panels": {
+          "name": {"it": "Panels", "en": "Panels"},
+          "desc": {"it": "Personalizzazione dei pannelli di controllo", "en": "Panel customization"},
+          "icon": "panel",
+          "items": [
+              {
+                  "key": "media_panel",
+                  "label": {"it": "Media Panel", "en": "Media Panel"},
+                  "type": "submenu",
+                  "submenu": "media_panel_config"
+              },
+              {
+                  "key": "mecha_panel",
+                  "label": {"it": "Mecha Panel", "en": "Mecha Panel"},
+                  "type": "submenu",
+                  "submenu": "mecha_panel_config"
+              },
+              {
+                  "key": "outer_panel",
+                  "label": {"it": "Outer Panel", "en": "Outer Panel"},
+                  "type": "submenu",
+                  "submenu": "outer_panel_config"
+              },
+              {
+                  "key": "terminal_id",
+                  "label": {"it": "Terminal ID", "en": "Terminal ID"},
+                  "type": "submenu",
+                  "submenu": "termid"
+              },
+              {
+                  "key": "netsphere_monitor",
+                  "label": {"it": "NetSphere Monitor", "en": "NetSphere Monitor"},
+                  "type": "submenu",
+                  "submenu": "netprobe"
+              },
+          ]
+      }
+  }
 
 # --- [C4] Home Styles & Clock Layouts ---
 # fattore di schiacciamento verticale delle orbite per l'inquadratura
@@ -449,27 +664,34 @@ NEXUS_SQUASH = 0.46
 # NEXUS_FAR_TILT) e non sono mai parallele fra loro -- pianeti su
 # piani diversi, mai un disco piatto unico.
 NEXUS_SELECT_ZONE = (155, 235)
+# v10.8: vista satellite (R1 su un nodo che ne ha uno, es. TOOLBOX) --
+# stessa scena del planetario ma ri-ancorata a destra e ingrandita,
+# invece che nella normale zona di selezione a sinistra.
+NEXUS_SAT_ANCHOR = (W - 112, H // 2 + 18)
+NEXUS_SAT_ZOOM_MULT = 2.6
 # v10.6: orbite ridistanziate ulteriormente (era 145/235) e nuova
 # terza orbita, la piu' lontana di tutte, riservata a END NODE.
-NEXUS_RING_RADIUS = {1: 155, 2: 270, 3: 350}
+NEXUS_RING_RADIUS = {1: 155, 2: 270, 3: 350, 4: 420}
 NEXUS_OUTER_TILT = 18
 NEXUS_FAR_TILT = -32     # v10.6: END NODE inclinato in senso opposto
                          # all'esterna -- un piano tutto suo, non solo
                          # piu' lontano ma visibilmente storto
-NEXUS_ORBIT_SPEED = {1: 7.0, 2: 3.0, 3: 1.3}     # piu' lontano, piu' lento
+NEXUS_ORBIT_SPEED = {1: 7.0, 2: 3.0, 3: 1.3, 4: 0.5}     # piu' lontano, piu' lento
 NEXUS_NODE_R = {
     # orbita media (RAIL-01): RAIL-01 MEDIA e' il pianeta piu'
     # grande dell'orbita, WORKSHOP il piu' piccolo, UPLINK a meta'
     # strada fra i due, FORGE un filo sotto UPLINK
-    3: 18, 5: 21, 2: 26, 6: 13,
-    4: 15, 1: 14, 7: 13, 8: 13,              # orbita esterna
+    3: 18, 5: 21, 2: 26, 6: 13, 10: 16, 11: 14,
+    4: 15, 1: 14, 7: 13, 8: 13, 12: 12, 13: 16,      # orbita esterna
     9: 6,                                    # END NODE: minuscolo, isolato
+    14: 5,                                   # LEGACY: ancora piu' piccolo
 }
 NEXUS_ZOOM = {                               # v10: zoom aumentato su tutti i nodi
     0: 0.95,                                 # sole: zoom fuori un filo
-    3: 1.28, 5: 1.05, 6: 1.75, 2: 1.02,      # orbita media
-    4: 1.45, 1: 1.50, 7: 1.55, 8: 1.55,      # orbita esterna, piu' piccoli
+    3: 1.28, 5: 1.05, 6: 1.75, 2: 1.02, 10: 1.30, 11: 1.20,  # orbita media
+    4: 1.45, 1: 1.50, 7: 1.55, 8: 1.55, 12: 1.60, 13: 1.40,  # orbita esterna
     9: 2.10,                                 # END NODE: zoom deciso, e' minuscolo
+    14: 3.50,                                # LEGACY: zoom enorme, e' minuscolo
 }
 # v10.6: decori orbitali sui pianeti di RAIL-01 -- non solo sfere
 # colorate, ognuno si porta dietro qualcosa che gli orbita attorno.
@@ -480,10 +702,14 @@ NEXUS_ZOOM = {                               # v10: zoom aumentato su tutti i no
 # intero). Formato: idx -> (kind, inclinazione_gradi, n.fasce,
 # tratteggiato).
 NEXUS_NODE_DECO = {
-    3: ("dust", -32, 1, False),   # THE FORGE: anello di detriti, diagonale
-    2: ("dust", 24, 2, False),    # RAIL-01 MEDIA: doppio anello, il piu' vistoso
-    5: ("signal", -14, 1, True),  # UPLINK: anello a impulsi, non polvere
-    6: ("moonlet", 0, 0, False),  # WORKSHOP: piccola luna al posto dell'anello
+    4: ("moonlet", 0, 0, False),   # TOOLBOX: sola luna
+}
+# v10.8: satelliti selezionabili con R1 da un nodo del Nexus -- indice
+# romano, nome, stato-schermata su cui naviga la A. idx -> lista di
+# (numero_romano, nome, stato).
+NEXUS_SATELLITES = {
+     4: [("I", "Outer-Desk", "outerdesk", "remote"),
+         ("II", "Deep VOID DESK", "deepvoiddesk", "cube")],
 }
 NOTIF_KINDS = {
     # tipo: (colore, icona, etichetta_it, etichetta_en)
@@ -556,6 +782,28 @@ RADIO_URL_MIGRATIONS = {
     "https://live.rstream.me/virginradio.mp3":
         "http://icecast.unitedradio.it/Virgin.mp3",
 }
+# Radio Browser API endpoints
+RADIO_BROWSER_BASE = "https://de1.api.radio-browser.info/json"
+RADIO_BROWSER_SEARCH = f"{RADIO_BROWSER_BASE}/stations/search"
+RADIO_BROWSER_COUNTRIES = f"{RADIO_BROWSER_BASE}/countries"
+RADIO_BROWSER_LANGUAGES = f"{RADIO_BROWSER_BASE}/languages"
+RADIO_BROWSER_TAGS = f"{RADIO_BROWSER_BASE}/tags"
+RADIO_CACHE_FILE = os.path.join(DATA, "radio_cache.json")
+RADIO_CACHE_EXPIRY = 86400
+RADIO_M3U_PLAYLISTS = [
+    {"name": "World (iptv-org)",
+     "url": "https://iptv-org.github.io/iptv/index.m3u"},
+    {"name": "Italy (iptv-org)",
+     "url": "https://iptv-org.github.io/iptv/countries/it.m3u"},
+    {"name": "News",
+     "url": "https://iptv-org.github.io/iptv/categories/news.m3u"},
+    {"name": "Music",
+     "url": "https://iptv-org.github.io/iptv/categories/music.m3u"},
+    {"name": "Movies",
+     "url": "https://iptv-org.github.io/iptv/categories/movies.m3u"},
+    {"name": "Sports",
+     "url": "https://iptv-org.github.io/iptv/categories/sports.m3u"},
+]
 CTRL_EXCLUDE_NAMES = ["gpio", "joypad", "power button",
                       "adc joystick", "axp2202", "muos-keys",
                       "direct-keys", "dierct-keys"]
@@ -641,13 +889,39 @@ SHUTDOWN_OPTS = [
     ("poweroff", (220, 60, 55), "power"),
     ("cancel", (150, 150, 155), "info"),
 ]
+# v10.9: selezione di END NODE nel planetario Nexus -- niente hub
+# normale: il pianeta stesso si illumina di una luce instabile e
+# inquietante (pulsa tra viola e verde tossico, mai ferma su un
+# colore solo) e sale al centro in alto mentre lo schermo si
+# scurisce, restando lui l'unica cosa ben visibile. Sotto di lui un
+# raggio della stessa luce illumina, una alla volta, le stesse 4
+# azioni di SHUTDOWN_OPTS (esclusa "cancel", che resta sul tasto B
+# come ovunque nell'app) disposte in un piccolo carosello che gira
+# con SU/GIU'. idx -> (chiave per shutdown_exec, icona, nome IT,
+# nome EN, descrizione IT, descrizione EN).
+ENDNODE_EERIE_A = (150, 20, 170)   # viola velenoso
+ENDNODE_EERIE_B = (35, 205, 95)    # verde tossico -- pulsa tra i due
+ENDNODE_ITEMS = [
+    ("close", "monitor", "LOG OUT", "LOG OUT",
+     "Termina sessione corrente di Void-Desk.",
+     "Ends the current Void-Desk session."),
+    ("restart_app", "gear", "RESTART", "RESTART",
+     "Riavvia l'applicazione Void-Desk.",
+     "Restarts the Void-Desk application."),
+    ("poweroff", "power", "SHUTDOWN", "SHUTDOWN",
+     "Spegne completamente il dispositivo.",
+     "Powers off the device completely."),
+    ("reboot", "gauge", "REBOOT", "REBOOT",
+     "Riavvia il sistema del dispositivo.",
+     "Reboots the device's system."),
+]
 BGM_EXTS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma",
            ".opus", ".mp4", ".webm"}
 MEDIA_EXTS = BGM_EXTS | {".mkv", ".avi", ".mov", ".m3u", ".m3u8"}
 BGM_SAMPLE_RATE = 44100
 BGM_OGG_QUALITY = "6"
-VERSION = "10.2.1"
-VERSION_CODENAME = "Nexus"
+VERSION = "10.5.0"
+VERSION_CODENAME = "D.N"
 MENU_DEST_COLORS = [
     (60, 200, 130),   # 0 START SESSION -- verde, avvio
     (230, 190, 50),   # 1 MUOS APPS -- giallo mustard, coerente col brand
@@ -659,6 +933,11 @@ MENU_DEST_COLORS = [
     (195, 180, 155),  # 7 SETTINGS -- beige caldo, neutro
     (215, 215, 225),  # 8 INFO & ABOUT -- argento
     (210, 75, 35),    # 9 SHUTDOWN -- rosso scuro/arancione
+    (255, 180, 50),   # 10 GAMES -- oro/ambra
+    (60, 230, 200),   # 11 DEVELOP — turchese
+    (200, 150, 255),  # 12 COMMUNITY — lavanda
+    (255, 120, 160),  # 13 OUTERDESK — rosa/cielo
+    (80, 80, 90),     # 14 LEGACY — grigio scuro
 ]
 # Ogni universo entra con un accento sonoro differente. Non e' solo un
 # click: il suono anticipa il carattere del luogo prima del suo bootanim.
@@ -672,8 +951,14 @@ TOOLBOX_GROUPS = [
     ("PRODUTTIVITA'", "PRODUCTIVITY", "calc", 4, "grid2"),
     ("RETE E FILE", "NETWORK & FILES", "folder", 3, "row3"),
     ("SVILUPPO", "DEVELOPMENT", "terminal", 3, "row3"),
-    ("INFORMAZIONE", "INFORMATION", "globe", 2, "row2"),
 ]
+# v10.7: voci del toolbox che hanno una targhetta propria in
+# assets/logos/ -- la tile la mostra al posto di icona+scritta. Le
+# altre voci (senza asset ancora) restano come sempre.
+TILE_BADGE = {
+    "calc": "calc", "clockmain": "clock", "cal": "cal",
+    "notes": "notes", "fileman": "file_grid_diver",
+}
 MAPP_VIEWS = ["list", "grid", "compact", "detailed"]
 ALARM_SOUNDS = ["classic", "digital", "gentle"]
 
@@ -865,29 +1150,104 @@ def sel_tint(accent):
     """Fondo della riga selezionata: nero tinto con l'accento."""
     return tuple(min(255, BG[i] + accent[i] // 7) for i in range(3))
 
-DATA = os.path.join(APP_DIR, "data")
-TEXTS_DIR = os.path.join(DATA, "Texts")
-PYSCRIPTS_DIR = os.path.join(DATA, "PythonScripts")
-TEXT_EXTS = {".txt", ".md", ".log", ".cfg", ".ini", ".json", ".csv",
-            ".yml", ".yaml", ".sh", ".conf", ".xml"}
-for _d in (TEXTS_DIR, PYSCRIPTS_DIR):
+
+LAST_LOG = os.path.join(LOGS_DIR, "voiddesk_lastsession.log")
+MAX_LOG_SIZE = 5 * 1024 * 1024  # 5 MB
+
+def log(msg, level="INFO"):
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    line = "[%s] [%s] %s\n" % (timestamp, level, msg)
+
     try:
-        os.makedirs(_d, exist_ok=True)
+        if os.path.exists(LOG) and os.path.getsize(LOG) >= MAX_LOG_SIZE:
+            old = LOG + ".old"
+            if os.path.exists(old):
+                os.remove(old)
+            os.rename(LOG, old)
+            with open(LOG, "w", encoding="utf-8") as fh:
+                fh.write(line)
+        else:
+            with open(LOG, "a", encoding="utf-8") as fh:
+                fh.write(line)
     except OSError:
         pass
-LOGS_DIR = os.path.join(DATA, "logs")
-try:
-    os.makedirs(LOGS_DIR, exist_ok=True)
-except OSError:
-    pass
-LOG = os.path.join(LOGS_DIR, "voiddesk.log")
+
+    try:
+        with open(LAST_LOG, "a", encoding="utf-8") as fh:
+            fh.write(line)
+    except OSError:
+        pass
+
+    try:
+        level_enum = LogLevel[level] if hasattr(LogLevel, level) else LogLevel.INFO
+    except (KeyError, AttributeError):
+        level_enum = LogLevel.INFO
+    try:
+        LoggerManager.get_instance().log("voiddesk", level_enum, msg)
+    except Exception:
+        pass
+
+
+def log_mirror(path, msg):
+    try:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write("%s %s\n" % (time.strftime("%H:%M:%S"), msg))
+        log("[MIRROR] %s -> %s" % (os.path.basename(path), msg))
+    except OSError:
+        log("[MIRROR FAIL] %s -> %s" % (os.path.basename(path), msg))
+
+
+# ============================================================================
+#  Rt:CORE SWITCHER — Caricamento del core alternativo se presente
+# ============================================================================
+
+RTCORE_FLAG = "/tmp/.vd_rtcore"
+RTCORE_STATUS = "/tmp/.vd_rtcore_status"
+
+if os.path.exists(RTCORE_FLAG):
+    try:
+        with open(RTCORE_FLAG) as f:
+            _rtcore_main = f.read().strip()
+        if _rtcore_main and os.path.isfile(_rtcore_main):
+            log("[Rt:CORE] Caricamento core alternativo: %s" % _rtcore_main)
+            os.remove(RTCORE_FLAG)
+            core_dir = os.path.dirname(_rtcore_main)
+            info_path = os.path.join(core_dir, "build_info.json")
+            core_name = "Unknown"
+            if os.path.isfile(info_path):
+                try:
+                    with open(info_path) as f:
+                        info = json.load(f)
+                        core_name = info.get("name", "Unknown")
+                except:
+                    pass
+            with open(RTCORE_STATUS, "w") as f:
+                json.dump({"main": _rtcore_main, "name": core_name}, f)
+            _globals = globals().copy()
+            _globals["__file__"] = _rtcore_main
+            _globals["__name__"] = "__main__"
+            with open(_rtcore_main, "r") as f:
+                _code = f.read()
+            exec(compile(_code, _rtcore_main, "exec"), _globals)
+    except Exception as e:
+        log("[Rt:CORE] Errore caricamento core alternativo: %s" % e)
+        try:
+            if os.path.exists(RTCORE_FLAG):
+                os.remove(RTCORE_FLAG)
+        except:
+            pass
+
 FONT_PATH = os.path.join(APP_DIR, "assets", "DejaVuSans.ttf")
 FONT_BOLD_PATH = os.path.join(APP_DIR, "assets", "DejaVuSans-Bold.ttf")
 FONT_MONO_PATH = os.path.join(APP_DIR, "assets", "JetBrainsMono-Regular.ttf")
 FONT_MONO_BOLD_PATH = os.path.join(APP_DIR, "assets",
                                    "JetBrainsMono-Bold.ttf")
-FONT_DISPLAY_PATH = os.path.join(APP_DIR, "assets",
-                                 "BebasNeue-Regular.otf")
+FONT_DISPLAY_PATH = os.path.join(APP_DIR, "assets", "font",
+                                 "oxanium", "Oxanium-ExtraBold.ttf")
+FONT_OXANIUM_REGULAR_PATH = os.path.join(APP_DIR, "assets", "font",
+                                         "oxanium", "Oxanium-Regular.ttf")
+FONT_OXANIUM_BOLD_PATH = os.path.join(APP_DIR, "assets", "font",
+                                      "oxanium", "Oxanium-Bold.ttf")
 
 EXIT_XFCE_LAUNCH = 11
 EXIT_XFCE_INSTALL = 12
@@ -896,6 +1256,10 @@ EXIT_PKG_REMOVE = 14
 EXIT_APT_UPDATE = 15
 EXIT_MUOS_APP = 16
 EXIT_XTERM = 17
+EXIT_OUTERDESK = 18
+EXIT_RTCORE = 19
+EXIT_DEEP_VOID_DESK = 20
+EXIT_SGRUB = 21
 
 # ---------------------------------------------------------------------------
 # Catalogo componenti: categorie -> voci
@@ -1423,6 +1787,28 @@ FUNCS = [(k, it, en, ic, act,
 FUNC_BY_KEY = {f[0]: f for f in FUNCS}
 
 
+ACTION_ICONS = {
+    "copy": "doc",
+    "cut": "trash",
+    "paste": "doc",
+    "delete": "trash",
+    "rename": "edit",
+    "newdir": "folder",
+    "newfile": "doc",
+    "frun": "terminal",
+    "finfo": "info",
+    "bookmark": "book",
+    "copypath": "goto",
+    "symlink": "goto",
+    "terminalhere": "terminal",
+    "compress": "archive",
+    "extract": "archive",
+    "select_all": "task",
+    "deselect_all": "task",
+    "sort": "goto",
+}
+
+
 def default_map():
     return {f[0]: list(f[5]) for f in FUNCS}
 
@@ -1620,7 +2006,8 @@ TR = {
   "opt_font_scale": "Dimensione testo",
   "opt_vfx_bg": "Sfondo animato", "opt_vfx_trans": "Transizioni",
   "opt_vfx_fx": "Effetti schermo",
-  "opt_lang": "Lingua",
+   "opt_lang": "Lingua",
+   "opt_dlang": "Lingua desktop", "opt_dlang_s": "solo gli ambienti, non l'app",
   "opt_ctrl": "Profilo controller", "opt_batt": "Batteria nell'header",
   "opt_st_clock": "Orologio nell'header",
   "opt_st_batt": "Icona batteria", "opt_st_vol": "Icona volume",
@@ -1649,7 +2036,7 @@ TR = {
   "mapps_go": "avvia", "mapps_r1": "glyph+scan",
   "h_forge": "THE FORGE", "h_forge_s": "installer, avvio al boot, update",
   "h_work": "WORKSHOP", "h_work_s": "stats, diagnosi, log, memorie, boost",
-  "h_up": "UPLINK", "h_up_s": "rete, PC link, Tailnet e controller esterni",
+   "h_up": "UPLINK", "h_up_s": "rete, sincronizzazione, FTP, Tailnet e controller",
   "h_media": "MEDIA VAULT",
   "m_radio": "Void Radio", "m_radio_s": "stazioni live e preferiti",
   "m_iptv": "VoidCast IPTV", "m_iptv_s": "M3U, EPG, guida TV e PVR",
@@ -1658,7 +2045,24 @@ TR = {
   "h_tool": "Rt:TOOLBOX", "h_tool_s": "terminale, calcolatrice, utility",
   "h_info": "INFO & ABOUT", "h_info_s": "progetto, manuale, guida rapida",
   "h_set": "SETTINGS", "h_set_s": "aspetto, audio, lingua dell'app",
-  "h_exit": "END NODE", "h_exit_s": "torna a muOS",
+   "h_exit": "END NODE", "h_exit_s": "torna a muOS",
+   "h_games": "GIOCHI", "h_games_s": "porting e giochi nativi per muOS",
+   "h_develop": "DEVELOP", "h_develop_s": "strumenti per sviluppatori",
+   "h_community": "COMMUNITY", "h_community_s": "forum, wiki, condivisione",
+   "h_outerdesk": "OUTER-DESK", "h_outerdesk_s": "app standalone e strumenti portatili",
+   "h_legacy": "LEGACY", "h_legacy_s": "la fine di un ciclo",
+   "g_pm": "PortMaster", "g_pm_s": "launcher giochi da terze parti",
+   "g_nat": "Giochi nativi", "g_nat_s": "cartelle MUOS/application",
+   "g_col": "Collezioni", "g_col_s": "raccolte tematiche di ROM",
+   "d_repl": "Python REPL", "d_repl_s": "console interattiva host muOS",
+   "d_ed": "VOID EDIT", "d_ed_s": "apri e modifica i file di testo",
+   "d_bld": "Builder", "d_bld_s": "strumenti di pacchettizzazione",
+   "c_forum": "Forum", "c_forum_s": "community.muos.dev",
+   "c_wiki": "Wiki", "c_wiki_s": "documentazione muos.dev",
+   "c_share": "Share", "c_share_s": "cartella file condivisi",
+   "od_apps": "Outer-Desk Apps", "od_apps_s": "app standalone e strumenti portatili",
+   "l_arch": "Archivio", "l_arch_s": "versioni e documenti storici",
+   "l_mem": "Memoriale", "l_mem_s": "storia e crediti del progetto",
   "f_inst": "Void Installer", "f_inst_s": "installa e rimuovi (L1: tab)",
   "f_auto": "Avvio al boot", "f_auto_s": "app che partono col desktop",
   "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
@@ -1670,8 +2074,11 @@ TR = {
   "w_boost": "Chou Henka", "w_boost_s": "swap e governor, separati",
   "w_chd": "Disc Crusher", "w_chd_s": "converti immagini disco in CHD",
   "w_dop": "Doppel-Defender", "w_dop_s": "trova ed elimina ROM doppie",
+  "w_devcheck": "Device Check:Rt", "w_devcheck_s": "pronto soccorso del dispositivo",
   "w_clean": "Pulisci cache apt", "w_clean_s": "recupera spazio",
   "w_logs": "Registro log", "w_logs_s": "tutti i diari, per area",
+  "w_logdash": "LOG DASHBOARD", "w_logdash_s": "controllo completo dei log",
+  "w_voiddecontext": "Void Decontextualized", "w_voiddecontext_s": "gestione context pack",
   "t_clock": "Clock", "t_clock_s": "digitale o analogico, con sveglie",
   "u_dlang": "Lingua desktop", "u_dlang_s": "solo gli ambienti, non l'app",
   "u_cthub": "Controller Hub", "u_cthub_s": "dispositivi USB/MIDI, profili e mappature",
@@ -1685,8 +2092,12 @@ TR = {
   "u_bt": "Bluetooth", "u_bt_s": "gestore completo: pair e connetti",
   "u_pcup": "PC Uplink", "u_pcup_s": "stats e notifiche col tuo PC",
   "u_base": "BaseStation Web", "u_base_s": "server web, trasferimento file e companion PC",
-  "u_netdiag": "Network Probe", "u_netdiag_s": "internet, indirizzo e diagnostica collegamento",
-  "u_ts": "Tailnet Console", "u_ts_s": "rete privata, peer, file e QR login",
+   "u_netdiag": "Network Probe", "u_netdiag_s": "internet, indirizzo e diagnostica collegamento",
+   "u_ts": "Tailnet Console", "u_ts_s": "rete privata, peer, file e QR login",
+   "u_sync": "Syncthing", "u_sync_s": "sincronizza file e cartelle",
+   "u_ftp": "FTPiercer", "u_ftp_s": "client FTP con profili",
+   "u_devmap": "Device Remapper", "u_devmap_s": "mappatura tasti e controller",
+   "u_wired": "Wired Controller", "u_wired_s": "gestione controller esterni USB/MIDI",
   "u_hot": "Hotspot", "u_hot_s": "rileva e usa lo script muOS",
   "t_sh": "Rt:Shell", "t_sh_s": "terminale veloce, host diretto",
   "t_calc": "Calcolatrice", "t_calc_s": "scientifica, nativa Void",
@@ -1700,8 +2111,33 @@ TR = {
   "t_rss": "RSS Reader", "t_rss_s": "notizie, tech, anime: eng + ita",
   "t_wx": "Meteo", "t_wx_s": "città monitorate, previsioni settimanali",
   "t_radio": "Void Radio", "t_radio_s": "stazioni internet, ricerca live",
-  "t_bgm": "BGM Normalizer", "t_bgm_s": "normalizza il volume delle musiche",
-  "wx_add": "+ aggiungi città", "wx_none": "nessuna città monitorata",
+   "t_bgm": "BGM Normalizer", "t_bgm_s": "normalizza il volume delle musiche",
+   "bgm_menu_file": "Elenco file", "bgm_menu_file_s": "seleziona e normalizza",
+   "bgm_menu_settings": "Parametri conversione", "bgm_menu_settings_s": "LUFS, formato, cartelle",
+   "bgm_menu_options": "Opzioni", "bgm_menu_options_s": "lingua, tema, effetti",
+   "bgm_menu_exit": "Esci", "bgm_menu_exit_s": "torna al menu",
+   "bgm_conv_norm": "Normalizza volume", "bgm_conv_trim": "Taglia silenzi",
+   "bgm_conv_ogg": "Converti in OGG", "bgm_conv_del": "Elimina originali",
+   "bgm_conv_lufs": "Target LUFS", "bgm_conv_input": "Cartella input",
+   "bgm_conv_output": "Cartella output", "bgm_opt_lang": "Lingua",
+   "bgm_opt_theme": "Tema", "bgm_opt_glitch": "Effetti glitch",
+   "bgm_opt_log": "Visualizza log", "bgm_opt_reset": "Ripristina default",
+   "bgm_opt_about": "Informazioni", "bgm_scan_info": "Scansionati {0} file da {1}",
+   "bgm_no_files": "Nessun file audio trovato",
+   "bgm_results_complete": "Elaborazione completata",
+   "bgm_tracks_completed": "{0}/{1} tracce completate",
+   "bgm_errors_found": "{0} errori", "bgm_log_saved": "Log salvato in: {0}",
+   "bgm_confirm_process": "Normalizzare {0} file?",
+   "bgm_confirm_process_s": "verranno convertiti in OGG",
+   "bgm_confirm_delete": "Eliminare i file originali?",
+   "bgm_confirm_delete_s": "azione irreversibile",
+   "bgm_ffmpeg_ok": "ffmpeg: disponibile", "bgm_ffmpeg_missing": "ffmpeg: MANCANTE",
+   "bgm_reset_done": "Impostazioni ripristinate",
+   "bgm_about_title": "BGM NORMALIZER", "bgm_about_ver": "v8.6",
+   "bgm_about_desc": "Normalizza il volume delle tracce audio BGM usando LUFS.",
+   "bgm_about_engine": "Motore: ffmpeg loudnorm (2-pass / 1-pass / simple)",
+   "bgm_about_author": "SPDW Factory Lab",
+   "wx_add": "+ aggiungi città", "wx_none": "nessuna città monitorata",
   "wx_searching": "cerco la città...", "wx_updating": "aggiorno il meteo...",
   "wx_notfound": "nessuna città trovata", "wx_pick": "quale intendi?",
   "wx_err": "meteo non disponibile",
@@ -1729,6 +2165,7 @@ TR = {
   "i_guide": "Guida rapida", "i_guide_s": "i comandi essenziali",
   "i_manifesto": "Manifesto", "i_manifesto_s": "un segnale dal VOID",
   "i_update": "Void Desk Update", "i_update_s": "versione, novità, release",
+  "cursedev_title": "", "cursedev_title_s": "",
   "installed": "installato", "notinst": "non installato - A: installa",
   "opens_desk": "si apre nel desktop: la trovi nel menu applicazioni",
   "tab_inst": "TAB: INSTALLA", "tab_rm": "TAB: RIMUOVI",
@@ -1753,27 +2190,68 @@ TR = {
   "cleaning": "pulizia della cache apt...",
   "no_space": "Solo %s liberi nell'immagine XFCE.",
   "no_space_s": "Usa 'Pulisci cache apt' o disinstalla qualcosa.",
-  "guide": "GUIDA RAPIDA", "guide_s": "comandi del menu e del desktop",
-  "k_ud": "SU/GIU", "k_lr": "SX/DX",
+   "guide": "GUIDA RAPIDA", "guide_s": "comandi del menu e del desktop",
+   "k_ud": "▲ ▼", "k_lr": "◄ ►",
+   "orbit": "orbita",
   "free": "liberi: %s",
   "n_sel": "%d selezionati", "mounting": "leggo lo stato dei componenti...",
   "about": "INFO SUL PROGETTO", "about_s": "suite Void, piattaforma, crediti",
   "title_compmenu": "VOID INSTALLER", "refresh": "aggiorna",
   "title_remove": "DISINSTALLA SOFTWARE", "title_auto": "AVVIO AL BOOT",
   "remove_btn": "disinstalla", "auto_on": "all'avvio", "auto_off": "no",
-  "not_inst": "non installato", "sel_none": "nessuna voce selezionata",
-  "no_base": "I componenti base del desktop non si possono rimuovere:",
-  "confirm_rm": "Disinstallo %d componenti?", "yes_a": "A = si'",
-  "no_b": "B = annulla", "shell_hint": "SELECT esce",
+   "not_inst": "non installato", "sel_none": "nessuna voce selezionata",
+   "no_base": "I componenti base del desktop non si possono rimuovere:",
+   "no_b": "B = annulla", "shell_hint": "SELECT esce",
   "opt_map": "Mappatura tasti", "title_map": "MAPPATURA TASTI",
   "map_stick": "Mouse sullo stick", "press": "PREMI IL TASTO DA ASSEGNARE A:",
   "press_s": "attendi 5 secondi per annullare",
   "used_by": "Il tasto %s e' gia' usato da: %s",
   "swap_q": "A = scambia le due funzioni     B = annulla",
-  "assign": "assegna", "reset": "ripristina", "reset_all": "tutti default",
-  "none": "(nessuno)",
- },
- "en": {
+   "assign": "assegna", "reset": "ripristina", "reset_all": "tutti default",
+   "none": "(nessuno)",
+   "mecha_panel": "MECHA PANEL", "mecha_panel_s": "comandi rapidi e scorciatoie",
+   "mecha_close": "chiudi", "mecha_custom": "personalizza",
+   "mecha_l1": "L1: torna al Nexus", "mecha_l2": "L2: END NODE",
+   "mecha_r1": "R1: Satellite", "mecha_r2": "R2: Toolbox",
+   "mecha_start": "START", "mecha_y": "Y", "mecha_sel": "SELECT: chiudi",
+   "mecha_none": "(non assegnato)",
+    "mecha_custom_title": "CONFIGURA MECHA PANEL",
+    "mecha_custom_hint": "A: assegna   B: indietro",
+    "mecha_action_nexus": "torna al Nexus", "mecha_action_endnode": "hub END NODE",
+    "mecha_action_satellite": "Satellite Outer-Desk", "mecha_action_toolbox": "hub Rt:Toolbox",
+    "mecha_action_none": "(nessuno)",
+    "play_pause": "pausa", "station": "stazione", "volume": "volume", "stop": "ferma",
+    "media_live": "● LIVE", "media_paused": "◐ PAUSA", "media_standby": "○ STANDBY",
+    "mecha_ready": "COMANDI TATTICI PRONTI", "mecha_init": "INIZIALIZZAZIONE...",
+    "btn_play": "PLAY", "btn_pause": "PAUSA", "btn_stop": "STOP",
+    "btn_signal": "Rt:DEPLOY", "btn_channel": "CANALE",
+    "media_author": "AUTORE", "media_series": "SERIE", "media_duration": "DURATA",
+    "media_time": "TEMPO", "media_no_media": "NESSUN MEDIA ATTIVO",
+    "radio_update": "Aggiorna catalogo",
+    "radio_filter_country": "Paese",
+    "radio_filter_language": "Lingua",
+    "radio_filter_genre": "Genere",
+    "radio_no_results": "Nessuna stazione trovata",
+    "radio_loading": "Caricamento stazioni...",
+    "radio_custom_tab": "PERSONALI",
+    "radio_custom_add": "Aggiungi stazione",
+    "radio_custom_del": "Rimuovi stazione",
+    "rss_export_opml": "Esporta OPML",
+    "rss_import_opml": "Importa OPML",
+    "rss_import_filter": "File OPML (*.opml)",
+   "outer_panel_title": "OUTER PANEL",
+   "outer_panel_app": "App in esecuzione",
+   "outer_panel_restart": "Riavvia Outer-App",
+   "outer_panel_close": "Chiudi Outer-App",
+   "outer_panel_logs": "Console log",
+   "outer_panel_stats": "Statistiche dispositivo",
+   "outer_panel_no_logo": "(logo mancante)",
+   "outer_panel_running": "IN ESECUZIONE",
+   "outer_panel_not_running": "NON IN ESECUZIONE",
+   "outer_panel_restarting": "RIAVVIO...",
+   "outer_panel_closing": "CHIUSURA...",
+   },
+  "en": {
   "xfce_run": "▶  XFCE DESKTOP", "xfce_inst": "▶  INSTALL XFCE DESKTOP",
   "xfce_run_s": "launch the full-screen Linux desktop",
   "xfce_inst_s": "about 400MB over Wi-Fi, 10-20 minutes",
@@ -1797,7 +2275,8 @@ TR = {
   "opt_font_scale": "Text size",
   "opt_vfx_bg": "Animated background", "opt_vfx_trans": "Transitions",
   "opt_vfx_fx": "Screen effects",
-  "opt_lang": "Language",
+   "opt_lang": "Language",
+   "opt_dlang": "Desktop language", "opt_dlang_s": "desktops only, not the app",
   "opt_ctrl": "Controller profile", "opt_batt": "Status bar icons",
   "opt_st_clock": "Clock in header",
   "opt_st_batt": "Battery icon", "opt_st_vol": "Volume icon",
@@ -1826,16 +2305,58 @@ TR = {
   "mapps_go": "launch", "mapps_r1": "glyph+scan",
   "h_forge": "THE FORGE", "h_forge_s": "installer, startup apps, update",
   "h_work": "WORKSHOP", "h_work_s": "stats, diagnostics, logs, storage",
-  "h_up": "UPLINK", "h_up_s": "network, PC link, Tailnet and external controllers",
+   "h_up": "UPLINK", "h_up_s": "network, sync, FTP, Tailnet and controllers",
   "h_media": "MEDIA VAULT",
   "m_radio": "Void Radio", "m_radio_s": "live stations and favorites",
   "m_iptv": "VoidCast IPTV", "m_iptv_s": "M3U, EPG, TV guide and PVR",
   "m_lib": "Media Library", "m_lib_s": "audio, video and SD playlists",
-  "m_bgm": "BGM Normalizer", "m_bgm_s": "LUFS, conversion and track cleanup",
-  "h_tool": "Rt:TOOLBOX", "h_tool_s": "terminal, calculator, utilities",
+   "m_bgm": "BGM Normalizer", "m_bgm_s": "LUFS, conversion and track cleanup",
+   "bgm_menu_file": "File List", "bgm_menu_file_s": "select and normalize",
+   "bgm_menu_settings": "Conversion Settings", "bgm_menu_settings_s": "LUFS, format, folders",
+   "bgm_menu_options": "Options", "bgm_menu_options_s": "language, theme, effects",
+   "bgm_menu_exit": "Exit", "bgm_menu_exit_s": "back to menu",
+   "bgm_conv_norm": "Normalize volume", "bgm_conv_trim": "Trim silence",
+   "bgm_conv_ogg": "Convert to OGG", "bgm_conv_del": "Delete originals",
+   "bgm_conv_lufs": "Target LUFS", "bgm_conv_input": "Input folder",
+   "bgm_conv_output": "Output folder", "bgm_opt_lang": "Language",
+   "bgm_opt_theme": "Theme", "bgm_opt_glitch": "Glitch FX",
+   "bgm_opt_log": "View log", "bgm_opt_reset": "Reset defaults",
+   "bgm_opt_about": "About", "bgm_scan_info": "Scanned {0} files from {1}",
+   "bgm_no_files": "No audio files found",
+   "bgm_results_complete": "Processing complete",
+   "bgm_tracks_completed": "{0}/{1} tracks completed",
+   "bgm_errors_found": "{0} errors", "bgm_log_saved": "Log saved to: {0}",
+   "bgm_confirm_process": "Normalize {0} files?",
+   "bgm_confirm_process_s": "they'll be converted to OGG",
+   "bgm_confirm_delete": "Delete original files?",
+   "bgm_confirm_delete_s": "irreversible action",
+   "bgm_ffmpeg_ok": "ffmpeg: available", "bgm_ffmpeg_missing": "ffmpeg: MISSING",
+   "bgm_reset_done": "Settings restored",
+   "bgm_about_title": "BGM NORMALIZER", "bgm_about_ver": "v8.6",
+   "bgm_about_desc": "Normalize background music volume using LUFS.",
+   "bgm_about_engine": "Engine: ffmpeg loudnorm (2-pass / 1-pass / simple)",
+   "bgm_about_author": "SPDW Factory Lab",
+   "h_tool": "Rt:TOOLBOX", "h_tool_s": "terminal, calculator, utilities",
   "h_info": "INFO & ABOUT", "h_info_s": "project, manual, quick guide",
   "h_set": "SETTINGS", "h_set_s": "look, audio, app language",
-  "h_exit": "END NODE", "h_exit_s": "back to muOS",
+   "h_exit": "END NODE", "h_exit_s": "back to muOS",
+   "h_games": "GAMES", "h_games_s": "native ports and games for muOS",
+   "h_develop": "DEVELOP", "h_develop_s": "developer tools",
+   "h_community": "COMMUNITY", "h_community_s": "forums, wiki, sharing",
+   "h_outerdesk": "OUTER-DESK", "h_outerdesk_s": "standalone apps and portable tools",
+   "h_legacy": "LEGACY", "h_legacy_s": "the end of a cycle",
+   "g_pm": "PortMaster", "g_pm_s": "third-party game launcher",
+   "g_nat": "Native games", "g_nat_s": "MUOS/application folders",
+   "g_col": "Collections", "g_col_s": "thematic ROM collections",
+   "d_repl": "Python REPL", "d_repl_s": "interactive muOS host console",
+   "d_ed": "VOID EDIT", "d_ed_s": "open and edit text files",
+   "d_bld": "Builder", "d_bld_s": "packaging and build tools",
+   "c_forum": "Forum", "c_forum_s": "community.muos.dev",
+   "c_wiki": "Wiki", "c_wiki_s": "muos.dev documentation",
+   "c_share": "Share", "c_share_s": "shared files folder",
+   "od_apps": "Outer-Desk Apps", "od_apps_s": "standalone apps and portable tools",
+   "l_arch": "Archive", "l_arch_s": "historical versions and documents",
+   "l_mem": "Memorial", "l_mem_s": "project history and credits",
   "f_inst": "Void Installer", "f_inst_s": "install & remove (L1: tab)",
   "f_auto": "Startup apps", "f_auto_s": "apps that boot with the desktop",
   "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
@@ -1847,8 +2368,11 @@ TR = {
   "w_boost": "Chou Henka", "w_boost_s": "swap and governor, split",
   "w_chd": "Disc Crusher", "w_chd_s": "convert disc images to CHD",
   "w_dop": "Doppel-Defender", "w_dop_s": "find and remove duplicate ROMs",
+  "w_devcheck": "Device Check:Rt", "w_devcheck_s": "device emergency ward",
   "w_clean": "Clean apt cache", "w_clean_s": "reclaim space",
   "w_logs": "Log registry", "w_logs_s": "every diary, by area",
+  "w_logdash": "LOG DASHBOARD", "w_logdash_s": "complete log control",
+  "w_voiddecontext": "Void Decontextualized", "w_voiddecontext_s": "context pack management",
   "t_clock": "Clock", "t_clock_s": "digital or analog, with alarms",
   "u_dlang": "Desktop language", "u_dlang_s": "desktops only, not the app",
   "u_cthub": "Controller Hub", "u_cthub_s": "USB/MIDI devices, profiles and mappings",
@@ -1862,8 +2386,12 @@ TR = {
   "u_bt": "Bluetooth", "u_bt_s": "full manager: pair and connect",
   "u_pcup": "PC Uplink", "u_pcup_s": "live stats and notifications",
   "u_base": "BaseStation Web", "u_base_s": "web server, file transfer and PC companion",
-  "u_netdiag": "Network Probe", "u_netdiag_s": "internet, address and connection diagnostics",
-  "u_ts": "Tailnet Console", "u_ts_s": "private network, peers, files and QR login",
+   "u_netdiag": "Network Probe", "u_netdiag_s": "internet, address and connection diagnostics",
+   "u_ts": "Tailnet Console", "u_ts_s": "private network, peers, files and QR login",
+   "u_sync": "Syncthing", "u_sync_s": "sync files and folders",
+   "u_ftp": "FTPiercer", "u_ftp_s": "FTP client with profiles",
+   "u_devmap": "Device Remapper", "u_devmap_s": "keys and controller mapping",
+   "u_wired": "Wired Controller", "u_wired_s": "USB/MIDI external controller management",
   "u_hot": "Hotspot", "u_hot_s": "detects and drives the muOS script",
   "t_sh": "Rt:Shell", "t_sh_s": "fast terminal, direct on host",
   "t_calc": "Calculator", "t_calc_s": "scientific, Void-native",
@@ -1906,6 +2434,7 @@ TR = {
   "i_guide": "Quick guide", "i_guide_s": "the essential controls",
   "i_manifesto": "Manifesto", "i_manifesto_s": "a signal from the VOID",
   "i_update": "Void Desk Update", "i_update_s": "version, news, releases",
+  "cursedev_title": "", "cursedev_title_s": "",
   "installed": "installed", "notinst": "not installed - A: install",
   "opens_desk": "opens in the desktop: find it in the app menu",
   "tab_inst": "TAB: INSTALL", "tab_rm": "TAB: REMOVE",
@@ -1930,8 +2459,9 @@ TR = {
   "cleaning": "cleaning the apt cache...",
   "no_space": "Only %s free inside the XFCE image.",
   "no_space_s": "Use 'Clean apt cache' or uninstall something.",
-  "guide": "QUICK GUIDE", "guide_s": "menu and desktop controls",
-  "k_ud": "UP/DN", "k_lr": "LT/RT",
+   "guide": "QUICK GUIDE", "guide_s": "menu and desktop controls",
+   "k_ud": "▲ ▼", "k_lr": "◄ ►",
+   "orbit": "orbit",
   "free": "free: %s",
   "n_sel": "%d selected", "mounting": "reading component status...",
   "opt_map": "Button mapping", "title_map": "BUTTON MAPPING",
@@ -1945,11 +2475,51 @@ TR = {
   "title_compmenu": "VOID INSTALLER", "refresh": "refresh",
   "title_remove": "UNINSTALL SOFTWARE", "title_auto": "STARTUP APPS",
   "remove_btn": "uninstall", "auto_on": "at startup", "auto_off": "no",
-  "not_inst": "not installed", "sel_none": "nothing selected",
-  "no_base": "Core desktop components cannot be removed:",
-  "confirm_rm": "Uninstall %d components?", "yes_a": "A = yes",
-  "no_b": "B = cancel", "shell_hint": "SELECT quits",
- },
+   "not_inst": "not installed", "sel_none": "nothing selected",
+   "no_base": "Core desktop components cannot be removed:",
+    "no_b": "B = cancel", "shell_hint": "SELECT quits",
+   "mecha_panel": "MECHA PANEL", "mecha_panel_s": "quick commands and shortcuts",
+   "mecha_close": "close", "mecha_custom": "customize",
+   "mecha_l1": "L1: return to Nexus", "mecha_l2": "L2: END NODE",
+   "mecha_r1": "R1: Satellite", "mecha_r2": "R2: Toolbox",
+   "mecha_start": "START", "mecha_y": "Y", "mecha_sel": "SELECT: close",
+   "mecha_none": "(not assigned)",
+    "mecha_custom_title": "MECHA PANEL CONFIG",
+    "mecha_custom_hint": "A: assign   B: back",
+    "mecha_action_nexus": "return to Nexus", "mecha_action_endnode": "END NODE hub",
+    "mecha_action_satellite": "Satellite Outer-Desk", "mecha_action_toolbox": "Rt:Toolbox hub",
+    "mecha_action_none": "(none)",
+    "play_pause": "pause", "station": "station", "volume": "volume", "stop": "stop",
+    "media_live": "● LIVE", "media_paused": "◐ PAUSED", "media_standby": "○ STANDBY",
+    "mecha_ready": "TACTICAL COMMANDS READY", "mecha_init": "INITIALIZING...",
+    "btn_play": "PLAY", "btn_pause": "PAUSE", "btn_stop": "STOP",
+    "btn_signal": "Rt:DEPLOY", "btn_channel": "CHANNEL",
+    "media_author": "AUTHOR", "media_series": "SERIES", "media_duration": "DURATION",
+    "media_time": "TIME", "media_no_media": "NO ACTIVE MEDIA",
+    "radio_update": "Update catalog",
+    "radio_filter_country": "Country",
+    "radio_filter_language": "Language",
+    "radio_filter_genre": "Genre",
+    "radio_no_results": "No stations found",
+    "radio_loading": "Loading stations...",
+    "radio_custom_tab": "CUSTOM",
+    "radio_custom_add": "Add station",
+    "radio_custom_del": "Remove station",
+   "rss_export_opml": "Export OPML",
+   "rss_import_opml": "Import OPML",
+   "rss_import_filter": "OPML files (*.opml)",
+   "outer_panel_title": "OUTER PANEL",
+   "outer_panel_app": "Running app",
+   "outer_panel_restart": "Restart Outer-App",
+   "outer_panel_close": "Close Outer-App",
+   "outer_panel_logs": "Console log",
+   "outer_panel_stats": "Device stats",
+   "outer_panel_no_logo": "(missing logo)",
+   "outer_panel_running": "RUNNING",
+   "outer_panel_not_running": "NOT RUNNING",
+   "outer_panel_restarting": "RESTARTING...",
+   "outer_panel_closing": "CLOSING...",
+  },
 
 }
 
@@ -1981,6 +2551,14 @@ def font_mono(size, bold=False):
 def font_display(size):
     try:
         return pygame.font.Font(FONT_DISPLAY_PATH, size)
+    except Exception:
+        return font_bold(size)
+
+
+def _get_horror_font(size):
+    try:
+        path = os.path.join(APP_DIR, "assets", "font", "horror", "Creepster-Regular.ttf")
+        return pygame.font.Font(path, size)
     except Exception:
         return font_bold(size)
 
@@ -2154,6 +2732,2245 @@ def terminal_id_generate():
 
 
 # ============================================================================
+#  [F] VOIDCAST — SPDW IPTV SUITE, integrata nativamente in Void-Desk
+#  Nata come companion app a se stante (vedi VoidCast_v1_1.muxapp), portata
+#  qui dentro su richiesta esplicita: stesso processo, stesso schermo, stesso
+#  input evinput -- niente piu' chroot-mount-relaunch per lanciarla. Tiene
+#  pero' un'identita' visiva tutta sua (font mono, nero piu' profondo, accento
+#  crimson) apposta per continuare a "sentirsi" un'app a parte dentro Void-Desk.
+#  Naming: ogni simbolo di alto livello e' prefissato VC/VC_ per non toccare
+#  nulla del resto di Void-Desk (occhio in particolare a non risuonare con la
+#  classe App qui sotto, che e' quella di Void-Desk stesso).
+# ============================================================================
+
+VC_APP_NAME = "VOIDCAST"
+VC_APP_VERSION = "1.1.0"
+VC_APP_TAGLINE = "SPDW IPTV SUITE // KYOMU BROADCAST NODE"
+
+VC_DATA_DIR = os.path.join(DATA, "voidcast")
+VC_CACHE_DIR = os.path.join(VC_DATA_DIR, "cache")
+VC_EPG_CACHE_DIR = os.path.join(VC_CACHE_DIR, "epg")
+VC_LOGO_CACHE_DIR = os.path.join(VC_CACHE_DIR, "logos")
+VC_REC_DIR = os.path.join(VC_DATA_DIR, "recordings")
+VC_CONFIG_PATH = os.path.join(VC_DATA_DIR, "config.json")
+VC_LOG_PATH = os.path.join(VC_DATA_DIR, "voidcast.log")
+VC_ADDON_DIR = os.path.join(APP_DIR, "voidcast_addons")
+
+for _vc_d in (VC_DATA_DIR, VC_CACHE_DIR, VC_EPG_CACHE_DIR, VC_LOGO_CACHE_DIR,
+             VC_REC_DIR):
+    try:
+        os.makedirs(_vc_d, exist_ok=True)
+    except OSError:
+        pass
+
+VC_PRESET_PLAYLISTS = [
+    ("iptv-org // WORLD (index)", "https://iptv-org.github.io/iptv/index.m3u"),
+    ("iptv-org // ITALY", "https://iptv-org.github.io/iptv/countries/it.m3u"),
+    ("iptv-org // NEWS", "https://iptv-org.github.io/iptv/categories/news.m3u"),
+    ("iptv-org // MUSIC", "https://iptv-org.github.io/iptv/categories/music.m3u"),
+    ("iptv-org // MOVIES", "https://iptv-org.github.io/iptv/categories/movies.m3u"),
+]
+
+# button_map/remap wizard del progetto originale non servono piu': l'input
+# passa gia' da evinput, uniforme con tutto il resto di Void-Desk (mappatura
+# tasti unica in RT CTRL HUB). Meno stato, meno un menu da mantenere.
+VC_CFG_DEFAULTS = {
+    "active_playlist": None,
+    "playlists": [],
+    "view_mode": "list",
+    "epg_manual_urls": [],
+    "epg_use_playlist_sources": True,
+    "epg_max_age_hours": 12,
+    "player_backend": "auto",
+    "player_cache_secs": 5,
+    "user_agent": "VLC/3.0.20 LibVLC/3.0.20",
+    "favorites": [],
+    "last_group": "*",
+    "theme_accent": "crimson",
+}
+
+
+def vc_log(msg):
+    try:
+        with open(VC_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write("%s %s\n" % (time.strftime("%H:%M:%S"), msg))
+    except OSError:
+        pass
+    log("[VOIDCAST] %s" % msg)
+
+
+class VCConfig(object):
+    def __init__(self):
+        self._sfx_cache = {}
+        self.sfx_enabled = True
+        self.cursedev_persistent = False
+        self.data = dict(VC_CFG_DEFAULTS)
+        self.load()
+
+    def load(self):
+        try:
+            with open(VC_CONFIG_PATH, "r", encoding="utf-8") as f:
+                stored = json.load(f)
+            for k, v in stored.items():
+                self.data[k] = v
+        except (OSError, ValueError):
+            pass
+
+    def save(self):
+        try:
+            with open(VC_CONFIG_PATH, "w", encoding="utf-8") as f:
+                json.dump(self.data, f, indent=2, ensure_ascii=False)
+        except OSError:
+            pass
+
+    def get(self, key, default=None):
+        return self.data.get(key, default)
+
+    def set(self, key, value, save=True):
+        self.data[key] = value
+        if save:
+            self.save()
+
+    def playlists(self):
+        return self.data.get("playlists", [])
+
+    def add_playlist(self, name, source, ptype):
+        existing = [int(p["id"].split("_")[1]) for p in self.playlists()]
+        pid = "pl_%d" % (max([0] + existing) + 1)
+        entry = {"id": pid, "name": name, "source": source, "type": ptype}
+        self.data.setdefault("playlists", []).append(entry)
+        if not self.data.get("active_playlist"):
+            self.data["active_playlist"] = pid
+        self.save()
+        return entry
+
+    def remove_playlist(self, pid):
+        self.data["playlists"] = [p for p in self.playlists() if p["id"] != pid]
+        if self.data.get("active_playlist") == pid:
+            pls = self.playlists()
+            self.data["active_playlist"] = pls[0]["id"] if pls else None
+        self.save()
+
+    def active_playlist(self):
+        pid = self.data.get("active_playlist")
+        for p in self.playlists():
+            if p["id"] == pid:
+                return p
+        return None
+
+    def toggle_favorite(self, url):
+        favs = self.data.setdefault("favorites", [])
+        if url in favs:
+            favs.remove(url)
+        else:
+            favs.append(url)
+        self.save()
+        return url in favs
+
+
+# --- [F1] net — download con UA custom, gzip, cache su disco -------------
+def _vc_opener(user_agent):
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    handler = urllib.request.HTTPSHandler(context=ctx)
+    op = urllib.request.build_opener(handler)
+    op.addheaders = [("User-Agent", user_agent or "Mozilla/5.0"),
+                     ("Accept-Encoding", "gzip")]
+    return op
+
+
+def vc_fetch_bytes(url, user_agent=None, timeout=25):
+    op = _vc_opener(user_agent)
+    with op.open(url, timeout=timeout) as resp:
+        raw = resp.read()
+    if raw[:2] == b"\x1f\x8b":
+        try:
+            raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
+        except OSError:
+            pass
+    return raw
+
+
+def vc_fetch_text(url, user_agent=None, timeout=25):
+    raw = vc_fetch_bytes(url, user_agent, timeout)
+    for enc in ("utf-8", "latin-1"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", "replace")
+
+
+def vc_cached_fetch(url, cache_dir, max_age_hours, user_agent=None):
+    os.makedirs(cache_dir, exist_ok=True)
+    key = hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
+    path = os.path.join(cache_dir, key + ".bin")
+    max_age = max_age_hours * 3600
+    if os.path.exists(path) and (time.time() - os.path.getmtime(path)) < max_age:
+        with open(path, "rb") as f:
+            return f.read(), True
+    data = vc_fetch_bytes(url, user_agent)
+    try:
+        with open(path, "wb") as f:
+            f.write(data)
+    except OSError:
+        pass
+    return data, False
+
+
+# --- [F2] m3u — parser M3U/M3U8 -------------------------------------------
+VC_ATTR_RE = re.compile(r'([A-Za-z0-9_-]+)="(.*?)"')
+
+
+class VCChannel(object):
+    __slots__ = ("name", "url", "tvg_id", "tvg_name", "logo", "group", "index")
+
+    def __init__(self, name, url, tvg_id="", tvg_name="", logo="", group="",
+                index=0):
+        self.name = name or tvg_name or "???"
+        self.url = url
+        self.tvg_id = tvg_id
+        self.tvg_name = tvg_name
+        self.logo = logo
+        self.group = group or "Ungrouped"
+        self.index = index
+
+    def epg_keys(self):
+        keys = []
+        if self.tvg_id:
+            keys.append(self.tvg_id.strip().lower())
+        if self.tvg_name:
+            keys.append(self.tvg_name.strip().lower())
+        keys.append(self.name.strip().lower())
+        return keys
+
+
+class VCPlaylist(object):
+    def __init__(self):
+        self.channels = []
+        self.epg_urls = []
+        self.groups = []
+
+    def build_groups(self):
+        seen, groups = set(), []
+        for ch in self.channels:
+            if ch.group not in seen:
+                seen.add(ch.group)
+                groups.append(ch.group)
+        self.groups = groups
+
+
+def vc_parse_m3u(text):
+    pl = VCPlaylist()
+    pending = None
+    idx = 0
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("#EXTM3U"):
+            attrs = dict(VC_ATTR_RE.findall(line))
+            for key in ("url-tvg", "x-tvg-url", "tvg-url"):
+                val = attrs.get(key, "")
+                for u in val.split(","):
+                    u = u.strip()
+                    if u and u not in pl.epg_urls:
+                        pl.epg_urls.append(u)
+            continue
+        if line.startswith("#EXTINF"):
+            attrs = dict(VC_ATTR_RE.findall(line))
+            name = line.rsplit(",", 1)[1].strip() if "," in line else ""
+            pending = {
+                "name": name,
+                "tvg_id": attrs.get("tvg-id", ""),
+                "tvg_name": attrs.get("tvg-name", ""),
+                "logo": attrs.get("tvg-logo", ""),
+                "group": attrs.get("group-title", ""),
+            }
+            continue
+        if line.startswith("#"):
+            continue
+        if pending is not None:
+            pl.channels.append(VCChannel(
+                pending["name"], line, pending["tvg_id"], pending["tvg_name"],
+                pending["logo"], pending["group"], idx))
+            idx += 1
+            pending = None
+        elif line.startswith(("http://", "https://", "rtmp://", "rtsp://",
+                              "udp://")):
+            pl.channels.append(VCChannel(line.split("/")[-1][:40], line,
+                                         index=idx))
+            idx += 1
+    pl.build_groups()
+    return pl
+
+
+def vc_load_playlist(entry, user_agent=None):
+    if entry["type"] == "url":
+        text = vc_fetch_text(entry["source"], user_agent)
+    else:
+        with open(entry["source"], "r", encoding="utf-8",
+                 errors="replace") as f:
+            text = f.read()
+    return vc_parse_m3u(text)
+
+
+# --- [F3] epg — motore EPG XMLTV multi-sorgente ---------------------------
+def _vc_parse_xmltv_time(s):
+    if not s:
+        return None
+    s = s.strip()
+    base, tz = (s.split(" ", 1) + [""])[:2] if " " in s else (s, "")
+    base = base[:14].ljust(14, "0")
+    try:
+        dt = datetime.strptime(base, "%Y%m%d%H%M%S")
+    except ValueError:
+        return None
+    offset = timedelta(0)
+    tz = tz.strip()
+    if len(tz) == 5 and tz[0] in "+-":
+        try:
+            offset = timedelta(hours=int(tz[1:3]), minutes=int(tz[3:5]))
+            if tz[0] == "-":
+                offset = -offset
+        except ValueError:
+            offset = timedelta(0)
+    return (dt - offset).replace(tzinfo=timezone.utc).timestamp()
+
+
+class VCProgramme(object):
+    __slots__ = ("start", "stop", "title", "desc")
+
+    def __init__(self, start, stop, title, desc=""):
+        self.start = start
+        self.stop = stop
+        self.title = title
+        self.desc = desc
+
+
+class VCEPG(object):
+    def __init__(self):
+        self.by_key = {}
+        self.sources_ok = []
+        self.sources_err = []
+        self.loaded_at = 0
+
+    def load(self, urls, user_agent=None, max_age_hours=12):
+        self.by_key.clear()
+        self.sources_ok, self.sources_err = [], []
+        for url in urls:
+            try:
+                data, cached = vc_cached_fetch(url, VC_EPG_CACHE_DIR,
+                                               max_age_hours, user_agent)
+                self._parse(data)
+                self.sources_ok.append(url + (" [cache]" if cached else ""))
+            except Exception as e:  # noqa: BLE001 -- su handheld si sopravvive
+                self.sources_err.append((url, str(e)[:80]))
+        for progs in self.by_key.values():
+            progs.sort(key=lambda p: p.start)
+        self.loaded_at = time.time()
+
+    def _parse(self, data):
+        chan_names = {}
+        for event, el in ET.iterparse(io.BytesIO(data), events=("end",)):
+            tag = el.tag.split("}")[-1]
+            if tag == "channel":
+                cid = (el.get("id") or "").strip().lower()
+                names = [(dn.text or "").strip().lower()
+                        for dn in el.findall("display-name") if dn.text]
+                if cid:
+                    chan_names[cid] = names
+                el.clear()
+            elif tag == "programme":
+                cid = (el.get("channel") or "").strip().lower()
+                start = _vc_parse_xmltv_time(el.get("start"))
+                stop = _vc_parse_xmltv_time(el.get("stop"))
+                t_el = el.find("title")
+                d_el = el.find("desc")
+                title = ((t_el.text or "").strip()
+                        if t_el is not None and t_el.text else "?")
+                desc = ((d_el.text or "").strip()
+                       if d_el is not None and d_el.text else "")
+                if cid and start:
+                    prog = VCProgramme(start, stop or start + 1800, title,
+                                       desc)
+                    keys = [cid] + chan_names.get(cid, [])
+                    for k in set(keys):
+                        self.by_key.setdefault(k, []).append(prog)
+                el.clear()
+
+    def programmes_for(self, channel):
+        for key in channel.epg_keys():
+            progs = self.by_key.get(key)
+            if progs:
+                return progs
+        return []
+
+    def now_next(self, channel, now=None):
+        now = now or time.time()
+        progs = self.programmes_for(channel)
+        cur, nxt = None, None
+        for p in progs:
+            if p.start <= now < p.stop:
+                cur = p
+            elif p.start > now:
+                nxt = p
+                break
+        return cur, nxt
+
+    def window(self, channel, start, stop):
+        return [p for p in self.programmes_for(channel)
+               if p.stop > start and p.start < stop]
+
+
+def vc_collect_epg_urls(cfg, playlist):
+    """Fonti EPG auto-scoperte: non solo dalla playlist attiva, ma da
+    tutte le playlist salvate che sono gia' state caricate almeno una
+    volta (epg_urls resta in cache sulla entry di config al momento
+    del caricamento -- vedi VCApp.reload_playlist -- cosi' non serve
+    riscaricare playlist inattive solo per sapere quali fonti EPG
+    dichiarano)."""
+    urls = []
+    if cfg.get("epg_use_playlist_sources", True):
+        if playlist is not None:
+            urls.extend(playlist.epg_urls)
+        for p in cfg.playlists():
+            urls.extend(p.get("epg_urls", []))
+    urls.extend(cfg.get("epg_manual_urls", []))
+    out, seen = [], set()
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
+# --- [F4] player — backend di riproduzione ---------------------------------
+# La UI pygame rilascia lo schermo (fbdisplay/evinput/pygame.display), mpv
+# prende il framebuffer/DRM per intero. Zapping via exit-code di mpv, gestito
+# un livello sopra in VCApp.play_channel (li' avviene anche il suspend/resume
+# dello schermo di Void-Desk -- il player qui sotto non sa nulla dell'host,
+# resta portabile e identico alla versione standalone).
+VC_RESULT_BACK = "back"
+VC_RESULT_NEXT = "next"
+VC_RESULT_PREV = "prev"
+VC_RESULT_FAV = "fav"
+VC_RESULT_ERROR = "error"
+
+_VC_GAMEPAD_CONF = """\
+# VOIDCAST mpv input conf (gamepad SDL)
+GAMEPAD_ACTION_RIGHT quit 0
+GAMEPAD_ACTION_DOWN cycle pause
+GAMEPAD_ACTION_LEFT quit 22
+GAMEPAD_DPAD_UP quit 20
+GAMEPAD_DPAD_DOWN quit 21
+GAMEPAD_DPAD_LEFT seek -30
+GAMEPAD_DPAD_RIGHT seek 30
+GAMEPAD_LEFT_SHOULDER add volume -5
+GAMEPAD_RIGHT_SHOULDER add volume 5
+GAMEPAD_START show-progress
+GAMEPAD_BACK show-text "${media-title}" 3000
+q quit 0
+n quit 20
+p quit 21
+"""
+
+
+class VCPlayer(object):
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.last_error = ""
+
+    def backend(self):
+        pref = self.cfg.get("player_backend", "auto")
+        if pref in ("mpv", "ffplay") and shutil.which(pref):
+            return pref
+        for cand in ("mpv", "ffplay"):
+            if shutil.which(cand):
+                return cand
+        return None
+
+    def _write_input_conf(self):
+        path = os.path.join(VC_DATA_DIR, "mpv_input.conf")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(_VC_GAMEPAD_CONF)
+        except OSError:
+            pass
+        return path
+
+    def play(self, channel):
+        """Blocca finche' il player gira. Ritorna un VC_RESULT_*."""
+        be = self.backend()
+        if be is None:
+            self.last_error = "No player found (mpv/ffplay)."
+            return VC_RESULT_ERROR
+        ua = self.cfg.get("user_agent", "")
+        cache_s = int(self.cfg.get("player_cache_secs", 5))
+        if be == "mpv":
+            cmd = [
+                "mpv", channel.url,
+                "--fs", "--really-quiet", "--osd-level=1",
+                "--vo=gpu,drm,sdl", "--hwdec=auto-safe",
+                "--input-gamepad=yes",
+                "--input-conf=%s" % self._write_input_conf(),
+                "--force-media-title=%s" % channel.name,
+                "--user-agent=%s" % ua,
+                "--network-timeout=12",
+                "--cache=yes", "--cache-secs=%d" % cache_s,
+                "--demuxer-max-bytes=48MiB",
+                "--force-seekable=no",
+            ]
+        else:
+            cmd = ["ffplay", "-fs", "-autoexit", "-loglevel", "error",
+                  "-user_agent", ua, "-i", channel.url]
+        try:
+            code = subprocess.call(cmd)
+        except OSError as e:
+            self.last_error = str(e)
+            return VC_RESULT_ERROR
+        if code == 20:
+            return VC_RESULT_NEXT
+        if code == 21:
+            return VC_RESULT_PREV
+        if code == 22:
+            return VC_RESULT_FAV
+        if code not in (0, 4):
+            self.last_error = "Player exited with code %d (dead stream?)" % code
+            return VC_RESULT_ERROR
+        return VC_RESULT_BACK
+
+
+# --- [F5] addons — SDK addon/tools -----------------------------------------
+# Un addon e' una cartella in voidcast_addons/<nome>/ con addon.json +
+# addon.py che espone register(api) -> lista di azioni. Rimasto identico
+# all'originale: e' l'unico pezzo di VOIDCAST che vive davvero come file a
+# se' sul disco (non e' codice imbottigliato in main_def.py) perche' e'
+# proprio il punto -- deve restare intercettabile e modificabile a mano.
+_VC_RECORDER_ADDON_JSON = """{
+  "name": "PVR Recorder",
+  "desc": "Records the current stream to SD via ffmpeg (copy, zero transcoding)",
+  "entry": "addon.py",
+  "version": "1.1.0",
+  "author": "SPDW Factory"
+}
+"""
+
+_VC_RECORDER_ADDON_PY = '''# -*- coding: utf-8 -*-
+# VOIDCAST addon // PVR Recorder v1.1
+# Records the current channel stream to SD with ffmpeg stream-copy (no
+# transcoding: the H700's CPU says thanks).
+#
+# Demonstrates the addon contract: register(api) -> list of actions.
+#   context "channel" -> shows in the channel action menu (START)
+#   context "menu"    -> shows in TOOLS / ADDONS
+
+import os
+import shutil
+import signal
+import subprocess
+import time
+
+_proc = None
+_current = ""
+
+
+def _ffmpeg():
+    return shutil.which("ffmpeg")
+
+
+def _start(api):
+    global _proc, _current
+    ch = api.current_channel
+    if ch is None:
+        api.toast("No channel selected", ok=False)
+        return
+    if _proc is not None and _proc.poll() is None:
+        api.toast("Recording already active: " + _current, ok=False)
+        return
+    ff = _ffmpeg()
+    if not ff:
+        api.toast("ffmpeg not found on system", ok=False)
+        return
+    safe = "".join(c if c.isalnum() or c in "-_" else "_"
+                  for c in ch.name)[:40]
+    out = os.path.join(api.recordings_dir,
+                       "%s_%s.ts" % (safe, time.strftime("%Y%m%d_%H%M%S")))
+    ua = api.config.get("user_agent", "")
+    cmd = [ff, "-hide_banner", "-loglevel", "error",
+          "-user_agent", ua, "-i", ch.url,
+          "-c", "copy", "-f", "mpegts", out]
+    try:
+        _proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+        _current = ch.name
+        api.log("REC start: %s -> %s" % (ch.name, out))
+        api.toast("REC: " + ch.name)
+    except OSError as e:
+        api.toast("ffmpeg failed: %s" % e, ok=False)
+
+
+def _stop(api):
+    global _proc
+    if _proc is None or _proc.poll() is not None:
+        api.toast("No recording active", ok=False)
+        _proc = None
+        return
+    try:
+        _proc.send_signal(signal.SIGINT)
+        _proc.wait(timeout=8)
+    except Exception:  # noqa: BLE001
+        _proc.kill()
+    _proc = None
+    api.log("REC stop: %s" % _current)
+    api.toast("Recording saved: " + _current)
+
+
+def _status(api):
+    if _proc is not None and _proc.poll() is None:
+        api.toast("REC in progress: " + _current)
+    else:
+        if os.path.isdir(api.recordings_dir):
+            n = len([f for f in os.listdir(api.recordings_dir)
+                    if f.endswith(".ts")])
+        else:
+            n = 0
+        api.toast("No active REC - %d file(s) in recordings/" % n)
+
+
+def register(api):
+    return [
+        {"label": "Record this channel", "action": _start,
+        "context": "channel"},
+        {"label": "Stop recording", "action": _stop, "context": "menu"},
+        {"label": "Recording status", "action": _status, "context": "menu"},
+    ]
+'''
+
+
+def _vc_bootstrap_addons():
+    """Crea voidcast_addons/recorder/ al primo avvio se manca -- cosi' l'SDK
+    addon resta una cartella vera e ispezionabile anche se tutto il resto di
+    VOIDCAST vive dentro main_def.py."""
+    folder = os.path.join(VC_ADDON_DIR, "recorder")
+    try:
+        os.makedirs(folder, exist_ok=True)
+        meta_path = os.path.join(folder, "addon.json")
+        if not os.path.isfile(meta_path):
+            with open(meta_path, "w", encoding="utf-8") as f:
+                f.write(_VC_RECORDER_ADDON_JSON)
+        entry_path = os.path.join(folder, "addon.py")
+        if not os.path.isfile(entry_path):
+            with open(entry_path, "w", encoding="utf-8") as f:
+                f.write(_VC_RECORDER_ADDON_PY)
+    except OSError as e:
+        vc_log("bootstrap addon FAIL: %s" % e)
+
+
+class VCAddonAPI(object):
+    """Superficie stabile esposta agli addon. Non rompere il contratto."""
+
+    def __init__(self, app):
+        self._app = app
+        self.config = app.cfg
+        self.data_dir = VC_DATA_DIR
+        self.recordings_dir = VC_REC_DIR
+
+    @property
+    def current_channel(self):
+        return getattr(self._app, "current_channel", None)
+
+    @property
+    def playlist(self):
+        return getattr(self._app, "playlist", None)
+
+    @property
+    def epg(self):
+        return getattr(self._app, "epg", None)
+
+    def toast(self, msg, ok=True):
+        self._app.toast(msg, ok)
+
+    def log(self, msg):
+        vc_log("[addon] %s" % msg)
+
+
+class VCAddonManager(object):
+    def __init__(self, app):
+        self.app = app
+        self.api = VCAddonAPI(app)
+        self.addons = []
+        self.errors = []
+
+    def discover(self):
+        _vc_bootstrap_addons()
+        self.addons, self.errors = [], []
+        base = VC_ADDON_DIR
+        if not os.path.isdir(base):
+            return
+        for name in sorted(os.listdir(base)):
+            folder = os.path.join(base, name)
+            meta_path = os.path.join(folder, "addon.json")
+            if not os.path.isfile(meta_path):
+                continue
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                entry = os.path.join(folder, meta.get("entry", "addon.py"))
+                spec = importlib.util.spec_from_file_location(
+                    "voidcast_addon_" + name, entry)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                actions = mod.register(self.api) or []
+                self.addons.append({"meta": meta, "actions": actions})
+            except Exception:  # noqa: BLE001
+                self.errors.append((name, traceback.format_exc(limit=2)))
+
+    def menu_actions(self):
+        out = []
+        for a in self.addons:
+            for act in a["actions"]:
+                if act.get("context", "menu") == "menu":
+                    out.append((a["meta"].get("name", "?"), act))
+        return out
+
+    def channel_actions(self):
+        out = []
+        for a in self.addons:
+            for act in a["actions"]:
+                if act.get("context") == "channel":
+                    out.append((a["meta"].get("name", "?"), act))
+        return out
+
+
+# --- [F6] ui — tema e widget ------------------------------------------------
+# Estetica voluta a se stante rispetto al resto di Void-Desk: nero ancora
+# piu' profondo, accento crimson di serie (cyan/amber restano scelte), e
+# soprattutto il font mono di sistema invece di quello proporzionale usato
+# ovunque altrove -- e' quel dettaglio a far "sentire" VOIDCAST un modulo
+# a parte, anche se ormai vive nello stesso processo e sullo stesso schermo.
+VC_ACCENTS = {
+    "crimson": (220, 40, 70),
+    "cyan": (60, 220, 230),
+    "amber": (255, 176, 32),
+}
+VC_BG = (5, 5, 8)
+VC_BG_PANEL = (14, 14, 20)
+VC_BG_SEL = (36, 20, 27)
+VC_FG = (212, 212, 218)
+VC_FG_DIM = (112, 112, 128)
+VC_FG_FAINT = (58, 58, 70)
+VC_OK = (90, 200, 120)
+VC_ERR = (230, 80, 80)
+
+
+class VCLogoCache(object):
+    """Loghi canale: scaricati in background (thread dedicato per URL,
+    con dedup) e messi in cache su disco -- il rendering pesca solo
+    dalla cache in memoria e non aspetta mai un download. Il fetch di
+    rete gira sul thread in background (nessuna chiamata pygame li'
+    dentro, non e' detto sia sicuro); la decodifica dell'immagine
+    (pygame.image.load + convert_alpha, che vuole il display gia'
+    pronto) avviene invece sul thread principale, dentro get(), non
+    appena i byte sono arrivati."""
+
+    def __init__(self):
+        self.surf = {}       # url -> Surface | False (fallito)
+        self.raw = {}        # url -> bytes scaricati, non ancora decodificati
+        self.pending = set()  # url con un download in corso
+        self.lock = threading.Lock()
+
+    def get(self, url, user_agent=None):
+        if not url:
+            return None
+        with self.lock:
+            if url in self.surf:
+                v = self.surf[url]
+                return v if v is not False else None
+            raw = self.raw.pop(url, None)
+        if raw is not None:
+            try:
+                s = pygame.image.load(io.BytesIO(raw))
+                s = s.convert_alpha()
+            except Exception:
+                s = False
+            with self.lock:
+                self.surf[url] = s
+            return s if s is not False else None
+        with self.lock:
+            if url in self.pending:
+                return None
+            self.pending.add(url)
+        th = threading.Thread(target=self._fetch, args=(url, user_agent))
+        th.daemon = True
+        th.start()
+        return None
+
+    def _fetch(self, url, user_agent):
+        try:
+            data, _cached = vc_cached_fetch(url, VC_LOGO_CACHE_DIR,
+                                            24 * 14, user_agent)
+        except Exception:
+            data = None
+        with self.lock:
+            self.pending.discard(url)
+            if data:
+                self.raw[url] = data
+            else:
+                self.surf[url] = False
+
+
+class VCTheme(object):
+    def __init__(self, accent_name="crimson"):
+        self.accent = VC_ACCENTS.get(accent_name, VC_ACCENTS["crimson"])
+        self.f_big = font_mono(32, bold=True)
+        self.f_med = font_mono(24)
+        self.f_small = font_mono(19)
+        self.f_tiny = font_mono(15)
+
+    def text(self, surf, txt, pos, font=None, color=VC_FG, maxw=None):
+        font = font or self.f_med
+        if maxw:
+            while font.size(txt)[0] > maxw and len(txt) > 3:
+                txt = txt[:-4] + "..."
+        surf.blit(font.render(txt, True, color), pos)
+
+    def header(self, surf, title, subtitle="", badge=None):
+        pygame.draw.rect(surf, VC_BG_PANEL, (0, 0, W, 44))
+        pygame.draw.line(surf, self.accent, (0, 44), (W, 44), 2)
+        if badge is not None:
+            bimg = getattr(self.host, "badge_img", lambda k, h: None)(badge, 28)
+            if bimg is not None:
+                bw_, bh_ = bimg.get_size()
+                surf.blit(bimg, (W - bw_ - 14, 8))
+                self.text(surf, "// " + title, (14, 9), self.f_big, self.accent)
+            else:
+                self.text(surf, "// " + title, (14, 9), self.f_big, self.accent)
+        else:
+            self.text(surf, "// " + title, (14, 9), self.f_big, self.accent)
+        if subtitle:
+            tw = self.f_small.size(subtitle)[0]
+            self.text(surf, subtitle, (W - tw - 14, 16), self.f_small,
+                     VC_FG_DIM)
+
+    def footer(self, surf, hints):
+        pygame.draw.rect(surf, VC_BG_PANEL, (0, H - 28, W, 28))
+        pygame.draw.line(surf, VC_FG_FAINT, (0, H - 28), (W, H - 28), 1)
+        x = 12
+        for key, label in hints:
+            self.text(surf, key, (x, H - 23), self.f_small, self.accent)
+            x += self.f_small.size(key)[0] + 5
+            self.text(surf, label, (x, H - 23), self.f_small, VC_FG_DIM)
+            x += self.f_small.size(label)[0] + 16
+
+    def scanlines(self, surf):
+        line = pygame.Surface((W, 1), pygame.SRCALPHA)
+        line.fill((0, 0, 0, 36))
+        for y in range(0, H, 3):
+            surf.blit(line, (0, y))
+
+
+class VCMenuList(object):
+    """Lista verticale scrollabile con selezione, sottotitoli e badge.
+    logo_fn (opzionale) e' una callable indice -> Surface|None: se
+    presente, disegna un'iconcina a sinistra di ogni riga visibile
+    (usata solo dall'elenco canali, per i loghi -- tutti gli altri
+    menu restano testuali come sempre)."""
+
+    def __init__(self, theme, items=None, row_h=34, top=54, bottom=H - 34,
+                logo_fn=None):
+        self.t = theme
+        self.items = items or []
+        self.sel = 0
+        self.row_h = row_h
+        self.top = top
+        self.bottom = bottom
+        self.logo_fn = logo_fn
+
+    def norm(self, i):
+        it = self.items[i]
+        if isinstance(it, str):
+            return it, "", ""
+        return (list(it) + ["", ""])[:3]
+
+    def visible_rows(self):
+        return max(1, (self.bottom - self.top) // self.row_h)
+
+    def move(self, delta):
+        if not self.items:
+            return
+        self.sel = (self.sel + delta) % len(self.items)
+
+    def page(self, delta):
+        if not self.items:
+            return
+        self.sel = max(0, min(len(self.items) - 1,
+                              self.sel + delta * self.visible_rows()))
+
+    def draw(self, surf):
+        if not self.items:
+            self.t.text(surf, ":: empty ::", (24, self.top + 10),
+                       self.t.f_med, VC_FG_DIM)
+            return
+        vis = self.visible_rows()
+        first = max(0, min(self.sel - vis // 2, len(self.items) - vis))
+        y = self.top
+        lsz = min(30, self.row_h - 6)
+        for i in range(first, min(first + vis, len(self.items))):
+            label, sub, badge = self.norm(i)
+            selected = (i == self.sel)
+            if selected:
+                pygame.draw.rect(surf, VC_BG_SEL, (6, y, W - 12,
+                                                   self.row_h - 2))
+                pygame.draw.rect(surf, self.t.accent, (6, y, 3,
+                                                       self.row_h - 2))
+            text_x = 22
+            if self.logo_fn:
+                icon = self.logo_fn(i)
+                ly = y + (self.row_h - lsz) // 2
+                if icon:
+                    surf.blit(pygame.transform.smoothscale(icon,
+                                                           (lsz, lsz)),
+                             (text_x, ly))
+                else:
+                    pygame.draw.rect(surf, VC_BG_PANEL,
+                                    (text_x, ly, lsz, lsz))
+                    pygame.draw.rect(surf, VC_FG_FAINT,
+                                    (text_x, ly, lsz, lsz), 1)
+                text_x += lsz + 8
+            badge_w = self.t.f_small.size(badge)[0] if badge else 0
+            self.t.text(surf, label, (text_x, y + 4), self.t.f_med,
+                       VC_FG if selected else VC_FG_DIM,
+                       maxw=W - 38 - text_x - badge_w)
+            if sub:
+                self.t.text(surf, sub, (text_x, y + 4 + 20), self.t.f_tiny,
+                           VC_FG_FAINT, maxw=W - 38 - text_x)
+            if badge:
+                bw = self.t.f_small.size(badge)[0]
+                self.t.text(surf, badge, (W - bw - 20, y + 8),
+                           self.t.f_small, self.t.accent)
+            y += self.row_h
+        if len(self.items) > vis:
+            track_h = self.bottom - self.top
+            bar_h = max(16, track_h * vis // len(self.items))
+            bar_y = (self.top + (track_h - bar_h) * self.sel //
+                    max(1, len(self.items) - 1))
+            pygame.draw.rect(surf, VC_FG_FAINT, (W - 6, self.top, 3, track_h))
+            pygame.draw.rect(surf, self.t.accent, (W - 6, bar_y, 3, bar_h))
+
+
+class VCChannelGrid(object):
+    """Griglia canali: logo se disponibile (scaricato in background,
+    vedi VCLogoCache), altrimenti iniziali come segnaposto."""
+
+    COLS, ROWS = 4, 3
+
+    def __init__(self, theme, channels=None):
+        self.t = theme
+        self.channels = channels or []
+        self.sel = 0
+
+    def move(self, dx, dy):
+        if not self.channels:
+            return
+        n = len(self.channels)
+        self.sel = max(0, min(n - 1, self.sel + dx + dy * self.COLS))
+
+    def draw(self, surf, epg=None, logo_fn=None):
+        if not self.channels:
+            self.t.text(surf, ":: no channels ::", (24, 70), self.t.f_med,
+                       VC_FG_DIM)
+            return
+        per_page = self.COLS * self.ROWS
+        page = self.sel // per_page
+        start = page * per_page
+        cw, chh = 150, 118
+        gx, gy = 12, 56
+        for i in range(start, min(start + per_page, len(self.channels))):
+            k = i - start
+            x = gx + (k % self.COLS) * (cw + 6)
+            y = gy + (k // self.COLS) * (chh + 6)
+            ch = self.channels[i]
+            selected = (i == self.sel)
+            pygame.draw.rect(surf, VC_BG_SEL if selected else VC_BG_PANEL,
+                            (x, y, cw, chh))
+            pygame.draw.rect(surf,
+                            self.t.accent if selected else VC_FG_FAINT,
+                            (x, y, cw, chh), 2 if selected else 1)
+            icon = logo_fn(i) if logo_fn else None
+            if icon:
+                lsz = 52
+                iw0, ih0 = icon.get_size()
+                if iw0 >= ih0:
+                    dw, dh = lsz, max(1, int(lsz * ih0 / iw0))
+                else:
+                    dh, dw = lsz, max(1, int(lsz * iw0 / ih0))
+                scaled = pygame.transform.smoothscale(icon, (dw, dh))
+                surf.blit(scaled, (x + (cw - dw) // 2, y + 14 +
+                                  (lsz - dh) // 2))
+            else:
+                initials = ("".join(w[0] for w in
+                                   ch.name.split()[:2]).upper() or "?")
+                f = self.t.f_big
+                iw, ih = f.size(initials)
+                self.t.text(surf, initials, (x + (cw - iw) // 2, y + 18),
+                          f, self.t.accent if selected else VC_FG_DIM)
+            self.t.text(surf, ch.name, (x + 6, y + 62), self.t.f_tiny,
+                       VC_FG if selected else VC_FG_DIM, maxw=cw - 12)
+            if epg is not None:
+                cur, _ = epg.now_next(ch)
+                if cur:
+                    self.t.text(surf, "> " + cur.title, (x + 6, y + 80),
+                              self.t.f_tiny, VC_FG_FAINT, maxw=cw - 12)
+            self.t.text(surf, "#%d" % (i + 1), (x + 6, y + chh - 18),
+                       self.t.f_tiny, VC_FG_FAINT)
+        total_pages = (len(self.channels) + per_page - 1) // per_page
+        self.t.text(surf, "page %d/%d" % (page + 1, total_pages),
+                   (W - 100, H - 52), self.t.f_tiny, VC_FG_DIM)
+
+
+class VCGuideView(object):
+    """Guida TV a timeline: colonna canali + blocchi programma su 3 ore."""
+
+    ROWS = 7
+    SPAN = 3 * 3600
+
+    def __init__(self, theme, channels=None):
+        self.t = theme
+        self.channels = channels or []
+        self.sel = 0
+        self.t0 = self._align(time.time() - 900)
+
+    @staticmethod
+    def _align(ts):
+        return ts - (ts % 1800)
+
+    def move(self, dy):
+        if self.channels:
+            self.sel = (self.sel + dy) % len(self.channels)
+
+    def pan(self, dx):
+        self.t0 = max(self._align(time.time() - 6 * 3600),
+                     self.t0 + dx * 1800)
+
+    def draw(self, surf, epg):
+        if not self.channels:
+            self.t.text(surf, ":: no channels ::", (24, 70), self.t.f_med,
+                       VC_FG_DIM)
+            return
+        name_w = 150
+        area_x, area_w = name_w + 4, W - name_w - 10
+        top, row_h = 74, 44
+        for k in range(7):
+            ts = self.t0 + k * 1800
+            x = area_x + int(area_w * (ts - self.t0) / self.SPAN)
+            label = time.strftime("%H:%M", time.localtime(ts))
+            self.t.text(surf, label, (x, 52), self.t.f_tiny, VC_FG_DIM)
+            pygame.draw.line(surf, VC_FG_FAINT, (x, 68),
+                            (x, top + self.ROWS * row_h), 1)
+        first = max(0, min(self.sel - self.ROWS // 2,
+                          len(self.channels) - self.ROWS))
+        now = time.time()
+        for r in range(first, min(first + self.ROWS, len(self.channels))):
+            ch = self.channels[r]
+            y = top + (r - first) * row_h
+            selected = (r == self.sel)
+            if selected:
+                pygame.draw.rect(surf, VC_BG_SEL, (0, y, W, row_h - 2))
+            self.t.text(surf, ch.name, (8, y + 12), self.t.f_small,
+                       VC_FG if selected else VC_FG_DIM, maxw=name_w - 12)
+            for p in epg.window(ch, self.t0, self.t0 + self.SPAN):
+                x1 = area_x + int(area_w * max(0, p.start - self.t0) /
+                                  self.SPAN)
+                x2 = area_x + int(area_w * min(self.SPAN, p.stop - self.t0) /
+                                  self.SPAN)
+                if x2 - x1 < 3:
+                    continue
+                live = p.start <= now < p.stop
+                pygame.draw.rect(surf, VC_BG_PANEL,
+                                (x1 + 1, y + 3, x2 - x1 - 2, row_h - 8))
+                pygame.draw.rect(surf,
+                                self.t.accent if live else VC_FG_FAINT,
+                                (x1 + 1, y + 3, x2 - x1 - 2, row_h - 8), 1)
+                self.t.text(surf, p.title, (x1 + 5, y + 12), self.t.f_tiny,
+                          VC_FG if live else VC_FG_DIM, maxw=x2 - x1 - 10)
+        if self.t0 <= now <= self.t0 + self.SPAN:
+            x = area_x + int(area_w * (now - self.t0) / self.SPAN)
+            pygame.draw.line(surf, self.t.accent, (x, 68),
+                            (x, top + self.ROWS * row_h), 2)
+        cur, nxt = epg.now_next(self.channels[self.sel])
+        y_info = top + self.ROWS * row_h + 4
+        if cur:
+            self.t.text(surf, "NOW: " + cur.title, (12, y_info),
+                      self.t.f_small, VC_FG, maxw=W - 24)
+        if nxt:
+            self.t.text(surf, "NEXT: %s (%s)" % (
+                nxt.title, time.strftime("%H:%M", time.localtime(nxt.start))),
+                (12, y_info + 20), self.t.f_tiny, VC_FG_DIM, maxw=W - 24)
+
+
+class VCOnScreenKeyboard(object):
+    """OSK a griglia per URL/ricerca."""
+
+    PAGES = [
+        "abcdefghij" "klmnopqrst" "uvwxyz0123" "456789-_./",
+        "ABCDEFGHIJ" "KLMNOPQRST" "UVWXYZ:/@?" "&=%#+~,;!*",
+    ]
+    COLS = 10
+
+    def __init__(self, theme, title, initial=""):
+        self.t = theme
+        self.title = title
+        self.value = initial
+        self.page = 0
+        self.sel = 0
+        self.done = None
+
+    def keys(self):
+        return self.PAGES[self.page]
+
+    def handle(self, btn):
+        keys = self.keys()
+        rows = (len(keys) + self.COLS - 1) // self.COLS
+        r, c = divmod(self.sel, self.COLS)
+        if btn == "UP":
+            r = (r - 1) % rows
+        elif btn == "DOWN":
+            r = (r + 1) % rows
+        elif btn == "LEFT":
+            c = (c - 1) % self.COLS
+        elif btn == "RIGHT":
+            c = (c + 1) % self.COLS
+        elif btn == "A":
+            self.value += keys[min(self.sel, len(keys) - 1)]
+        elif btn == "B":
+            if self.value:
+                self.value = self.value[:-1]
+            else:
+                self.done = False
+        elif btn == "Y":
+            self.value += " "
+        elif btn in ("L1", "R1"):
+            self.page = (self.page + 1) % len(self.PAGES)
+        elif btn == "START":
+            self.done = True
+        elif btn == "X":
+            self.done = False
+        self.sel = min(r * self.COLS + c, len(keys) - 1)
+
+    def draw(self, surf):
+        surf.fill(VC_BG)
+        self.t.header(surf, self.title, "OSK")
+        pygame.draw.rect(surf, VC_BG_PANEL, (14, 60, W - 28, 36))
+        pygame.draw.rect(surf, self.t.accent, (14, 60, W - 28, 36), 1)
+        shown = self.value[-52:]
+        self.t.text(surf, shown + "_", (22, 68), self.t.f_med, VC_FG)
+        keys = self.keys()
+        kx, ky, kw, kh = 40, 120, 56, 52
+        for i, chak in enumerate(keys):
+            r, c = divmod(i, self.COLS)
+            x, y = kx + c * kw, ky + r * kh
+            selected = (i == self.sel)
+            pygame.draw.rect(surf, VC_BG_SEL if selected else VC_BG_PANEL,
+                            (x, y, kw - 6, kh - 6))
+            pygame.draw.rect(surf,
+                            self.t.accent if selected else VC_FG_FAINT,
+                            (x, y, kw - 6, kh - 6), 1)
+            f = self.t.f_med
+            cw, chh = f.size(chak)
+            self.t.text(surf, chak, (x + (kw - 6 - cw) // 2,
+                                    y + (kh - 6 - chh) // 2), f,
+                      VC_FG if selected else VC_FG_DIM)
+        self.t.footer(surf, [("A", "type"), ("B", "del"), ("Y", "space"),
+                            ("L/R", "symbols"), ("START", "OK"),
+                            ("X", "cancel")])
+
+
+class VCToast(object):
+    def __init__(self, theme):
+        self.t = theme
+        self.msg = ""
+        self.ok = True
+        self.until = 0
+
+    def show(self, msg, ok=True, secs=2.4):
+        self.msg, self.ok, self.until = msg, ok, time.time() + secs
+
+    def draw(self, surf):
+        if time.time() > self.until or not self.msg:
+            return
+        f = self.t.f_small
+        tw = f.size(self.msg)[0]
+        w = min(W - 40, tw + 30)
+        x, y = (W - w) // 2, H - 70
+        pygame.draw.rect(surf, VC_BG_PANEL, (x, y, w, 30))
+        pygame.draw.rect(surf, VC_OK if self.ok else VC_ERR, (x, y, w, 30), 1)
+        self.t.text(surf, self.msg, (x + 15, y + 6), f,
+                   VC_OK if self.ok else VC_ERR, maxw=w - 30)
+
+
+# --- [F7] screens — Home / Channels / Channel actions / Channel info -------
+class VCScreen(object):
+    title = "?"
+
+    def __init__(self, app):
+        self.app = app
+        self.t = app.theme
+
+    def _l(self, it_text, en_text):
+        return it_text if self.app.host.lang == "it" else en_text
+
+    def on_button(self, btn):
+        if btn == "B":
+            self.app.pop()
+
+    def draw(self, surf):
+        pass
+
+
+class VCHomeScreen(VCScreen):
+    title = "VOIDCAST"
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.menu = VCMenuList(self.t, row_h=40, top=64)
+        self.refresh()
+
+    def refresh(self):
+        _l = self._l
+        apl = self.app.cfg.active_playlist()
+        nch = len(self.app.playlist.channels) if self.app.playlist else 0
+        none_ = _l("nessuna", "none")
+        self.menu.items = [
+            ("▶ " + _l("CANALI", "CHANNELS"),
+            _l("lista attiva: %s — %d canali", "active list: %s — %d channels")
+            % (apl["name"] if apl else none_, nch), ""),
+            ("★ " + _l("PREFERITI", "FAVORITES"),
+            _l("%d canali salvati", "%d channels saved") %
+            len(self.app.cfg.get("favorites", [])), ""),
+            ("⌕ " + _l("RICERCA", "SEARCH"),
+            _l("cerca canale per nome", "search channel by name"), ""),
+            ("≡ PLAYLIST",
+            _l("liste M3U ed EPG (URL / file / preset GitHub)",
+              "M3U lists and EPG (URL / file / GitHub preset)"), ""),
+            ("⚒ " + _l("STRUMENTI / ADDON", "TOOLS / ADDONS"),
+            _l("registrazione, tools, estensioni",
+              "recording, tools, extensions"), ""),
+            ("⚙ " + _l("IMPOSTAZIONI", "SETTINGS"),
+            _l("vista, player, tema, info", "view, player, theme, info"),
+            ""),
+            ("⏻ " + _l("Torna al Vault", "Back to the Vault"),
+            _l("esce da VoidCast", "exits VoidCast"), ""),
+        ]
+
+    def on_button(self, btn):
+        if btn == "UP":
+            self.menu.move(-1)
+            self.app.play("move")
+        elif btn == "DOWN":
+            self.menu.move(1)
+            self.app.play("move")
+        elif btn == "A":
+            i = self.menu.sel
+            if i == 0:
+                self.app.open_channels()
+            elif i == 1:
+                self.app.open_channels(favorites=True)
+            elif i == 2:
+                self.app.push(VCSearchScreen(self.app))
+            elif i == 3:
+                self.app.push(VCPlaylistScreen(self.app))
+            elif i == 4:
+                self.app.push(VCToolsScreen(self.app))
+            elif i == 5:
+                self.app.push(VCSettingsScreen(self.app))
+            elif i == 6:
+                self.app.running = False
+        elif btn == "B":
+            self.app.running = False  # da qui si esce anche col B
+
+    def draw(self, surf):
+        self.t.header(surf, "VOIDCAST", VC_APP_TAGLINE, badge="void_cast")
+        self.refresh()
+        self.menu.draw(surf)
+        self.t.footer(surf, [("A", self._l("apri", "open")),
+                            ("START", self._l("canali", "channels")),
+                            ("SELECT", self._l("guida tv", "guide"))])
+
+
+class VCChannelsScreen(VCScreen):
+    """Vista canali unificata: list / grid / guide, cicla con SELECT."""
+
+    def __init__(self, app, channels, label, mode=None):
+        super().__init__(app)
+        self.all_channels = channels
+        self.label = label
+        self.mode = mode or app.cfg.get("view_mode", "list")
+        self.group_i = 0
+        self.groups = ["*"] + (app.playlist.groups if app.playlist else [])
+        lg = app.cfg.get("last_group", "*")
+        if lg in self.groups:
+            self.group_i = self.groups.index(lg)
+        self._rebuild()
+
+    def _filtered(self):
+        g = self.groups[self.group_i]
+        if g == "*":
+            return self.all_channels
+        return [c for c in self.all_channels if c.group == g]
+
+    def _logo_for(self, i):
+        if i >= len(self.channels):
+            return None
+        ch = self.channels[i]
+        if not ch.logo:
+            return None
+        return self.app.logos.get(ch.logo, self.app.cfg.get("user_agent"))
+
+    def _rebuild(self):
+        chans = self._filtered()
+        self.channels = chans
+        favs = set(self.app.cfg.get("favorites", []))
+        self.menu = VCMenuList(self.t, row_h=40, top=64, bottom=H - 34,
+                               logo_fn=self._logo_for)
+        self.menu.items = [(c.name, c.group, "★" if c.url in favs else "")
+                           for c in chans]
+        self.grid = VCChannelGrid(self.t, chans)
+        self.guide = VCGuideView(self.t, chans)
+
+    def _sel(self):
+        if self.mode == "grid":
+            return self.grid.sel
+        if self.mode == "guide":
+            return self.guide.sel
+        return self.menu.sel
+
+    def current(self):
+        if not self.channels:
+            return None
+        return self.channels[min(self._sel(), len(self.channels) - 1)]
+
+    def on_button(self, btn):
+        if btn == "SELECT":
+            order = ["list", "grid", "guide"]
+            self.mode = order[(order.index(self.mode) + 1) % 3]
+            self.app.cfg.set("view_mode", self.mode)
+            return
+        if btn in ("L1", "R1") and self.mode != "guide":
+            self.group_i = ((self.group_i + (1 if btn == "R1" else -1)) %
+                           len(self.groups))
+            self.app.cfg.set("last_group", self.groups[self.group_i])
+            self._rebuild()
+            return
+        if btn == "Y":
+            ch = self.current()
+            if ch:
+                fav = self.app.cfg.toggle_favorite(ch.url)
+                added = self._l("★ aggiunto: ", "★ added: ")
+                removed = self._l("☆ rimosso: ", "☆ removed: ")
+                self.app.toast((added if fav else removed) + ch.name)
+                self._rebuild()
+            return
+        if btn == "START":
+            ch = self.current()
+            if ch:
+                self.app.push(VCChannelActionsScreen(self.app, ch))
+            return
+        if btn == "A":
+            ch = self.current()
+            if ch:
+                self.app.play_channel(self.channels, self.channels.index(ch))
+            return
+        if btn == "B":
+            self.app.pop()
+            return
+        if self.mode == "list":
+            if btn == "UP":
+                self.menu.move(-1)
+                self.app.play("move")
+            elif btn == "DOWN":
+                self.menu.move(1)
+                self.app.play("move")
+            elif btn == "LEFT":
+                self.menu.page(-1)
+            elif btn == "RIGHT":
+                self.menu.page(1)
+        elif self.mode == "grid":
+            if btn == "UP":
+                self.grid.move(0, -1)
+                self.app.play("move")
+            elif btn == "DOWN":
+                self.grid.move(0, 1)
+                self.app.play("move")
+            elif btn == "LEFT":
+                self.grid.move(-1, 0)
+            elif btn == "RIGHT":
+                self.grid.move(1, 0)
+        else:
+            if btn == "UP":
+                self.guide.move(-1)
+                self.app.play("move")
+            elif btn == "DOWN":
+                self.guide.move(1)
+                self.app.play("move")
+            elif btn == "LEFT":
+                self.guide.pan(-1)
+            elif btn == "RIGHT":
+                self.guide.pan(1)
+
+    def draw(self, surf):
+        _l = self._l
+        g = self.groups[self.group_i]
+        all_ = _l("TUTTI", "ALL")
+        sub = "%s · %s · %d ch" % (self.label, all_ if g == "*" else g,
+                                   len(self.channels))
+        titles = {"list": "CHANNELS ▤", "grid": "CHANNELS ▦",
+                 "guide": "TV GUIDE ◫"}
+        self.t.header(surf, titles[self.mode], sub)
+        if self.mode == "list":
+            self.menu.draw(surf)
+            ch = self.current()
+            if ch and self.app.epg:
+                cur, _ = self.app.epg.now_next(ch)
+                if cur:
+                    self.t.text(surf, "» " + _l("ORA", "NOW") + ": " +
+                              cur.title, (12, H - 52), self.t.f_small,
+                              VC_FG_DIM, maxw=W - 24)
+        elif self.mode == "grid":
+            self.grid.draw(surf, self.app.epg, logo_fn=self._logo_for)
+        else:
+            self.guide.draw(surf, self.app.epg)
+        self.t.footer(surf, [("A", "play"), ("Y", "fav"),
+                            ("START", _l("azioni", "actions")),
+                            ("SELECT", _l("vista", "view")),
+                            ("L/R", _l("gruppo", "group"))])
+
+
+class VCChannelActionsScreen(VCScreen):
+    """Menu contestuale canale: play, fav, azioni addon, info."""
+
+    def __init__(self, app, channel):
+        super().__init__(app)
+        self.ch = channel
+        self.menu = VCMenuList(self.t, row_h=36, top=64)
+        self.actions = []
+        self._build()
+
+    def _build(self):
+        _l = self._l
+        fav = self.ch.url in self.app.cfg.get("favorites", [])
+        items = [("▶ " + _l("Riproduci", "Play"), "", ""),
+                (("☆ " + _l("Rimuovi dai preferiti", "Remove from favorites"))
+                 if fav else
+                 ("★ " + _l("Aggiungi ai preferiti", "Add to favorites")),
+                 "", "")]
+        self.actions = ["play", "fav"]
+        for addon_name, act in self.app.addons.channel_actions():
+            items.append((act["label"], _l("addon: ", "addon: ") +
+                         addon_name, "⚒"))
+            self.actions.append(act)
+        items.append(("ℹ " + _l("Dettagli canale", "Channel details"),
+                      "", ""))
+        self.actions.append("info")
+        self.menu.items = items
+
+    def on_button(self, btn):
+        if btn == "UP":
+            self.menu.move(-1)
+            self.app.play("move")
+        elif btn == "DOWN":
+            self.menu.move(1)
+            self.app.play("move")
+        elif btn == "B":
+            self.app.pop()
+        elif btn == "A":
+            act = self.actions[self.menu.sel]
+            if act == "play":
+                self.app.pop()
+                self.app.play_channel([self.ch], 0)
+            elif act == "fav":
+                self.app.cfg.toggle_favorite(self.ch.url)
+                self.app.pop()
+            elif act == "info":
+                self.app.push(VCChannelInfoScreen(self.app, self.ch))
+            else:
+                self.app.current_channel = self.ch
+                try:
+                    act["action"](self.app.addons.api)
+                except Exception as e:  # noqa: BLE001
+                    self.app.toast("Addon error: %s" % e, ok=False)
+                self._build()
+
+    def draw(self, surf):
+        self.t.header(surf, self.ch.name[:30], self.ch.group)
+        self.menu.draw(surf)
+        self.t.footer(surf, [("A", self._l("esegui", "run")),
+                            ("B", self._l("indietro", "back"))])
+
+
+class VCChannelInfoScreen(VCScreen):
+    def __init__(self, app, ch):
+        super().__init__(app)
+        self.ch = ch
+
+    def draw(self, surf):
+        _l = self._l
+        self.t.header(surf, _l("DETTAGLI", "DETAILS"), self.ch.name[:34])
+        y = 66
+        rows = [(_l("Nome", "Name"), self.ch.name),
+               (_l("Gruppo", "Group"), self.ch.group),
+               ("tvg-id", self.ch.tvg_id or "—"),
+               ("tvg-name", self.ch.tvg_name or "—"),
+               ("URL", self.ch.url)]
+        if self.app.epg:
+            cur, nxt = self.app.epg.now_next(self.ch)
+            rows.append((_l("ORA", "NOW"), cur.title if cur else "—"))
+            rows.append((_l("POI", "NEXT"), nxt.title if nxt else "—"))
+            if cur and cur.desc:
+                rows.append((_l("Trama", "Synopsis"), cur.desc[:220]))
+        for k, v in rows:
+            self.t.text(surf, k.upper(), (14, y), self.t.f_small,
+                      self.t.accent)
+            maxw = W - 130
+            words, line, yy = str(v).split(), "", y
+            for wd in words:
+                test = (line + " " + wd).strip()
+                if self.t.f_small.size(test)[0] > maxw:
+                    self.t.text(surf, line, (120, yy), self.t.f_small, VC_FG)
+                    yy += 18
+                    line = wd
+                else:
+                    line = test
+            self.t.text(surf, line, (120, yy), self.t.f_small, VC_FG)
+            y = yy + 24
+        self.t.footer(surf, [("B", _l("indietro", "back"))])
+
+
+# --- [F8] screens — Playlist / Preset / FileBrowser / EPG -------------------
+class VCPlaylistScreen(VCScreen):
+    def __init__(self, app):
+        super().__init__(app)
+        self.menu = VCMenuList(self.t, row_h=38, top=64)
+        self._rebuild()
+
+    def _rebuild(self):
+        _l = self._l
+        cfg = self.app.cfg
+        items = []
+        active = cfg.get("active_playlist")
+        for p in cfg.playlists():
+            items.append((p["name"], p["source"],
+                         ("● " + _l("ATTIVA", "ACTIVE"))
+                         if p["id"] == active else ""))
+        items.append(("+ " + _l("Aggiungi da URL", "Add from URL"),
+                     _l("inserisci URL M3U con la tastiera",
+                       "enter an M3U URL with the keyboard"), ""))
+        items.append(("+ " + _l("Aggiungi da file", "Add from file"),
+                     _l("sfoglia la SD (.m3u/.m3u8)",
+                       "browse the SD card (.m3u/.m3u8)"), ""))
+        items.append(("+ " + _l("Preset GitHub (iptv-org)",
+                               "GitHub preset (iptv-org)"),
+                     _l("liste free mondiali", "free worldwide lists"), ""))
+        items.append(("↻ " + _l("Ricarica lista attiva", "Reload active list"),
+                     _l("riscarica canali + EPG", "re-download channels + EPG"),
+                     ""))
+        n_epg = len(vc_collect_epg_urls(cfg, self.app.playlist))
+        items.append(("◈ EPG",
+                     _l("%d fonti guida TV (auto + manuali)",
+                       "%d TV guide sources (auto + manual)") % n_epg, ""))
+        self.menu.items = items
+        self.n_pl = len(cfg.playlists())
+
+    def on_button(self, btn):
+        if btn == "UP":
+            self.menu.move(-1)
+            self.app.play("move")
+        elif btn == "DOWN":
+            self.menu.move(1)
+            self.app.play("move")
+        elif btn == "B":
+            self.app.pop()
+        elif btn == "X":
+            if self.menu.sel < self.n_pl:
+                p = self.app.cfg.playlists()[self.menu.sel]
+                self.app.cfg.remove_playlist(p["id"])
+                self.app.toast(self._l("Eliminata: ", "Deleted: ") +
+                              p["name"])
+                self._rebuild()
+        elif btn == "A":
+            i = self.menu.sel
+            if i < self.n_pl:
+                p = self.app.cfg.playlists()[i]
+                self.app.cfg.set("active_playlist", p["id"])
+                self.app.reload_playlist()
+                self._rebuild()
+            elif i == self.n_pl:
+                self.app.push(VCTextInputScreen(
+                    self.app, self._l("URL PLAYLIST", "PLAYLIST URL"),
+                    "https://", lambda url: self._add_url(url)))
+            elif i == self.n_pl + 1:
+                self.app.push(VCFileBrowserScreen(self.app, self._add_file))
+            elif i == self.n_pl + 2:
+                self.app.push(VCPresetScreen(self.app, self._rebuild))
+            elif i == self.n_pl + 3:
+                self.app.reload_playlist(force=True)
+            elif i == self.n_pl + 4:
+                self.app.push(VCEpgScreen(self.app))
+
+    def _add_url(self, url):
+        name = url.rstrip("/").split("/")[-1] or "playlist"
+        self.app.cfg.add_playlist(name, url, "url")
+        self.app.reload_playlist()
+        self._rebuild()
+
+    def _add_file(self, path):
+        self.app.cfg.add_playlist(os.path.basename(path), path, "file")
+        self.app.reload_playlist()
+        self._rebuild()
+
+    def draw(self, surf):
+        _l = self._l
+        self.t.header(surf, "PLAYLIST",
+                      "%d " % self.n_pl + _l("liste", "lists"))
+        self.menu.draw(surf)
+        self.t.footer(surf, [("A", _l("attiva/apri", "activate/open")),
+                            ("X", _l("elimina", "delete")),
+                            ("B", _l("indietro", "back"))])
+
+
+class VCPresetScreen(VCScreen):
+    def __init__(self, app, on_done):
+        super().__init__(app)
+        self.on_done = on_done
+        self.menu = VCMenuList(self.t, row_h=38, top=64)
+        self.menu.items = [(n, u, "") for n, u in VC_PRESET_PLAYLISTS]
+
+    def on_button(self, btn):
+        if btn == "UP":
+            self.menu.move(-1)
+            self.app.play("move")
+        elif btn == "DOWN":
+            self.menu.move(1)
+            self.app.play("move")
+        elif btn == "B":
+            self.app.pop()
+        elif btn == "A":
+            name, url = VC_PRESET_PLAYLISTS[self.menu.sel]
+            self.app.cfg.add_playlist(name, url, "url")
+            self.app.pop()
+            self.app.reload_playlist()
+            self.on_done()
+
+    def draw(self, surf):
+        _l = self._l
+        self.t.header(surf, _l("PRESET GITHUB", "GITHUB PRESETS"),
+                      "iptv-org · free · " + _l("mondiali", "worldwide"))
+        self.menu.draw(surf)
+        self.t.footer(surf, [("A", _l("aggiungi e attiva",
+                                     "add and activate")),
+                            ("B", _l("indietro", "back"))])
+
+
+class VCFileBrowserScreen(VCScreen):
+    EXTS = (".m3u", ".m3u8")
+    ROOTS = ["/mnt/mmc", "/mnt/sdcard", "/mnt/usb", os.path.expanduser("~")]
+
+    def __init__(self, app, on_pick, path=None):
+        super().__init__(app)
+        self.on_pick = on_pick
+        self.path = path
+        self.menu = VCMenuList(self.t, row_h=32, top=64)
+        self.entries = []
+        self._list()
+
+    def _list(self):
+        entries = []
+        if self.path is None:
+            for r in self.ROOTS:
+                if os.path.isdir(r):
+                    entries.append((r, True))
+        else:
+            entries.append(("..", True))
+            try:
+                for name in sorted(os.listdir(self.path)):
+                    if name.startswith("."):
+                        continue
+                    full = os.path.join(self.path, name)
+                    if os.path.isdir(full):
+                        entries.append((name, True))
+                    elif name.lower().endswith(self.EXTS):
+                        entries.append((name, False))
+            except OSError:
+                pass
+        self.entries = entries
+        self.menu.items = [("▸ " + n if d else "· " + n, "", "")
+                          for n, d in entries]
+        self.menu.sel = 0
+
+    def on_button(self, btn):
+        if btn == "UP":
+            self.menu.move(-1)
+            self.app.play("move")
+        elif btn == "DOWN":
+            self.menu.move(1)
+            self.app.play("move")
+        elif btn == "LEFT":
+            self.menu.page(-1)
+        elif btn == "RIGHT":
+            self.menu.page(1)
+        elif btn == "B":
+            self.app.pop()
+        elif btn == "A" and self.entries:
+            name, is_dir = self.entries[self.menu.sel]
+            if name == "..":
+                parent = os.path.dirname(self.path.rstrip("/"))
+                self.path = parent if parent and parent != "/" else None
+                self._list()
+            elif is_dir:
+                self.path = (name if self.path is None
+                           else os.path.join(self.path, name))
+                self._list()
+            else:
+                full = os.path.join(self.path, name)
+                self.app.pop()
+                self.on_pick(full)
+
+    def draw(self, surf):
+        _l = self._l
+        self.t.header(surf, "FILE BROWSER",
+                      self.path or _l("radici", "roots"))
+        self.menu.draw(surf)
+        self.t.footer(surf, [("A", _l("apri", "open")),
+                            ("B", _l("indietro", "back"))])
+
+
+class VCEpgScreen(VCScreen):
+    def __init__(self, app):
+        super().__init__(app)
+        self.menu = VCMenuList(self.t, row_h=36, top=64)
+        self._rebuild()
+
+    def _rebuild(self):
+        _l = self._l
+        app = self.app
+        auto = app.playlist.epg_urls if app.playlist else []
+        manual = app.cfg.get("epg_manual_urls", [])
+        ok = set(u.split(" [")[0] for u in
+                (app.epg.sources_ok if app.epg else []))
+        err = dict(app.epg.sources_err) if app.epg else {}
+        items = []
+        self.slots = []
+        auto_lbl = _l("auto (dalla playlist) ", "auto (from playlist) ")
+        man_lbl = _l("manuale (X per rimuovere) ", "manual (X to remove) ")
+        for u in auto:
+            state = "✓" if u in ok else ("✗" if u in err else "…")
+            items.append((u[:58], auto_lbl + err.get(u, ""), state))
+            self.slots.append(("auto", u))
+        for u in manual:
+            state = "✓" if u in ok else ("✗" if u in err else "…")
+            items.append((u[:58], man_lbl + err.get(u, ""), state))
+            self.slots.append(("manual", u))
+        items.append(("+ " + _l("Aggiungi URL EPG", "Add EPG URL"),
+                     _l("XMLTV, anche .gz — quante ne vuoi",
+                       "XMLTV, .gz too — as many as you like"), ""))
+        items.append(("↻ " + _l("Ricarica EPG", "Reload EPG"),
+                     _l("riscarica tutte le fonti",
+                       "re-download all sources"), ""))
+        auto_state = ("ON" if app.cfg.get("epg_use_playlist_sources")
+                     else "OFF")
+        items.append(("Auto-discovery: %s" % auto_state,
+                     _l("usa le fonti url-tvg dichiarate nella playlist",
+                       "use the url-tvg sources declared in the playlist"),
+                     ""))
+        self.menu.items = items
+        self.slots += [("add", None), ("reload", None), ("toggle", None)]
+
+    def on_button(self, btn):
+        if btn == "UP":
+            self.menu.move(-1)
+            self.app.play("move")
+        elif btn == "DOWN":
+            self.menu.move(1)
+            self.app.play("move")
+        elif btn == "B":
+            self.app.pop()
+        elif btn == "X":
+            kind, u = self.slots[self.menu.sel]
+            if kind == "manual":
+                urls = self.app.cfg.get("epg_manual_urls", [])
+                urls.remove(u)
+                self.app.cfg.set("epg_manual_urls", urls)
+                self._rebuild()
+        elif btn == "A":
+            kind, _ = self.slots[self.menu.sel]
+            if kind == "add":
+                self.app.push(VCTextInputScreen(
+                    self.app, "URL EPG (XMLTV)", "https://", self._add_url))
+            elif kind == "reload":
+                self.app.reload_epg(force=True)
+                self._rebuild()
+            elif kind == "toggle":
+                cur = self.app.cfg.get("epg_use_playlist_sources", True)
+                self.app.cfg.set("epg_use_playlist_sources", not cur)
+                self.app.reload_epg()
+                self._rebuild()
+
+    def _add_url(self, url):
+        urls = self.app.cfg.get("epg_manual_urls", [])
+        if url not in urls:
+            urls.append(url)
+        self.app.cfg.set("epg_manual_urls", urls)
+        self.app.reload_epg(force=True)
+        self._rebuild()
+
+    def draw(self, surf):
+        _l = self._l
+        n = len(self.app.epg.by_key) if self.app.epg else 0
+        self.t.header(surf, _l("SORGENTI EPG", "EPG SOURCES"),
+                      "%d " % n + _l("chiavi canale indicizzate",
+                                    "channel keys indexed"))
+        self.menu.draw(surf)
+        self.t.footer(surf, [("A", "ok"), ("X", _l("rimuovi", "remove")),
+                            ("B", _l("indietro", "back"))])
+
+
+# --- [F9] screens — Search / TextInput / Settings / Tools / Log / Info -----
+class VCSearchScreen(VCScreen):
+    def __init__(self, app):
+        super().__init__(app)
+        self.osk = VCOnScreenKeyboard(app.theme,
+                                      self._l("RICERCA CANALE",
+                                             "SEARCH CHANNEL"))
+
+    def on_button(self, btn):
+        self.osk.handle(btn)
+        if self.osk.done is False:
+            self.app.pop()
+        elif self.osk.done is True:
+            q = self.osk.value.strip().lower()
+            self.app.pop()
+            if q and self.app.playlist:
+                found = [c for c in self.app.playlist.channels
+                        if q in c.name.lower() or q in c.group.lower()]
+                self.app.push(VCChannelsScreen(
+                    self.app, found,
+                    self._l("ricerca: %s", "search: %s") % q))
+
+    def draw(self, surf):
+        self.osk.draw(surf)
+
+
+class VCTextInputScreen(VCScreen):
+    def __init__(self, app, title, initial, on_ok):
+        super().__init__(app)
+        self.osk = VCOnScreenKeyboard(app.theme, title, initial)
+        self.on_ok = on_ok
+
+    def on_button(self, btn):
+        self.osk.handle(btn)
+        if self.osk.done is False:
+            self.app.pop()
+        elif self.osk.done is True:
+            val = self.osk.value.strip()
+            self.app.pop()
+            if val:
+                self.on_ok(val)
+
+    def draw(self, surf):
+        self.osk.draw(surf)
+
+
+class VCSettingsScreen(VCScreen):
+    def __init__(self, app):
+        super().__init__(app)
+        self.menu = VCMenuList(self.t, row_h=38, top=64)
+
+    def _items(self):
+        _l = self._l
+        cfg = self.app.cfg
+        none_ = _l("NESSUNO", "NONE")
+        return [
+            (_l("Vista predefinita: %s", "Default view: %s") %
+            cfg.get("view_mode"), "list / grid / guide", ""),
+            (_l("Player: %s", "Player: %s") % cfg.get("player_backend"),
+            _l("auto / mpv / ffplay — rilevato: %s",
+              "auto / mpv / ffplay — detected: %s") %
+            (self.app.player.backend() or none_), ""),
+            (_l("Cache player: %ds", "Player cache: %ds") %
+            cfg.get("player_cache_secs"),
+            _l("buffer per stream ballerini",
+              "buffer for unstable streams"), ""),
+            (_l("EPG max età cache: %dh", "EPG max cache age: %dh") %
+            cfg.get("epg_max_age_hours"),
+            _l("oltre questa età riscarica",
+              "re-downloads past this age"), ""),
+            (_l("Tema: %s", "Theme: %s") % cfg.get("theme_accent"),
+            _l("crimson / cyan / amber (riavvia)",
+              "crimson / cyan / amber (restart)"), ""),
+            ("User-Agent", (cfg.get("user_agent") or "")[:50], ""),
+            ("ℹ INFO", "VOIDCAST %s — SPDW Factory" % VC_APP_VERSION, ""),
+        ]
+
+    def on_button(self, btn):
+        cfg = self.app.cfg
+        if btn == "UP":
+            self.menu.move(-1)
+        elif btn == "DOWN":
+            self.menu.move(1)
+        elif btn == "B":
+            self.app.pop()
+        elif btn == "A" or btn in ("LEFT", "RIGHT"):
+            i = self.menu.sel
+            step = -1 if btn == "LEFT" else 1
+            if i == 0:
+                opts = ["list", "grid", "guide"]
+                cur = opts.index(cfg.get("view_mode"))
+                cfg.set("view_mode", opts[(cur + step) % 3])
+            elif i == 1:
+                opts = ["auto", "mpv", "ffplay"]
+                cur = opts.index(cfg.get("player_backend"))
+                cfg.set("player_backend", opts[(cur + step) % 3])
+            elif i == 2:
+                cfg.set("player_cache_secs",
+                        max(0, min(30, cfg.get("player_cache_secs") + step)))
+            elif i == 3:
+                cfg.set("epg_max_age_hours",
+                        max(1, min(48, cfg.get("epg_max_age_hours") + step)))
+            elif i == 4:
+                opts = list(VC_ACCENTS.keys())
+                cur = opts.index(cfg.get("theme_accent"))
+                cfg.set("theme_accent", opts[(cur + step) % len(opts)])
+            elif i == 5 and btn == "A":
+                self.app.push(VCTextInputScreen(
+                    self.app, "USER-AGENT", cfg.get("user_agent"),
+                    lambda v: cfg.set("user_agent", v)))
+            elif i == 6 and btn == "A":
+                self.app.push(VCInfoScreen(self.app))
+
+    def draw(self, surf):
+        _l = self._l
+        self.t.header(surf, _l("IMPOSTAZIONI", "SETTINGS"),
+                      "config.json")
+        self.menu.items = self._items()
+        self.menu.draw(surf)
+        self.t.footer(surf, [("A/◄►", _l("modifica", "change")),
+                            ("B", _l("indietro", "back"))])
+
+
+class VCToolsScreen(VCScreen):
+    def __init__(self, app):
+        super().__init__(app)
+        self.menu = VCMenuList(self.t, row_h=38, top=64)
+        self._rebuild()
+
+    def _rebuild(self):
+        _l = self._l
+        items = []
+        self.actions = []
+        for addon_name, act in self.app.addons.menu_actions():
+            items.append((act["label"], _l("addon: ", "addon: ") +
+                         addon_name, "⚒"))
+            self.actions.append(act)
+        items.append(("↻ " + _l("Ricarica addon", "Reload addons"),
+                     _l("riscansiona voidcast_addons/",
+                       "rescans voidcast_addons/"), ""))
+        self.actions.append("rescan")
+        items.append(("▤ " + _l("Log applicazione", "Application log"),
+                     _l("ultime 20 righe di voidcast.log",
+                       "last 20 lines of voidcast.log"), ""))
+        self.actions.append("log")
+        if self.app.addons.errors:
+            items.append(("⚠ " + _l("%d addon in errore",
+                                   "%d addon(s) with errors") %
+                         len(self.app.addons.errors),
+                         self.app.addons.errors[0][0], ""))
+            self.actions.append("errors")
+        self.menu.items = items
+
+    def on_button(self, btn):
+        if btn == "UP":
+            self.menu.move(-1)
+        elif btn == "DOWN":
+            self.menu.move(1)
+        elif btn == "B":
+            self.app.pop()
+        elif btn == "A":
+            act = self.actions[self.menu.sel]
+            if act == "rescan":
+                self.app.addons.discover()
+                self.app.toast(self._l("Addon: %d caricati",
+                                      "Addons: %d loaded") %
+                              len(self.app.addons.addons))
+                self._rebuild()
+            elif act == "log":
+                self.app.push(VCLogScreen(self.app))
+            elif act == "errors":
+                self.app.push(VCLogScreen(self.app, addon_errors=True))
+            else:
+                try:
+                    act["action"](self.app.addons.api)
+                except Exception as e:  # noqa: BLE001
+                    self.app.toast("Addon error: %s" % e, ok=False)
+                self._rebuild()
+
+    def draw(self, surf):
+        _l = self._l
+        self.t.header(surf, _l("STRUMENTI / ADDON", "TOOLS / ADDONS"),
+                      "%d " % len(self.app.addons.addons) +
+                      _l("addon attivi", "active addons"))
+        self.menu.draw(surf)
+        self.t.footer(surf, [("A", _l("esegui", "run")),
+                            ("B", _l("indietro", "back"))])
+
+
+class VCLogScreen(VCScreen):
+    def __init__(self, app, addon_errors=False):
+        super().__init__(app)
+        if addon_errors:
+            self.lines = []
+            for name, tb in app.addons.errors:
+                self.lines.append("== " + name)
+                self.lines += tb.splitlines()[-4:]
+        else:
+            try:
+                with open(VC_LOG_PATH, "r", encoding="utf-8") as f:
+                    self.lines = f.read().splitlines()[-20:]
+            except OSError:
+                self.lines = [self._l("(log vuoto)", "(log empty)")]
+
+    def draw(self, surf):
+        self.t.header(surf, "LOG", VC_LOG_PATH)
+        y = 60
+        for ln in self.lines[-20:]:
+            self.t.text(surf, ln, (10, y), self.t.f_tiny, VC_FG_DIM,
+                      maxw=W - 20)
+            y += 18
+        self.t.footer(surf, [("B", self._l("indietro", "back"))])
+
+
+class VCInfoScreen(VCScreen):
+    def draw(self, surf):
+        _l = self._l
+        self.t.header(surf, "VOIDCAST %s" % VC_APP_VERSION, "SPDW Factory", badge="void_cast")
+        lines = [
+            ("", VC_APP_TAGLINE),
+            ("", ""),
+            (_l("Target", "Target"),
+            "muOS · RG35XX H · 640x480 · " +
+            _l("integrata in Void-Desk", "embedded in Void-Desk")),
+            (_l("Motore", "Engine"),
+            "Python 3 + pygame · " + _l("playback mpv (drm)",
+                                       "mpv playback (drm)")),
+            (_l("Liste", "Lists"),
+            _l("M3U da URL, file locale o preset iptv-org",
+              "M3U from URL, local file or iptv-org preset")),
+            ("EPG", _l("XMLTV multi-fonte: auto (url-tvg) + manuali",
+                      "Multi-source XMLTV: auto (url-tvg) + manual")),
+            (_l("Viste", "Views"),
+            _l("elenco · griglia · guida TV timeline",
+              "list · grid · TV guide timeline")),
+            (_l("Addon", "Addons"),
+            "voidcast_addons/ — " +
+            _l("API stabile per PVR & co.", "stable API for PVR & co.")),
+        ]
+        y = 66
+        for k, v in lines:
+            if k:
+                self.t.text(surf, k.upper(), (16, y), self.t.f_small,
+                          self.t.accent)
+            self.t.text(surf, v, (110, y), self.t.f_small, VC_FG_DIM,
+                      maxw=W - 130)
+            y += 24
+        self.t.footer(surf, [("B", self._l("indietro", "back"))])
+
+
+# --- [F10] VCApp — controller radice, agganciato a Void-Desk come host -----
+class VCApp(object):
+    """Al posto del vecchio App standalone: niente piu' pygame.init/display/
+    joystick/clock/loop propri -- tutto quello arriva gia' da Void-Desk, che
+    tiene questa istanza come self.voidcast e le smista draw()/on_button()
+    ogni volta che lo stato in cima allo stack di Void-Desk e' 'voidcast'.
+    'host' e' l'istanza App di Void-Desk: serve per lo spinner animato dei
+    lavori lunghi (run_busy) e per cedere/riprendere lo schermo attorno a
+    mpv (vc_suspend_display / vc_resume_display)."""
+
+    def __init__(self, host):
+        self.host = host
+        self.cfg = VCConfig()
+        self.theme = VCTheme(self.cfg.get("theme_accent", "crimson"))
+        self.player = VCPlayer(self.cfg)
+        self.addons = VCAddonManager(self)
+        self._toast = VCToast(self.theme)
+        self.logos = VCLogoCache()
+        self.playlist = None
+        self.epg = VCEPG()
+        self.current_channel = None
+        self.running = True
+        self.stack = []
+        self.bootstrapped = False
+
+    def bootstrap(self):
+        """Discovery addon + home + caricamento playlist attiva: fatto una
+        volta sola, al primo ingresso in VOIDCAST (non ad ogni frame ne' ad
+        ogni rientro)."""
+        if self.bootstrapped:
+            return
+        self.bootstrapped = True
+        self.addons.discover()
+        self.push(VCHomeScreen(self))
+        if self.cfg.active_playlist():
+            self.reload_playlist()
+
+    # ------------------------------------------------------------------
+    def push(self, screen):
+        self.stack.append(screen)
+
+    def pop(self):
+        if len(self.stack) > 1:
+            self.stack.pop()
+
+    def top(self):
+        return self.stack[-1]
+
+    def toast(self, msg, ok=True):
+        self._toast.show(msg, ok)
+        vc_log(("[ok] " if ok else "[err] ") + msg)
+
+    # ------------------------------------------------------------------
+    def reload_playlist(self, force=False):
+        entry = self.cfg.active_playlist()
+        if not entry:
+            self.playlist = None
+            return
+        ua = self.cfg.get("user_agent")
+
+        def _do():
+            return vc_load_playlist(entry, ua)
+
+        it = self.host.lang == "it"
+        label = ("scarico lista: " if it else "downloading list: ") + \
+            entry["name"]
+        pl = self.host.run_busy(label, _do)
+        if pl is not None:
+            self.playlist = pl
+            # in cache sulla entry di config: cosi' vc_collect_epg_urls
+            # puo' poolare le fonti EPG dichiarate da TUTTE le playlist
+            # salvate, non solo quella attiva in questo momento.
+            entry["epg_urls"] = pl.epg_urls
+            self.cfg.save()
+            self.toast((
+                "Lista ok: %d canali, %d fonti EPG dichiarate" if it else
+                "List ok: %d channels, %d EPG sources declared") %
+                (len(pl.channels), len(pl.epg_urls)))
+            self.reload_epg(force=force)
+        else:
+            self.toast(("Impossibile scaricare la lista: %s" if it else
+                       "Could not download the list: %s") %
+                      entry["name"], ok=False)
+
+    def reload_epg(self, force=False):
+        urls = vc_collect_epg_urls(self.cfg, self.playlist)
+        if not urls:
+            self.epg = VCEPG()
+            return
+        max_age = 0 if force else self.cfg.get("epg_max_age_hours", 12)
+        ua = self.cfg.get("user_agent")
+
+        def _do():
+            e = VCEPG()
+            e.load(urls, ua, max_age)
+            return e
+
+        it = self.host.lang == "it"
+        label = (("carico EPG (%d fonti)" if it else
+                 "loading EPG (%d sources)") % len(urls))
+        e = self.host.run_busy(label, _do)
+        if e is not None:
+            self.epg = e
+            msg = (("EPG: %d ok, %d errori" if it else
+                   "EPG: %d ok, %d errors") %
+                  (len(e.sources_ok), len(e.sources_err)))
+            self.toast(msg, ok=not e.sources_err or bool(e.sources_ok))
+        else:
+            self.toast(("Caricamento EPG fallito" if it else
+                       "EPG loading failed"), ok=False)
+
+    # ------------------------------------------------------------------
+    def open_channels(self, mode=None, favorites=False):
+        it = self.host.lang == "it"
+        if not self.playlist or not self.playlist.channels:
+            self.toast(("Nessuna lista attiva: vai in PLAYLIST" if it else
+                       "No active list: go to PLAYLIST"), ok=False)
+            self.push(VCPlaylistScreen(self))
+            return
+        chans = self.playlist.channels
+        label = "playlist"
+        if favorites:
+            favs = set(self.cfg.get("favorites", []))
+            chans = [c for c in chans if c.url in favs]
+            label = "favorites" if not it else "preferiti"
+        self.push(VCChannelsScreen(self, chans, label, mode))
+
+    def play_channel(self, channels, index):
+        """Loop di zapping: gestisce next/prev/fav via exit code del
+        player. Lo schermo di Void-Desk viene ceduto per intero a mpv
+        (vc_suspend_display) e ripreso esattamente come lo aveva lasciato
+        (vc_resume_display) ad ogni canale, zapping incluso."""
+        i = index
+        while True:
+            ch = channels[i]
+            self.current_channel = ch
+            vc_log("play: %s" % ch.name)
+            self.host.vc_suspend_display()
+            try:
+                result = self.player.play(ch)
+            finally:
+                self.host.vc_resume_display()
+            if result == VC_RESULT_NEXT:
+                i = (i + 1) % len(channels)
+            elif result == VC_RESULT_PREV:
+                i = (i - 1) % len(channels)
+            elif result == VC_RESULT_FAV:
+                fav = self.cfg.toggle_favorite(ch.url)
+                self.toast(("★ " if fav else "☆ ") + ch.name)
+            elif result == VC_RESULT_ERROR:
+                it = self.host.lang == "it"
+                err = self.player.last_error or (
+                    "Errore player" if it else "Player error")
+                self.toast(err, ok=False)
+                return
+            else:
+                return
+
+    # ------------------------------------------------------------------
+    def dispatch(self, btn):
+        """Punto d'ingresso unico chiamato da Void-Desk per ogni pressione
+        mentre lo stato attivo e' 'voidcast'. Un piccolo suono coerente col
+        resto di Void-Desk (VOIDCAST da sola non ne aveva) prima di passare
+        il tasto alla schermata in cima allo stack."""
+        if not btn:
+            return
+        if btn in ("UP", "DOWN", "LEFT", "RIGHT", "L1", "R1"):
+            self.host.play("move")
+        elif btn in ("A", "START", "Y"):
+            self.host.play("click")
+        elif btn == "B":
+            self.host.play("back")
+        self.top().on_button(btn)
+
+    def draw(self, surf):
+        surf.fill(VC_BG)
+        try:
+            self.top().draw(surf)
+        except Exception:  # noqa: BLE001 -- mai morire per un draw
+            vc_log("draw FAIL: %s" % traceback.format_exc(limit=3))
+            self.pop()
+        self._toast.draw(surf)
+        self.theme.scanlines(surf)
+
+
+# ============================================================================
 #  [E] CLASS APP — CORE APPLICATION
 # ============================================================================
 class App(object):
@@ -2166,11 +4983,42 @@ class App(object):
         if not fbdisplay.attach(self.surface):
             print("fbdisplay non disponibile")
         self.cfg = load_cfg()
+        if self.cfg.get("home_style") not in HOME_STYLES:
+            self.cfg["home_style"] = DEFAULT_HOME_STYLE
         self.lang = self.cfg.get("lang", "it")
         self.accent = ACCENTS.get(self.cfg.get("theme", "ambra"),
                                   ACCENTS["ambra"])
         self.accent2 = theme_secondary(self.accent)
         self.sel_bg = sel_tint(self.accent)
+        # Default per i pannelli di controllo (CURSEDEV > Panels)
+        self.cfg.setdefault("media_panel", {
+            "position": "bottom",
+            "width": 300,
+            "height": 180,
+            "opacity": 0.85,
+            "show_station_info": True,
+            "show_volume": True,
+            "show_progress": True,
+        })
+        self.cfg.setdefault("outer_panel", {
+            "position": "right",
+            "width": 200,
+            "opacity": 0.8,
+            "show_logs": True,
+            "show_stats": True,
+        })
+        self.cfg.setdefault("netsphere_monitor", {
+            "position": "left",
+            "width": 220,
+            "opacity": 0.85,
+            "show_radar": True,
+            "show_telemetry": True,
+        })
+        self.cfg.setdefault("terminal_id", {
+            "show_on_startup": True,
+            "operator_name": "SPDW-07",
+            "terminal_id": "",
+        })
         self.bg_img = None
         self.fx_img = None
         self.stripe_img = None
@@ -2209,6 +5057,12 @@ class App(object):
         self.fm_clip = None
         self.fm_pick = None
         self.fm_items = []
+        self.fm_sort = 0
+        self.fm_sort_rev = False
+        self._fmenu_sel = 0
+        self._fmenu_scroll = 0
+        self._fmenu_anim_start = None
+        self._fmenu_anim_progress = 0.0
         self.ed_path = ""
         self.ed_lines = [""]
         self.ed_cur = 0
@@ -2297,6 +5151,10 @@ class App(object):
         self.busy_steps = []
         self.busy_step_idx = 0
         self.busy_current = None
+        self.busy_cancelled = False
+        self.busy_accent = None
+        self.busy_icon = None
+        self.busy_step_done = []
         self.taskpanel_sel = 0
         self.img_free = None
         self.img_total = None
@@ -2313,11 +5171,68 @@ class App(object):
                 self.stack = ["home", "clihub", "clitools"]
         except OSError:
             pass
+        self.DATA = DATA
+        self.EXIT_APT_UPDATE = EXIT_APT_UPDATE
         self.sel = 0
         self.nexus_ring = 0
         self.nexus_rot_mid = 0
         self.nexus_rot_out = 0
         self.nexus_rot_far = 0
+        self.nexus_rot_void = 0
+        self.nradar_rot_mid = 0
+        self.nradar_rot_out = 0
+        self.nradar_rot_far = 0
+        self.nradar_rot_void = 0
+        self.nexus_sat_sel = 0
+        self.od_sel = 0
+        self.od_scroll = 0
+        self.od_detail_sel = 0
+        self.od_deps_cache = {}
+        self.od_launched = False
+        self.od_launch_t = 0.0
+        self.endnode_ring_sel = 0
+        self.rtcarousel_sel = 0
+        self._rtcore_current_main = None
+        self._rtcore_current_name = None
+        self._carousel_echo = False
+        self._carousel_echo_text = ""
+        self._carousel_echo_pos = (0, 0)
+        self._carousel_echo_timer = 0.0
+        self._core_fragment = None
+        self._core_fragment_pos = (0, 0)
+        self._core_fragment_velocity = (0, 0)
+        status_file = "/tmp/.vd_rtcore_status"
+        if os.path.exists(status_file):
+            try:
+                with open(status_file) as f:
+                    data = json.load(f)
+                    self._rtcore_current_main = data.get("main")
+                    self._rtcore_current_name = data.get("name", "Unknown")
+            except:
+                pass
+        self.voidcast = None  # istanza VCApp, creata al primo ingresso
+        # CURSEDEV Secret Menu
+        self.nexus_combo_sequence = []
+        self.nexus_combo_target = ["RIGHT", "LEFT", "DOWN", "UP", "RIGHT", "LEFT", "DOWN", "UP"]
+        self.cursedev_secret_glitch_phase = 0
+        self.cursedev_secret_glitch_t0 = 0.0
+        self._cursedev_notif_sent = False
+        self.cursedev_menu_sel = 0
+        # Panel combo (R2/L2)
+        self.panel_combo_sequence = []
+        self.panel_combo_target = ["RIGHT", "LEFT", "DOWN", "RIGHT", "LEFT", "DOWN", "UP"]
+        self._panel_combo_triggered = False
+        self.nexus_logo_scale = 1.0
+        self.nexus_orbit_distance = 1.0
+        self.nexus_orbit_tilt = 0.0
+        self.nexus_node_size = 1.0
+        self.nexus_node_glow = 1.0
+        self._nexus_fast_travel = None
+        self._nexus_fast_travel_t0 = 0.0
+        self._combo_l2r2 = None
+        self._combo_l2r2_start = None
+        self._frame_count = 0
+        self._cache_cleanup_counter = 0
         self.home_scroll = 0
         self.sel_log = 0
         self.opt_sel = 0
@@ -2334,6 +5249,10 @@ class App(object):
         # sessione lunga.
         self._text_cache = collections.OrderedDict()
         self._text_cache_max = 600
+        self._np_panel_open = False
+        self._np_panel_slide = 0.0
+        self._np_panel_sel = 0
+        self._np_click_suppressed = False
         self._dpad_t = 0.0
         self.map_sel = 0
         self.comp_sel = 0
@@ -2356,11 +5275,22 @@ class App(object):
         self.update_checking = False
         self.updset_open = False
         self.updset_sel = 0
+        self.updset_scroll = 0
         self.updset_ethos1 = None
         self.updset_ethos2 = None
         self.updset_particle_a = 0.0
         self.update_local_path = None
         self.update_local_ver = None
+        self.updmenu_sel = 0
+        self.updmenu_scroll = 0
+        self.storico_sel = 0
+        self.storico_scroll = 0
+        self.local_update_items = []
+        self.local_update_sel = 0
+        self.local_update_scroll = 0
+        self.local_update_log = []
+        self.local_update_progress = 0
+        self.local_update_installing = False
         self.notif_queue = []
         self.notif_active = None
         self.notif_phase = None
@@ -2368,6 +5298,46 @@ class App(object):
         self.notif_unread = 0
         self.media_panel_phase = None
         self.media_panel_t0 = 0.0
+        self.media_panel_station_idx = 0
+        self.media_btn_anim = None
+        self.media_btn_anim_t0 = 0.0
+        # Media Vault state
+        self.media_vault_phase = None
+        self.media_vault_anim_t0 = 0.0
+        self.media_vault_sel = 0
+        self.media_vault_flash_alpha = 0
+        self.media_vault_sword_progress = 0.0
+        self.media_vault_quadrants_cache = None
+        self.media_vault_cache_key = None
+
+        # Dirty rect renderer
+        self.dirty_renderer = DirtyRectRenderer()
+        self.gear_angle = 0.0
+        self.led_color_phase = 0.0
+        self.deploy_btn_active = False
+        self.deploy_btn_anim = None
+        self.deploy_btn_anim_t0 = 0.0
+        self.mecha_panel_phase = None
+        self.mecha_panel_t0 = 0.0
+        self.mecha_panel_sel = 0
+        self.mecha_panel_config = self.cfg.get("mecha_panel_config", {
+            "L1": "return_to_nexus",
+            "L2": "goto_endnode",
+            "R1": "goto_satellite",
+            "R2": "goto_toolbox",
+            "START": "none",
+            "Y": "none",
+            "SELECT": "close",
+        })
+        self.outer_panel_phase = None
+        self.outer_panel_t0 = 0.0
+        self.outer_panel_sel = 0
+        self.outer_panel_start_held = False  # NEW: track if START is being held
+        self.outer_panel_start_t0 = 0.0  # NEW: timer for START held
+        self.outerdesk_running_app = None
+        self.outerdesk_proc = None
+        self.outer_log_lines = ["Outer-Desk ready."]
+        self._outer_btn_rects = {}
         self.ctrl_devices = []
         self.ctrl_sel = 0
         self.ctrl_active_readers = {}
@@ -2390,18 +5360,58 @@ class App(object):
         self.r2_tablet_t0 = 0.0
         self.l2_panel_phase = None
         self.l2_panel_t0 = 0.0
+        self.devcheck_dept = 0
+        self.devcheck_diag_mode = 0
+        self._dc_sel_sel = 0
+        self._dc_sel_cats = ["image", "envs", "sys", "net", "storage"]
+        self._dc_net = None
+        self._dc_rec = None
         self.bstation_srv = None
         self.ts_netcheck_data = {}
         self.ts_login_url = ""
         self.ts_qr_matrix = None
+        self.ts_tailnet_name = ""
+        self.ts_magicdns = False
+        self.ts_key_expiry = None
+        self.ts_version = ""
+        self.ts_browse_path = "/mnt/mmc/ROMS"
+        self.ts_browse_items = []
+        self.ts_browse_sel = 0
+        self.ts_browse_marked = set()
+        self.ts_browse_dirs_only = False
+        self.ts_send_target = ""
+        self.ts_result_msg = ""
+        self.ts_loading_msg = ""
+        self.ts_exit_sel = 0
+        self.ts_theme_sel = 0
+        self.ts_peer_detail_msg = ""
+        self.ts_ssh_enabled = False
         self.bgm_files = []
         self.bgm_sel = 0
         self.bgm_marked = set()
         self.bgm_log = []
         self.bgm_proc_idx = 0
         self.bgm_proc_pct = 0
+        self.bgm_conv_sel = 0
+        self.bgm_opt_sel = 0
+        self.bgm_theme_sel = 0
+        self.bgm_log_view_scroll = 0
+        self.bgm_log_view_lines = []
+        self.bgm_result_msg = ""
+        self.bgm_processing = False
+        self.bgm_process_done = False
+        self.bgm_process_total = 0
+        self.bgm_process_idx = 0
+        self.bgm_process_log = []
+        self.bgm_preview_file = None
+        self.bgm_preview_proc = None
+        self.bgm_file_infos = {}
+        self.bgm_menu_sel = 0
         self.radio_mpv = None
+        self.media_mpv = None
         self.radio_sel = 0
+        self.radio_visible = 8
+        self.radio_options_sel = 0
         self.radio_tab = "all"
         self.radio_playing = None
         self.radio_search_q = ""
@@ -2411,6 +5421,23 @@ class App(object):
         self.radio_sleep_min = 0
         self.radio_sleep_t0 = 0.0
         self.radio_last_health_check = 0.0
+        self.radio_cache = {}
+        try:
+            if os.path.isfile(RADIO_CACHE_FILE):
+                with open(RADIO_CACHE_FILE) as f:
+                    self.radio_cache = json.load(f)
+        except Exception:
+            self.radio_cache = {}
+        self.radio_filter_type = None
+        self.radio_filter_value = None
+        self.radio_filter_values = []
+        self.radio_filter_idx = 0
+        self.radio_import_playlists = []
+        self.radio_import_sel = 0
+        self.radio_import_mode = "playlist"
+        self.radio_import_channels = []
+        self.radio_import_marked = set()
+        self.radio_import_url = ""
         self.mapp_sd_tab = "all"
         self.calc_layout_idx = 0
         self.calc_subj_idx = 0
@@ -2518,6 +5545,20 @@ class App(object):
                 import traceback
                 sys.stderr.write("intro non riuscita: %s\n" % e)
                 traceback.print_exc(file=sys.stderr)
+            # Check for Rt:CORE build selection from grub menu
+            rtcore_path = None
+            try:
+                with open("/tmp/.vd_rtcore_sel") as f:
+                    rtcore_path = f.read().strip()
+            except Exception:
+                pass
+            if rtcore_path:
+                try:
+                    os.remove("/tmp/.vd_rtcore_sel")
+                except Exception:
+                    pass
+                self.exit_code = 19
+                return 19
         # migrazione v6: boost separato in swap+cpu, animazioni/bgm on
         if self.cfg.get("boost") is False:
             self.cfg.setdefault("boost_swap", False)
@@ -2558,6 +5599,43 @@ class App(object):
                 except Exception:
                     pass
             threading.Thread(target=bg_bstation, daemon=True).start()
+        self.forge_hub = ForgeHub(self)
+        self.uplink_hub = UplinkHub(self)
+        self.media_hub = MediaHub(self)
+        self.workshop_hub = WorkshopHub(self)
+        self.toolbox_hub = ToolboxHub(self)
+        self.mapps_hub = MappsHub(self)
+        self.settings_hub = SettingsHub(self)
+        self.info_hub = InfoHub(self)
+        self.shutdown_hub = ShutdownHub(self)
+        self.controller_hub = ControllerHub(self)
+        self.games_hub = GamesHub(self)
+        self.develop_hub = DevelopHub(self)
+        self.community_hub = CommunityHub(self)
+        self.outerdesk_hub = OuterdeskHub(self)
+        self.legacy_hub = LegacyHub(self)
+        self.nexus_renderer = NexusRenderer(self)
+        self.volume_overlay = VolumeOverlay(self)
+        self.volume_level = 50
+        try:
+            import subprocess
+            result = subprocess.run(["amixer", "sget", "Master"], capture_output=True, text=True)
+            for line in result.stdout.splitlines():
+                if "[" in line and "%" in line:
+                    pct = line.split("[")[1].split("%")[0]
+                    self.volume_level = int(pct)
+                    break
+        except Exception:
+            pass
+        self.logger_manager = LoggerManager.get_instance()
+        self.log_registry = LogRegistry.get_instance()
+        self.logger_manager.log("voiddesk", LogLevel.INFO, "VoidDesk avviato (v10.5.0)")
+        self._logviewer_filter_source = None
+        self._logviewer_filter_level = None
+        self._logger_sel = 0
+        self._logger_scroll = 0
+        self._logger_visible = 14
+        log("App init complete, lang=%s, theme=%s" % (self.lang, self.cfg.get("theme", "ambra")))
 
     # ---------------------------------------------------------------- i18n
 
@@ -2572,7 +5650,7 @@ class App(object):
         return table.get(txt, txt)
 
 
-# --- [E3] Menu Rebuilder (Home / MUOS Apps / Media / Forge / Toolbox / Uplink / Workshop / Settings / Info / Exit) ---
+# --- [E3] Menu Rebuilder (Home / MUOS Apps / Media / Forge / Toolbox / Uplink / Workshop / Settings / Info / Exit / Games / Develop / Community / Outerdesk / Legacy) ---
     def rebuild_menu(self):
         xfce_ok = os.path.exists(os.path.join(DATA, ".xfce_ready"))
         t = self.t
@@ -2587,10 +5665,16 @@ class App(object):
             (t("h_set"), t("h_set_s")),
             (t("h_info"), t("h_info_s")),
             (t("h_exit"), t("h_exit_s")),
+            (t("h_games"), t("h_games_s")),
+            (t("h_develop"), t("h_develop_s")),
+            (t("h_community"), t("h_community_s")),
+            (t("h_outerdesk"), t("h_outerdesk_s")),
+            (t("h_legacy"), t("h_legacy_s")),
         ]
         self.menu_icons = ["start", "window", "speaker", "forge",
                            "toolbox", "uplink", "workshop", "gear",
-                           "book", "power"]
+                           "book", "power",
+                           "games", "develop", "community", "outerdesk", "legacy"]
 
     # ---------------------------------------------------- stile SPDW/BLAME!
 
@@ -2862,52 +5946,149 @@ class App(object):
             return None
 
     def build_sfx(self):
-        """Suoni UI sintetizzati al volo: blip di apertura, ritorno,
-        movimento e scatto d'aggancio. Zero asset; se l'audio manca,
-        silenzio e pace."""
+        """Suoni UI sintetizzati al volo: libreria completa per ogni
+        azione, con noise, FM e componenti inharmonic per un carattere
+        'sbrobbante' e cyberpunk."""
         try:
             pygame.mixer.init(22050, -16, 1, 256)
         except pygame.error:
             return None
 
-        def tone(f0, f1, ms, vol=0.30, noise=0.0):
-            n = int(22050 * ms / 1000)
+        def _tone(f0, f1, ms, vol=0.20, noise=0.0, fm=0.0, fm_index=0.0, inharmonic=None):
+            sr = 22050
+            n = int(sr * ms / 1000)
             buf = bytearray()
             ph = 0.0
-            rnd = random.Random(3)
+            ph_mod = 0.0
+            rnd = random.Random(42)
             for i in range(n):
                 t = i / float(n)
-                ph += 2 * math.pi * (f0 + (f1 - f0) * t) / 22050
+                freq = f0 + (f1 - f0) * t
+                ph += 2 * math.pi * freq / sr
                 v = math.sin(ph)
+                if fm:
+                    ph_mod += 2 * math.pi * fm * t / sr
+                    v = math.sin(ph + fm_index * math.sin(ph_mod))
+                if inharmonic:
+                    for ratio, amp in inharmonic:
+                        v += amp * math.sin(ph * ratio + t * 3.0)
+                    v /= 1.0 + sum(amp for _, amp in inharmonic)
                 if noise:
                     v = v * (1 - noise) + noise * (rnd.random() * 2 - 1)
-                env = min(1.0, i / 40.0) * (1 - t) ** 1.6
-                smp = int(vol * env * 32767 * v)
+                env = min(1.0, i / 30.0) * (1 - t) ** 1.8
+                smp = int(vol * env * 32767 * max(-1.0, min(1.0, v)))
+                buf += smp.to_bytes(2, "little", signed=True)
+            return pygame.mixer.Sound(buffer=bytes(buf))
+
+        def _whisper():
+            sr = 22050
+            duration = 2.0
+            n = int(sr * duration)
+            buf = bytearray()
+            rnd = random.Random(666)
+            ph = 0.0
+            for i in range(n):
+                t = i / float(n)
+                freq = 80 + 20 * math.sin(t * 0.5)
+                ph += 2 * math.pi * freq / sr
+                noise = rnd.random() * 2 - 1
+                mod = 0.3 + 0.2 * math.sin(t * 1.3)
+                v = math.sin(ph) * 0.4 + noise * 0.6
+                env = min(1.0, t * 2) * (1 - t * 0.5)
+                v = v * (1 - t * 0.3)
+                smp = int(0.15 * env * v * 32767)
                 buf += smp.to_bytes(2, "little", signed=True)
             return pygame.mixer.Sound(buffer=bytes(buf))
         try:
-            return {"open": tone(420, 980, 70),
-                    "back": tone(760, 320, 60),
-                    "move": tone(1240, 1240, 16, 0.16),
-                    "snap": tone(190, 130, 45, 0.34, 0.55),
-                    "click": tone(900, 500, 30, 0.20, 0.60),
-                    "off": tone(320, 38, 480, 0.42, 0.35),
-                    "nexus": tone(560, 1520, 110, 0.24, 0.10),
-                    "charge": tone(140, 640, 340, 0.22, 0.30),
-                    "charge2": tone(100, 420, 320, 0.22, 0.24),
-                    "charge3": tone(220, 820, 310, 0.22, 0.34),
-                    "charge4": tone(170, 540, 360, 0.20, 0.20),
-                    "lid_click": tone(200, 85, 90, 0.25, 0.45),
-                    "page_flip": tone(420, 950, 70, 0.16, 0.55)}
+            return {
+                "open": _tone(420, 980, 70),
+                "back": _tone(760, 320, 60),
+                "move": _tone(1240, 1240, 16, vol=0.18, noise=0.35),
+                "snap": _tone(190, 130, 45, vol=0.28, noise=0.55),
+                "click": _tone(900, 500, 30, vol=0.20, noise=0.60, fm=180, fm_index=3.5),
+                "off": _tone(320, 38, 480, vol=0.30, noise=0.35),
+                "nexus": _tone(560, 1520, 110, vol=0.20, noise=0.10, fm=220, fm_index=4.0),
+                "charge": _tone(140, 640, 340, vol=0.20, noise=0.30, fm=100, fm_index=6.0),
+                "charge2": _tone(100, 420, 320, vol=0.20, noise=0.24, fm=80, fm_index=5.0),
+                "charge3": _tone(220, 820, 310, vol=0.20, noise=0.34, fm=120, fm_index=7.0),
+                "charge4": _tone(170, 540, 360, vol=0.18, noise=0.20, fm=90, fm_index=5.0),
+                "panel_open": _tone(500, 900, 60, vol=0.18, noise=0.12),
+                "panel_close": _tone(900, 500, 60, vol=0.18, noise=0.12),
+                "hub_open": _tone(200, 800, 120, vol=0.22, noise=0.20, inharmonic=[(2.1, 0.3), (3.5, 0.15)]),
+                "dpad_menu": _tone(1000, 700, 20, vol=0.16, noise=0.35, fm=250, fm_index=2.5),
+                "dpad_nexus": _tone(880, 440, 35, vol=0.18, noise=0.40, fm=180, fm_index=4.0),
+                "nexus_switch": _tone(220, 880, 70, vol=0.18, noise=0.12, inharmonic=[(2.4, 0.4), (3.7, 0.25)]),
+                "nexus_select": _tone(120, 680, 100, vol=0.20, noise=0.15, fm=55, fm_index=5.0),
+                "nexus_exit": _tone(900, 300, 45, vol=0.18, noise=0.30, fm=200, fm_index=2.5),
+                "satellite_select": _tone(600, 1200, 50, vol=0.18, noise=0.20, fm=300, fm_index=3.0),
+                "endnode_open": _tone(55, 110, 400, vol=0.35, noise=0.50, fm=40, fm_index=12.0, inharmonic=[(2.0, 0.4), (3.0, 0.2)]),
+                "endnode_carousel": _tone(65, 130, 60, vol=0.28, noise=0.40, fm=50, fm_index=8.0),
+                "endnode_select": _tone(80, 160, 80, vol=0.30, noise=0.45, fm=60, fm_index=10.0),
+                "endnode_back": _tone(110, 55, 120, vol=0.28, noise=0.35, fm=45, fm_index=6.0),
+                "rerezero": _tone(80, 1200, 200, vol=0.20, noise=0.60, fm=300, fm_index=10.0),
+                "rerezero2": _tone(1200, 80, 180, vol=0.20, noise=0.70, fm=400, fm_index=12.0),
+                "glitch_loop": _tone(200, 800, 200, vol=0.15, noise=0.7, fm=100, fm_index=8.0),
+                "glitch_slash": _tone(400, 1200, 80, vol=0.25, noise=0.3, fm=300, fm_index=5.0),
+                "glitch_door": _tone(60, 200, 600, vol=0.30, noise=0.2, fm=20, fm_index=4.0),
+                "success": _tone(440, 880, 120, vol=0.20, noise=0.10, inharmonic=[(1.5, 0.3), (2.0, 0.15)]),
+                "error": _tone(220, 110, 80, vol=0.20, noise=0.50, fm=100, fm_index=5.0),
+                "games_boot": _tone(440, 880, 150, vol=0.25, noise=0.15, fm=200, fm_index=4.0),
+                "develop_boot": _tone(600, 1200, 120, vol=0.20, noise=0.10, fm=300, fm_index=3.0),
+                "community_boot": _tone(330, 660, 180, vol=0.22, noise=0.05, fm=150, fm_index=5.0),
+                "outerdesk_boot": _tone(200, 800, 130, vol=0.25, noise=0.20, fm=250, fm_index=6.0),
+                "legacy_boot": _tone(100, 300, 200, vol=0.20, noise=0.30, fm=50, fm_index=8.0),
+                "whisper": _whisper(),
+            }
         except pygame.error:
             return None
 
-    def play(self, name):
-        if self.sfx and self.cfg.get("sfx", True):
-            try:
-                self.sfx[name].play()
-            except (KeyError, pygame.error):
-                pass
+    def play_whisper(self, loop=True):
+        if not getattr(self, "sfx", None) or not self.cfg.get("sfx", True):
+            return
+        try:
+            s = self.sfx.get("whisper")
+            if s is not None:
+                s.play(loops=-1 if loop else 0)
+        except:
+            pass
+
+    def stop_whisper(self):
+        try:
+            s = getattr(self, "sfx", {}).get("whisper")
+            if s is not None:
+                s.stop()
+        except:
+            pass
+
+    def play(self, name, vol=1.0):
+        self.play_sfx(name, vol)
+
+    def play_sfx(self, name, vol=1.0):
+        if not getattr(self, "sfx_enabled", True):
+            return
+        cache = getattr(self, "_sfx_cache", None)
+        if cache is None:
+            cache = {}
+            self._sfx_cache = cache
+        if name not in cache:
+            synth = getattr(self, "sfx", None)
+            if synth and name in synth:
+                cache[name] = synth[name]
+            else:
+                path = os.path.join(APP_DIR, "assets", "sfx", name + ".ogg")
+                if not os.path.exists(path):
+                    path = os.path.join(APP_DIR, "assets", "sfx", name + ".mp3")
+                if not os.path.exists(path):
+                    path = os.path.join(APP_DIR, "assets", "sfx", name + ".wav")
+                try:
+                    cache[name] = pygame.mixer.Sound(path)
+                except Exception:
+                    return
+        try:
+            cache[name].set_volume(max(0.0, min(1.0, vol)))
+            cache[name].play()
+        except Exception:
+            pass
 
 
 # --- [H4] Home Scroll & Selection Visibility // HUB: NEXUS ---
@@ -3054,12 +6235,12 @@ class App(object):
             self.run_busy(self.t("mounting"), self.scan_status)
             self._scanned = True
 
-    def play_media_boot(self, mode):
-        """Micro-boot distinti del Media Vault: ogni ingresso ha un
-        movimento e un suono propri, ma resta breve per non rallentare il
-        flusso del menu."""
+    def play_media_boot(self, mode, skip_check=None):
+        """Micro-boot distinti del Media Vault, ora con durata comparabile a VoidCast."""
         if self.cfg.get("vfx_trans", 3) <= 0:
             return
+        if skip_check is None:
+            skip_check = lambda: "START" in evinput.poll() or "A" in evinput.poll()
         specs = {
             "radio": ((80, 220, 200), "RADIO // SINTONIA", "click"),
             "iptv": ((218, 68, 96), "VOIDCAST // SEGNALE", "charge"),
@@ -3067,36 +6248,299 @@ class App(object):
             "normalize": ((245, 185, 64), "BGM // NORMALIZE", "snap"),
         }
         col, title, sound = specs.get(mode, specs["library"])
+        if mode == "iptv":
+            self._media_boot_iptv(col, title, sound, skip_check)
+            return
+
         self.play(sound)
         real_flip = pygame.display.flip
         try:
-            for frame in range(10):
-                k = frame / 9.0
+            # Durata aumentata a ~1.5 secondi (40 frame a 30 fps)
+            frames = 40
+            t0 = time.time()
+            skip_font = pygame.font.Font(FONT_PATH, 14)
+            skip_txt = skip_font.render(
+                "START/A: salta" if self.lang == "it"
+                else "START/A: skip", True, (120, 120, 130))
+            skip_w = skip_txt.get_width()
+            flash = pygame.Surface((W, H), pygame.SRCALPHA)
+
+            for frame in range(frames):
+                if skip_check and skip_check():
+                    return
+                k = frame / float(frames - 1)  # 0..1
                 self.surface.fill((5, 8, 12))
+                cx, cy = W // 2, H // 2 - 20
+
                 if mode == "radio":
+                    # Onde radio concentriche che si espandono
                     for ring in range(1, 7):
                         r = int(12 + ring * 24 * k)
-                        pygame.draw.circle(self.surface, col, (W // 2, H // 2), r, 1)
-                elif mode == "iptv":
-                    for y in range(30, H - 30, 18):
-                        x = int((frame * 37 + y * 3) % W)
-                        pygame.draw.line(self.surface, col, (0, y), (x, y), 2)
+                        alpha = int(255 * (1 - abs(k - ring / 7.0) * 2))
+                        if alpha > 0:
+                            pygame.draw.circle(self.surface, col, (cx, cy), r, max(1, int(3 * (1 - k))))
+                    # Barre di frequenza
+                    for i in range(8):
+                        h = int(20 + 60 * math.sin(k * 12 + i * 1.2) ** 2)
+                        x = cx - 80 + i * 22
+                        pygame.draw.rect(self.surface, col, (x, cy + 40 - h, 8, h))
+
                 elif mode == "library":
-                    for x in range(40, W - 20, 44):
-                        h = int(20 + 170 * k * ((x // 44) % 3 + 1) / 3)
-                        pygame.draw.rect(self.surface, col, (x, H - 82 - h, 25, h), 1)
-                else:
-                    for x in range(28, W - 28, 28):
-                        h = int((18 + ((x * 7) % 90)) * k)
-                        pygame.draw.line(self.surface, col, (x, H // 2 - h),
-                                         (x, H // 2 + h), 2)
-                tw = self.f_med_b.size(title)[0]
-                self.text(title, ((W - tw) // 2, H // 2 - 16),
-                          self.f_med_b, col)
+                    # Cartella che si apre e file che volano fuori
+                    if k < 0.3:
+                        flap = int(30 * (k / 0.3))
+                        pygame.draw.rect(self.surface, (40, 50, 70), (cx - 60, cy - 20, 120, 40))
+                        pygame.draw.rect(self.surface, col, (cx - 60, cy - 20 - flap, 80, flap + 4))
+                    else:
+                        # File che si dispongono a griglia
+                        n_files = min(8, int((k - 0.3) / 0.7 * 8))
+                        for i in range(n_files):
+                            x = cx - 80 + (i % 4) * 40
+                            y = cy + 20 + (i // 4) * 30
+                            pygame.draw.rect(self.surface, (220, 230, 245), (x, y, 20, 26))
+                            pygame.draw.rect(self.surface, col, (x, y, 20, 26), 1)
+
+                else:  # normalize
+                    # Spettro audio (barre animate)
+                    for i in range(16):
+                        h = int(10 + 70 * (0.5 + 0.5 * math.sin(k * 20 + i * 0.9)))
+                        x = cx - 90 + i * 12
+                        col_bar = tuple(min(255, int(c * (0.6 + 0.4 * (i / 16.0)))) for c in col)
+                        pygame.draw.rect(self.surface, col_bar, (x, cy + 40 - h, 6, h))
+                    # Onda sonora
+                    for x in range(cx - 80, cx + 80, 4):
+                        y = cy + math.sin(x * 0.1 + k * 8) * 20
+                        pygame.draw.circle(self.surface, col, (x, int(y)), 2)
+
+                # Titolo che compare alla fine
+                if k > 0.7:
+                    alpha = int(255 * (k - 0.7) / 0.3)
+                    img = self.f_med_b.render(title, True, col)
+                    img.set_alpha(alpha)
+                    tw = img.get_width()
+                    self.surface.blit(img, (cx - tw // 2, H - 60))
+
+                # Eventuale flash finale — surface riutilizzata
+                if k > 0.95:
+                    flash.fill((255, 255, 255, int(80 * (k - 0.95) / 0.05)))
+                    self.surface.blit(flash, (0, 0))
+
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
                 pygame.display.flip()
-                self.clock.tick(48)
+                self.clock.tick(30)  # 30 fps = 1.33 secondi totali
+
+            # Breve pausa finale
+            time.sleep(0.2)
+
         finally:
             pygame.display.flip = real_flip
+
+    def _media_boot_iptv(self, col, title, sound, skip_check=None):
+        """Boot dedicato di VOIDCAST: statico senza segnale che si dirada
+        mentre "sintonizza", poi un lampo di aggancio e il titolo pulito
+        e fermo -- decisamente piu' lungo e in tensione degli altri boot
+        del Media Vault, di proposito."""
+        self.play(sound)
+        dim = tuple(int(c * 0.35) for c in col)
+        skip_font = pygame.font.Font(FONT_PATH, 14)
+        skip_txt = skip_font.render(
+            "START/A: salta" if self.lang == "it"
+            else "START/A: skip", True, (120, 120, 130))
+        skip_w = skip_txt.get_width()
+
+        def noise(density, glitch_p):
+            for _ in range(density):
+                x = random.randint(0, W - 1)
+                y = random.randint(0, H - 1)
+                w_ = random.randint(4, 46)
+                h_ = 1 if random.random() > 0.15 else random.randint(1, 3)
+                c = col if random.random() < glitch_p else dim
+                pygame.draw.rect(self.surface, c, (x, y, w_, h_))
+
+        frames_a = 14
+        for f in range(frames_a):
+            if skip_check and skip_check():
+                return
+            self.surface.fill((4, 4, 6))
+            noise(140, 0.10)
+            if f % 4 < 2:
+                lbl = "NO SIGNAL"
+                lw = self.f_med_b.size(lbl)[0]
+                self.text(lbl, ((W - lw) // 2, H // 2 - 10), self.f_med_b,
+                          dim)
+            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+            pygame.display.flip()
+            self.clock.tick(22)
+
+        frames_b = 20
+        for f in range(frames_b):
+            if skip_check and skip_check():
+                return
+            k = (f + 1) / float(frames_b)
+            self.surface.fill((4, 4, 6))
+            noise(int(140 * (1 - k)) + 4, 0.16 + 0.2 * k)
+            for y in range(0, H, 3):
+                xo = int(((f * 23) % W) * (1 - k * 0.6))
+                pygame.draw.line(self.surface, dim, (0, y), (xo, y), 1)
+            lbl = "TUNING" + "." * (1 + f % 3)
+            lw = self.f_med_b.size(lbl)[0]
+            self.text(lbl, ((W - lw) // 2, H // 2 - 10), self.f_med_b, col)
+            bar_w0 = int(W * 0.5)
+            bx = (W - bar_w0) // 2
+            pygame.draw.rect(self.surface, dim,
+                            (bx, H // 2 + 20, bar_w0, 4), 1)
+            pygame.draw.rect(self.surface, col,
+                            (bx, H // 2 + 20, int(bar_w0 * k), 4))
+            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+            pygame.display.flip()
+            self.clock.tick(26)
+
+        for _ in range(2):
+            if skip_check and skip_check():
+                return
+            self.surface.fill(col)
+            pygame.display.flip()
+            self.clock.tick(26)
+            self.surface.fill((5, 8, 12))
+            pygame.display.flip()
+            self.clock.tick(26)
+
+        frames_c = 10
+        for f in range(frames_c):
+            if skip_check and skip_check():
+                return
+            self.surface.fill((5, 8, 12))
+            for yy in range(30, H - 30, 18):
+                pygame.draw.line(self.surface, col, (0, yy), (W, yy), 1)
+            tw = self.f_med_b.size(title)[0]
+            self.text(title, ((W - tw) // 2, H // 2 - 16), self.f_med_b,
+                     col)
+            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+            pygame.display.flip()
+            self.clock.tick(30)
+
+    # --- [E3b] Outer-Desk Boot Animation ---
+    def play_outerdesk_boot(self, on_done=None, skip_check=None):
+        col = OUTERDESK_COLOR
+        self.play("outerdesk_boot")
+        skip_font = pygame.font.Font(FONT_PATH, 14)
+        skip_txt = skip_font.render(
+            "START/A: salta" if self.lang == "it"
+            else "START/A: skip", True, (120, 120, 130))
+        skip_w = skip_txt.get_width()
+        evinput.poll()
+        f1 = 24
+        for f in range(f1):
+            if skip_check and skip_check():
+                return
+            k = (f + 1) / float(f1)
+            self.surface.fill((5, 8, 11))
+            _r = random.Random(777)
+            _t = time.time()
+            for _ in range(int(80 * k)):
+                _sx = _r.randint(0, W - 1)
+                _sy = _r.randint(0, H - 1)
+                _br = int(30 + 60 * k * abs(math.sin(_t * 0.7 + _sx * 0.03)))
+                if _br > 0:
+                    self.surface.set_at((_sx, _sy),
+                                        (max(0, col[0] - _br),
+                                         max(0, col[1] - _br),
+                                         min(255, col[2] + _br)))
+            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+            pygame.display.flip()
+            self.clock.tick(40)
+        f2 = 20
+        tx, ty = 16, 70
+        tw = int(W * 0.32)
+        th = H - 134
+        for f in range(f2):
+            if skip_check and skip_check():
+                return
+            k = (f + 1) / float(f2)
+            ek = 1 - (1 - k) ** 3
+            self.surface.fill((5, 8, 11))
+            _r = random.Random(777)
+            for _ in range(80):
+                _sx = _r.randint(0, W - 1)
+                _sy = _r.randint(0, H - 1)
+                self.surface.set_at((_sx, _sy),
+                                    (max(0, col[0] - 30),
+                                     max(0, col[1] - 40),
+                                     min(255, col[2] + 20)))
+            self._draw_safety_tablet(tx, ty, tw, th * ek, col, k)
+            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+            pygame.display.flip()
+            self.clock.tick(42)
+        full = "OUTER-DESK"
+        t0 = time.time()
+        ly = 70
+        lx = W - 16 - self.f_big_b.size(full)[0]
+        done = False
+        while not done:
+            if skip_check and skip_check():
+                return
+            el = time.time() - t0
+            nc = min(len(full), int(el / 0.12) + 1)
+            if nc >= len(full) and el > len(full) * 0.12 + 0.6:
+                done = True
+            self.surface.fill((5, 8, 11))
+            _r = random.Random(777)
+            for _ in range(80):
+                _sx = _r.randint(0, W - 1)
+                _sy = _r.randint(0, H - 1)
+                self.surface.set_at((_sx, _sy),
+                                    (max(0, col[0] - 30),
+                                     max(0, col[1] - 40),
+                                     min(255, col[2] + 20)))
+            self._draw_safety_tablet(tx, ty, tw, th, col, 1.0)
+            icons.draw(self.surface, "outer", lx - 40, ly - 4, 28, col)
+            part = full[:nc]
+            if part:
+                self.text(part, (lx, ly), self.f_big_b, col)
+            if nc < len(full) and int(el * 4) % 2:
+                _cx = lx + self.f_big_b.size(part)[0]
+                pygame.draw.line(self.surface, col,
+                                 (_cx, ly + 28), (_cx + 12, ly + 28), 2)
+            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+            pygame.display.flip()
+            self.clock.tick(20)
+        if on_done:
+            on_done()
+
+    def _draw_safety_tablet(self, x, y, w, h, col, k=1.0):
+        _sh = int(12 * k)
+        if _sh > 0:
+            pygame.draw.ellipse(self.surface,
+                                (*tuple(c // 3 for c in INK),
+                                 int(40 * k)),
+                                (x - 8, y + h + 2, w + 16, _sh))
+        _fill = tuple(int(c * 0.65 + INK[i] * 0.35) for i, c in enumerate(col))
+        pts = [(x, y), (x + w - 9, y), (x + w, y + 9),
+               (x + w, y + h), (x, y + h)]
+        pygame.draw.polygon(self.surface, _fill, pts)
+        pygame.draw.polygon(self.surface,
+                            tuple(min(255, int(c * 0.8 * k)) for c in col),
+                            pts, 2)
+        n = 6
+        for i in range(n):
+            _lk = max(0, k - i / float(n + 2))
+            if _lk > 0.01:
+                _ly = y + 20 + i * (h - 40) // n
+                _lw = int((w - 16) * _lk)
+                pygame.draw.line(self.surface,
+                                 tuple(int(c * 0.5 * min(1, k)) for c in col),
+                                 (x + 8, _ly), (x + 8 + _lw, _ly), 1)
+        _bx, _by = x + 14, y + h - 22
+        _pulse = 0.6 + 0.4 * abs(math.sin(time.time() * 3.0))
+        if k > 0.5:
+            _glow = tuple(int(c * 0.4 * _pulse * k) for c in col)
+            pygame.draw.circle(self.surface, _glow, (_bx, _by),
+                               max(6, int(8 * k)))
+            pygame.draw.circle(self.surface, col, (_bx, _by),
+                               max(2, int(5 * k)), 1)
+            self.text("OK", (_bx + 9, _by - 4), self.f_tiny, col)
+
+
 
 
 # --- [I7] INFO & ABOUT Hub — About, Manual, Guide, Manifesto, Update // HUB: INFO & ABOUT ---
@@ -3108,313 +6552,100 @@ class App(object):
                                 if cur in vals else 0]
             save_cfg(self.cfg)
             return
-        if hub == "forge":
-            if key == "vdupdate":
-                if self.update_data is None:
-                    self.update_checking = True
-                    self.update_data = self.run_busy(
-                        self.t("checking"), self.gh_fetch_releases)
-                    self.update_checking = False
-                self.push("voidupdate")
-            elif key == "clitools":
-                self.run_busy(self.t("checking"), self.scan_status)
-                self.clihub_sel = 0
-                self.push("clihub")
-            elif key == "update":
-                self.envdet_env = ENVS[0][0]
-                self.envdet_sel = 0
-                self.push("envdetail")
-            else:
-                self.comp_action({"installer": "install", "autostart":
-                                  "autostart"}[key])
-        elif hub == "workshop":
-            if key == "stats":
-                self.info_title = "DEVICE STATS"
-                self.info_lines = self.run_busy(self.t("checking"),
-                                                self.void_stats) or []
-                self.scroll = 0
-                self.push("info")
-            elif key == "diag":
-                def go():
-                    self.diag_scan_steps = self.diag_steps()
-                    self.diag_scan_idx = 0
-                    self.diag_scan_t0 = time.time()
-                    self.diag_scan_log = []
-                    self.diag_scan_results = [("sec", "gear",
-                                              "VOID DIAG")]
-                    self.push("diagscan")
-                self.confirm = (("Device pronto al setaccio.\n"
-                                "Procedere?" if self.lang == "it"
-                                else "Device ready for the sieve.\n"
-                                "Proceed?"), go, "VOID DIAG", "gear",
-                               None, "triage")
-                self.push("confirm")
-            elif key == "monitor":
-                self.mon = {"cpu": [], "ram": [], "net": [], "tmp": [],
-                            "last": None, "t": 0}
-                self.mon_tab = 0
-                self.push("monitor")
-            elif key == "storage":
-                self.info_title = ("SPAZIO ARCHIVIAZIONE" if
-                                   self.lang == "it" else "STORAGE")
-                self.info_lines = self.run_busy(self.t("checking"),
-                                                self.storage_lines) or []
-                self.scroll = 0
-                self.push("info")
-            elif key == "boost":
-                self.boost_sel = 0
-                self.push("boostcfg")
-            elif key == "chd":
-                self.run_busy(self.t("checking"), self.scan_status)
-                if not self.status.get("mame-tools (chdman)"):
-                    self.info_lines = [
-                        ("sec", "disk", "DISC CRUSHER"),
-                        ("kv", "", "chdman non è installato" if
-                         self.lang == "it" else
-                         "chdman is not installed", NO_R),
-                        ("kv", "", "Void Installer > STRUMENTI/CLI > "
-                         "mame-tools" if self.lang == "it" else
-                         "Void Installer > TOOLS/CLI > mame-tools",
-                         DIM)]
-                    self.scroll = 0
-                    self.push("info")
-                else:
-                    self.chd_browse_open()
-            elif key == "doppel":
-                self.doppel_open()
-            elif key == "clean":
-                self.comp_action("clean")
-            elif key == "logs":
-                self.sel_log = 1
-                self.logs = self.build_logs()
-                self.push("logs")
-            elif key == "backup":
-                self.bak_sel = 0
-                self.push("backup")
-        elif hub == "uplink":
-            if key == "ctrlhub":
-                self.hub_sel = 0
-                self.push("hub:ctrlhub")
-            elif key == "wifi":
-                self.wm_sel = 0
-                self.wm_nets = self.run_busy(self.t("wm_scan"),
-                                             self.wm_scan) or []
-                self.push("wifimgr")
-            elif key == "bt":
-                self.bt_sel = 0
-                self.bt_devs = self.run_busy("bluetooth...",
-                                             lambda:
-                                             self.bt_list(False)) or []
-                self.push("btmgr")
-            elif key == "hotspot":
-                self.push("hotmgr")
-            elif key == "pcup":
-                if not self.pc_servers:
-                    self.pc_scanning = True
-                    self.run_busy(self.t("checking"), self.pcup_scan)
-                    self.pc_scanning = False
-                self.pc_srv_sel = 0
-                self.push("pcupsrv")
-            elif key == "basestation":
-                self.push("bstationsend")
-            elif key == "tsgui":
-                try:
-                    self.play_ts_intro()
-                except Exception as e:
-                    sys.stderr.write("bootanim tailnet non riuscita: %s\n" % e)
-                self.ts_open()
-            elif key == "netdiag":
-                st = self.status_snapshot()
-                ip = self.own_ip() or "non disponibile"
-                internet = self.run_busy(self.t("checking"), net_test)
-                base = "attivo" if self.bstation_srv is not None else "fermo"
-                self.info_title = "NETWORK PROBE"
-                self.info_lines = self.stub_lines("NETWORK PROBE", [
-                    "Wi-Fi: " + ("connesso" if st.get("conn") else "non connesso"),
-                    "IP locale: " + ip,
-                    "Internet: " + internet,
-                    "BaseStation: " + base,
-                    "Tailnet: apri Tailnet Console per peer e netcheck."])
-                self.scroll = 0
-                self.push("info")
-        elif hub == "mediahub":
-            if key == "radio":
-                self.play_media_boot("radio")
-                self.radio_tab = "all"
-                self.radio_sel = 0
-                self.push("radio")
-            elif key == "voidcast":
-                self.play_media_boot("iptv")
-                for root in MUOS_APP_ROOTS:
-                    app_dir = os.path.join(root, "VoidCast")
-                    if os.path.isfile(os.path.join(app_dir, "mux_launch.sh")):
-                        self.launch_muos({"name": "VoidCast", "dir": app_dir})
-                        return
-                self.info_title = "VOIDCAST IPTV"
-                self.info_lines = self.stub_lines(
-                    "VOIDCAST IPTV", [
-                        "Installa VoidCast.zip con Archive Manager, poi "
-                        "torna qui: Media Vault lo avviera' direttamente.",
-                        "M3U · EPG · guida TV · PVR recorder."])
-                self.scroll = 0
-                self.push("info")
-            elif key == "library":
-                self.play_media_boot("library")
-                self.fm_open(ext_filter=MEDIA_EXTS)
-            elif key == "bgmnorm":
-                self.play_media_boot("normalize")
-                dirs = []
-                for mount in ("/mnt/mmc", "/mnt/sdcard"):
-                    for cand in ("MUOS/theme", "BGM", "Music", "bgm", "music"):
-                        path = os.path.join(mount, cand)
-                        if os.path.isdir(path):
-                            dirs.append(path)
-                self.bgm_files = self.run_busy(self.t("checking"),
-                                               lambda: self.bgm_scan(dirs)) or []
-                self.bgm_sel = 0
-                self.bgm_marked = set()
-                self.push("bgmlist")
-        elif hub == "ctrlhub":
-            if key == "map":
-                self.push("map")
-            elif key == "devices":
-                self.ctrl_scan()
-                self.ctrl_sel = 0
-                self.push("ctrldevices")
-        elif hub == "toolbox":
-            if key == "shell":
-                self.rtsh_open()
-            elif key == "clockmain":
-                try:
-                    self.play_clock_gaze(entering=True)
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim clock non riuscita: %s\n" % e)
-                self.push("clock")
-            elif key == "calc":
-                self.calc_expr = ""
-                self.calc_sel = 0
-                try:
-                    self.play_calc_lid(opening=True)
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim calc non riuscita: %s\n" % e)
-                self.push("calc")
-            elif key == "cal":
-                self.evs = self.cal_load()
-                lt = time.localtime()
-                self.cal_cur = [lt.tm_year, lt.tm_mon, lt.tm_mday]
-                self.cal_view = "month"
-                self.ev_sel = 0
-                self.push("cal")
-            elif key == "notes":
-                self.notes = self.notes_refresh()
-                self.note_sel = 0
-                self.push("notes")
-            elif key == "rss":
-                try:
-                    self.play_rss_intro()
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim rss non riuscita: %s\n" % e)
-                self.rss_sel = 0
-                self.push("rss")
-                if not self.rss_items and self.rss_enabled_feeds():
-                    self.run_busy(self.t("rss_upd"), self.rss_refresh)
-            elif key == "weather":
-                try:
-                    self.play_weather_intro()
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim meteo non riuscita: %s\n" % e)
-                self.wx_sel = 0
-                self.push("weather")
-                cities = self.cfg.get("weather_cities") or []
-                if cities and not self.wx_data:
-                    self.run_busy(self.t("wx_updating"),
-                                  self.wx_refresh_all)
-            elif key == "pyrepl":
-                self.py_ns = {}
-                self.py_out = ["Python %s // host muOS" %
-                               sys.version.split()[0],
-                               ">>> "]
-                try:
-                    self.play_python_intro()
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim python non riuscita: %s\n" % e)
 
-                def run_and_open(p):
-                    self.py_runfile(p)
-                    self.push("pyrepl")
-                self.fm_open(start_path=PYSCRIPTS_DIR,
-                            ext_filter={".py"}, pick=run_and_open)
-            elif key == "fileman":
-                try:
-                    self.play_files_intro()
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim files non riuscita: %s\n" % e)
-                self.fm_open()
-            elif key == "ftp":
-                try:
-                    self.play_ftp_intro()
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim ftp non riuscita: %s\n" % e)
-                self.ftp_prof_sel = 0
-                self.push("ftpprof")
-            elif key == "editor":
-                try:
-                    self.play_editor_intro()
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim editor non riuscita: %s\n" % e)
-                self.fm_open(start_path=TEXTS_DIR,
-                            ext_filter=TEXT_EXTS)
-            elif key == "sync":
-                try:
-                    self.play_sync_intro()
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim sync non riuscita: %s\n" % e)
-                self.sync_open()
-            elif key in TOOL_PKGS:
-                self.tool_open(key)
-            elif key == "tsgui":
-                try:
-                    self.play_ts_intro()
-                except Exception as e:
-                    sys.stderr.write(
-                        "bootanim tailscale non riuscita: %s\n" % e)
-                self.ts_open()
-        elif hub == "infohub":
-            if key == "about":
-                self.info_title = ("INFO PROGETTO" if self.lang ==
-                                   "it" else "PROJECT INFO")
-                self.info_lines = self.about_lines()
-            elif key == "guide":
-                self.info_title = ("GUIDA CONTROLLI" if self.lang ==
-                                   "it" else "CONTROLS GUIDE")
-                self.info_lines = self.guide_lines()
-            elif key == "manifesto":
-                self.scroll = 0
-                self.push("manifesto")
-                return
-            elif key == "voidupdate":
-                if self.update_data is None:
-                    self.update_checking = True
-                    self.update_data = self.run_busy(
-                        self.t("checking"), self.gh_fetch_releases)
-                    self.update_checking = False
-                self.push("voidupdate")
-                return
-            else:
-                self.man_sel = 0
-                self.push("manual")
-                return
-            self.scroll = 0
-            self.push("info")
+        hub_actions = {
+            "forge": {
+                "installer": lambda: self.push("comp"),
+                "autostart": lambda: self.push("autostart"),
+                "update": lambda: self.forge_hub.comp_action("update"),
+                "vdupdate": lambda: self.push("voidupdate"),
+                "clitools": lambda: self.push("clihub"),
+            },
+            "workshop": {
+                "devcheck": lambda: self.push("devcheck"),
+                "monitor": lambda: self.push("monitor"),
+                "boost": lambda: self.push("boostcfg"),
+                "chd": lambda: self.chd_browse_open(),
+                "doppel": lambda: self.doppel_open(),
+                "logs": lambda: self.push("logs"),
+                "logdashboard": lambda: self.push("logdashboard"),
+                "voiddecontext": lambda: self.push("voiddecontext"),
+                "backup": lambda: self.push("backup"),
+            },
+            "uplink": {
+                "wifi": lambda: self.push("wifimgr"),
+                "hotspot": lambda: self.push("hotmgr"),
+                "bt": lambda: self.push("btmgr"),
+                "pcup": lambda: self.push("pcupsrv"),
+                "basestation": lambda: self.push("bstationsend"),
+                "sync": lambda: self.sync_open(),
+                "tsgui": lambda: self.ts_open(),
+                "ftp": lambda: self.push("ftpprof"),
+                "netdiag": lambda: self.netprobe_refresh() or self.push("netprobe"),
+                "deviceremapper": lambda: self.ctrl_scan() or self.push("ctrldevices"),
+                "wiredcontroller": lambda: self.ctrl_scan() or self.push("ctrldevices"),
+            },
+            "ctrlhub": {
+                "kbdmb": lambda: self.hub_action("ctrlhub", "kbdmb", "cycle"),
+                "kbdx": lambda: self.hub_action("ctrlhub", "kbdx", "cycle"),
+                "ctrl": lambda: self.hub_action("ctrlhub", "ctrl", "cycle"),
+                "map": lambda: self.push("map"),
+                "devices": lambda: self.ctrl_scan() or self.push("ctrldevices"),
+            },
+            "mediahub": {
+                "radio": lambda: self.push("radio"),
+                "voidcast": lambda: self.voidcast_enter(),
+                "library": lambda: self.fm_open(start_path="/mnt/mmc/ROMS"),
+                "bgmnorm": lambda: self.push("bgmmain"),
+            },
+            "toolbox": {
+                "calc": lambda: self.push("calc"),
+                "clockmain": lambda: self.push("clock"),
+                "cal": lambda: self.push("cal"),
+                "notes": lambda: self.push("notes"),
+                "fileman": lambda: self.fm_open(),
+                "shell": lambda: self.rtsh_open(),
+                "pyrepl": lambda: self.push("pyrepl"),
+                "void_edit": lambda: self.ed_load("") or self.push("edit"),
+                "rss": lambda: self.push("rss"),
+                "weather": lambda: self.push("weather"),
+            },
+            "infohub": {
+                "about": lambda: self.set_info_lines(self.about_lines()) or self.push("info"),
+                "manual": lambda: self.push("manual"),
+                "guide": lambda: self.set_info_lines(self.guide_lines()) or self.push("info"),
+                "manifesto": lambda: self.push("manifesto"),
+                "voidupdate": lambda: self.push("voidupdate"),
+                "cursedev": lambda: self.cursedev_enter(),
+            },
+            "games": {
+                "portmaster": lambda: self.games_hub.portmaster(),
+                "native": lambda: self.games_hub.native(),
+                "collections": lambda: self.games_hub.collections(),
+            },
+            "develop": {
+                "repl": lambda: self.develop_hub.repl(),
+                "editor": lambda: self.develop_hub.editor(),
+                "builder": lambda: self.develop_hub.builder(),
+            },
+            "community": {
+                "forum": lambda: self.community_hub.forum(),
+                "wiki": lambda: self.community_hub.wiki(),
+                "share": lambda: self.community_hub.share(),
+            },
+            "outerdesk": {
+                "apps": lambda: self.outerdesk_hub.apps(),
+            },
+            "legacy": {
+                "archive": lambda: self.legacy_hub.archive(),
+                "memorial": lambda: self.legacy_hub.memorial(),
+            },
+        }
+        action = hub_actions.get(hub, {}).get(key)
+        if action:
+            action()
+        else:
+            self.notify("Errore", f"Azioni non trovata: {hub}/{key}", "warning")
 
 
 # --- [J4] CHD Batch Converter // HUB: WORKSHOP ---
@@ -3456,6 +6687,23 @@ class App(object):
                       else "LAUNCHING %s...") % app["name"].upper())
         self.exit_code = EXIT_MUOS_APP
         self.running = False
+
+    def launch_muos_app_by_name(self, name):
+        """Cerca un'app muOS con il nome (case-insensitive) e la lancia.
+
+        Utile per lanciare dinamicamente un'app scansionata da
+        MUOS/application quando si conosce solo il nome. Se l'app non
+        viene trovata, mostra una notifica di avviso.
+        """
+        if not self.mapps:
+            self.mapps = self.scan_muos()
+        for app in self.mapps:
+            if app["name"].lower() == name.lower():
+                self.launch_muos(app)
+                return
+        self.notify("App non trovata" if self.lang == "it" else "App not found",
+                    f"Nessuna app: '{name}'" if self.lang == "it"
+                    else f"No app named '{name}'", "warning")
 
     # ================== VOID FTP: client nativo ==================
 
@@ -4059,6 +7307,1975 @@ class App(object):
                                   maxw=W - 60)
                         y += 19
                     y += 5
+
+    def netprobe_refresh(self):
+        try:
+            st = self.status_snapshot()
+            ip = self.own_ip() or "non disponibile"
+            internet = self.run_busy(self.t("checking"), net_test)
+            base = "attivo" if self.bstation_srv is not None else "fermo"
+            ts_state = "N/A"
+            if hasattr(self, "ts"):
+                ts_state = (self.ts or {}).get("state", "N/A")
+            self.netprobe_data = {
+                "ip": ip,
+                "internet": internet,
+                "base": base,
+                "ts": ts_state,
+                "st": st,
+                "t": time.time(),
+            }
+            log("netprobe_refresh: ip=%s, internet=%s, base=%s, ts=%s" %
+                (ip, internet, base, ts_state))
+        except Exception as e:
+            log("netprobe_refresh CRASH: %s" % e, "ERROR")
+            import traceback
+            log(traceback.format_exc(), "ERROR")
+
+    def draw_netprobe(self, mecha=False):
+        # ============================================================
+        #  NET-SPHERE // MECHA HUD  —  cruscotto cyberpunk neon
+        #  zona superiore (2/3): olografica · zona bassa (1/3): mecha
+        # ============================================================
+        data = getattr(self, "netprobe_data", {}) or {}
+        st = data.get("st", {}) or {}
+        now = time.time()
+        s = self.surface
+
+        # ---- animazione di ingresso mecha (pan a destra + suoni) ----
+        np_opts = self.cfg.get("netprobe_opts", dict(NETPROBE_DEFAULTS))
+        slide_speed = np_opts.get("slide_speed", 0.02)
+        if mecha:
+            if getattr(self, "_np_mecha_t0", None) is None:
+                self._np_mecha_t0 = now
+                self.play("charge")
+            pan_elapsed = now - self._np_mecha_t0
+            pan_duration = max(0.2, 1.2 * (0.02 / max(0.005, slide_speed)))
+        else:
+            if getattr(self, "_np_mecha_t0", None) is not None:
+                del self._np_mecha_t0
+            pan_elapsed = 1.3
+            pan_duration = 1.2
+        pan_prog = min(1.0, pan_elapsed / pan_duration)
+        pan_ease = pan_prog * pan_prog * (3 - 2 * pan_prog)
+        ox = int(pan_ease * 80)
+
+        ip = data.get("ip") or "---"
+        internet_ok = data.get("internet") == "OK"
+        internet_txt = data.get("internet", "---")
+        base_on = self.bstation_srv is not None
+        base_txt = data.get("base", "---")
+        ts_state = data.get("ts", "---")
+        pcup_on = getattr(self, "pc_client", None) is not None
+
+        wifi_conn = bool(st.get("conn"))
+        wifi_lvl = st.get("wifi") or 0
+        wifi_ssid = st.get("ssid") or "---"
+        wifi_iface = st.get("iface") or "---"
+        bt_on = st.get("bt")
+        hot_on = st.get("hot")
+        batt = st.get("batt")
+        chg = st.get("chg")
+        vol = st.get("vol") or 0
+        usb = st.get("usb") or "---"
+
+        # --- live /proc telemetry (letture leggere, per-frame) ---
+        load = 0.0
+        up_s = 0.0
+        mem_pct = 0
+        try:
+            load = float(open("/proc/loadavg").read().split()[0])
+        except Exception:
+            pass
+        try:
+            up_s = float(open("/proc/uptime").read().split()[0])
+        except Exception:
+            pass
+        try:
+            mt = ma = None
+            for ln in open("/proc/meminfo"):
+                p = ln.split(":")
+                if p[0] == "MemTotal":
+                    mt = int(p[1].split()[0])
+                elif p[0] == "MemAvailable":
+                    ma = int(p[1].split()[0])
+            if mt:
+                mem_pct = max(0, min(100, int((1.0 - (ma or 0) / mt) * 100)))
+        except Exception:
+            pass
+        gateway = None
+        dns = None
+        try:
+            for ln in open("/proc/net/route"):
+                p = ln.split()
+                if len(p) > 7 and p[1] == "00000000" and p[7] != "00000000":
+                    gateway = ".".join(str(int(p[2][i:i + 2], 16))
+                                       for i in (6, 4, 2, 0))
+                    break
+        except Exception:
+            pass
+        try:
+            for ln in open("/etc/resolv.conf"):
+                if ln.startswith("nameserver"):
+                    dns = ln.split()[1]
+                    break
+        except Exception:
+            pass
+
+        # --- neon palette ---
+        CY = (90, 232, 255)     # ciano identitario uplink
+        MG = (255, 72, 210)     # magenta
+        LM = (120, 255, 122)    # verde lime
+        AM = (255, 196, 66)     # ambra
+        RD = (255, 78, 78)      # rosso allarme
+        OR = (255, 132, 52)     # arancio
+        VI = (180, 124, 255)    # viola
+        WH = (226, 236, 246)
+        DBG = (7, 13, 28)       # blu scuro fondo
+        NEON_P = (255, 140, 200)  # rosa neon (mecha)
+        NEON_C = (180, 255, 240)  # cyan neon (mecha)
+
+        # --- fonts (vari, con cache su istanza) ---
+        fn = getattr(self, "_np_f", None)
+        if fn is None:
+            fn = {
+                "big":   font_display(30),
+                "title": font_display(13),
+                "num":   font_display(23),
+                "num2":  font_display(15),
+                "lbl":   font_bold(11),
+                "mono":  font_mono(12),
+                "monob": font_mono(12, bold=True),
+                "tinym": font_mono(10),
+            }
+            self._np_f = fn
+
+        def T(txt, x, y, f, col, maxw=None):
+            self.text(txt, (x, y), f, col, maxw=maxw)
+
+        def layer(w, h, x=0, y=0):
+            return pygame.Surface((w, h), pygame.SRCALPHA)
+
+        def panel(x, y, w, h, col, fill=(6, 12, 26)):
+            pygame.draw.rect(s, fill, (x, y, w, h))
+            pygame.draw.rect(s, col, (x, y, w, h), 1)
+            g = sel_tint(col)
+            pygame.draw.line(s, g, (x + 2, y + 2), (x + w - 2, y + 2), 1)
+            pygame.draw.line(s, g, (x + 2, y + 2), (x + 2, y + h - 2), 1)
+            for (cxp, cyp, dx, dy) in ((x, y, 1, 1), (x + w, y, -1, 1),
+                                       (x, y + h, 1, -1), (x + w, y + h, -1, -1)):
+                pygame.draw.line(s, col, (cxp, cyp), (cxp + 5 * dx, cyp), 2)
+                pygame.draw.line(s, col, (cxp, cyp), (cxp, cyp + 5 * dy), 2)
+
+        def label(x, y, txt, col, f=fn["lbl"]):
+            T(txt, x, y, f, col)
+
+        def led(cx, cy, r, col, on, blink=False):
+            if on:
+                a = 210 if not blink else int(110 + 120 * abs(math.sin(now * 4)))
+                gl = layer(2 * r + 8, 2 * r + 8)
+                pygame.draw.circle(gl, (*col, a), (r + 4, r + 4), r + 2)
+                pygame.draw.circle(gl, (*col, a // 2), (r + 4, r + 4), r)
+                s.blit(gl, (cx - r - 4, cy - r - 4))
+            pygame.draw.circle(s, (10, 14, 20), (cx, cy), r)
+            pygame.draw.circle(s, col if on else (60, 70, 82), (cx, cy), r - 2)
+            pygame.draw.circle(s, sel_tint(col) if on else (30, 38, 48),
+                               (cx - r // 3, cy - r // 3), max(1, r // 3))
+
+        # ---------- SFONDO ----------
+        s.fill(DBG)
+        for gx in range(0, W, 30):
+            pygame.draw.line(s, (16, 26, 48), (gx, 44), (gx, H - 28), 1)
+        for gy in range(46, H - 28, 30):
+            pygame.draw.line(s, (16, 26, 48), (0, gy), (W, gy), 1)
+        # scanline CRT fitte (rispettano l'opzione quando in modalità mecha)
+        _show_scan = np_opts.get("scanlines", True) if mecha else True
+        if _show_scan:
+            for sy in range(44, H, 3):
+                pygame.draw.line(s, (3, 5, 9), (0, sy), (W, sy), 1)
+        # sweep olografico verticale
+        sweep_x = int((now * 46) % (W + 200)) - 100
+        gl = layer(6, H - 44)
+        for yy in range(H - 44):
+            a = int(70 * (1 - abs(yy - (H - 44) / 2) / ((H - 44) / 2)))
+            pygame.draw.line(gl, (*CY, max(0, a)), (2, yy), (4, yy), 2)
+        s.blit(gl, (sweep_x, 44))
+        # banda CRT orizzontale che scorre (refresh monitor)
+        crt_y = int((now * 70) % (H - 44)) + 44
+        cgl = layer(W, 10)
+        for yy in range(10):
+            a = int(42 * (1 - abs(yy - 5) / 5))
+            pygame.draw.line(cgl, (150, 220, 255, a), (0, yy), (W, yy), 1)
+        s.blit(cgl, (0, crt_y - 5))
+        # vignettatura bordi
+        vgl = layer(W, H)
+        for i in range(46):
+            a = int(115 * (1 - i / 46.0))
+            pygame.draw.rect(vgl, (0, 0, 0, a), (0, i, W, 1))
+            pygame.draw.rect(vgl, (0, 0, 0, a), (0, H - 1 - i, W, 1))
+            pygame.draw.rect(vgl, (0, 0, 0, a), (i, 0, 1, H))
+            pygame.draw.rect(vgl, (0, 0, 0, a), (W - 1 - i, 0, 1, H))
+        s.blit(vgl, (0, 0))
+        # bracket d'angolo
+        for cx, cy, dx, dy in ((0, 0, 1, 1), (W, 0, -1, 1),
+                               (0, H, 1, -1), (W, H, -1, -1)):
+            pygame.draw.line(s, CY, (cx, cy), (cx + 12 * dx, cy), 2)
+            pygame.draw.line(s, CY, (cx, cy), (cx, cy + 12 * dy), 2)
+
+        if mecha:
+            # ---- cabina mecha: ingranaggi, tubi, cavi su sfondo ----
+            _show_machines = np_opts.get("machines", True)
+            if _show_machines:
+                # tubi orizzontali (linee industriali)
+                for _py in (100, 210, 330):
+                    pygame.draw.rect(s, (30, 35, 45, 180), (4, _py, W - 8, 5))
+                    for _px in range(24, W, 96):
+                        pygame.draw.rect(s, (60, 70, 85), (_px, _py - 4, 10, 13),
+                                         border_radius=3)
+
+                # ingranaggi grandi rotanti
+                for _gx, _gy, _gr, _spd in (
+                        (58, 186, 26, 0.9), (W - 72, 250, 36, -0.7),
+                        (W - 50, 400, 22, 1.4)):
+                    _ang = now * _spd
+                    _pts = []
+                    for _k in range(12):
+                        _a = _ang + _k * (math.pi / 6)
+                        _r = _gr if _k % 2 == 0 else int(_gr * 0.7)
+                        _pts.append((_gx + _r * math.cos(_a),
+                                     _gy + _r * math.sin(_a)))
+                    pygame.draw.polygon(s, (34, 38, 48), _pts)
+                    pygame.draw.polygon(s, (70, 82, 100), _pts, 1)
+                    pygame.draw.circle(s, (14, 18, 26), (_gx, _gy),
+                                       int(_gr * 0.3))
+                    # perni centrali
+                    pygame.draw.circle(s, (50, 60, 70), (_gx, _gy), 4)
+
+                # cavi che pendono (effetto "serpentina")
+                for _cx in (58, W - 72, W - 50, 300):
+                    _cy0 = 45
+                    for _seg in range(0, 56, 7):
+                        _sx = int(6 * math.sin(_seg * 0.45 + now * 1.3 + _cx))
+                        if _seg > 0:
+                            _ex = int(6 * math.sin((_seg - 7) * 0.45
+                                       + now * 1.3 + _cx))
+                            pygame.draw.line(s, (42, 48, 58, 200),
+                                             (_cx + _sx, _cy0 + _seg),
+                                             (_cx + _ex, _cy0 + _seg + 7), 2)
+
+            # suono ambientale meccanico (click ogni ~2s)
+            if np_opts.get("ambient_sounds", True):
+                if int(now * 2) % 2 == 0 and not getattr(
+                        self, "_np_click_suppressed", False):
+                    self._np_click_suppressed = True
+                    self.play("click")
+                elif int(now * 2) % 2 != 0:
+                    self._np_click_suppressed = False
+
+        # ---------- HEADER NEON ----------
+        pygame.draw.rect(s, INK, (0, 0, W, 42))
+        pygame.draw.line(s, CY, (0, 42), (W, 42), 2)
+        # ghost cromatici (RGB split) + main
+        T("NET-SPHERE", 12, 8, fn["big"], (170, 36, 70))
+        T("NET-SPHERE", 16, 6, fn["big"], (28, 120, 150))
+        T("NET-SPHERE", 14, 7, fn["big"], CY)
+        hw = fn["big"].size("NET-SPHERE")[0]
+        T("NETWORK PROBE // TELEMETRY GRID", 22 + hw, 16, fn["lbl"], FAINT)
+        # ticker "stream" animato
+        for di in range(6):
+            da = 130 if (int(now * 4) + di) % 6 == 0 else 28
+            pygame.draw.circle(s, (*CY, da), (24 + hw + di * 9, 22), 2)
+        # uptime
+        uh = int(up_s // 3600)
+        um = int((up_s % 3600) // 60)
+        T("UP %dh%02dm" % (uh, um), W - 205, 16, fn["lbl"], AM)
+        # REC lampeggiante
+        rec = int(120 + 120 * abs(math.sin(now * 3)))
+        gl = layer(14, 14, 0, 0)
+        pygame.draw.circle(gl, (*RD, rec), (7, 7), 5)
+        s.blit(gl, (W - 78, 16))
+        T("REC", W - 64, 15, fn["lbl"], RD)
+        for hx in range(0, W, 18):
+            pygame.draw.line(s, CY, (hx, 42), (hx + 8, 46), 2)
+
+        if mecha:
+            # ---- insegna neon appesa al bordo superiore ----
+            sign_w, sign_h = 200, 56
+            sign_x = 24
+            sign_y = 2 + 5 * math.sin(now * 0.8)  # penzolamento leggero
+            # cavi che tengono l'insegna (pendenti)
+            for cx, cy in ((sign_x + 20, sign_y - 4),
+                           (sign_x + sign_w - 20, sign_y - 4)):
+                sw = 3 * math.sin(now * 1.4 + cx)
+                for seg in range(0, 22, 5):
+                    if seg > 0:
+                        ex = cx + sw * (seg / 22)
+                        pygame.draw.line(s, (42, 48, 58, 220),
+                                         (cx - sw + sw * ((seg - 5) / 22),
+                                          22 + (seg - 5)),
+                                         (ex, 22 + seg), 2)
+                # dente di fissaggio
+                pygame.draw.circle(s, (70, 82, 100),
+                                   (cx + sw, 22 + 22), 5)
+            # cornice in rilievo (3D bevel)
+            pygame.draw.rect(s, (8, 12, 18),
+                             (sign_x - 4, sign_y, sign_w + 8, sign_h),
+                             border_radius=6)
+            pygame.draw.rect(s, (46, 52, 64),
+                             (sign_x - 2, sign_y + 2, sign_w + 4,
+                              sign_h - 4), 1, border_radius=5)
+            pygame.draw.rect(s, (90, 100, 120),
+                             (sign_x - 4, sign_y, sign_w + 8, sign_h), 2,
+                             border_radius=6)
+            # corpo insegna (vetrino scuro)
+            pygame.draw.rect(s, (6, 10, 16),
+                             (sign_x, sign_y + 4, sign_w, sign_h - 8),
+                             border_radius=4)
+            # antenna / ricevitore a sinistra
+            ant_x = sign_x + 14
+            ant_y = sign_y + 26
+            # asta
+            pygame.draw.line(s, (160, 170, 180), (ant_x, ant_y - 18),
+                             (ant_x, ant_y + 10), 3)
+            # palla superiore che pulsa
+            pulse = 0.6 + 0.4 * abs(math.sin(now * 3.3))
+            _pul_col = (min(255, int(NEON_P[0] * pulse)),
+                        min(255, int(NEON_P[1] * pulse)),
+                        min(255, int(NEON_P[2] * pulse)))
+            pygame.draw.circle(s, _pul_col, (ant_x, ant_y - 18), 6)
+            # onde radio (archi)
+            for _i, _r in enumerate((10, 17, 24)):
+                _a = 0.5 + 0.3 * math.sin(now * 2 + _i)
+                _alpha = 90 - _i * 20
+                pygame.draw.arc(s, (*CY, _alpha),
+                                (ant_x + 10 - _r, ant_y - 18 - _r, _r * 2, _r * 2),
+                                -_a - 0.35, -_a + 0.35, 2)
+            # testo neon "Network PROBE"
+            f_neon = font_display(20)
+            # glow sotto il testo (scalato da neon_intensity)
+            _ni = np_opts.get("neon_intensity", 1.0)
+            _gl = layer(sign_w, 40)
+            for _off in range(6, 0, -1):
+                _ga = int((25 - _off * 3) * _ni)
+                if _ga > 0:
+                    pygame.draw.rect(_gl, (*NEON_P, _ga),
+                                     (0, _off - 2, sign_w, 40), 1,
+                                     border_radius=4)
+            s.blit(_gl, (sign_x, sign_y + 4))
+            T("Network", sign_x + 38, sign_y + 14, f_neon, NEON_P)
+            T("PROBE", sign_x + 38, sign_y + 34, f_neon, CY)
+
+        # ============================================================
+        #  ZONA OLOGRAFICA  (y 46 -> 318)
+        # ============================================================
+        # --- RADAR (scan grid) ---
+        def draw_radar(x, y, w, h, col):
+            panel(x, y, w, h, col)
+            gl = layer(w, h)
+            cx, cy = w // 2, h // 2 + 6
+            R = min(w, h) // 2 - 12
+            # anelli di range + assi
+            for rr2 in (R, R * 3 // 4, R // 2):
+                pygame.draw.circle(gl, sel_tint(col), (cx, cy), rr2, 1)
+            pygame.draw.line(gl, sel_tint(col), (cx - R, cy), (cx + R, cy), 1)
+            pygame.draw.line(gl, sel_tint(col), (cx, cy - R), (cx, cy + R), 1)
+            # anello esterno tratteggiato rotante
+            da = (now * 0.6) % (math.pi / 8)
+            for k in range(0, 64):
+                if k % 2:
+                    continue
+                a = k * (math.pi / 32) + da
+                x1 = cx + (R + 3) * math.cos(a)
+                y1 = cy + (R + 3) * math.sin(a)
+                x2 = cx + (R + 6) * math.cos(a)
+                y2 = cy + (R + 6) * math.sin(a)
+                pygame.draw.line(gl, sel_tint(col), (x1, y1), (x2, y2), 1)
+            # sweep + scia
+            ang = (now * 1.6) % (2 * math.pi)
+            for k in range(34):
+                a = ang - k * 0.05
+                rr = R * (1 - k / 34.0)
+                ex = cx + rr * math.cos(a)
+                ey = cy + rr * math.sin(a)
+                pygame.draw.line(gl, (*col, int(150 * (1 - k / 34.0))),
+                                 (cx, cy), (ex, ey), 2)
+            # anello ping in espansione
+            pf = (now * 0.6) % 1.0
+            pygame.draw.circle(gl, (*col, int(120 * (1 - pf))),
+                               (cx, cy), int(R * pf), 1)
+            s.blit(gl, (x, y))
+            nodes = [("AP", wifi_conn, 0.7, 0.58),
+                     ("NET", internet_ok, 1.6, 0.82),
+                     ("BST", base_on, 2.5, 0.5),
+                     ("TS", ts_state == "Running", 3.4, 0.76),
+                     ("PC", pcup_on, 4.3, 0.62),
+                     ("BT", bt_on is True, 5.2, 0.86)]
+            for nm, on, a0, dist in nodes:
+                a = a0
+                bx = cx + R * dist * math.cos(a)
+                by = cy + R * dist * math.sin(a)
+                bc = col if on else (70, 86, 100)
+                if on:
+                    pygame.draw.line(s, sel_tint(bc),
+                                     (x + cx, y + cy),
+                                     (x + int(bx), y + int(by)), 1)
+                blink = (0.55 + 0.45 * math.sin(now * 3 + a0)) if on else 1.0
+                gl2 = layer(w, h)
+                pygame.draw.circle(gl2, (*bc, int(170 * blink)),
+                                   (int(bx), int(by)), 5)
+                s.blit(gl2, (x, y))
+                pygame.draw.circle(s, bc, (x + int(bx), y + int(by)), 3)
+                T(nm, x + int(bx) + 5, y + int(by) - 5,
+                  fn["tinym"], bc if on else FAINT)
+            label(x + 6, y + 5, "SCAN GRID", col)
+            T("%d NODES" % sum(1 for _, on, _, _ in nodes),
+              x + 6, y + h - 14, fn["tinym"], col)
+
+        # --- TACHIMETRO OLOGRAFICO ---
+        def draw_gauge(x, y, w, h, col, frac, title, sub, val_txt):
+            panel(x, y, w, h, col)
+            cx, cy = x + w // 2, y + h // 2 - 2
+            R = min(w, h) // 2 - 16
+            a0 = math.radians(135)
+            a1 = math.radians(405)
+            # arco valore (sfondo + riempimento)
+            for i in range(61):
+                a = a0 + (a1 - a0) * i / 60
+                x1 = cx + R * math.cos(a)
+                y1 = cy + R * math.sin(a)
+                x2 = cx + (R - 6) * math.cos(a)
+                y2 = cy + (R - 6) * math.sin(a)
+                c = (40, 52, 66) if i / 60.0 > frac else col
+                pygame.draw.line(s, c, (x1, y1), (x2, y2), 2)
+            # tacche minori
+            for i in range(31):
+                a = a0 + (a1 - a0) * i / 30
+                x1 = cx + (R - 7) * math.cos(a)
+                y1 = cy + (R - 7) * math.sin(a)
+                x2 = cx + (R - 11) * math.cos(a)
+                y2 = cy + (R - 11) * math.sin(a)
+                pygame.draw.line(s, sel_tint(col), (x1, y1), (x2, y2), 1)
+            # tacche maggiori
+            for i in range(11):
+                a = a0 + (a1 - a0) * i / 10
+                x1 = cx + (R - 8) * math.cos(a)
+                y1 = cy + (R - 8) * math.sin(a)
+                x2 = cx + (R - 14) * math.cos(a)
+                y2 = cy + (R - 14) * math.sin(a)
+                pygame.draw.line(s, col, (x1, y1), (x2, y2), 1)
+            na = a0 + (a1 - a0) * frac
+            nx = cx + (R - 12) * math.cos(na)
+            ny = cy + (R - 12) * math.sin(na)
+            # bloom lancetta
+            gl = layer(2 * R + 16, 2 * R + 16)
+            pygame.draw.line(gl, (*col, 130), (R + 8, R + 8),
+                             (R + 8 + (nx - cx), R + 8 + (ny - cy)), 4)
+            s.blit(gl, (cx - R - 8, cy - R - 8))
+            pygame.draw.line(s, col, (cx, cy), (nx, ny), 2)
+            pygame.draw.circle(s, col, (cx, cy), 3)
+            pygame.draw.circle(s, WH, (nx, ny), 2)
+            label(x + 6, y + 5, title, col)
+            # box valore
+            vw = fn["num"].size(val_txt)[0]
+            bx0 = cx - vw // 2 - 6
+            pygame.draw.rect(s, (4, 10, 20), (bx0, cy - 16, vw + 12, 22))
+            pygame.draw.rect(s, sel_tint(col), (bx0, cy - 16, vw + 12, 22), 1)
+            T(val_txt, cx - vw // 2, cy - 12, fn["num"], WH)
+            T(sub, cx - fn["num2"].size(sub)[0] // 2, y + h - 20,
+              fn["num2"], col)
+
+        # --- BOX INFO (righe colorate) ---
+        def info_box(x, y, w, h, col, title, lines):
+            panel(x, y, w, h, col)
+            pygame.draw.rect(s, col, (x, y, 3, h), 1)
+            pygame.draw.rect(s, sel_tint(col), (x + 1, y + 2, 2, h - 4))
+            label(x + 8, y + 5, title, col)
+            ty = y + 22
+            for txt, lc in lines:
+                T(txt, x + 10, ty, fn["mono"], lc, maxw=w - 16)
+                ty += 14
+
+        # --- GRIGLIA LED 2x2 ---
+        def led_grid(x, y, w, h, col, items):
+            panel(x, y, w, h, col)
+            label(x + 6, y + 5, "LINK STATUS", col)
+            cols = 2
+            rows = (len(items) + 1) // 2
+            cw = (w - 8) // cols
+            ch = (h - 18) // rows
+            for i, (nm, on, bc) in enumerate(items):
+                r = i // cols
+                c = i % cols
+                bx = x + 4 + c * cw
+                by = y + 20 + r * ch + ch // 2
+                led(bx + 8, by, 6, bc, on, blink=True)
+                T(nm, bx + 20, by - 8, fn["tinym"], WH, maxw=cw - 24)
+                stt = "ON" if on else "OFF"
+                T(stt, bx + 20, by + 5, fn["tinym"],
+                  bc if on else FAINT, maxw=cw - 24)
+
+        # --- GRAFICO A LINEA (sparkline) ---
+        def spark(x, y, w, h, col, title, getv):
+            panel(x, y, w, h, col)
+            label(x + 6, y + 5, title, col)
+            hist = getattr(self, "_np_hist", None)
+            if hist is None:
+                hist = [0.5] * 120
+                self._np_hist = hist
+            hist.append(max(0.02, min(0.98, getv())))
+            if len(hist) > 120:
+                hist.pop(0)
+            gx0, gy0, gw, gh = 6, 18, w - 12, h - 24
+            gl = layer(w, h)
+            n = len(hist)
+            pts = []
+            for i, vv in enumerate(hist):
+                pts.append((gx0 + i * gw / (n - 1), gy0 + gh * (1 - vv)))
+            # griglia
+            for gxi in range(0, gw, 22):
+                pygame.draw.line(gl, sel_tint(col), (gx0 + gxi, gy0),
+                                (gx0 + gxi, gy0 + gh), 1)
+            if len(pts) > 1:
+                fill_pts = [(gx0, gy0 + gh)] + pts + [(gx0 + gw, gy0 + gh)]
+                pygame.draw.polygon(gl, (*col, 38), fill_pts)
+                pygame.draw.lines(gl, (*col, 230), False, pts, 2)
+            s.blit(gl, (x, y))
+            pygame.draw.line(s, sel_tint(col),
+                             (x + gx0, y + gy0 + gh), (x + gx0 + gw, y + gy0 + gh), 1)
+            if pts:
+                hx, hy = pts[-1]
+                led(int(x + hx), int(y + hy), 3, col, True)
+
+        # --- BARRE A SEGMENTI (vitali di sistema) ---
+        def segbars(x, y, w, h, items):
+            T("SYSTEM VITALS", x + 6, y + 4, fn["lbl"], CY)
+            n = len(items)
+            pad = 8
+            bw = (w - pad * (n + 1)) // n
+            for i, (lab, frac, bc) in enumerate(items):
+                bx = x + pad + i * (bw + pad)
+                by = y + 22
+                bh = 20
+                pygame.draw.rect(s, (8, 12, 20), (bx, by, bw, bh))
+                pygame.draw.rect(s, bc, (bx, by, bw, bh), 1)
+                seg, gap = 14, 3
+                nseg = bw // (seg + gap)
+                on = int(frac * nseg)
+                for j in range(nseg):
+                    sx = bx + 3 + j * (seg + gap)
+                    if sx + seg > bx + bw - 3:
+                        break
+                    c = bc if j < on else (28, 36, 46)
+                    pygame.draw.rect(s, c, (sx, by + 3, seg, bh - 6))
+                T(lab, bx, by + bh + 4, fn["tinym"], DIM, maxw=bw)
+                T("%d%%" % int(frac * 100), bx + bw - 28,
+                  by + bh + 4, fn["tinym"], bc)
+
+        # --- posizionamento TETRIS olografico ---
+        draw_radar(8, 46, 132, 132, CY)
+        draw_gauge(140, 46, 132, 132, MG,
+                   (wifi_lvl / 3.0 if wifi_conn else 0.0),
+                   "Wi-Fi SIGNAL", wifi_ssid if wifi_conn else "no link",
+                   ("%d/3" % wifi_lvl) if wifi_conn else "--")
+        draw_gauge(272, 46, 132, 132, LM,
+                   (0.82 if internet_ok else 0.1),
+                   "UPLINK QoS", internet_txt,
+                    "OK" if internet_ok else "OFFLINE")
+        info_box(404, 46, 228, 66, VI, "NODE ID",
+                  [("SSID  " + (wifi_ssid[:14] if wifi_conn else "--"),
+                    CY if wifi_conn else FAINT),
+                   ("IP    " + str(ip)[:18], WH),
+                   ("IFACE " + str(wifi_iface)[:14], AM)])
+        led_grid(404, 112, 228, 66, OR,
+                  [("BLUETOOTH", bt_on is True, CY),
+                   ("HOTSPOT", hot_on, AM),
+                   ("BASESTN", base_on, VI),
+                   ("TAILSCALE", ts_state == "Running", LM)])
+        spark(8, 178, 396, 74, MG, "THROUGHPUT",
+              lambda: (0.5 + 0.32 * math.sin(now * 0.8)
+                       + (0.1 * math.sin(now * 3.0) if internet_ok else 0))
+              if internet_ok else (0.08 + 0.04 * math.sin(now * 5)))
+        info_box(404, 178, 228, 74, CY, "ROUTE / CORE",
+                  [("GW   " + (str(gateway) or "n/a"), AM),
+                   ("DNS  " + (str(dns) or "n/a"), AM),
+                   ("TS   " + str(ts_state)[:16], VI),
+                   ("USB  " + str(usb)[:16], WH)])
+        segbars(8, 252, 624, 66,
+                [("BATT", (batt / 100.0 if batt else 0.0),
+                  LM if not chg else AM),
+                 ("VOL", (vol / 100.0 if vol else 0.0), CY),
+                 ("CPU", min(1.0, load / 4.0), OR),
+                 ("MEM", mem_pct / 100.0, VI)])
+
+        # separatore olografico / mecha
+        pygame.draw.line(s, (40, 70, 120), (0, 320), (W, 320), 1)
+
+        # ============================================================
+        #  ZONA MECHA  (y 322 -> 452, 1/3 inferiore, strumenti fisici)
+        # ============================================================
+        mx, my, mw, mh = 8, 322, 624, 130
+        pygame.draw.rect(s, (10, 13, 20), (mx, my, mw, mh))
+        pygame.draw.rect(s, STEEL, (mx, my, mw, mh), 2)
+        pygame.draw.rect(s, (4, 6, 10), (mx + 2, my + 2, mw - 4, mh - 4), 1)
+        # scanline texture sulla piastra mecha
+        for sy2 in range(my + 4, my + mh - 2, 4):
+            pygame.draw.line(s, (2, 4, 8), (mx + 4, sy2), (mx + mw - 4, sy2), 1)
+        for rx in (mx + 8, mx + mw - 8):
+            for ry in (my + 8, my + mh - 8):
+                pygame.draw.circle(s, STEEL_HI, (rx, ry), 3)
+                pygame.draw.circle(s, INK, (rx, ry), 1)
+        T("// MECHA CONSOLE — PHYSICAL TELEMETRY", mx + 12, my + 6,
+          fn["tinym"], (150, 170, 190))
+
+        def reactor(cx, cy, r, col):
+            gl = layer(2 * r + 10, 2 * r + 10)
+            pulse = 0.5 + 0.5 * abs(math.sin(now * 2))
+            pygame.draw.circle(gl, (*col, int(130 * pulse)),
+                               (r + 5, r + 5), r)
+            s.blit(gl, (cx - r - 5, cy - r - 5))
+            pygame.draw.circle(s, (8, 12, 18), (cx, cy), r)
+            pygame.draw.circle(s, col, (cx, cy), r, 1)
+            a = now * 1.2
+            pts = []
+            for k in range(6):
+                aa = a + k * (math.pi / 3)
+                pts.append((cx + r * 0.7 * math.cos(aa),
+                            cy + r * 0.7 * math.sin(aa)))
+            pygame.draw.polygon(s, col, pts, 1)
+            pygame.draw.circle(s, col, (cx, cy), 3)
+
+        def phys_dial(cx, cy, r, col, frac, title):
+            pygame.draw.circle(s, (16, 20, 28), (cx, cy), r)
+            pygame.draw.circle(s, (44, 50, 60), (cx, cy), r, 3)
+            pygame.draw.circle(s, (8, 10, 14), (cx, cy), r - 3)
+            a0 = math.radians(135)
+            a1 = math.radians(405)
+            for i in range(0, 21):
+                a = a0 + (a1 - a0) * i / 20
+                x1 = cx + (r - 4) * math.cos(a)
+                y1 = cy + (r - 4) * math.sin(a)
+                x2 = cx + (r - 9) * math.cos(a)
+                y2 = cy + (r - 9) * math.sin(a)
+                c = RD if i > 16 else sel_tint(col)
+                pygame.draw.line(s, c, (x1, y1), (x2, y2), 1)
+            steps = int(20 * frac)
+            for i in range(steps):
+                a = a0 + (a1 - a0) * i / 20
+                x1 = cx + (r - 5) * math.cos(a)
+                y1 = cy + (r - 5) * math.sin(a)
+                x2 = cx + (r - 12) * math.cos(a)
+                y2 = cy + (r - 12) * math.sin(a)
+                pygame.draw.line(s, col, (x1, y1), (x2, y2), 3)
+            na = a0 + (a1 - a0) * frac
+            nx = cx + (r - 12) * math.cos(na)
+            ny = cy + (r - 12) * math.sin(na)
+            pygame.draw.line(s, RD, (cx, cy), (nx, ny), 2)
+            pygame.draw.circle(s, RD, (cx, cy), 3)
+            gl = layer(2 * r + 6, 2 * r + 6)
+            pygame.draw.circle(gl, (255, 255, 255, 36), (r + 3, r + 3), r - 2)
+            s.blit(gl, (cx - r - 3, cy - r - 3))
+            T(title, cx - fn["tinym"].size(title)[0] // 2, cy + r - 16,
+              fn["tinym"], DIM)
+
+        def lamp(x, y, col, name, on, sub):
+            pygame.draw.circle(s, (20, 24, 32), (x, y), 10)
+            pygame.draw.circle(s, STEEL, (x, y), 10, 2)
+            led(x, y, 7, col, on, blink=True)
+            T(name, x + 16, y - 8, fn["tinym"], WH, maxw=120)
+            T(sub, x + 16, y + 5, fn["tinym"], col if on else FAINT, maxw=120)
+
+        def vubar(x, y, w, h, frac, col, title):
+            pygame.draw.rect(s, (6, 9, 16), (x, y, w, h))
+            pygame.draw.rect(s, STEEL, (x, y, w, h), 1)
+            segs = 18
+            pad = 4
+            sh = (h - 2 * pad) // segs
+            peak = max(0.0, min(1.0, frac))
+            for i in range(segs):
+                sy = y + pad + i * sh
+                f = (segs - 1 - i) / (segs - 1)
+                c2 = LM if f < 0.6 else (AM if f < 0.8 else RD)
+                on = frac >= f
+                pygame.draw.rect(s, c2 if on else (24, 30, 38),
+                                 (x + pad, sy, w - 2 * pad, sh - 2))
+            pk = int((1 - peak) * (segs - 1))
+            pky = y + pad + pk * sh + sh // 2
+            pygame.draw.line(s, WH, (x + 2, pky), (x + w - 2, pky), 1)
+            T(title, x, y - 12, fn["tinym"], DIM)
+
+        # due quadranti analogici
+        up_pwr = (0.7 + 0.2 * math.sin(now * 0.7)) if internet_ok else 0.12
+        sig_int = ((wifi_lvl / 3.0) * 0.85 + 0.1) if wifi_conn else 0.1
+        phys_dial(72, 392, 42, CY, up_pwr, "UPLINK PWR")
+        phys_dial(202, 392, 42, AM, sig_int, "SIG INTEG")
+        reactor(272, 392, 16, MG)
+        # lampe luminose fisiche
+        lamp(300, 350, CY, "INTERNET", internet_ok,
+             internet_txt[:14])
+        lamp(300, 372, CY, "BLUETOOTH", bt_on is True,
+             "UP" if bt_on is True else ("DOWN" if bt_on is False else "N/A"))
+        lamp(300, 394, AM, "HOTSPOT", hot_on,
+             (str(len(getattr(self, "_hot_devs", []))) + " dev")
+             if hot_on else "idle")
+        lamp(300, 416, VI, "BASESTN", base_on, base_txt[:14])
+        # barra VU segnale
+        vubar(470, 340, 150, 98,
+               (0.55 + 0.4 * abs(math.sin(now * 1.3))) if internet_ok
+               else 0.08, MG, "SIG MAIN")
+
+        if mecha:
+            # ---- finestra della stanza adiacente (rivelata col pan) ----
+            room_w = 130
+            room_h = 160
+            room_x = W - room_w - 10 + int(60 * (1 - pan_ease))
+            room_y = 70
+            # cornice spessa (vetro)
+            pygame.draw.rect(s, (16, 20, 28),
+                             (room_x - 6, room_y - 6, room_w + 12, room_h + 12),
+                             border_radius=8)
+            pygame.draw.rect(s, (50, 55, 65),
+                             (room_x - 4, room_y - 4, room_w + 8, room_h + 8), 2,
+                             border_radius=7)
+            # contenuto stanza (macchinari)
+            pygame.draw.rect(s, (5, 8, 14),
+                             (room_x, room_y, room_w, room_h), border_radius=4)
+            if np_opts.get("machines", True):
+                # pannelli di controllo nella stanza
+                for ry in range(12, room_h - 8, 30):
+                    for rx in range(12, room_w - 8, 34):
+                        _led = (int(now * 2) + rx + ry) % 2 == 0
+                        _col = LM if _led else (30, 35, 40)
+                        pygame.draw.rect(s, (18, 22, 30),
+                                         (room_x + rx, room_y + ry, 18, 18),
+                                         border_radius=2)
+                        pygame.draw.rect(s, (40, 46, 56),
+                                         (room_x + rx, room_y + ry, 18, 18), 1,
+                                         border_radius=2)
+                        pygame.draw.circle(s, _col,
+                                           (room_x + rx + 5, room_y + ry + 5), 3)
+                        pygame.draw.circle(s,
+                                           CY if (rx % 3 == 0) else (30, 35, 40),
+                                           (room_x + rx + 13, room_y + ry + 13), 3)
+                # tubi nella stanza
+                for ry in (20, 60, 100, 140):
+                    pygame.draw.line(s, (42, 48, 58),
+                                     (room_x, room_y + ry),
+                                     (room_x + room_w, room_y + ry), 2)
+            # vetro riflesso
+            _rf = layer(room_w, room_h)
+            for ry in range(0, room_h, 6):
+                _a = int(14 * (1 - ry / room_h))
+                pygame.draw.line(_rf, (100, 150, 200, _a), (0, ry),
+                                 (room_w, ry), 1)
+            s.blit(_rf, (room_x, room_y))
+
+            # ---- icona antenna/ricevitore rotante ----
+            _icx = 100
+            _icy = 150
+            _ir = 28
+            _rot_spd = np_opts.get("icon_rotation_speed", 0.03)
+            _ia = now * (1.4 * (_rot_spd / 0.03))
+            # anello esterno rotante con raggi
+            for _i in range(16):
+                _a = _ia + _i * (math.pi / 8)
+                _sx = _icx + (_ir + 3) * math.cos(_a)
+                _sy = _icy + (_ir + 3) * math.sin(_a)
+                pygame.draw.circle(s, CY, (int(_sx), int(_sy)), 2)
+            # cerchio interno
+            pygame.draw.circle(s, (10, 14, 22), (_icx, _icy), _ir)
+            pygame.draw.circle(s, CY, (_icx, _icy), _ir, 2)
+            # petali/segmenti (a causa della rotazione)
+            for _i in range(8):
+                _a = _ia + _i * (math.pi / 4)
+                _ex = _icx + (_ir + 6) * math.cos(_a)
+                _ey = _icy + (_ir + 6) * math.sin(_a)
+                pygame.draw.line(s, (*NEON_P, 80 + 40 * abs(
+                    math.sin(_a * 2))), (_icx, _icy), (_ex, _ey), 2)
+            # elementi centrali (croce antenna)
+            pygame.draw.line(s, WH, (_icx - 18, _icy + 10),
+                             (_icx + 18, _icy - 10), 3)
+            pygame.draw.line(s, WH, (_icx - 18, _icy - 10),
+                             (_icx + 18, _icy + 10), 3)
+            pygame.draw.circle(s, AM, (_icx, _icy), 5)
+            pygame.draw.circle(s, WH, (_icx, _icy), 5, 1)
+
+        it = (self.lang == "it")
+
+        # ---------- FOOTER ----------
+        if mecha:
+            self.footer([("A", "Aggiorna" if it else "Refresh"),
+                         ("B", self.t("back")),
+                         ("L/R1", "Cabina" if it else "Cabin")])
+        else:
+            self.footer([("A", "Aggiorna"), ("B", self.t("back"))])
+        log("draw_netprobe%s rendered ok" %
+            ("_mecha" if mecha else ""))
+
+    def _draw_netprobe_panel(self, s, now):
+        """Pannello di controllo che scende dall'alto quando in modalità
+        mecha.  Slider e toggle per regolare effetti, suoni e animazioni.
+        Leggero: usa solo rettangoli, cerchi e font già in cache."""
+        if not getattr(self, "_np_panel_open", False) and \
+           getattr(self, "_np_panel_slide", 0.0) <= 0.01:
+            return
+
+        # animazione slide
+        if self._np_panel_open:
+            self._np_panel_slide = min(1.0, self._np_panel_slide + 0.04)
+        else:
+            self._np_panel_slide = max(0.0, self._np_panel_slide - 0.04)
+
+        if self._np_panel_slide <= 0.01:
+            return
+
+        opts = self.cfg.get("netprobe_opts", dict(NETPROBE_DEFAULTS))
+        it = self.lang == "it"
+        CY = (90, 232, 255)
+        NEON_P = (255, 140, 200)
+
+        pw, ph = W - 40, 200
+        px = 20
+        py = int(20 - ph * (1 - self._np_panel_slide))
+
+        panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        panel.fill((8, 10, 16, 230))
+        pygame.draw.rect(panel, (60, 70, 90, 180), (0, 0, pw, ph), 2,
+                         border_radius=10)
+        # bordo neon
+        _np = opts.get("neon_intensity", 1.0)
+        _ngl = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        for _d in range(4, 0, -1):
+            _ga = int(30 * _np / _d)
+            if _ga > 0:
+                pygame.draw.rect(_ngl, (*NEON_P, _ga),
+                                 (_d - 2, _d - 2, pw - 2 * (_d - 1),
+                                  ph - 2 * (_d - 1)), 1, border_radius=10 - _d)
+        panel.blit(_ngl, (0, 0))
+
+        # titolo
+        T = lambda txt, x, y, f, col: self.text(txt, (x, y), f, col)
+        T(it and "CONTROLLI" or "CONTROLS", 16, 10, font_display(18), CY)
+
+        # separatore
+        pygame.draw.line(panel, (40, 50, 70), (10, 30), (pw - 10, 30), 1)
+
+        # opzioni: (etichetta, chiave, tipo, min, max, step)
+        items = [
+            ("Slide Speed", "slide_speed", 0.005, 0.06, 0.005),
+            ("Rotazione Icona", "icon_rotation_speed", 0.005, 0.08, 0.005,
+             "icon_rotation" if not it else "icon_rotation"),
+            ("Intensità Neon", "neon_intensity", 0.2, 2.0, 0.1),
+        ]
+        toggles = [
+            ("Suoni Ambi.", "ambient_sounds"),
+            ("Scanline", "scanlines"),
+            ("Macchine", "machines"),
+        ]
+
+        col_w = pw // 2
+        _yy = 40
+        _sel = getattr(self, "_np_panel_sel", 0)
+        _all_items = items + toggles + [("Reset", "reset")]
+
+        for _i, item in enumerate(_all_items):
+            _label = item[0]
+            _key = item[1]
+            _is_toggle = len(item) <= 2
+            _is_reset = _key == "reset"
+            _x = 12 + (_i % 2) * col_w
+            _y = _yy + (_i // 2) * 32
+
+            _sel_now = (_i == _sel)
+            _sel_col = (90, 232, 255) if _sel_now else FAINT
+            _bg_col = (14, 18, 26) if _sel_now else (8, 12, 20)
+
+            pygame.draw.rect(panel, _bg_col, (_x, _y, col_w - 8, 26),
+                             border_radius=4)
+            if _sel_now:
+                pygame.draw.rect(panel, (90, 232, 255),
+                                 (_x, _y, col_w - 8, 26), 1, border_radius=4)
+
+            if _is_reset:
+                T(_label, _x + 8, _y + 6, font(11), (255, 100, 100))
+            elif _is_toggle:
+                _val = opts.get(_key, True)
+                _check = _val
+                # checkbox
+                _cbx, _cby = _x + 100, _y + 6
+                pygame.draw.rect(panel, (20, 26, 34), (_cbx, _cby, 16, 16),
+                                 border_radius=3)
+                if _check:
+                    pygame.draw.line(panel, (90, 232, 255),
+                                     (_cbx + 3, _cby + 5),
+                                     (_cbx + 7, _cby + 9), 2)
+                    pygame.draw.line(panel, (90, 232, 255),
+                                     (_cbx + 7, _cby + 9),
+                                     (_cbx + 13, _cby + 1), 2)
+                T(_label, _x + 8, _y + 6, font(11), _sel_col)
+            else:
+                _key, _min, _max, _step = item[1], item[2], item[3], item[4]
+                _val = opts.get(_key, 0.5)
+                _pct = (_val - _min) / (_max - _min)
+                _bx, _by = _x + 90, _y + 10
+                _bw = col_w - 104
+                pygame.draw.rect(panel, (20, 26, 34), (_bx, _by, _bw, 8),
+                                 border_radius=4)
+                _fw = int(_bw * _pct)
+                if _fw > 0:
+                    pygame.draw.rect(panel, (90, 232, 255),
+                                     (_bx, _by, _fw, 8), border_radius=4)
+                T(_label, _x + 8, _y + 6, font(11), _sel_col)
+                T("%.2f" % _val, _bx + _bw + 6, _y + 6, font(10),
+                  (200, 200, 210))
+
+        # footer istruzioni
+        if len(_all_items) > 4:
+            f_sm = font(9)
+            self.text((it and "SU/GIÒ" or "UP/DN") + " " +
+                      (it and "MODIFICA" or "EDIT") + " · " +
+                      (it and "A toggle" or "A toggle") + " · " +
+                      (it and "SELECT/B" or "SELECT/B") + " " +
+                      (it and "chiudi" or "close"),
+                      (px + 10, py + ph - 18), f_sm, (140, 150, 160))
+
+        s.blit(panel, (px, py))
+
+    def _handle_netprobe_panel_input(self, btn):
+        """Gestisce i tasti quando il pannello di controllo è aperto."""
+        opts = self.cfg.get("netprobe_opts", dict(NETPROBE_DEFAULTS))
+        items = [
+            ("Slide Speed", "slide_speed", 0.005, 0.06, 0.005),
+            ("Icon Rotation", "icon_rotation_speed", 0.005, 0.08, 0.005),
+            ("Neon Intensity", "neon_intensity", 0.2, 2.0, 0.1),
+            ("Ambient Sounds", "ambient_sounds"),
+            ("Scanlines", "scanlines"),
+            ("Machines", "machines"),
+            ("Reset", "reset"),
+        ]
+        sel = getattr(self, "_np_panel_sel", 0)
+        n = len(items)
+
+        if btn == "UP":
+            sel = max(0, sel - 1)
+            self._np_panel_sel = sel
+        elif btn == "DOWN":
+            sel = min(n - 1, sel + 1)
+            self._np_panel_sel = sel
+        elif btn in ("LEFT", "RIGHT"):
+            item = items[sel]
+            key = item[1]
+            if key == "reset":
+                self.cfg["netprobe_opts"] = dict(NETPROBE_DEFAULTS)
+                save_cfg(self.cfg)
+                self.play("success")
+            else:
+                val = opts.get(key, NETPROBE_DEFAULTS.get(key))
+                if isinstance(val, bool):
+                    opts[key] = not val
+                elif isinstance(val, (int, float)):
+                    mn, mx, step = item[2], item[3], item[4]
+                    direction = 1 if btn == "RIGHT" else -1
+                    opts[key] = max(mn, min(mx, round(
+                        val + direction * step, 4)))
+                self.cfg["netprobe_opts"] = opts
+                save_cfg(self.cfg)
+        elif btn == "A":
+            item = items[sel]
+            key = item[1]
+            if key == "reset":
+                self.cfg["netprobe_opts"] = dict(NETPROBE_DEFAULTS)
+                save_cfg(self.cfg)
+                self.play("success")
+            elif len(item) <= 2:
+                opts[key] = not opts.get(key, True)
+                self.cfg["netprobe_opts"] = opts
+                save_cfg(self.cfg)
+        elif btn == "B":
+            self._np_panel_open = False
+            self.play("back")
+
+    # ============================================================
+    #  DEVICE CHECK:Rt  —  pronto soccorso / triage del dispositivo
+    #  reparti: 0 TRIAGE · 1 DIAGNOSTICA · 2 MEMORIE · 3 PULIZIA
+    #  navigazione reparti con L1 / R1
+    # ============================================================
+    def _apt_cache_size(self):
+        tot = 0
+        for base in ("/var/cache/apt/archives",
+                     "/mnt/mmc/void-desk-chroot/var/cache/apt/archives"):
+            try:
+                for root, _d, files in os.walk(base):
+                    for f in files:
+                        try:
+                            tot += os.path.getsize(os.path.join(root, f))
+                        except OSError:
+                            pass
+            except OSError:
+                pass
+        return tot
+
+    def _vdiag_log(self, path, lines):
+        try:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write("=== %s ===\n" % time.strftime("%Y-%m-%d %H:%M:%S"))
+                for ln in lines:
+                    f.write("%s\n" % ln)
+                f.write("\n")
+        except OSError:
+            pass
+        for ln in lines:
+            log("[VDIAG] %s" % ln)
+
+    def vdiag_quick(self):
+        """Diagnostica rapida con timeout e gestione errori."""
+        it = (self.lang == "it")
+        lines = []
+        lines.append(("hdr", "QUICK CHECK" if not it else "CHECK RAPIDO"))
+
+        try:
+            import subprocess
+            result = subprocess.run(["cat", "/proc/loadavg"],
+                                   capture_output=True, text=True, timeout=2)
+            v = result.stdout.strip()
+            lines.append(("kv", "LOAD" if not it else "CARICO", v.split()[0] if v else "N/A", FG if v else NO_R))
+        except Exception:
+            lines.append(("kv", "LOAD" if not it else "CARICO", "N/A", NO_R))
+
+        try:
+            mt = ma = None
+            with open("/proc/meminfo") as f:
+                for ln in f:
+                    if ln.startswith("MemTotal:"):
+                        mt = int(ln.split()[1])
+                    elif ln.startswith("MemAvailable:"):
+                        ma = int(ln.split()[1])
+            if mt:
+                pct = max(0, min(100, int((1.0 - (ma or 0) / mt) * 100)))
+                lines.append(("kv", "RAM", "%d%% usata" % pct, FG if pct < 85 else NO_R))
+        except Exception:
+            lines.append(("kv", "RAM", "N/A", NO_R))
+
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp") as f:
+                val = f.read().strip()
+                if val.isdigit():
+                    temp = int(val) / 1000.0
+                    lines.append(("kv", "TEMP", "%.1f C" % temp, FG if temp < 75 else NO_R))
+        except Exception:
+            lines.append(("kv", "TEMP", "N/A", NO_R))
+
+        img = os.path.join(DATA, "xfce.img")
+        if os.path.exists(img):
+            try:
+                size = os.path.getsize(img)
+                lines.append(("kv", "IMAGE", "OK %s" % human(size), OK_G))
+            except Exception:
+                lines.append(("kv", "IMAGE", "OK", OK_G))
+        else:
+            lines.append(("kv", "IMAGE", "MISSING" if not it else "ASSENTE", NO_R))
+
+        base, extra = self.read_envs()
+        env_str = "xfce " + " ".join(sorted(extra - {"xfce"})) if base else ("base non installata" if it else "base not installed")
+        lines.append(("kv", "ENVS", env_str.strip(), FG if base else DIM))
+
+        try:
+            import subprocess
+            result = subprocess.run(["curl", "-sI", "--max-time", "5", "https://ports.ubuntu.com"],
+                                   capture_output=True, timeout=6)
+            net_ok = result.returncode == 0
+            lines.append(("kv", "NET", "OK" if net_ok else "NO", OK_G if net_ok else NO_R))
+        except Exception:
+            lines.append(("kv", "NET", "NO", NO_R))
+
+        return lines
+
+    def vdiag_selective(self, categories):
+        it = (self.lang == "it")
+        lines = []
+        lines.append(("hdr", "SELECTIVE CHECK" if not it else "CHECK SELETTIVO"))
+        for cat in categories:
+            if cat == "image":
+                img = os.path.join(DATA, "xfce.img")
+                lines.append(("kv", "IMMAGINE XFCE" if it else "XFCE IMAGE", ("OK %s" % human(os.path.getsize(img))) if os.path.exists(img) else ("ASSENTE" if it else "MISSING"), OK_G if os.path.exists(img) else NO_R))
+            elif cat == "envs":
+                base, extra = self.read_envs()
+                lines.append(("kv", "AMBIENTI" if it else "ENVS", ("xfce " + " ".join(sorted(extra - {"xfce"}))).strip() if base else ("base non installata" if it else "base not installed"), FG if base else DIM))
+            elif cat == "sys":
+                try:
+                    gv = open("/sys/devices/system/cpu/cpufreq/policy0/scaling_governor").read().strip()
+                    lines.append(("kv", "GOVERNOR", gv, FG))
+                except OSError:
+                    lines.append(("kv", "GOVERNOR", "N/A", NO_R))
+                try:
+                    sw = open("/proc/swaps").read().splitlines()[1:]
+                    lines.append(("kv", "SWAP", sw[0].split()[0] if sw else ("nessuna" if it else "none"), OK_G if sw else DIM))
+                except OSError:
+                    lines.append(("kv", "SWAP", "N/A", NO_R))
+                try:
+                    v = open("/proc/loadavg").read().strip()
+                    lines.append(("kv", "LOAD", v.split()[0], FG))
+                except OSError:
+                    lines.append(("kv", "LOAD", "N/A", NO_R))
+            elif cat == "net":
+                lines.append(("kv", "RETE", "OK" if (net_test() == "OK") else "NO", OK_G if (net_test() == "OK") else NO_R))
+            elif cat == "storage":
+                for lbl, p in (("SD1 (mmc)", "/mnt/mmc"), ("SD2 (sdcard)", "/mnt/sdcard")):
+                    try:
+                        st = os.statvfs(p)
+                        free = st.f_bavail * st.f_frsize
+                        tot = st.f_blocks * st.f_frsize
+                        pctf = 100 - (free * 100 // tot if tot else 0)
+                        lines.append(("kv", lbl, "%d%% usato" % pctf, FG))
+                    except OSError:
+                        lines.append(("kv", lbl, "N/A", NO_R))
+            elif cat == "sessions":
+                try:
+                    last = ""
+                    for ln in open(os.path.join(DATA, "xfce_session.log"), errors="replace"):
+                        if "sessione terminata" in ln:
+                            last = ln.strip().split()[-1]
+                    lines.append(("kv", "ULTIMA SESSIONE" if it else "LAST SESSION", last or ("nessuna" if it else "none"), FG if last else DIM))
+                except OSError:
+                    lines.append(("kv", "ULTIMA SESSIONE" if it else "LAST SESSION", "N/A", NO_R))
+            elif cat == "deps":
+                missing = self.deps_missing("forge")
+                lines.append(("kv", "DIPENDENZE" if it else "DEPS", ("tutto ok" if it else "all clear") if not missing else ("mancanti: %d" % len(missing) if it else "missing: %d" % len(missing)), OK_G if not missing else NO_R))
+            elif cat == "ctrl":
+                try:
+                    devs = controllers.list_devices()
+                    lines.append(("kv", "CONTROLLER" if it else "CTRL", "%d device" % len(devs), FG))
+                except Exception:
+                    lines.append(("kv", "CONTROLLER" if it else "CTRL", "N/A", NO_R))
+            elif cat == "voidcast":
+                lines.append(("kv", "VOIDCAST", os.path.exists(os.path.join(APP_DIR, "VoidCast", "voidcast.log")) and "presente" or ("assente" if it else "missing"), OK_G if os.path.exists(os.path.join(APP_DIR, "VoidCast", "voidcast.log")) else DIM))
+        path = os.path.join(LOGS_DIR, "vdiag_selective.log")
+        self._vdiag_log(path, ["%s: %s" % (k, v) if len(v) == 1 else "%s: %s [%s]" % (k, v[0], v[2]) for k, *v in lines if k != "hdr"])
+        return lines
+
+    def vdiag_deep(self):
+        it = (self.lang == "it")
+        lines = []
+        lines.append(("hdr", "DEEP CHECK" if not it else "CHECK APPROFONDITO"))
+        cats = ["image", "envs", "sys", "net", "storage", "sessions", "deps", "ctrl", "voidcast"]
+        for cat in cats:
+            try:
+                sub = self.vdiag_selective([cat])
+                lines.extend(sub[1:])
+            except Exception as e:
+                lines.append(("kv", cat.upper(), "ERR: %s" % str(e)[:40], NO_R))
+        try:
+            lines.append(("kv", "BOOT" if not it else "AVVIO", os.path.exists(os.path.join(DATA, ".xfce_ready")) and "pronto" or ("non pronto" if it else "not ready"), OK_G if os.path.exists(os.path.join(DATA, ".xfce_ready")) else NO_R))
+        except OSError:
+            pass
+        try:
+            lines.append(("kv", "HOTSPOT", self.hot_active() and "attivo" or ("fermo" if it else "idle"), OK_G if self.hot_active() else DIM))
+        except Exception:
+            pass
+        path = os.path.join(LOGS_DIR, "vdiag_deep.log")
+        self._vdiag_log(path, ["%s: %s" % (k, v) if len(v) == 1 else "%s: %s [%s]" % (k, v[0], v[2]) for k, *v in lines if k != "hdr"])
+        return lines
+
+    def devcheck_action(self):
+        d = getattr(self, "devcheck_dept", 0)
+        if d == 0:
+            self.workshop_hub.stats()
+        elif d == 1:
+            mode = getattr(self, "devcheck_diag_mode", 0)
+            label = ("Esecuzione diagnostica..." if self.lang == "it"
+                     else "Running diagnostics...")
+            try:
+                if mode == 0:
+                    result = self.run_busy(label, self.vdiag_quick)
+                    if isinstance(result, Exception):
+                        self.notify("Errore", str(result), "critical")
+                        return
+                    if result:
+                        self.info_title = ("VDIAG QUICK" if self.lang != "it" else "VDIAG RAPIDO")
+                        self.info_lines = result
+                        self.scroll = 0
+                        self.push("info")
+                elif mode == 1:
+                    cats = getattr(self, "_dc_sel_cats", ["image", "envs", "sys", "net", "storage"])
+                    result = self.run_busy(label, lambda: self.vdiag_selective(cats))
+                    if isinstance(result, Exception):
+                        self.notify("Errore", str(result), "critical")
+                        return
+                    if result:
+                        self.info_title = ("VDIAG SELECTIVE" if self.lang != "it" else "VDIAG SELETTIVO")
+                        self.info_lines = result
+                        self.scroll = 0
+                        self.push("info")
+                elif mode == 2:
+                    result = self.run_busy(label, self.vdiag_deep)
+                    if isinstance(result, Exception):
+                        self.notify("Errore", str(result), "critical")
+                        return
+                    if result:
+                        self.info_title = ("VDIAG DEEP" if self.lang != "it" else "VDIAG APPROFONDITO")
+                        self.info_lines = result
+                        self.scroll = 0
+                        self.push("info")
+            except Exception as e:
+                self.notify("Errore diagnostica", str(e)[:80], "critical")
+        elif d == 2:
+            self.workshop_hub.storage()
+        elif d == 3:
+            self.workshop_hub.clean()
+
+    def draw_devcheck(self):
+        s = self.surface
+        now = time.time()
+        it = (self.lang == "it")
+        dept = getattr(self, "devcheck_dept", 0) % 4
+        st = self.status_snapshot()
+
+        # --- dati dispositivo ---
+        batt = st.get("batt")
+        chg = st.get("chg")
+        vol = st.get("vol") or 0
+        bt = st.get("bt")
+        wifi_lvl = st.get("wifi") or 0
+        wifi_conn = bool(st.get("conn"))
+        wifi_ssid = st.get("ssid") or "---"
+        ip = st.get("ip") or "---"
+        iface = st.get("iface") or "---"
+        temp = 0.0
+        try:
+            v = open("/sys/class/thermal/thermal_zone0/temp").read().strip()
+            if v.isdigit():
+                iv = int(v)
+                temp = iv / 1000.0 if iv > 1000 else float(iv)
+        except OSError:
+            pass
+        up_s = 0.0
+        try:
+            up_s = float(open("/proc/uptime").read().split()[0])
+        except (OSError, ValueError):
+            pass
+        load = 0.0
+        try:
+            load = float(open("/proc/loadavg").read().split()[0])
+        except (OSError, ValueError):
+            pass
+        mem_used_pct = 0
+        mem_tot = 0
+        try:
+            mt = ma = None
+            for ln in open("/proc/meminfo"):
+                p = ln.split(":")
+                if p[0] == "MemTotal":
+                    mt = int(p[1].split()[0])
+                elif p[0] == "MemAvailable":
+                    ma = int(p[1].split()[0])
+            if mt:
+                mem_used_pct = max(0, min(100, int((1.0 - (ma or 0) / mt) * 100)))
+                mem_tot = mt // 1024
+        except Exception:
+            pass
+        arch = ""
+        try:
+            arch = os.uname().machine
+        except OSError:
+            pass
+        sd1 = disk_free("/mnt/mmc")
+        sd2 = disk_free("/mnt/sdcard")
+        net_ok = getattr(self, "_dc_net", None)
+        if net_ok is None:
+            net_ok = (net_test() == "OK")
+            self._dc_net = net_ok
+        up_str = "%dh%02dm" % (int(up_s // 3600), int((up_s % 3600) // 60))
+
+        # --- palette clinica ---
+        CLIN = (205, 245, 250)
+        RED = (255, 72, 82)
+        GRN = (95, 255, 150)
+        AMB = (255, 200, 90)
+        BLU = (90, 175, 255)
+        VIO = (185, 145, 255)
+        WH = (230, 238, 245)
+        DBG = (8, 14, 20)
+
+        fn = getattr(self, "_dc_f", None)
+        if fn is None:
+            fn = {"big": font_display(26), "title": font_display(14),
+                  "num": font_display(26), "num2": font_display(15),
+                  "lbl": font_bold(11), "mono": font_mono(12),
+                  "tinym": font_mono(10)}
+            self._dc_f = fn
+
+        def T(txt, x, y, f, col, maxw=None):
+            self.text(txt, (x, y), f, col, maxw=maxw)
+
+        def layer(w, h):
+            return pygame.Surface((w, h), pygame.SRCALPHA)
+
+        def panel(x, y, w, h, col, fill=(10, 16, 22)):
+            pygame.draw.rect(s, fill, (x, y, w, h))
+            pygame.draw.rect(s, col, (x, y, w, h), 1)
+            g = sel_tint(col)
+            pygame.draw.line(s, g, (x + 2, y + 2), (x + w - 2, y + 2), 1)
+            pygame.draw.line(s, g, (x + 2, y + 2), (x + 2, y + h - 2), 1)
+            for (cxp, cyp, dx, dy) in ((x, y, 1, 1), (x + w, y, -1, 1),
+                                       (x, y + h, 1, -1), (x + w, y + h, -1, -1)):
+                pygame.draw.line(s, col, (cxp, cyp), (cxp + 5 * dx, cyp), 2)
+                pygame.draw.line(s, col, (cxp, cyp), (cxp, cyp + 5 * dy), 2)
+
+        def led(cx, cy, r, col, on, blink=False):
+            if on:
+                a = 210 if not blink else int(110 + 120 * abs(math.sin(now * 4)))
+                gl = layer(2 * r + 8, 2 * r + 8)
+                pygame.draw.circle(gl, (*col, a), (r + 4, r + 4), r + 2)
+                pygame.draw.circle(gl, (*col, a // 2), (r + 4, r + 4), r)
+                s.blit(gl, (cx - r - 4, cy - r - 4))
+            pygame.draw.circle(s, (10, 14, 20), (cx, cy), r)
+            pygame.draw.circle(s, col if on else (60, 70, 82), (cx, cy), r - 2)
+            pygame.draw.circle(s, sel_tint(col) if on else (30, 38, 48),
+                               (cx - r // 3, cy - r // 3), max(1, r // 3))
+
+        def cross(cx, cy, r, col):
+            t = max(2, r // 3)
+            pygame.draw.rect(s, col, (cx - r, cy - t, 2 * r, 2 * t))
+            pygame.draw.rect(s, col, (cx - t, cy - r, 2 * t, 2 * r))
+
+        def hbar(x, y, w, h, frac, col, label, val):
+            pygame.draw.rect(s, (8, 12, 18), (x, y, w, h))
+            pygame.draw.rect(s, col, (x, y, w, h), 1)
+            seg, gap = 10, 2
+            nseg = w // (seg + gap)
+            on = int(max(0.0, min(1.0, frac)) * nseg)
+            for j in range(nseg):
+                sx = x + 2 + j * (seg + gap)
+                if sx + seg > x + w - 2:
+                    break
+                c = col if j < on else (26, 34, 42)
+                pygame.draw.rect(s, c, (sx, y + 2, seg, h - 4))
+            if label:
+                T(label, x, y - 12, fn["tinym"], CLIN)
+            if val:
+                T(val, x + w - fn["tinym"].size(val)[0], y - 12,
+                  fn["tinym"], col)
+
+        def ecg(x, y, w, h, col):
+            panel(x, y, w, h, col)
+            gl = layer(w, h)
+            for gx in range(0, w, 14):
+                pygame.draw.line(gl, sel_tint(col), (gx, 0), (gx, h), 1)
+            for gy in range(0, h, 14):
+                pygame.draw.line(gl, sel_tint(col), (0, gy), (w, gy), 1)
+            n = 80
+            base = 6
+            amp = h - 16
+            pts = []
+            for i in range(n):
+                px = 6 + i * (w - 12) / (n - 1)
+                ph = (now * 1.6 + i * 0.10) % 1.0
+                v = 0.5
+                if ph < 0.08:
+                    v = 0.5 - (ph / 0.08) * 0.12
+                elif ph < 0.12:
+                    v = 0.38 + ((ph - 0.08) / 0.04) * 0.95
+                elif ph < 0.16:
+                    v = 1.33 - ((ph - 0.12) / 0.04) * 1.5
+                elif ph < 0.20:
+                    v = -0.17 + ((ph - 0.16) / 0.04) * 0.67
+                pts.append((px, base + amp * (1 - v)))
+            pygame.draw.lines(gl, col, False, pts, 2)
+            s.blit(gl, (x, y))
+            if pts:
+                led(int(x + pts[-1][0]), int(y + pts[-1][1]), 3, col, True)
+
+        # ---------- SFONDO ----------
+        s.fill(DBG)
+        for gx in range(0, W, 30):
+            pygame.draw.line(s, (14, 24, 32), (gx, 42), (gx, H - 28), 1)
+        for gy in range(46, H - 28, 30):
+            pygame.draw.line(s, (14, 24, 32), (0, gy), (W, gy), 1)
+        for sy in range(44, H, 3):
+            pygame.draw.line(s, (2, 4, 6), (0, sy), (W, sy), 1)
+
+        # ---------- HEADER ----------
+        pygame.draw.rect(s, INK, (0, 0, W, 42))
+        pygame.draw.line(s, RED, (0, 42), (W, 42), 2)
+        cross(22, 21, 12, RED)
+        T("DEVICE CHECK // RT", 36, 9, fn["big"], CLIN)
+        hw = fn["big"].size("DEVICE CHECK // RT")[0]
+        T("PRONTO SOCCORSO DIGITALE", 42 + hw, 15, fn["lbl"], FAINT)
+        pid = arch.upper() or "DEVICE"
+        T(pid, W - 14 - fn["lbl"].size(pid)[0], 15, fn["lbl"], BLU)
+        for hx in range(0, W, 18):
+            pygame.draw.line(s, RED, (hx, 42), (hx + 8, 46), 2)
+
+        # ---------- TABS REPARTI ----------
+        depts = [("TRIAGE", "task"), ("DIAGNOSTICA", "gear"),
+                 ("MEMORIE", "storage"), ("PULIZIA", "trash")]
+        tabw, tabh, ty = 150, 22, 48
+        total = tabw * 4 + 8 * 3
+        sx0 = (W - total) // 2
+        for i, (nm, ic) in enumerate(depts):
+            tx = sx0 + i * (tabw + 8)
+            act = (i == dept)
+            col = RED if act else CLIN
+            if act:
+                pygame.draw.rect(s, sel_tint(RED), (tx, ty, tabw, tabh))
+                pygame.draw.rect(s, RED, (tx, ty, tabw, tabh), 2)
+            else:
+                pygame.draw.rect(s, (10, 16, 22), (tx, ty, tabw, tabh))
+                pygame.draw.rect(s, sel_tint(CLIN), (tx, ty, tabw, tabh), 1)
+            icons.draw(s, ic, tx + 5, ty + 3, 16, col)
+            T(nm, tx + 24, ty + 5, fn["tinym"], col)
+
+        # ============================================================
+        #  REPARTO 0 — TRIAGE
+        # ============================================================
+        if dept == 0:
+            ecg(8, 76, 290, 150, GRN)
+            T("MONITOR VITALE", 14, 80, fn["tinym"], CLIN)
+            bpm = 72 + int(6 * math.sin(now * 2))
+            T("%d" % bpm, 250, 92, fn["num"], GRN)
+            T("BPM", 250, 122, fn["tinym"], FAINT)
+
+            def vital(ox, oy, lab, val, unit, col, frac):
+                panel(ox, oy, 150, 70, col)
+                T(lab, ox + 6, oy + 4, fn["tinym"], CLIN)
+                T(val, ox + 6, oy + 20, fn["num"], col)
+                T(unit, ox + 8 + fn["num"].size(val)[0], oy + 30,
+                  fn["tinym"], FAINT)
+                hbar(ox + 6, oy + 56, 138, 6, frac, col, "", "")
+
+            battcol = GRN if (batt and batt > 20) else RED
+            tempcol = AMB if temp < 72 else RED
+            vital(306, 76, "BATTERIA", ("%d%%" % batt) if batt else "--",
+                  "carica" if chg else "nam", battcol,
+                  (batt / 100.0 if batt else 0.0))
+            vital(462, 76, "TEMPERATURA", ("%.1f" % temp), "C", tempcol,
+                  min(1.0, temp / 90.0))
+            vital(306, 152, "CARICO CPU", ("%.2f" % load), "load", BLU,
+                  min(1.0, load / 4.0))
+            vital(462, 152, "RAM", ("%d%%" % mem_used_pct), "usata", VIO,
+                  mem_used_pct / 100.0)
+
+            # scanner corporeo
+            panel(8, 232, 290, 150, GRN)
+            T("SCANNER CORPOREO", 14, 236, fn["tinym"], CLIN)
+            bx, by, bw, bh = 40, 252, 200, 110
+            pygame.draw.rect(s, (14, 22, 30), (bx, by, bw, bh),
+                             border_radius=14)
+            pygame.draw.rect(s, GRN, (bx, by, bw, bh), 2, border_radius=14)
+            hots = [("BATT", 0.25, 0.35, battcol), ("CPU", 0.55, 0.42, BLU),
+                    ("TEMP", 0.8, 0.35, tempcol),
+                    ("MEM", 0.4, 0.7, VIO),
+                    ("NET", 0.72, 0.72,
+                     GRN if wifi_conn else FAINT)]
+            for nm, hxp, hyp, hc in hots:
+                ax = bx + int(hxp * bw)
+                ay = by + int(hyp * bh)
+                led(ax, ay, 4, hc, True)
+                T(nm, ax + 7, ay - 5, fn["tinym"], hc)
+            ly = int((now * 0.5 % 1.0) * bh)
+            gl = layer(290, 150)
+            pygame.draw.line(gl, (120, 255, 170, 120), (0, ly), (290, ly), 2)
+            s.blit(gl, (8, 232))
+
+            # memorie rapide
+            panel(306, 232, 312, 150, CLIN)
+            T("MEMORIE", 312, 236, fn["tinym"], CLIN)
+            yy = 258
+
+            def sbar(lbl, free, tt, col):
+                nonlocal yy
+                if free is None:
+                    hbar(312, yy, 300, 8, 0, FAINT, lbl, "n/d")
+                    yy += 28
+                    return
+                pctf = 100 - (free * 100 // tt if tt else 0)
+                hbar(312, yy, 300, 8, (free / tt if tt else 0), col, lbl,
+                     "%s/%s  %d%%" % (human(free), human(tt), pctf))
+                yy += 28
+
+            sbar("SD1 (mmc)", sd1[0], sd1[1], BLU)
+            sbar("SD2 (sdcard)", sd2[0], sd2[1], VIO)
+
+            # striscia stato
+            pygame.draw.rect(s, (8, 12, 18), (8, 388, 624, 56))
+            pygame.draw.rect(s, sel_tint(CLIN), (8, 388, 624, 56), 1)
+            chips = [("WIFI", wifi_ssid if wifi_conn else "off",
+                      GRN if wifi_conn else FAINT),
+                     ("BT", "ON" if bt is True else "OFF",
+                      GRN if bt is True else FAINT),
+                     ("IP", ip[:18], CLIN),
+                     ("RETE", "OK" if net_ok else "NO",
+                      GRN if net_ok else RED),
+                     ("ACCESO", up_str, CLIN)]
+            for i, (nm, vv, cc) in enumerate(chips):
+                cx = 14 + i * 124
+                T(nm, cx, 394, fn["tinym"], FAINT)
+                T(vv, cx, 408, fn["tinym"], cc, maxw=120)
+
+        # ============================================================
+        #  REPARTO 1 — DIAGNOSTICA (QUICK / SELECTIVE / DEEP)
+        # ============================================================
+        elif dept == 1:
+            diag_mode = getattr(self, "devcheck_diag_mode", 0) % 3
+            tabs = [("QUICK", "bolt"), ("SELECTIVE", "list"),
+                    ("DEEP", "search")]
+            tabw, tabh, ty = 150, 22, 48
+            total = tabw * 3 + 8 * 2
+            sx0 = (W - total) // 2
+            for i, (nm, ic) in enumerate(tabs):
+                tx = sx0 + i * (tabw + 8)
+                act = (i == diag_mode)
+                col = RED if act else CLIN
+                if act:
+                    pygame.draw.rect(s, sel_tint(RED), (tx, ty, tabw, tabh))
+                    pygame.draw.rect(s, RED, (tx, ty, tabw, tabh), 2)
+                else:
+                    pygame.draw.rect(s, (10, 16, 22), (tx, ty, tabw, tabh))
+                    pygame.draw.rect(s, sel_tint(CLIN), (tx, ty, tabw, tabh), 1)
+                icons.draw(s, ic, tx + 5, ty + 3, 16, col)
+                T(nm, tx + 24, ty + 5, fn["tinym"], col)
+
+            if diag_mode == 0:
+                T("CHECK RAPIDO" if it else "QUICK CHECK",
+                  W // 2 - fn["title"].size("CHECK RAPIDO" if it else "QUICK CHECK")[0] // 2,
+                  80, fn["title"], CLIN)
+                desc = (("Controllo essenziale: CPU, RAM, temp, image, "
+                         "ambienti e rete.\nPremi A per avviare.")
+                        if it else
+                        ("Essential scan: CPU, RAM, temp, image, "
+                         "environments and network.\nPress A to start."))
+                for i, ln in enumerate(desc.split("\n")):
+                    T(ln, W // 2 - fn["lbl"].size(ln)[0] // 2, 108 + i * 16,
+                      fn["lbl"], FAINT)
+                items = [("CPU / LOAD", True), ("RAM", True), ("TEMP", True),
+                         ("IMAGE", True), ("ENVS", True), ("NET", True)]
+                cy = 148
+                for nm, ok in items:
+                    led(40, cy, 5, GRN if ok else RED, True)
+                    T(nm, 54, cy - 5, fn["mono"], CLIN)
+                    cy += 22
+                hint = "A = AVVIA QUICK CHECK" if it else "A = RUN QUICK CHECK"
+                T(hint, W // 2 - fn["lbl"].size(hint)[0] // 2, cy + 8,
+                  fn["lbl"], AMB)
+
+            elif diag_mode == 1:
+                T("CHECK SELETTIVO" if it else "SELECTIVE CHECK",
+                  W // 2 - fn["title"].size("CHECK SELETTIVO" if it else "SELECTIVE CHECK")[0] // 2,
+                  80, fn["title"], CLIN)
+                desc = (("Seleziona gli aspetti da controllare con UP/DOWN "
+                         "e A per toggle.\nPremi A di nuovo per avviare.")
+                        if it else
+                        ("Select aspects to check with UP/DOWN and A to "
+                         "toggle.\nPress A again to start."))
+                for i, ln in enumerate(desc.split("\n")):
+                    T(ln, W // 2 - fn["lbl"].size(ln)[0] // 2, 108 + i * 16,
+                      fn["lbl"], FAINT)
+                sel_cats = getattr(self, "_dc_sel_cats", ["image", "envs", "sys", "net", "storage"])
+                all_cats = [
+                    ("image", "IMMAGINE XFCE" if it else "XFCE IMAGE"),
+                    ("envs", "AMBIENTI DESKTOP" if it else "DESKTOP ENVS"),
+                    ("sys", "SISTEMA / GOVERNOR" if it else "SYSTEM / GOVERNOR"),
+                    ("net", "RETE / COLLEGAMENTO" if it else "NETWORK"),
+                    ("storage", "STORAGE / SPAZIO" if it else "STORAGE"),
+                    ("sessions", "SESSIONI PRECEDENTI" if it else "PREVIOUS SESSIONS"),
+                    ("deps", "DIPENDENZE / COMPONENTI" if it else "DEPENDENCIES"),
+                    ("ctrl", "CONTROLLER / INPUT" if it else "CONTROLLER"),
+                    ("voidcast", "VOIDCAST / MEDIA" if it else "VOIDCAST"),
+                ]
+                cy = 148
+                sel_idx = getattr(self, "_dc_sel_sel", 0)
+                for i, (key, nm) in enumerate(all_cats):
+                    on = key in sel_cats
+                    if i == sel_idx:
+                        pygame.draw.rect(s, sel_tint(CLIN), (30, cy - 2, 580, 20))
+                    led(40, cy + 4, 5, GRN if on else FAINT, on)
+                    T(nm, 54, cy, fn["mono"], CLIN)
+                    T("ON" if on else "OFF", W - 60, cy, fn["tinym"],
+                      GRN if on else FAINT)
+                    cy += 22
+                hint = "A = TOGGLE / AVVIA" if it else "A = TOGGLE / START"
+                T(hint, W // 2 - fn["lbl"].size(hint)[0] // 2, cy + 8,
+                  fn["lbl"], AMB)
+
+            elif diag_mode == 2:
+                T("CHECK APPROFONDITO" if it else "DEEP CHECK",
+                  W // 2 - fn["title"].size("CHECK APPROFONDITO" if it else "DEEP CHECK")[0] // 2,
+                  80, fn["title"], CLIN)
+                desc = (("Controllo estensivo su TUTTA l'applicazione: "
+                         "immagine, ambienti, sistema, rete, storage, "
+                         "sessioni, dipendenze, controller e VoidCast.\n"
+                         "Premi A per avviare.")
+                        if it else
+                        ("Extensive scan of the ENTIRE application: image, "
+                         "environments, system, network, storage, sessions, "
+                         "dependencies, controller and VoidCast.\n"
+                         "Press A to start."))
+                for i, ln in enumerate(desc.split("\n")):
+                    T(ln, W // 2 - fn["lbl"].size(ln)[0] // 2, 108 + i * 16,
+                      fn["lbl"], FAINT)
+                checks = [("IMMAGINE XFCE", True), ("AMBIENTI DESKTOP", True),
+                          ("SISTEMA / GOVERNOR", True), ("RETE / COLLEGAMENTO", True),
+                          ("STORAGE / SPAZIO", True), ("SESSIONI PRECEDENTI", True),
+                          ("DIPENDENZE", True), ("CONTROLLER", True),
+                          ("VOIDCAST", True)]
+                cy = 148
+                for nm, ok in checks:
+                    led(40, cy, 5, GRN if ok else RED, True)
+                    T(nm, 54, cy - 5, fn["mono"], CLIN)
+                    cy += 22
+                hint = "A = AVVIA DEEP CHECK" if it else "A = RUN DEEP CHECK"
+                T(hint, W // 2 - fn["lbl"].size(hint)[0] // 2, cy + 8,
+                  fn["lbl"], AMB)
+
+        # ============================================================
+        #  REPARTO 2 — MEMORIE
+        # ============================================================
+        elif dept == 2:
+            T("BANCHE DI MEMORIA", 14, 80, fn["title"], CLIN)
+            panel(8, 96, 624, 300, CLIN)
+            yy = 116
+
+            def bank(lbl, free, tt, col):
+                nonlocal yy
+                pygame.draw.rect(s, (10, 16, 22), (16, yy, 600, 56))
+                pygame.draw.rect(s, col, (16, yy, 600, 56), 1)
+                T(lbl, 26, yy + 6, fn["mono"], CLIN)
+                if free is None:
+                    T("non montata", 26, yy + 30, fn["tinym"], FAINT)
+                    yy += 66
+                    return
+                pctf = 100 - (free * 100 // tt if tt else 0)
+                T("%s liberi / %s" % (human(free), human(tt)),
+                  26, yy + 30, fn["tinym"], WH)
+                hbar(320, yy + 18, 280, 12, (free / tt if tt else 0), col,
+                     "", "%d%% usato" % pctf)
+                yy += 66
+
+            bank("SD1 (mmc)", sd1[0], sd1[1], BLU)
+            bank("SD2 (sdcard)", sd2[0], sd2[1], VIO)
+            img = os.path.join(DATA, "xfce.img")
+            imgsz = os.path.getsize(img) if os.path.exists(img) else 0
+            if imgsz:
+                pygame.draw.rect(s, (10, 16, 22), (16, yy, 600, 56))
+                pygame.draw.rect(s, AMB, (16, yy, 600, 56), 1)
+                T("IMMAGINE XFCE", 26, yy + 6, fn["mono"], CLIN)
+                T("dimensione: %s" % human(imgsz), 26, yy + 30,
+                  fn["tinym"], WH)
+            T("A = dettaglio completo" if it else "A = full detail",
+              W // 2 - fn["lbl"].size("A = dettaglio completo"
+                                      if it else "A = full detail")[0] // 2,
+              404, fn["lbl"], AMB)
+
+        # ============================================================
+        #  REPARTO 3 — PULIZIA
+        # ============================================================
+        elif dept == 3:
+            panel(8, 76, 624, 300, AMB)
+            T("SALA CHIRURGICA — PULIZIA", 14, 80, fn["title"], AMB)
+            intro = (("Rimuove la cache apt e i pacchetti scaricati non\n"
+                      "piu' necessari, liberando spazio su SD.")
+                     if it else
+                     ("Removes the apt cache and downloaded packages no\n"
+                      "longer needed, reclaiming SD space."))
+            for i, ln in enumerate(intro.split("\n")):
+                T(ln, 14, 108 + i * 16, fn["lbl"], FAINT)
+            rec = getattr(self, "_dc_rec", None)
+            if rec is None:
+                rec = self._apt_cache_size()
+                self._dc_rec = rec
+            T("spazio recuperabile", 14, 158, fn["lbl"], CLIN)
+            T("~%s" % human(rec), 14, 176, fn["num"], GRN)
+            bw, bh = 220, 54
+            bxb, byb = (W - bw) // 2, 224
+            pygame.draw.rect(s, (20, 30, 20), (bxb, byb, bw, bh),
+                             border_radius=8)
+            pygame.draw.rect(s, RED, (bxb, byb, bw, bh), 3, border_radius=8)
+            T("ESEGUI  (A)", bxb + bw // 2 -
+              fn["big"].size("ESEGUI  (A)")[0] // 2, byb + 14, fn["big"], WH)
+            warn = "ATTENZIONE: operazione irreversibile" if it else \
+                   "WARNING: irreversible operation"
+            T(warn, W // 2 - fn["lbl"].size(warn)[0] // 2, 300,
+              fn["tinym"], RED)
+
+        # ---------- FOOTER ----------
+        self.footer([("L1/R1", "reparto"), ("A", "azione"),
+                     ("B", self.t("back"))])
+
+    # ---------------------------------------------------------------
+    #  VOID DESK UPDATE — pannello di controllo aggiornamenti
+    # ---------------------------------------------------------------
+    def draw_voidupdate(self):
+        s = self.surface
+        now = time.time()
+        it = (self.lang == "it")
+        up_cyan = (60, 210, 220)
+
+        # --- sfondo cyberpunk ---
+        s.fill((4, 5, 8))
+        for gx in range(0, W, 40):
+            pygame.draw.line(s, (20, 30, 45), (gx, 42), (gx, H - 28), 1)
+        for gy in range(44, H - 28, 40):
+            pygame.draw.line(s, (20, 30, 45), (0, gy), (W, gy), 1)
+        for sy in range(44, H, 3):
+            pygame.draw.line(s, (2, 4, 6), (0, sy), (W, sy), 1)
+
+        # --- header ---
+        pygame.draw.rect(s, INK, (0, 0, W, 42))
+        pygame.draw.line(s, up_cyan, (0, 42), (W, 42), 2)
+        pygame.draw.line(s, theme_secondary(up_cyan), (10, 36),
+                         (W - 10, 36), 1)
+        for hx in range(0, 46, 9):
+            pygame.draw.line(s, up_cyan, (hx, 42), (hx + 5, 46), 2)
+        # icona animata
+        scx, scy, srad = 18, 21, 13
+        icons.draw(s, "gear", scx - 7, scy - 7, 14, up_cyan)
+        ang = (now * 1.6) % (2 * math.pi)
+        px = scx + int(srad * math.cos(ang))
+        py = scy + int(srad * math.sin(ang))
+        pygame.draw.circle(s, up_cyan, (px, py), 3)
+        self.text("VOID DESK UPDATE", (scx + 24, 9), self.f_med, up_cyan)
+        update_badge = self.badge_img("vd_update", 28)
+        if update_badge is not None:
+            bw_, bh_ = update_badge.get_size()
+            self.surface.blit(update_badge, (W - bw_ - 14, 7))
+
+        # --- pannello stato ---
+        panel_y, panel_h = 50, 80
+        pygame.draw.rect(s, (12, 16, 18), (8, panel_y, W - 16, panel_h))
+        pygame.draw.rect(s, up_cyan, (8, panel_y, W - 16, panel_h), 1)
+        # glow interno
+        glow = sel_tint(up_cyan)
+        pygame.draw.line(s, glow, (10, panel_y + 2),
+                         (W - 10, panel_y + 2), 1)
+        pygame.draw.line(s, glow, (10, panel_y + 2),
+                         (10, panel_y + panel_h - 2), 1)
+        # LED stato
+        avail = self.update_available()
+        checking = getattr(self, "update_checking", False)
+        if checking:
+            led_col = (255, 200, 60)
+            stato_txt = "verifica in corso..." if it else "checking..."
+        elif avail:
+            led_col = (60, 255, 110)
+            stato_txt = "! Aggiornamento disponibile" if it else \
+                "! Update available"
+        elif self.update_data and self.update_data.get("ok"):
+            led_col = (60, 255, 110)
+            stato_txt = "Aggiornato" if it else "Up to date"
+        else:
+            led_col = (255, 72, 82)
+            stato_txt = "verifica non riuscita" if it else "check failed"
+        # LED con glow
+        led_x, led_y = 24, panel_y + 24
+        a = int(150 + 80 * abs(math.sin(now * 4)))
+        gl_surf = pygame.Surface((28, 28), pygame.SRCALPHA)
+        pygame.draw.circle(gl_surf, (*led_col, a), (14, 14), 10)
+        pygame.draw.circle(gl_surf, (*led_col, a // 2), (14, 14), 7)
+        s.blit(gl_surf, (led_x - 14, led_y - 14))
+        pygame.draw.circle(s, (10, 14, 20), (led_x, led_y), 7)
+        pygame.draw.circle(s, led_col, (led_x, led_y), 5)
+        # testo stato
+        self.text(stato_txt, (led_x + 18, led_y - 6), self.f_med, FG)
+        # versione corrente
+        self.text("v" + VERSION, (W - 24, led_y - 6), self.f_small, DIM,
+                  maxw=150, align="right")
+
+        # --- barra di progresso (se in corso) ---
+        if checking:
+            bar = pygame.Rect(24, panel_y + 50, W - 48, 10)
+            pygame.draw.rect(s, (10, 15, 20), bar)
+            pygame.draw.rect(s, up_cyan, bar, 2)
+            prog = (now * 0.3) % 1.0
+            pygame.draw.rect(s, up_cyan,
+                             (bar.x, bar.y, int(bar.w * prog), bar.h))
+            # segmenti
+            seg = 12
+            for sx in range(bar.x, bar.x + int(bar.w * prog), seg + 2):
+                if sx + seg > bar.x + bar.w:
+                    break
+                pygame.draw.rect(s, (*up_cyan, 180),
+                                 (sx, bar.y + 2, seg, bar.h - 4))
+
+        # --- lista release ---
+        releases = (self.update_data or {}).get("releases", [])[:3]
+        y = panel_y + panel_h + 12
+        if releases:
+            self.text("RELEASE RECENTI", (14, y), self.f_tiny, up_cyan)
+            y += 20
+            for rel in releases:
+                r = pygame.Rect(8, y, W - 16, 56)
+                pygame.draw.rect(s, (12, 16, 20), r)
+                pygame.draw.rect(s, LINE, r, 1)
+                tag = rel.get("tag_name", "?")
+                self.text(tag, (20, y + 6), self.f_med_b, up_cyan)
+                pub = (rel.get("published_at", "") or "")[:10]
+                self.text(pub, (W - 20, y + 6), self.f_small, DIM,
+                          align="right")
+                body = (rel.get("body", "") or "").split("\n")[0][:80]
+                if body:
+                    self.text(body, (20, y + 30), self.f_small, DIM,
+                              maxw=W - 40)
+                y += 62
+        else:
+            y += 10
+            no_rel = "Nessuna release caricata" if it else \
+                "No releases loaded"
+            self.text(no_rel, (14, y + 8), self.f_small, FAINT)
+
+        # --- footer ---
+        self.footer([("A", "Controlla" if it else "Check"),
+                     ("X", "Impostazioni" if it else "Settings"),
+                     ("Y", "Aggiorna" if it else "Update"),
+                     ("B", self.t("back"))])
+
+    # ---------------------------------------------------------------
+    #  START SESSION — selezione ambienti con schede
+    # ---------------------------------------------------------------
+    def draw_session(self):
+        s = self.surface
+        now = time.time()
+        it = (self.lang == "it")
+
+        # --- sfondo ---
+        s.fill((5, 5, 10))
+        for gx in range(0, W, 40):
+            pygame.draw.line(s, (18, 22, 32), (gx, 42), (gx, H - 28), 1)
+        for gy in range(44, H - 28, 40):
+            pygame.draw.line(s, (18, 22, 32), (0, gy), (W, gy), 1)
+
+        # --- header ---
+        pygame.draw.rect(s, INK, (0, 0, W, 42))
+        pygame.draw.line(s, (60, 200, 130), (0, 42), (W, 42), 2)
+        icons.draw(s, "start", 10, 9, 24, (60, 200, 130))
+        self.text("START SESSION", (42, 9), self.f_med, (60, 200, 130))
+        self.text("seleziona ambiente" if it else "select environment",
+                  (42, 28), self.f_tiny, FAINT)
+
+        # --- schede ambienti ---
+        base, extra = self.read_envs()
+        cur = self.cfg.get("desk_env", "xfce")
+        envs = [("xfce", "XFCE", "CORE"),
+                ("icewm", "IceWM", "TURBO"),
+                ("lxde", "LXDE", "LIGHT")]
+        y = 50
+        bh = 116
+        for j, (key, name, codename) in enumerate(envs):
+            col = self.env_color(key)
+            inst = base and (key == "xfce" or key in extra)
+            active = (key == cur)
+            sel = (j == getattr(self, "env_sel", 0))
+            rect = pygame.Rect(8, y, W - 16, bh)
+            # sfondo scheda
+            if sel:
+                pygame.draw.rect(s, sel_tint(col), rect)
+                pygame.draw.rect(s, col, rect, 2)
+                # glow
+                glow_surf = pygame.Surface((W - 8, bh + 8), pygame.SRCALPHA)
+                glow_surf.fill((*col, 30))
+                s.blit(glow_surf, (4, y - 4))
+            else:
+                pygame.draw.rect(s, (10, 12, 18), rect)
+                pygame.draw.rect(s, LINE if not inst else col, rect, 1)
+            # icona ambiente
+            icx, icy, icsz = 20, y + 16, 48
+            fillbox = sel_tint(col) if sel else INK
+            self.env_icon_frame(key, icx, icy, icsz, col, fillbox)
+            self.env_glyph(key, icx + 8, icy + 7, 3, col)
+            # nome e codename
+            self.text(name, (icx + icsz + 16, icy - 4), self.f_big, FG)
+            self.text(codename, (icx + icsz + 16, icy + 32), self.f_small, DIM)
+            # stato (LED + testo)
+            if active and inst:
+                stato = "ATTIVO" if it else "ACTIVE"
+                stat_col = (96, 225, 120)
+            elif inst:
+                stato = "INSTALLATO" if it else "INSTALLED"
+                stat_col = (96, 225, 120)
+            else:
+                stato = "NON INSTALLATO" if it else "NOT INSTALLED"
+                stat_col = (238, 62, 58)
+            # LED
+            led_x, led_y = W - 30, icy + 10
+            a = int(150 + 80 * abs(math.sin(now * 3 + j)))
+            gl = pygame.Surface((24, 24), pygame.SRCALPHA)
+            pygame.draw.circle(gl, (*stat_col, a), (12, 12), 8)
+            pygame.draw.circle(gl, (*stat_col, a // 2), (12, 12), 5)
+            s.blit(gl, (led_x - 12, led_y - 12))
+            pygame.draw.circle(s, (10, 14, 20), (led_x, led_y), 6)
+            pygame.draw.circle(s, stat_col, (led_x, led_y), 4)
+            # testo stato
+            self.text(stato, (led_x - 50, led_y - 6), self.f_small, stat_col,
+                      maxw=40, align="right")
+            # X dettagli hint
+            self.text("X " + ("dettagli" if it else "details"),
+                      (led_x - 50, led_y + 16), self.f_tiny, DIM, maxw=40,
+                      align="right")
+            # separator
+            pygame.draw.line(s, LINE, (18, y + bh - 1),
+                             (W - 18, y + bh - 1), 1)
+            y += bh + 8
+
+        # --- footer ---
+        self.footer([("A", "Avvia" if it else "Launch"),
+                     ("X", "Dettagli" if it else "Details"),
+                     ("B", self.t("back"))])
+
+    # ---------------------------------------------------------------
+    #  THE FORGE — griglia strumenti
+    # ---------------------------------------------------------------
+    def draw_forge(self):
+        s = self.surface
+        now = time.time()
+        it = (self.lang == "it")
+        FORGE_HOT = (225, 95, 40)
+
+        # --- sfondo fucina ---
+        s.fill((10, 6, 4))
+        self.forge_backdrop()
+
+        # --- header ---
+        pygame.draw.rect(s, INK, (0, 0, W, 42))
+        pygame.draw.line(s, FORGE_ACCENT, (0, 42), (W, 42), 2)
+        icons.draw(s, "forge", 10, 9, 24, FORGE_ACCENT)
+        self.text("THE FORGE", (42, 9), self.f_med, FORGE_ACCENT)
+        self.text("strumenti di sistema" if it else "system tools",
+                  (42, 28), self.f_tiny, FAINT)
+
+        # --- griglia strumenti ---
+        items = HUBS["forge"][2]
+        cols = 3
+        cell_w = (W - 32) // cols
+        cell_h = 72
+        gap = 8
+        for idx, (k, ic, lk, sk, kind) in enumerate(items):
+            col_idx = idx % cols
+            row_idx = idx // cols
+            x = 12 + col_idx * (cell_w + gap)
+            y = 50 + row_idx * (cell_h + gap)
+            sel = (idx == self.hub_sel)
+            rect = pygame.Rect(x, y, cell_w, cell_h)
+            if sel:
+                pygame.draw.rect(s, (30, 20, 15), rect)
+                pygame.draw.rect(s, FORGE_ACCENT, rect, 2)
+                # glow
+                glow = pygame.Surface((cell_w + 8, cell_h + 8),
+                                      pygame.SRCALPHA)
+                glow.fill((*FORGE_ACCENT, 40))
+                s.blit(glow, (x - 4, y - 4))
+            else:
+                pygame.draw.rect(s, (10, 8, 6), rect)
+                pygame.draw.rect(s, (60, 50, 40), rect, 1)
+            # icona
+            icons.draw(s, ic, x + 10, y + 10, 36,
+                       FORGE_ACCENT if sel else (100, 80, 60))
+            # nome
+            self.text(self.t(lk), (x + 54, y + 12), self.f_med,
+                      FG if sel else DIM)
+            # sottotitolo
+            self.text(self.t(sk), (x + 54, y + 42), self.f_small,
+                      DIM if sel else FAINT, maxw=cell_w - 60)
+
+        # --- footer ---
+        self.footer([("A", self.t("open")), ("B", self.t("back"))])
 
     def play_python_intro(self):
         """Sagoma di serpente stilizzata originale che si arrotola --
@@ -4674,12 +9891,12 @@ class App(object):
 
 
 # --- [N12] Text Editor (VOID EDIT) // HUB: RT:TOOLBOX ---
-    def rtsh_open(self):
+    def rtsh_open(self, cwd=None):
         cols, rows = self.rtsh_cols, self.rtsh_rows
         try:
             self.rtsh_sess = rtshell.PtySession(
                 shell="/bin/bash", cols=cols, rows=rows,
-                cwd=os.path.expanduser("~"))
+                cwd=cwd or os.path.expanduser("~"))
         except OSError as e:
             self.info_lines = self.stub_lines(
                 "RT:SHELL", ["avvio fallito: %s" % e])
@@ -4944,9 +10161,14 @@ class App(object):
                      (cx + 80, cy + 20), (cx - 40, cy + 80),
                      (cx + 40, cy + 80)]
             edges = [(0, 1), (0, 2), (1, 2), (1, 3), (2, 4), (3, 4),
-                    (0, 3), (0, 4)]
-            t0 = time.time()
+                     (0, 3), (0, 4)]
+            skip_font = pygame.font.Font(FONT_PATH, 16)
+            skip_txt = skip_font.render(
+                "Premi un tasto per saltare..." if self.lang == "it"
+                else "Press ANY key to skip...", True, (120, 120, 130))
             for i in range(14):
+                if evinput.poll():
+                    return
                 k = i / 13.0
                 self.surface.fill((10, 6, 5))
                 ne = int(len(edges) * k)
@@ -4956,9 +10178,13 @@ class App(object):
                 for nx, ny in nodes:
                     pygame.draw.circle(self.surface, ts_red,
                                        (nx, ny), 8)
+                self.surface.blit(skip_txt, (W - skip_txt.get_width() - 12,
+                                             H - 28))
                 real_flip()
                 time.sleep(0.02)
             for i in range(10):
+                if evinput.poll():
+                    return
                 self.surface.fill((10, 6, 5))
                 for a, b in edges:
                     pygame.draw.line(self.surface, (110, 40, 38),
@@ -4969,12 +10195,16 @@ class App(object):
                 for nx, ny in nodes:
                     pygame.draw.circle(self.surface, ts_red,
                                        (nx, ny), 8)
+                self.surface.blit(skip_txt, (W - skip_txt.get_width() - 12,
+                                             H - 28))
                 real_flip()
                 time.sleep(0.025)
             f = pygame.font.Font(FONT_PATH, 34)
             word = "Tailscale"
             ww = f.size(word)[0]
             for i in range(12):
+                if evinput.poll():
+                    return
                 k = i / 11.0
                 self.surface.fill((10, 6, 5))
                 for a, b in edges:
@@ -4986,8 +10216,398 @@ class App(object):
                 img = f.render(word, True, ts_red)
                 img.set_alpha(int(255 * min(1, k * 2)))
                 self.surface.blit(img, (cx - ww // 2, cy + 110))
+                self.surface.blit(skip_txt, (W - skip_txt.get_width() - 12,
+                                             H - 28))
                 real_flip()
                 time.sleep(0.02)
+        finally:
+            pygame.display.flip = real_flip
+
+    def play_games_boot(self, skip_check=None):
+        """Animazione di caricamento per GAMES: controller che si illumina e schermo che si accende."""
+        if self.cfg.get("vfx_trans", 3) <= 0:
+            return
+        self.play("games_boot")
+        real_flip = pygame.display.flip
+        try:
+            evinput.poll()
+            col = NEXUS_NODE_COLOR[10]  # oro
+            cx, cy = W // 2, H // 2 - 20
+            t0 = time.time()
+            skip_font = pygame.font.Font(FONT_PATH, 14)
+            skip_txt = skip_font.render(
+                "START/A: salta" if self.lang == "it"
+                else "START/A: skip", True, (120, 120, 130))
+            skip_w = skip_txt.get_width()
+
+            # ATTO 1: controller che pulsa
+            for i in range(12):
+                if skip_check and skip_check():
+                    return
+                k = i / 11.0
+                self.surface.fill((5, 5, 10))
+                pulse = 0.5 + 0.5 * math.sin(t0 * 3 + i * 0.5)
+                r = 50 + int(10 * pulse)
+                pygame.draw.circle(self.surface, col, (cx, cy), r, 3)
+                pygame.draw.circle(self.surface, col, (cx, cy), r - 10, 2)
+                # D-pad stilizzato
+                pygame.draw.rect(self.surface, col, (cx - 20, cy - 20, 40, 8))
+                pygame.draw.rect(self.surface, col, (cx - 20, cy + 12, 40, 8))
+                pygame.draw.rect(self.surface, col, (cx - 20, cy - 12, 8, 24))
+                pygame.draw.rect(self.surface, col, (cx + 12, cy - 12, 8, 24))
+                # Pulsanti A/B/X/Y
+                for dx, dy in ((-16, -16), (16, -16), (-16, 16), (16, 16)):
+                    pygame.draw.circle(self.surface, col, (cx + dx, cy + dy), 6, 2)
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
+
+            # ATTO 2: schermo che si accende (flash)
+            flash = pygame.Surface((W, H), pygame.SRCALPHA)
+            for i in range(6):
+                if skip_check and skip_check():
+                    return
+                self.surface.fill((5, 5, 10))
+                pygame.draw.circle(self.surface, col, (cx, cy), 50, 3)
+                pygame.draw.circle(self.surface, col, (cx, cy), 50 - 10, 2)
+                # Flash crescente — riutilizza la surface allocata una volta sola
+                flash.fill((255, 255, 255, int(30 * (i / 5.0))))
+                self.surface.blit(flash, (0, 0))
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.02)
+
+            # ATTO 3: il nome
+            f = pygame.font.Font(FONT_DISPLAY_PATH, 40)
+            word = "GIOCHI" if self.lang == "it" else "GAMES"
+            ww = f.size(word)[0]
+            for i in range(10):
+                if skip_check and skip_check():
+                    return
+                k = i / 9.0
+                self.surface.fill((5, 5, 10))
+                pygame.draw.circle(self.surface, col, (cx, cy), 50, 3)
+                pygame.draw.circle(self.surface, col, (cx, cy), 50 - 10, 2)
+                img = f.render(word, True, col)
+                img.set_alpha(int(255 * min(1, k * 2)))
+                self.surface.blit(img, (cx - ww // 2, cy + 70))
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
+        finally:
+            pygame.display.flip = real_flip
+
+    def play_develop_boot(self, skip_check=None):
+        """Animazione di caricamento per DEVELOP: terminale che digita codice."""
+        if self.cfg.get("vfx_trans", 3) <= 0:
+            return
+        self.play("develop_boot")
+        real_flip = pygame.display.flip
+        try:
+            evinput.poll()
+            col = NEXUS_NODE_COLOR[11]  # turchese
+            cx, cy = W // 2, H // 2 - 10
+            t0 = time.time()
+            skip_font = pygame.font.Font(FONT_PATH, 14)
+            skip_txt = skip_font.render(
+                "START/A: salta" if self.lang == "it"
+                else "START/A: skip", True, (120, 120, 130))
+            skip_w = skip_txt.get_width()
+
+            # ATTO 1: terminale che appare
+            f_code = pygame.font.Font(FONT_MONO_PATH, 14)
+            code_lines = [
+                "def void():" if self.lang == "it" else "def void():",
+                "    return True" if self.lang == "it" else "    return True",
+                "void()  # attiva" if self.lang == "it" else "void()  # activate",
+                "▶ READY" if self.lang == "it" else "▶ READY",
+            ]
+            for i in range(16):
+                if skip_check and skip_check():
+                    return
+                k = i / 15.0
+                self.surface.fill((3, 5, 7))
+                # Cornice terminale
+                pygame.draw.rect(self.surface, (8, 10, 14), (cx - 160, cy - 80, 320, 160), border_radius=6)
+                pygame.draw.rect(self.surface, col, (cx - 160, cy - 80, 320, 160), 2, border_radius=6)
+                # Linee che appaiono gradualmente
+                n_lines = min(len(code_lines), int(1 + k * 4))
+                for j in range(n_lines):
+                    txt = code_lines[j]
+                    if j == n_lines - 1 and int(time.time() * 3) % 2:
+                        txt += "_"
+                    img = f_code.render(txt, True, (120, 240, 200) if j < n_lines - 1 else col)
+                    self.surface.blit(img, (cx - 140 + 10, cy - 60 + j * 24))
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
+
+            # ATTO 2: il nome
+            f = pygame.font.Font(FONT_DISPLAY_PATH, 36)
+            word = "DEVELOP"
+            ww = f.size(word)[0]
+            for i in range(10):
+                if skip_check and skip_check():
+                    return
+                k = i / 9.0
+                self.surface.fill((3, 5, 7))
+                pygame.draw.rect(self.surface, (8, 10, 14), (cx - 160, cy - 80, 320, 160), border_radius=6)
+                pygame.draw.rect(self.surface, col, (cx - 160, cy - 80, 320, 160), 2, border_radius=6)
+                for j, txt in enumerate(code_lines[:-1]):
+                    img = f_code.render(txt, True, (120, 240, 200))
+                    self.surface.blit(img, (cx - 140 + 10, cy - 60 + j * 24))
+                img = f.render(word, True, col)
+                img.set_alpha(int(255 * min(1, k * 2)))
+                self.surface.blit(img, (cx - ww // 2, cy + 90))
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
+        finally:
+            pygame.display.flip = real_flip
+
+    def play_community_boot(self, skip_check=None):
+        """Animazione di caricamento per COMMUNITY: tre figure che si incontrano."""
+        if self.cfg.get("vfx_trans", 3) <= 0:
+            return
+        self.play("community_boot")
+        real_flip = pygame.display.flip
+        try:
+            evinput.poll()
+            col = NEXUS_NODE_COLOR[12]  # lavanda
+            cx, cy = W // 2, H // 2
+            t0 = time.time()
+            skip_font = pygame.font.Font(FONT_PATH, 14)
+            skip_txt = skip_font.render(
+                "START/A: salta" if self.lang == "it"
+                else "START/A: skip", True, (120, 120, 130))
+            skip_w = skip_txt.get_width()
+
+            # ATTO 1: tre punti luminosi che si avvicinano
+            positions = [(-120, 40), (0, -80), (120, 40)]
+            for i in range(20):
+                if skip_check and skip_check():
+                    return
+                k = i / 19.0
+                self.surface.fill((6, 4, 10))
+                for j, (dx0, dy0) in enumerate(positions):
+                    dx = dx0 * (1 - k)
+                    dy = dy0 * (1 - k)
+                    px = cx + dx
+                    py = cy + dy
+                    r = 10 + int(6 * k)
+                    col_shift = 0.6 + 0.4 * (j / 2.0)
+                    c = tuple(int(c * col_shift) for c in col)
+                    pygame.draw.circle(self.surface, c, (int(px), int(py)), r)
+                    pygame.draw.circle(self.surface, (255, 255, 255, 60), (int(px), int(py)), r + 6, 1)
+                # Connessioni che si formano
+                if k > 0.3:
+                    alpha = int(120 * (k - 0.3) / 0.7)
+                    for a in range(3):
+                        b = (a + 1) % 3
+                        x1 = cx + positions[a][0] * (1 - k)
+                        y1 = cy + positions[a][1] * (1 - k)
+                        x2 = cx + positions[b][0] * (1 - k)
+                        y2 = cy + positions[b][1] * (1 - k)
+                        pygame.draw.line(self.surface, (*col, alpha), (int(x1), int(y1)), (int(x2), int(y2)), 2)
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.016)
+
+            # ATTO 2: il nome
+            f = pygame.font.Font(FONT_DISPLAY_PATH, 38)
+            word = "COMMUNITY"
+            ww = f.size(word)[0]
+            for i in range(10):
+                if skip_check and skip_check():
+                    return
+                k = i / 9.0
+                self.surface.fill((6, 4, 10))
+                # Cerchio centrale che pulsa
+                pulse = 0.5 + 0.5 * math.sin(t0 * 3 + i)
+                pygame.draw.circle(self.surface, col, (cx, cy), 30 + int(6 * pulse), 2)
+                pygame.draw.circle(self.surface, col, (cx, cy), 20 + int(4 * pulse), 1)
+                img = f.render(word, True, col)
+                img.set_alpha(int(255 * min(1, k * 2)))
+                self.surface.blit(img, (cx - ww // 2, cy + 60))
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
+        finally:
+            pygame.display.flip = real_flip
+
+    def play_outerdesk_boot(self, skip_check=None):
+        """Animazione di caricamento per OUTERDESK: razzo/logo OuterDesk che si attiva."""
+        if self.cfg.get("vfx_trans", 3) <= 0:
+            return
+        self.play("outerdesk_boot")
+        real_flip = pygame.display.flip
+        try:
+            evinput.poll()
+            col = NEXUS_NODE_COLOR[13]  # rosa/cielo
+            cx, cy = W // 2, H // 2 - 10
+            t0 = time.time()
+            skip_font = pygame.font.Font(FONT_PATH, 14)
+            skip_txt = skip_font.render(
+                "START/A: salta" if self.lang == "it"
+                else "START/A: skip", True, (120, 120, 130))
+            skip_w = skip_txt.get_width()
+
+            # ATTO 1: razzo che decolla (linea di fumo)
+            for i in range(14):
+                if skip_check and skip_check():
+                    return
+                k = i / 13.0
+                self.surface.fill((3, 4, 8))
+                y_off = int(80 * k)
+                # Scia di fumo
+                for j in range(8):
+                    y_smoke = cy + 60 + y_off + j * 14
+                    if y_smoke < H:
+                        alpha = int(80 * (1 - j / 8.0))
+                        r_smoke = int(6 + j * 2)
+                        pygame.draw.circle(self.surface, (200, 200, 220, alpha), (cx, y_smoke), r_smoke)
+                # Razzo
+                pygame.draw.polygon(self.surface, col, [
+                    (cx, cy - 30 - y_off),
+                    (cx - 15, cy + 10 - y_off),
+                    (cx + 15, cy + 10 - y_off),
+                ])
+                pygame.draw.rect(self.surface, col, (cx - 8, cy + 10 - y_off, 16, 20))
+                # Ali
+                pygame.draw.polygon(self.surface, col, [
+                    (cx - 15, cy + 20 - y_off),
+                    (cx - 25, cy + 30 - y_off),
+                    (cx - 15, cy + 30 - y_off),
+                ])
+                pygame.draw.polygon(self.surface, col, [
+                    (cx + 15, cy + 20 - y_off),
+                    (cx + 25, cy + 30 - y_off),
+                    (cx + 15, cy + 30 - y_off),
+                ])
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
+
+            # ATTO 2: esplosione di stelle
+            for i in range(8):
+                if skip_check and skip_check():
+                    return
+                self.surface.fill((3, 4, 8))
+                for _ in range(15):
+                    sx = cx + random.randint(-100, 100)
+                    sy = cy + random.randint(-60, 60)
+                    sz = random.randint(1, 3)
+                    alpha = random.randint(100, 200)
+                    pygame.draw.circle(self.surface, (col[0], col[1], col[2], alpha), (sx, sy), sz)
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.02)
+
+            # ATTO 3: il nome
+            f = pygame.font.Font(FONT_DISPLAY_PATH, 34)
+            word = "OUTER-DESK"
+            ww = f.size(word)[0]
+            for i in range(10):
+                if skip_check and skip_check():
+                    return
+                k = i / 9.0
+                self.surface.fill((3, 4, 8))
+                img = f.render(word, True, col)
+                img.set_alpha(int(255 * min(1, k * 2)))
+                self.surface.blit(img, (cx - ww // 2, cy + 70))
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
+        finally:
+            pygame.display.flip = real_flip
+
+    def play_legacy_boot(self, skip_check=None):
+        """Animazione di caricamento per LEGACY: clessidra che scorre e si spegne."""
+        if self.cfg.get("vfx_trans", 3) <= 0:
+            return
+        self.play("legacy_boot")
+        real_flip = pygame.display.flip
+        try:
+            evinput.poll()
+            col = NEXUS_NODE_COLOR[14]  # grigio scuro
+            accent = (180, 180, 190)
+            cx, cy = W // 2, H // 2 - 10
+            t0 = time.time()
+            skip_font = pygame.font.Font(FONT_PATH, 14)
+            skip_txt = skip_font.render(
+                "START/A: salta" if self.lang == "it"
+                else "START/A: skip", True, (120, 120, 130))
+            skip_w = skip_txt.get_width()
+
+            # ATTO 1: clessidra che si svuota
+            for i in range(16):
+                if skip_check and skip_check():
+                    return
+                k = i / 15.0
+                self.surface.fill((4, 4, 6))
+                # Clessidra
+                pygame.draw.polygon(self.surface, (80, 80, 90), [
+                    (cx - 40, cy - 60),
+                    (cx + 40, cy - 60),
+                    (cx, cy),
+                    (cx + 40, cy + 60),
+                    (cx - 40, cy + 60),
+                    (cx, cy),
+                ], 2)
+                # Sabbia che scende
+                sand_h = int(80 * k)
+                pygame.draw.polygon(self.surface, accent, [
+                    (cx - 4, cy - 50 + sand_h),
+                    (cx + 4, cy - 50 + sand_h),
+                    (cx, cy - 50),
+                ])
+                # Granelli che cadono
+                for j in range(3):
+                    sx = cx + random.randint(-8, 8)
+                    sy = cy + int(40 * k) + j * 8
+                    if sy < cy + 55:
+                        pygame.draw.circle(self.surface, accent, (sx, sy), 1)
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
+
+            # ATTO 2: fade out (spegnimento)
+            dark = pygame.Surface((W, H), pygame.SRCALPHA)
+            for i in range(8):
+                if skip_check and skip_check():
+                    return
+                k = i / 7.0
+                self.surface.fill((4, 4, 6))
+                pygame.draw.polygon(self.surface, (80, 80, 90), [
+                    (cx - 40, cy - 60),
+                    (cx + 40, cy - 60),
+                    (cx, cy),
+                    (cx + 40, cy + 60),
+                    (cx - 40, cy + 60),
+                    (cx, cy),
+                ], 2)
+                # Buio che avanza — surface riutilizzata invece di allocare ogni frame
+                dark.fill((0, 0, 0, int(200 * k)))
+                self.surface.blit(dark, (0, 0))
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.02)
+
+            # ATTO 3: il nome (che compare dal buio)
+            f = pygame.font.Font(FONT_DISPLAY_PATH, 40)
+            word = "LEGACY"
+            ww = f.size(word)[0]
+            for i in range(10):
+                if skip_check and skip_check():
+                    return
+                k = i / 9.0
+                self.surface.fill((4, 4, 6))
+                img = f.render(word, True, (180, 180, 190))
+                img.set_alpha(int(255 * min(1, k * 2)))
+                self.surface.blit(img, (cx - ww // 2, cy + 80))
+                self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
+                real_flip()
+                time.sleep(0.018)
         finally:
             pygame.display.flip = real_flip
 
@@ -5312,11 +10932,19 @@ class App(object):
                 pass
 
         try:
+            port = int(self.cfg.get("bstation_port", 8765))
+        except (TypeError, ValueError):
+            port = 8765
+        try:
             srv = http.server.ThreadingHTTPServer(
-                ("0.0.0.0", 8765), Handler)
+                ("0.0.0.0", port), Handler)
             srv.daemon_threads = True
-        except OSError:
+        except OSError as e:
+            # porta occupata o non disponibile: la schermata mostra
+            # questo messaggio invece di un semplice "non parte"
+            self.bstation_last_error = str(e)
             return False
+        self.bstation_last_error = None
         self.bstation_srv = srv
         self.bstation_thread = threading.Thread(
             target=srv.serve_forever, daemon=True)
@@ -5328,6 +10956,23 @@ class App(object):
         if srv:
             srv.shutdown()
             self.bstation_srv = None
+
+    def bstation_set_port(self, val):
+        """Cambia la porta d'ascolto di BaseStation. Se il server e'
+        gia' acceso lo riavvia subito sulla nuova porta, cosi' non
+        serve ricordarsi di fermarlo e riaccenderlo a mano."""
+        try:
+            port = int(str(val).strip())
+        except (TypeError, ValueError):
+            return False
+        if not (1 <= port <= 65535):
+            return False
+        self.cfg["bstation_port"] = port
+        save_cfg(self.cfg)
+        if self.bstation_srv is not None:
+            self.basestation_serve_stop()
+            self.basestation_serve_start()
+        return True
 
     def own_ip(self):
         try:
@@ -6180,6 +11825,7 @@ class App(object):
                 self.push("calc")
             elif command == "console:open_options":
                 self.opt_sel = 0
+                self.opt_scroll = 0
                 self.push("options")
             elif command == "console:media_panel":
                 self._media_panel_toggle()
@@ -6268,6 +11914,8 @@ class App(object):
         """Mette in coda una notifica cyberpunk. Richiamabile da
         qualunque punto dell'app: messaggi dal Basestation, eventi
         interni (screenshot inviata, aggiornamento completato...)."""
+        if self.media_panel_phase == "show":
+            return
         if kind not in NOTIF_KINDS:
             kind = "standard"
         note = {"title": str(title)[:60], "body": str(body)[:90],
@@ -6280,37 +11928,321 @@ class App(object):
         save_cfg(self.cfg)
 
     def _media_panel_toggle(self):
+        log("_media_panel_toggle: current phase=%s" % self.media_panel_phase)
         if self.media_panel_phase is None:
             self.media_panel_phase = "in"
+            self.notif_queue.clear()
+            self.notif_active = None
+            self.notif_phase = None
+            self.play("panel_open")
         elif self.media_panel_phase == "show":
             self.media_panel_phase = "out"
+            self.play("panel_close")
         else:
             return
         self.media_panel_t0 = time.time()
-        self.play("click")
 
     def _media_panel_button(self, btn):
+        log("_media_panel_button: btn=%s, media_phase=%s, mecha_phase=%s" %
+            (btn, self.media_panel_phase, self.mecha_panel_phase))
         if btn == "MENU" or btn == "B":
+            if self.mecha_panel_phase is not None:
+                self._mecha_panel_toggle()
+                return
             self._media_panel_toggle()
             return
+        if btn == "SELECT":
+            if self.mecha_panel_phase is None:
+                self._mecha_panel_toggle()
+            elif self.mecha_panel_phase == "show":
+                self._mecha_panel_toggle()
+            return
         if btn == "X":
+            self.media_btn_anim = {"btn": "stop", "t0": time.time(), "duration": 0.12}
+            self.play("click")
             self.radio_stop()
-            self.notify("Void Radio", "stream fermato", "system")
+            return
+        if btn in ("UP", "DOWN"):
+            lst = self.radio_list_for_tab()
+            if lst:
+                cur = self.radio_playing
+                cur_url = cur.get("url") if cur else None
+                cur_idx = None
+                for i, st in enumerate(lst):
+                    if st.get("url") == cur_url:
+                        cur_idx = i
+                        break
+                if cur_idx is None:
+                    cur_idx = 0
+                d = -1 if btn == "UP" else 1
+                new_idx = (cur_idx + d) % len(lst)
+                self.media_panel_station_idx = new_idx
+                self.radio_play(lst[new_idx])
+                self.media_btn_anim = {"btn": "ch" + btn.lower(), "t0": time.time(), "duration": 0.12}
+                self.play("click")
+            return
+        if self.mecha_panel_phase is not None:
+            self._mecha_panel_button(btn)
             return
         if not self.radio_mpv or not self.radio_mpv.is_running():
-            self.notify("Controller media", "nessun flusso audio attivo",
-                        "standard")
             return
         if btn == "A":
-            paused = self.radio_mpv.toggle_pause()
-            self.notify("Void Radio", "in pausa" if paused else "ripresa",
-                        "message")
+            self.media_btn_anim = {"btn": "play", "t0": time.time(), "duration": 0.15}
+            self.play("click")
+            self.radio_mpv.toggle_pause()
         elif btn in ("LEFT", "RIGHT"):
             vol = self.radio_mpv.get_property("volume")
             vol = int(vol if isinstance(vol, (int, float)) else 100)
             vol = max(0, min(100, vol + (5 if btn == "RIGHT" else -5)))
             self.radio_mpv.set_volume(vol)
-            self.notify("Volume radio", "%d%%" % vol, "standard")
+
+    def _mecha_panel_toggle(self):
+        log("_mecha_panel_toggle: current phase=%s, media_phase=%s" %
+            (self.mecha_panel_phase, self.media_panel_phase))
+        if self.mecha_panel_phase is None:
+            self.mecha_panel_phase = "in"
+            self.mecha_panel_t0 = time.time()
+            self.deploy_btn_active = True
+            self.deploy_btn_anim = {"t0": time.time(), "duration": 0.3}
+            self.play("panel_open")
+        elif self.mecha_panel_phase == "show":
+            self.mecha_panel_phase = "out"
+            self.mecha_panel_t0 = time.time()
+            self.deploy_btn_active = False
+            self.deploy_btn_anim = {"t0": time.time(), "duration": 0.3}
+            self.play("panel_close")
+
+    def _mecha_panel_button(self, btn):
+        log("_mecha_panel_button: btn=%s, mecha_phase=%s" %
+            (btn, self.mecha_panel_phase))
+        if btn == "SELECT" or btn == "B" or btn == "MENU":
+            if btn == "SELECT" and self.mecha_panel_phase == "show":
+                self.deploy_btn_anim = {"t0": time.time(), "duration": 0.2}
+                self.play("click")
+            self._mecha_panel_toggle()
+            return
+        action = self.mecha_panel_config.get(btn, "none")
+        if action == "close":
+            self._mecha_panel_toggle()
+        elif action == "return_to_nexus":
+            self.play("back")
+            self.stack = ["home"]
+            self.media_panel_phase = "out"
+            self.media_panel_t0 = time.time()
+            self.mecha_panel_phase = None
+        elif action == "goto_endnode":
+            self.play("click")
+            self.push("endnodering")
+            self.media_panel_phase = "out"
+            self.media_panel_t0 = time.time()
+            self.mecha_panel_phase = None
+        elif action == "goto_satellite":
+            self.play("click")
+            self.push("nexussat")
+            self.media_panel_phase = "out"
+            self.media_panel_t0 = time.time()
+            self.mecha_panel_phase = None
+        elif action == "goto_toolbox":
+            self.play("click")
+            self.push("hub:toolbox")
+            self.media_panel_phase = "out"
+            self.media_panel_t0 = time.time()
+            self.mecha_panel_phase = None
+
+    def _mecha_panel_draw(self):
+        phase = self.mecha_panel_phase
+        if phase is None or self.media_panel_phase != "show":
+            return
+        elapsed = time.time() - self.mecha_panel_t0
+        if phase == "in":
+            k = min(1.0, elapsed / 0.22)
+            y = int(H - 120 + 120 * (1 - (1 - k) ** 3))
+            if k >= 1.0:
+                self.mecha_panel_phase = "show"
+        else:
+            k = min(1.0, elapsed / 0.18)
+            y = int(H - 120 * (k * k)) if phase == "out" else H - 120
+            if phase == "out" and k >= 1.0:
+                self.mecha_panel_phase = None
+                return
+        mw, mh, mx = W - 32, 120, 16
+        mcol = (140, 155, 170)
+        amber = (255, 190, 60)
+        t_now = time.time()
+
+        bg = getattr(self, "_mecha_panel_bg", None)
+        if bg is None:
+            try:
+                img = pygame.image.load(
+                    os.path.join(APP_DIR, "assets", "objects", "mechapanel.png"))
+                bg = pygame.transform.smoothscale(img, (mw, mh))
+            except Exception:
+                bg = pygame.Surface((mw, mh))
+                bg.fill((10, 12, 16))
+            self._mecha_panel_bg = bg
+        panel_surf = bg.copy()
+        self.surface.blit(panel_surf, (mx, y))
+
+        border_pulse = 0.7 + 0.3 * abs(math.sin(t_now * 1.5))
+        steel_hi_brt = tuple(min(255, int(c * border_pulse)) for c in STEEL_HI)
+        pygame.draw.rect(self.surface, STEEL, (mx, y, mw, 2))
+        pygame.draw.line(self.surface, steel_hi_brt, (mx, y), (mx + mw, y), 1)
+        pygame.draw.rect(self.surface, STEEL, (mx, y + mh - 2, mw, 2))
+        pygame.draw.rect(self.surface, STEEL, (mx, y, 2, mh))
+        pygame.draw.rect(self.surface, STEEL, (mx + mw - 2, y, 2, mh))
+
+        for rx, ry in ((mx + 4, y + 4), (mx + mw - 4, y + 4),
+                       (mx + 4, y + mh - 4), (mx + mw - 4, y + mh - 4)):
+            pygame.draw.circle(self.surface, (20, 22, 28), (rx, ry), 3)
+            pygame.draw.circle(self.surface, STEEL_HI, (rx, ry), 2)
+
+        self.text("TACTICAL COMMANDS", (mx + 12, y + 8), self.f_small_b, amber)
+
+        hints = [
+            ("L1", self.mecha_panel_config.get("L1", "none")),
+            ("L2", self.mecha_panel_config.get("L2", "none")),
+            ("R1", self.mecha_panel_config.get("R1", "none")),
+            ("R2", self.mecha_panel_config.get("R2", "none")),
+            ("START", self.mecha_panel_config.get("START", "none")),
+            ("Y", self.mecha_panel_config.get("Y", "none")),
+            ("SELECT", self.mecha_panel_config.get("SELECT", "close")),
+        ]
+        action_labels = {
+            "return_to_nexus": self.t("mecha_action_nexus"),
+            "goto_endnode": self.t("mecha_action_endnode"),
+            "goto_satellite": self.t("mecha_action_satellite"),
+            "goto_toolbox": self.t("mecha_action_toolbox"),
+            "close": self.t("mecha_close"),
+            "none": self.t("mecha_none"),
+        }
+
+        cols = 3
+        bw = (mw - 32 - (cols - 1) * 8) // cols
+        bh = 26
+        fx = mx + 16
+        fy = y + 32
+
+        for idx, (key, action) in enumerate(hints):
+            r = idx // cols
+            c = idx % cols
+            bx = fx + c * (bw + 8)
+            by = fy + r * (bh + 5)
+
+            pygame.draw.rect(self.surface, (6, 8, 12), (bx + 1, by + 1, bw, bh), border_radius=4)
+            pygame.draw.rect(self.surface, (18, 20, 24), (bx, by, bw, bh), border_radius=4)
+            pygame.draw.line(self.surface, STEEL_HI, (bx + 1, by + 1), (bx + bw - 2, by + 1), 1)
+            pygame.draw.line(self.surface, STEEL_HI, (bx + 1, by + 1), (bx + 1, by + bh - 2), 1)
+            pygame.draw.rect(self.surface, mcol, (bx, by, bw, bh), 2, border_radius=4)
+            pygame.draw.line(self.surface, (25, 28, 32), (bx + 3, by + bh - 3), (bx + bw - 3, by + bh - 3), 1)
+
+            kw = self.f_small.size(key)[0]
+            self.text(key, (bx + (bw - kw) // 2, by + 2), self.f_tiny, amber)
+
+            lbl = action_labels.get(action, action)
+            lw = self.f_small.size(lbl)[0]
+            self.text(lbl, (bx + (bw - lw) // 2, by + 14), self.f_tiny, FAINT)
+
+            led_x = bx + bw - 8
+            led_y = by + 4
+            is_active = action != "none"
+            led_col = (60, 255, 110) if is_active else (60, 60, 60)
+            pygame.draw.circle(self.surface, (10, 12, 16), (led_x, led_y), 4)
+            pygame.draw.circle(self.surface, led_col, (led_x, led_y), 3)
+            if is_active:
+                pulse = 0.5 + 0.5 * abs(math.sin(t_now * 4 + idx * 1.2))
+                led_glow = pygame.Surface((12, 12), pygame.SRCALPHA)
+                led_glow.fill((*led_col, int(60 + 50 * pulse)))
+                self.surface.blit(led_glow, (led_x - 6, led_y - 6))
+
+        status_y = y + mh - 18
+        pygame.draw.line(self.surface, mcol, (mx + 10, status_y), (mx + mw - 10, status_y), 1)
+        status_txt = self.t("mecha_ready") if self.mecha_panel_phase == "show" else self.t("mecha_init")
+        self.text(status_txt, (mx + 12, status_y + 3), self.f_tiny, DIM)
+
+    def _mecha_config_draw(self):
+        items = [
+            ("L1", self.mecha_panel_config.get("L1", "none")),
+            ("L2", self.mecha_panel_config.get("L2", "none")),
+            ("R1", self.mecha_panel_config.get("R1", "none")),
+            ("R2", self.mecha_panel_config.get("R2", "none")),
+            ("START", self.mecha_panel_config.get("START", "none")),
+            ("Y", self.mecha_panel_config.get("Y", "none")),
+            ("SELECT", self.mecha_panel_config.get("SELECT", "close")),
+        ]
+        action_labels = {
+            "return_to_nexus": self.t("mecha_action_nexus"),
+            "goto_endnode": self.t("mecha_action_endnode"),
+            "goto_satellite": self.t("mecha_action_satellite"),
+            "goto_toolbox": self.t("mecha_action_toolbox"),
+            "close": self.t("mecha_close"),
+            "none": self.t("mecha_none"),
+        }
+        actions = ["return_to_nexus", "goto_endnode", "goto_satellite",
+                    "goto_toolbox", "close", "none"]
+        self.header(self.t("mecha_custom_title"), icon="gear")
+        y0 = 60
+        for idx, (key, action) in enumerate(items):
+            y = y0 + idx * 32
+            sel = (idx == self.mecha_config_sel)
+            if sel:
+                pygame.draw.rect(self.surface, sel_tint(self.accent),
+                                 (20, y, W - 40, 26), border_radius=4)
+            kw = self.f_small.size(key)[0]
+            self.npanel(24, y + 2, kw + 12, 22, border=self.accent, fill=INK, cut=5)
+            self.text(key, (30, y + 5), self.f_tiny, self.accent)
+            lbl = action_labels.get(action, action)
+            lw = self.f_small.size(lbl)[0]
+            self.text(lbl, (W - 24 - lw, y + 5), self.f_tiny, DIM if not sel else FG)
+        self.footer([("A", self.t("assign")), ("B", self.t("back"))])
+        if self.mecha_config_sel < len(items):
+            key, action = items[self.mecha_config_sel]
+            cur_idx = actions.index(action) if action in actions else len(actions) - 1
+            hint = "%s: %s" % (key, action_labels.get(actions[(cur_idx + 1) % len(actions)], ""))
+            self.text(hint, (24, H - 50), self.f_tiny, FAINT)
+
+    def _get_panel_items(self, config_key):
+        """Restituisce la lista di (label, key, values) per un dato pannello."""
+        items_map = {
+            "media_panel": [
+                ("Posizione", "position", ["top", "bottom", "left", "right"]),
+                ("Larghezza", "width", range(100, 500, 10)),
+                ("Altezza", "height", range(100, 400, 10)),
+                ("Opacità", "opacity", [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
+                ("Mostra info stazione", "show_station_info", [True, False]),
+                ("Mostra volume", "show_volume", [True, False]),
+                ("Mostra progresso", "show_progress", [True, False]),
+            ],
+            "outer_panel": [
+                ("Posizione", "position", ["left", "right", "top", "bottom"]),
+                ("Larghezza", "width", range(100, 400, 10)),
+                ("Opacità", "opacity", [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
+                ("Mostra log", "show_logs", [True, False]),
+                ("Mostra statistiche", "show_stats", [True, False]),
+            ],
+        }
+        return items_map.get(config_key, [])
+
+    def render_panel_config(self, config_key, items=None):
+        """Schermata di configurazione generica per un pannello."""
+        if items is None:
+            items = self._get_panel_items(config_key)
+        self.header("Configura " + config_key.replace("_", " ").title(), icon="gear")
+        cfg = self.cfg.get(config_key, {})
+        sel = getattr(self, "_panel_sel", 0)
+        y = 70
+        for idx, (label, key, values) in enumerate(items):
+            if idx == sel:
+                self.sel_frame(8, y, W - 16, 34, color=self.accent)
+            self.text(label, (24, y + 8), self.f_small, FG if idx == sel else DIM)
+            val = cfg.get(key, values[0] if values else "")
+            if isinstance(val, bool):
+                val_str = "ON" if val else "OFF"
+            else:
+                val_str = str(val)
+            self.text(val_str, (W - 60, y + 8), self.f_small, self.accent)
+            y += 40
+        self._panel_sel = sel
+        self.footer([(self.t("k_ud"), "naviga"), ("A", "modifica"), ("B", self.t("back"))])
 
     def _media_panel_draw(self):
         phase = self.media_panel_phase
@@ -6327,31 +12259,203 @@ class App(object):
             y = int(-172 * (k * k)) if phase == "out" else 0
             if phase == "out" and k >= 1.0:
                 self.media_panel_phase = None
+                self.mecha_panel_phase = None
                 return
-        pw, ph, px = W - 32, 164, 16
-        col = (90, 200, 190)
-        self.npanel(px, y, pw, ph, border=col, fill=(7, 18, 17), cut=14)
-        self.text("M // CONTROLLER MULTIMEDIALE", (px + 16, y + 13),
-                  self.f_tiny, col)
+        pw, ph, px = W - 32, 172, 16
+        col = self.accent
+        t_now = time.time()
         active = self.radio_mpv is not None and self.radio_mpv.is_running()
         info = self.radio_mpv.status() if active else {}
+
+        bg = getattr(self, "_media_panel_bg", None)
+        if bg is None:
+            try:
+                img = pygame.image.load(
+                    os.path.join(APP_DIR, "assets", "objects", "mediapanel.png"))
+                bg = pygame.transform.smoothscale(img, (pw, ph))
+            except Exception:
+                bg = pygame.Surface((pw, ph))
+                bg.fill((8, 10, 14))
+            self._media_panel_bg = bg
+        panel_surf = bg.copy()
+        self.surface.blit(panel_surf, (px, y))
+        
+        # --- GLOW BORDER ---
+        border_pts = [(px, y), (px + pw - 14, y), (px + pw, y + 14),
+                      (px + pw, y + ph), (px, y + ph)]
+        pygame.draw.polygon(self.surface, col, border_pts, 1)
+        for i in range(3):
+            alpha = 22 - i * 7
+            glow = pygame.Surface((pw + 6, ph + 6), pygame.SRCALPHA)
+            g_pts = [(3, 3), (pw - 14 + 3, 3), (pw + 3, 14 + 3),
+                     (pw + 3, ph + 3), (3, ph + 3)]
+            pygame.draw.polygon(glow, (*col, alpha), g_pts, 1)
+            self.surface.blit(glow, (px - 3, y - 3))
+        
+        # --- TOP BEZEL (broadcast monitor) ---
+        bezel_h = 28
+        pygame.draw.rect(self.surface, (4, 6, 10), (px + 2, y + 2, pw - 4, bezel_h))
+        pygame.draw.line(self.surface, col, (px, y + bezel_h), (px + pw, y + bezel_h), 1)
+        pygame.draw.line(self.surface, sel_tint(col), (px + 2, y + 2), (px + pw - 16, y + 2), 1)
+        self.text("MEDIA PANEL", (px + 12, y + 8), self.f_small_b, col)
+        
+        if active and not info.get("pause"):
+            status_txt = self.t("media_live")
+            status_col = col
+        elif active and info.get("pause"):
+            status_txt = self.t("media_paused")
+            status_col = (230, 190, 60)
+        else:
+            status_txt = self.t("media_standby")
+            status_col = FAINT
+        self.text(status_txt, (px + pw - 68, y + 9), self.f_tiny, status_col)
+        
+        # --- WAVEFORM DECORATION ---
+        if active and not info.get("pause"):
+            wave_y = y + bezel_h + 2
+            wave_h = 10
+            wave_pts = []
+            for wx in range(px + 12, px + pw - 12, 3):
+                phase = (t_now * 5 + wx * 0.15) % (math.pi * 2)
+                wh = int(2 + 5 * abs(math.sin(phase)))
+                wy = wave_y + wave_h // 2 - wh // 2
+                wave_pts.append((wx, wy + wh))
+            if len(wave_pts) > 1:
+                pygame.draw.lines(self.surface, (*col, 50), False, wave_pts, 1)
+                for wx, wy in wave_pts[::3]:
+                    pygame.draw.line(self.surface, (*col, 80), (wx, wy - 4), (wx, wy), 1)
+        
+        # --- TRACK INFO CARD ---
+        card_y = y + bezel_h + (14 if active and not info.get("pause") else 8)
+        card_h = 48
+        pygame.draw.rect(self.surface, (6, 8, 12), (px + 12, card_y, pw - 24, card_h), border_radius=6)
+        pygame.draw.rect(self.surface, (*col, 80), (px + 12, card_y, pw - 24, card_h), 1, border_radius=6)
+        pygame.draw.line(self.surface, sel_tint(col), (px + 13, card_y + 1), (px + pw - 17, card_y + 1), 1)
+        
         title = (info.get("icy_title") or
                  (self.radio_playing or {}).get("name") or
-                 "NESSUN FLUSSO ATTIVO")
-        self.text(title[:48], (px + 16, y + 42), self.f_med_b,
-                  FG if active else DIM, maxw=pw - 32)
+                 self.t("no_media"))
+        max_title_len = 40
+        if len(title) > max_title_len:
+            title = title[:max_title_len] + "…"
+        self.text(title, (px + 20, card_y + 8), self.f_med_b,
+                  FG if active else DIM, maxw=pw - 100)
+        
+        lst = self.radio_list_for_tab()
+        n_stations = len(lst)
+        cur_idx = self.media_panel_station_idx
+        if self.radio_playing and lst:
+            for i, st in enumerate(lst):
+                if st.get("url") == (self.radio_playing or {}).get("url"):
+                    cur_idx = i
+                    break
+        idx_txt = "%d / %d" % (cur_idx + 1, n_stations) if n_stations else "- / -"
+        self.text(idx_txt, (px + pw - 60, card_y + 12), self.f_tiny, FAINT)
+        
+        # --- PROGRESS BAR ---
+        prog = info.get("progress", 0.0)
+        bar_x = px + 12
+        bar_y = card_y + card_h + 8
+        bar_w = pw - 24
+        pygame.draw.rect(self.surface, (10, 12, 16), (bar_x, bar_y, bar_w, 8))
+        pygame.draw.rect(self.surface, LINE, (bar_x, bar_y, bar_w, 8), 1)
+        if prog > 0:
+            fill_w = max(2, int(bar_w * prog))
+            for i in range(fill_w):
+                t = i / max(1, fill_w - 1)
+                r = int(col[0] * (1 - t) + (30, 220, 200)[0] * t)
+                g = int(col[1] * (1 - t) + (30, 220, 200)[1] * t)
+                b = int(col[2] * (1 - t) + (30, 220, 200)[2] * t)
+                pygame.draw.line(self.surface, (r, g, b),
+                                 (bar_x + i, bar_y + 1),
+                                 (bar_x + i, bar_y + 6), 1)
+            if fill_w > 2:
+                glow_line = pygame.Surface((fill_w, 3), pygame.SRCALPHA)
+                glow_line.fill((*col, 50))
+                self.surface.blit(glow_line, (bar_x, bar_y - 1))
+        self.text("%3d%%" % int(prog * 100), (bar_x + bar_w - 40, bar_y + 10), self.f_tiny, FG)
+        
+        # --- STATE & VOLUME ROW ---
+        row_y = bar_y + 22
         state = "PAUSA" if info.get("pause") else "IN RIPRODUZIONE"
         if not active:
-            state = "apri Void Radio per iniziare"
-        self.text(state, (px + 16, y + 72), self.f_tiny,
-                  (230, 190, 60) if info.get("pause") else col)
+            state = self.t("no_media")
+        state_col = (230, 190, 60) if info.get("pause") else col
+        if active and not info.get("pause"):
+            pulse = 0.5 + 0.5 * abs(math.sin(t_now * 3.0))
+            state_col = tuple(min(255, int(c * (0.7 + 0.3 * pulse))) for c in col)
+        
+        led_x = bar_x
+        led_y = row_y + 5
+        pygame.draw.circle(self.surface, (10, 12, 16), (led_x, led_y), 6)
+        pygame.draw.circle(self.surface, state_col, (led_x, led_y), 4)
+        if active and not info.get("pause"):
+            led_glow = pygame.Surface((16, 16), pygame.SRCALPHA)
+            led_glow.fill((*state_col, 80))
+            self.surface.blit(led_glow, (led_x - 8, led_y - 8))
+        self.text(state, (led_x + 12, row_y), self.f_tiny, state_col)
+        
         vol = info.get("volume", 0) if active else 0
-        pygame.draw.rect(self.surface, LINE, (px + 16, y + 98, pw - 32, 6))
-        pygame.draw.rect(self.surface, col,
-                         (px + 16, y + 98, int((pw - 32) * vol / 100), 6))
-        self.text("%3d%%" % vol, (px + pw - 60, y + 110), self.f_tiny, FG)
-        self.text("A pausa/riprendi   SX/DX volume   X ferma   B chiudi",
-                  (px + 16, y + 132), self.f_tiny, FAINT, maxw=pw - 32)
+        vol_x = bar_x + 100
+        vol_y = row_y + 1
+        ladder_w = 80
+        ladder_h = 12
+        pygame.draw.rect(self.surface, (10, 12, 16), (vol_x, vol_y, ladder_w, ladder_h))
+        pygame.draw.rect(self.surface, LINE, (vol_x, vol_y, ladder_w, ladder_h), 1)
+        if vol > 0:
+            fill_w = max(2, int(ladder_w * vol / 100))
+            seg_w = 3
+            seg_gap = 2
+            n_segs = fill_w // (seg_w + seg_gap)
+            for i in range(n_segs):
+                sx = vol_x + 2 + i * (seg_w + seg_gap)
+                if sx + seg_w > vol_x + ladder_w - 2:
+                    break
+                if i < n_segs * 0.6:
+                    seg_col = col
+                elif i < n_segs * 0.85:
+                    seg_col = (230, 190, 60)
+                else:
+                    seg_col = (255, 80, 80)
+                pygame.draw.rect(self.surface, seg_col, (sx, vol_y + 2, seg_w, ladder_h - 4))
+                seg_glow = pygame.Surface((seg_w, 2), pygame.SRCALPHA)
+                seg_glow.fill((*seg_col, 50))
+                self.surface.blit(seg_glow, (sx, vol_y + 1))
+        self.text("%3d%%" % vol, (vol_x + ladder_w + 4, vol_y), self.f_tiny, FG)
+        
+        # --- CONTROL BUTTONS ---
+        btn_y = row_y + 22
+        btn_hints = [
+            ("A", self.t("play_pause")),
+            (self.t("k_ud"), self.t("station")),
+            (self.t("k_lr"), self.t("volume")),
+            ("X", self.t("stop")),
+            ("B", self.t("back")),
+            ("SELECT", self.t("mecha_panel")),
+        ]
+        fx = px + 12
+        for key, label in btn_hints:
+            bw = self.f_small.size(key)[0] + 14
+            bh = 22
+            pygame.draw.rect(self.surface, (14, 16, 20), (fx, btn_y, bw, bh), border_radius=4)
+            pygame.draw.rect(self.surface, LINE, (fx, btn_y, bw, bh), 1, border_radius=4)
+            pygame.draw.line(self.surface, sel_tint(col), (fx + 1, btn_y + 1), (fx + bw - 2, btn_y + 1), 1)
+            self.text(key, (fx + 5, btn_y + 4), self.f_tiny, col)
+            lx = fx + bw + 4
+            self.text(label, (lx, btn_y + 4), self.f_tiny, DIM)
+            fx = lx + self.f_small.size(label)[0] + 10
+        
+        # --- SCANLINE OVERLAY ---
+        for sy in range(y, y + ph, 3):
+            pygame.draw.line(self.surface, (0, 0, 0, 25), (px, sy), (px + pw, sy), 1)
+        
+        # --- BROADCAST GRAIN ---
+        rnd = random.Random(int(t_now * 7) % 65536)
+        for _ in range(40):
+            gx = px + rnd.randrange(0, pw)
+            gy = y + rnd.randrange(0, ph)
+            ga = rnd.randint(15, 40)
+            pygame.draw.line(self.surface, (ga, ga, ga), (gx, gy), (gx + 1, gy), 1)
 
     def _radio_health_update(self):
         if not self.radio_playing or not self.radio_mpv:
@@ -6420,53 +12524,84 @@ class App(object):
         if tx >= W:
             return
         acc = self.accent
+        it = (self.lang == "it")
         panel = pygame.Surface((tw, th), pygame.SRCALPHA)
-        pygame.draw.rect(panel, (20, 22, 26, 250), (0, 0, tw, th),
-                         border_radius=16)
-        pygame.draw.rect(panel, STEEL, (0, 0, tw, th), 4,
-                         border_radius=16)
-        for sy in range(0, th, 3):
-            pygame.draw.line(panel, (255, 255, 255, 6), (0, sy),
-                             (tw, sy), 1)
-        cx = tw // 2
-        acx, acy, ar = cx, 54, 30
-        pygame.draw.circle(panel, sel_tint(acc), (acx, acy), ar)
-        pygame.draw.circle(panel, acc, (acx, acy), ar, 2)
-        pygame.draw.circle(panel, acc, (acx, acy - 8), 10, 2)
-        pygame.draw.arc(panel, acc, (acx - 16, acy - 2, 32, 26),
-                        3.4, 6.0, 2)
-        uname = self.cfg.get("termid_name") or "OPERATORE"
-        unw = self.f_med.size(uname)[0]
-        panel.blit(self.f_med.render(uname, True, FG),
-                  ((tw - unw) // 2, acy + ar + 14))
-        pygame.draw.line(panel, LINE, (20, acy + ar + 44),
-                         (tw - 20, acy + ar + 44), 1)
+        # v10.7: carta d'identita' vera -- fascia intestazione da ente
+        # emittente, foto rettangolare (non piu' un avatar tondo, che
+        # legge come icona-profilo e non come foto tessera), chip
+        # dorato stile smart-card, banda a barre in fondo. Raggio
+        # d'angolo piu' piccolo del tablet: una carta, non un device.
+        pygame.draw.rect(panel, PANEL, (0, 0, tw, th), border_radius=10)
+        pygame.draw.rect(panel, STEEL, (0, 0, tw, th), 3, border_radius=10)
+        band_h = 30
+        band = pygame.Rect(0, 0, tw, band_h)
+        pygame.draw.rect(panel, sel_tint(acc), band, border_radius=10)
+        pygame.draw.rect(panel, PANEL, (0, 10, tw, band_h - 10))
+        pygame.draw.rect(panel, sel_tint(acc), (0, 0, tw, band_h - 8))
+        pygame.draw.line(panel, acc, (0, band_h), (tw, band_h), 2)
+        panel.blit(self.f_tiny.render("SPDW FACTORY", True, FG), (12, 6))
+        doctxt = "TERMINAL ID"
+        dtw = self.f_tiny.size(doctxt)[0]
+        panel.blit(self.f_tiny.render(doctxt, True, FG),
+                  (tw - 12 - dtw, 6))
+        # foto tessera rettangolare
+        px0, py0, pw0, ph0 = 16, band_h + 12, 64, 78
+        pygame.draw.rect(panel, sel_tint(acc), (px0, py0, pw0, ph0))
+        pygame.draw.rect(panel, acc, (px0, py0, pw0, ph0), 2)
+        hx, hy = px0 + pw0 // 2, py0 + 26
+        pygame.draw.circle(panel, acc, (hx, hy), 15)
+        pygame.draw.circle(panel, PANEL, (hx, hy), 15, 2)
+        should = pygame.Rect(px0 + 6, py0 + ph0 - 26, pw0 - 12, 24)
+        pygame.draw.ellipse(panel, acc, should)
+        pygame.draw.rect(panel, PANEL, (px0, py0 + ph0 - 6, pw0, 6))
+        # chip dorato stile smart-card, sopra la foto
+        chip = pygame.Rect(px0 + pw0 + 12, py0 + 4, 26, 18)
+        gold = (196, 162, 74)
+        pygame.draw.rect(panel, gold, chip, border_radius=3)
+        for gx in (chip.x + 8, chip.x + 17):
+            pygame.draw.line(panel, (120, 96, 40), (gx, chip.y + 2),
+                             (gx, chip.bottom - 2), 1)
+        pygame.draw.line(panel, (120, 96, 40),
+                         (chip.x + 2, chip.centery),
+                         (chip.right - 2, chip.centery), 1)
+        uname = self.cfg.get("termid_name") or (
+                "Operatore" if it else "Operator")
+        unw = self.f_small.size(uname)[0]
+        name_x = px0 + pw0 + 12
+        panel.blit(self.f_tiny.render(
+                   "Nome / Name" if it else "Name", True, FAINT),
+                  (name_x, py0 + 30))
+        panel.blit(self.f_small.render(uname, True, FG),
+                  (name_x, py0 + 44))
+        pygame.draw.line(panel, LINE, (16, py0 + ph0 + 14),
+                         (tw - 16, py0 + ph0 + 14), 1)
         rows = [
-            ("TERMINAL ID", str(self.cfg.get("termid_id") or "?")),
-            ("VERSIONE" if self.lang == "it" else "VERSION",
+            ("Terminal ID", str(self.cfg.get("termid_id") or "?")),
+            ("Versione" if it else "Version",
             "v" + VERSION + " " + VERSION_CODENAME),
-            ("TEMA" if self.lang == "it" else "THEME",
-            self.cfg.get("theme", "ambra").upper()),
-            ("AMBIENTE" if self.lang == "it" else "ENVIRONMENT",
-            self.cfg.get("desk_env", "xfce").upper()),
+            ("Tema" if it else "Theme",
+            self.cfg.get("theme", "ambra").capitalize()),
+            ("Ambiente" if it else "Environment",
+            self.cfg.get("desk_env", "xfce").capitalize()),
         ]
-        ry = acy + ar + 60
+        ry = py0 + ph0 + 24
         for lbl, val in rows:
             panel.blit(self.f_tiny.render(lbl, True, FAINT),
                       (20, ry))
             panel.blit(self.f_small.render(val[:22], True, acc),
                       (20, ry + 15))
-            ry += 42
-        gy = th - 30
-        gx = tw - 30
-        gang = time.time() * 1.6
-        for tth in range(6):
-            a = gang + tth * math.pi / 3
-            x1 = gx + int(6 * math.cos(a))
-            y1 = gy + int(6 * math.sin(a))
-            x2 = gx + int(11 * math.cos(a))
-            y2 = gy + int(11 * math.sin(a))
-            pygame.draw.line(panel, STEEL, (x1, y1), (x2, y2), 2)
+            ry += 36
+        # banda a barre in fondo, come una zona a lettura ottica
+        bar_y = th - 22
+        id_txt = str(self.cfg.get("termid_id") or "spdw")
+        seed = sum((i + 1) * ord(c) for i, c in enumerate(id_txt))
+        rnd = random.Random(seed)
+        bx = 18
+        while bx < tw - 18:
+            bw_ = rnd.choice((2, 2, 3, 5))
+            pygame.draw.line(panel, STEEL, (bx, bar_y),
+                             (bx, bar_y + 12), bw_)
+            bx += bw_ + rnd.choice((2, 3, 4))
         self.surface.blit(panel, (tx, ty))
         cable_x0 = tx + tw - 6
         for seg in range(0, W - cable_x0, 8):
@@ -6502,7 +12637,7 @@ class App(object):
         hot_on = bool(st.get("hot"))
         pc_on = self.bstation_srv is not None
         usb_val = st.get("usb")
-        usb_detail = usb_val.upper() if usb_val else off_txt
+        usb_detail = usb_val.capitalize() if usb_val else off_txt
         return [
             ("wifi", "Wi-Fi", wifi_on, wifi_detail),
             ("bt", "Bluetooth", bool(bt_val), bt_detail),
@@ -6532,38 +12667,41 @@ class App(object):
             tx = rest_x
         if tx <= -tw:
             return
-        acc = self.accent
+
         panel = pygame.Surface((tw, th), pygame.SRCALPHA)
-        pygame.draw.rect(panel, (20, 22, 26, 250), (0, 0, tw, th),
-                         border_radius=16)
-        pygame.draw.rect(panel, STEEL, (0, 0, tw, th), 4,
-                         border_radius=16)
-        for sy in range(0, th, 3):
-            pygame.draw.line(panel, (255, 255, 255, 6), (0, sy),
-                             (tw, sy), 1)
-        title = "NET-SPHERE MONITOR"
-        tsize = self.f_small.size(title)[0]
-        panel.blit(self.f_small.render(title, True, acc),
-                  ((tw - tsize) // 2, 16))
-        pygame.draw.line(panel, LINE, (20, 40), (tw - 20, 40), 1)
+        pygame.draw.rect(panel, (10, 12, 18), (0, 0, tw, th), border_radius=10)
+        pygame.draw.rect(panel, (40, 45, 55), (0, 0, tw, th), 3, border_radius=10)
+        band_h = 30
+        band = pygame.Rect(0, 0, tw, band_h)
+        pygame.draw.rect(panel, (20, 25, 35), band, border_radius=10)
+        pygame.draw.rect(panel, (10, 12, 18), (0, 10, tw, band_h - 10))
+        pygame.draw.rect(panel, (20, 25, 35), (0, 0, tw, band_h - 8))
+        pygame.draw.line(panel, (80, 200, 255), (0, band_h), (tw, band_h), 2)
+        f = self.f_tiny
+        panel.blit(f.render("NET-SPHERE MONITOR", True, (220, 230, 240)), (12, 6))
+
         rows = self._l2_panel_indicators()
-        ry = 56
-        row_h = max(30, (th - ry - 16) // len(rows))
+        ry = band_h + 12
+        row_h = max(28, (th - band_h - 12 - 10) // len(rows) if rows else 28)
         for key, label, active, detail in rows:
-            led = OK_G if active else FAINT
-            icons.draw(panel, key, 18, ry, 22, acc if active else FAINT)
-            pygame.draw.circle(panel, led, (tw - 24, ry + 11), 5)
-            panel.blit(self.f_small.render(label, True, FG), (48, ry))
-            panel.blit(self.f_tiny.render(str(detail)[:20], True, DIM),
-                      (48, ry + 17))
+            col = (80, 200, 255) if active else (60, 70, 80)
+            icons.draw(panel, key, 16, ry + 4, 20, col)
+            pygame.draw.circle(panel, col, (tw - 18, ry + 12), 6)
+            if active:
+                glow = pygame.Surface((12, 12), pygame.SRCALPHA)
+                glow.fill((*col, 40))
+                panel.blit(glow, (tw - 24, ry + 6))
+            f_lbl = self.f_small if active else self.f_tiny
+            panel.blit(f_lbl.render(label, True, (200, 210, 220) if active else (100, 110, 120)), (42, ry + 2))
+            panel.blit(self.f_tiny.render(str(detail)[:18], True, (140, 150, 160)), (42, ry + 18))
             ry += row_h
+
         self.surface.blit(panel, (tx, ty))
         cable_x0 = tx
         for seg in range(0, cable_x0, 8):
             xx = cable_x0 - seg
             yy = ty + th // 2 + int(3 * math.sin(seg * 0.5))
-            pygame.draw.line(self.surface, STEEL, (xx, yy),
-                             (xx - 5, yy), 3)
+            pygame.draw.line(self.surface, (60, 80, 90), (xx, yy), (xx - 5, yy), 3)
 
     def _notif_draw(self):
         self._notif_update()
@@ -6700,36 +12838,443 @@ class App(object):
                        "bitrate": s.get("bitrate") or 0})
         return out
 
-    def radio_play(self, station):
-        station = dict(station)
-        station["url"] = RADIO_URL_MIGRATIONS.get(station["url"],
-                                                   station["url"])
-        if self.radio_mpv is None:
-            self.radio_mpv = mpvctl.MpvController(
-                "/tmp/voiddesk_radio.sock")
-        ok, err = self.radio_mpv.start(station["url"])
-        if ok:
-            self.radio_playing = station
-            self.radio_add_recent(station)
-            self.radio_sleep_min = 0
-        return ok, err
+    def radio_search_open(self):
+        def done(v):
+            q = v.strip()
+            if not q:
+                return
+            self.radio_search_q = q
+            self.radio_searching = True
+            self.radio_search_results = []
+            self.radio_search_sel = 0
+            def do_search():
+                return self.radio_search(q)
+            results = self.run_busy(
+                self.t("radio_searching") if hasattr(self, "t") else "Searching...",
+                do_search)
+            self.radio_searching = False
+            if results:
+                self.radio_search_results = results
+                self.radio_search_sel = 0
+                self.push("radiosearch")
+        self.osk_open(self.t("radio_search_title"), "", done)
+
+    def radio_fetch(self, url, timeout=10, retries=2):
+        """Esegue una richiesta HTTP GET con tentativi di riprova,
+        restituisce i dati JSON parsati."""
+        for attempt in range(retries):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "VoidRadio/1.0 (muOS)"}
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    return json.loads(r.read().decode("utf-8", errors="replace"))
+            except Exception as e:
+                self.log("radio_fetch attempt %d error: %s" % (attempt + 1, e), "ERROR")
+                if attempt == retries - 1:
+                    return None
+                time.sleep(1)
+        return None
+
+    def radio_fetch_stations(self, params=None, force_refresh=False):
+        import urllib.parse
+        cache = self.radio_cache
+        cache_key = str(sorted(params.items())) if params else "default"
+        now = time.time()
+        if not force_refresh and cache.get(cache_key) and \
+           (now - cache[cache_key]["timestamp"] < RADIO_CACHE_EXPIRY):
+            return cache[cache_key]["data"]
+
+        url = RADIO_BROWSER_SEARCH
+        if params:
+            if params.get("country"):
+                url = ("%s/json/stations/bycountry/%s" %
+                       (RADIO_BROWSER_BASE,
+                        urllib.parse.quote(params["country"])))
+                params = {k: v for k, v in params.items()
+                          if k != "country"}
+            if "limit" not in params:
+                params["limit"] = 100
+            url += "?" + "&".join(
+                "%s=%s" % (k, urllib.parse.quote(str(v)))
+                for k, v in params.items())
+        else:
+            url += "?limit=100"
+
+        data = self.radio_fetch(url)
+        if data is None:
+            return self._radio_fallback_stations()
+
+        stations = []
+        for s in data:
+            u = s.get("url_resolved") or s.get("url")
+            if not u:
+                continue
+            stations.append({
+                "name": (s.get("name") or "?")[:60],
+                "url": u,
+                "tags": (s.get("tags") or "")[:40],
+                "country": s.get("country") or "",
+                "countrycode": s.get("countrycode") or "",
+                "language": s.get("language") or "",
+                "bitrate": s.get("bitrate") or 0,
+                "favicon": s.get("favicon") or "",
+                "clickcount": s.get("clickcount") or 0,
+            })
+
+        cache[cache_key] = {"timestamp": now, "data": stations}
+        try:
+            with open(RADIO_CACHE_FILE, "w") as f:
+                json.dump(cache, f)
+        except Exception:
+            pass
+        return stations
+
+    def _radio_fallback_stations(self):
+        return RADIO_BUILTIN
+
+    def radio_refresh_cache(self):
+        self.radio_cache = {}
+        try:
+            os.remove(RADIO_CACHE_FILE)
+        except Exception:
+            pass
+
+    def radio_get_countries(self):
+        data = self.radio_fetch(RADIO_BROWSER_COUNTRIES)
+        return [c["name"] for c in data] if data else []
+
+    def radio_get_languages(self):
+        data = self.radio_fetch(RADIO_BROWSER_LANGUAGES)
+        return [l["name"] for l in data] if data else []
+
+    def radio_get_tags(self):
+        data = self.radio_fetch(RADIO_BROWSER_TAGS)
+        return [t["name"] for t in data] if data else []
+
+    def _radio_genre_icon(self, tags_str):
+        if not tags_str:
+            return None
+        tags_lower = tags_str.lower()
+        genre_map = {
+            "rock": "guitar",
+            "pop": "music",
+            "jazz": "music",
+            "classical": "music",
+            "electronic": "waveform",
+            "techno": "waveform",
+            "house": "waveform",
+            "ambient": "waveform",
+            "dance": "music",
+            "hip hop": "mic",
+            "rap": "mic",
+            "metal": "guitar",
+            "news": "news",
+            "talk": "mic",
+            "sport": "sport",
+            "country": "globe",
+            "folk": "guitar",
+            "latin": "music",
+            "r&b": "music",
+            "soul": "music",
+            "blues": "music",
+            "reggae": "music",
+            "punk": "guitar",
+            "indie": "music",
+            "alternative": "music",
+            "christian": "star",
+            "religious": "star",
+            "instrumental": "music",
+            "chill": "waveform",
+            "lo-fi": "waveform",
+            "lofi": "waveform",
+        }
+        for keyword, icon_name in genre_map.items():
+            if keyword in tags_lower:
+                return icon_name
+        return "music"
+
+    def radio_custom_path(self):
+        return os.path.join(DATA, "radio_custom.json")
+
+    def radio_custom_load(self):
+        try:
+            raw = json.load(open(self.radio_custom_path()))
+        except (OSError, ValueError):
+            return []
+        out = []
+        for f in raw if isinstance(raw, list) else []:
+            if isinstance(f, dict) and f.get("name") and f.get("url"):
+                out.append(f)
+        return out
+
+    def radio_add_custom(self, name, url):
+        custom = self.radio_custom_load()
+        custom.append({"name": name, "url": url,
+                       "tags": "", "country": "",
+                       "countrycode": "", "language": "",
+                       "bitrate": 0, "favicon": "",
+                       "clickcount": 0})
+        try:
+            with open(self.radio_custom_path(), "w") as f:
+                json.dump(custom, f, indent=1)
+        except OSError:
+            return False
+        return True
+
+    def radio_remove_custom(self, name):
+        custom = self.radio_custom_load()
+        custom = [f for f in custom if f.get("name") != name]
+        try:
+            with open(self.radio_custom_path(), "w") as f:
+                json.dump(custom, f, indent=1)
+        except OSError:
+            return False
+        return True
+
+    def rss_export_opml(self):
+        root = ET.Element("opml", version="1.0")
+        head = ET.SubElement(root, "head")
+        ET.SubElement(head, "title").text = "VoidDesk RSS Feeds"
+        body = ET.SubElement(root, "body")
+        for name, url, lang, cat in RSS_FEEDS:
+            outline = ET.SubElement(body, "outline", type="rss",
+                                    text=name, xmlUrl=url)
+            outline.set("category", cat)
+            outline.set("language", lang)
+        custom = self.rss_custom_load()
+        for entry in custom:
+            if isinstance(entry, dict) and entry.get("name") and \
+               entry.get("url"):
+                outline = ET.SubElement(body, "outline", type="rss",
+                                        text=entry["name"],
+                                        xmlUrl=entry["url"])
+                outline.set("category", "general")
+        tree = ET.ElementTree(root)
+        tmp = os.path.join(self.DATA, "voiddesk_feeds.opml")
+        tree.write(tmp, encoding="utf-8", xml_declaration=True)
+        return tmp
+
+    def rss_import_opml(self, filepath):
+        try:
+            tree = ET.parse(filepath)
+            root = tree.getroot()
+            count = 0
+            for outline in root.findall(".//outline"):
+                if outline.get("type") == "rss":
+                    name = (outline.get("text") or
+                            outline.get("title") or "Feed")
+                    url = outline.get("xmlUrl") or outline.get("url")
+                    if name and url:
+                        if self.rss_add_custom(name, url):
+                            count += 1
+            return True, count
+        except Exception as e:
+            return False, str(e)
 
     def radio_stop(self):
         if self.radio_mpv is not None:
             self.radio_mpv.stop()
         self.radio_playing = None
 
+    def radio_play(self, station):
+        """Avvia la riproduzione di una stazione radio tramite mpv."""
+        if not station or not station.get("url"):
+            self.notify("Radio", "URL stazione non valido", "warning")
+            return False, "URL non valido"
+
+        self.radio_stop()
+
+        if self.radio_mpv is None:
+            self.radio_mpv = mpvctl.MpvController("/tmp/voiddesk_radio.sock")
+
+        ok, err = self.radio_mpv.start(station["url"])
+        if ok:
+            self.radio_playing = station
+            self.radio_last_health_check = time.time()
+            self.notify("Void Radio", f"Riproduzione: {station.get('name', '?')}", "success")
+            self.radio_add_recent(station)
+            return True, ""
+        else:
+            self.radio_mpv = None
+            self.notify("Void Radio", f"Errore: {err}", "warning")
+            return False, err
+
+    def play_media_file(self, path):
+        """Riproduce un file audio/video dal file manager.
+        Per l'audio usa mpv in background (no video).
+        Per il video sospende il display e usa mpv fullscreen."""
+        mpv, ffplay, _ = self.check_media_deps()
+        player = mpv or ffplay
+        if not player:
+            self.notify(
+                "Media Player",
+                "mpv/ffplay mancanti: installa i player multimediali",
+                "warning")
+            return False
+        if self.radio_mpv is not None and self.radio_mpv.is_running():
+            self.radio_mpv.stop()
+            self.radio_playing = None
+        ext = os.path.splitext(path)[1].lower()
+        audio_exts = {".mp3", ".ogg", ".wav", ".flac", ".m4a", ".aac",
+                      ".opus"}
+        if ext in audio_exts:
+            if self.media_mpv is not None:
+                self.media_mpv.stop()
+            if self.media_mpv is None:
+                self.media_mpv = mpvctl.MpvController(
+                    "/tmp/voiddesk_media.sock")
+            ok, err = self.media_mpv.start(path)
+            if ok:
+                self.notify(
+                    "Media Player",
+                    "in riproduzione: %s" % os.path.basename(path),
+                    "success")
+            else:
+                self.notify("Media Player", err, "warning")
+            return ok
+        else:
+            self.vc_suspend_display()
+            try:
+                cmd = [player, "--fs", "--really-quiet", "--osd-level=1",
+                       "--vo=gpu,drm,sdl", "--idle=no", path]
+                subprocess.call(cmd)
+            except OSError as e:
+                self.notify("Media Player", str(e)[:60], "warning")
+            finally:
+                self.vc_resume_display()
+            return True
+
     def radio_list_for_tab(self):
-        if self.radio_tab == "all":
-            return RADIO_BUILTIN
-        if self.radio_tab in ("italia", "tekno"):
-            return [st for st in RADIO_BUILTIN
-                    if st.get("category") == self.radio_tab]
+        if self.radio_tab == "custom":
+            return self.radio_custom_load()
         if self.radio_tab == "preferiti":
             return self.radio_favorites()
         if self.radio_tab == "recenti":
             return self.cfg.get("radio_recent", [])
+        if self.radio_tab in ("italia", "tekno"):
+            return [st for st in RADIO_BUILTIN
+                    if st.get("category") == self.radio_tab]
+        if self.radio_tab == "all":
+            if self.radio_filter_type and self.radio_filter_value:
+                params = {self.radio_filter_type: self.radio_filter_value,
+                          "limit": 100}
+                return self.radio_fetch_stations(params)
+            return self.radio_fetch_stations()
         return RADIO_BUILTIN
+
+    def radio_import_open(self):
+        self.radio_import_playlists = RADIO_M3U_PLAYLISTS + [
+            {"name": self.t("radio_custom_url"), "url": "", "category": "custom"}]
+        self.radio_import_sel = 0
+        self.radio_import_mode = "playlist"
+        self.radio_import_channels = []
+        self.radio_import_marked = set()
+        self.radio_import_url = ""
+        self.push("radio_import")
+
+    def radio_import_parse_m3u(self, text):
+        channels = []
+        pending = None
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("#EXTM3U"):
+                continue
+            if line.startswith("#EXTINF"):
+                attrs = {}
+                for key in ["tvg-name", "tvg-logo", "group-title"]:
+                    m = re.search(r'%s="([^"]*)"' % key, line)
+                    if m:
+                        attrs[key] = m.group(1)
+                if "," in line:
+                    name = line.rsplit(",", 1)[1].strip()
+                else:
+                    name = attrs.get("tvg-name", "")
+                pending = {
+                    "name": name or attrs.get("tvg-name", "?"),
+                    "url": "",
+                    "group": attrs.get("group-title", ""),
+                    "logo": attrs.get("tvg-logo", ""),
+                }
+                continue
+            if pending and not line.startswith("#"):
+                pending["url"] = line
+                channels.append(pending)
+                pending = None
+        return channels
+
+    def radio_import_fetch(self, url):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "VoidDesk/1.0"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                text = r.read().decode("utf-8", "replace")
+            return self.radio_import_parse_m3u(text)
+        except Exception as e:
+            self.notify("Void Radio", str(e)[:80], "warning")
+            return []
+
+    def radio_import_add(self):
+        custom = self.radio_custom_load()
+        existing_urls = {c["url"] for c in custom}
+        added = 0
+        for idx in sorted(self.radio_import_marked):
+            if idx < len(self.radio_import_channels):
+                ch = self.radio_import_channels[idx]
+                if ch["url"] and ch["url"] not in existing_urls:
+                    custom.append({
+                        "name": ch["name"],
+                        "url": ch["url"],
+                        "tags": ch.get("group", ""),
+                        "country": "",
+                        "countrycode": "",
+                        "language": "",
+                        "bitrate": 0,
+                        "favicon": ch.get("logo", ""),
+                        "clickcount": 0,
+                    })
+                    existing_urls.add(ch["url"])
+                    added += 1
+        if added:
+            try:
+                with open(self.radio_custom_path(), "w") as f:
+                    json.dump(custom, f, indent=1)
+                self.notify("Void Radio",
+                            ("Importati %d canali" % added)
+                            if self.lang == "it" else
+                            ("Imported %d channels" % added),
+                            "success")
+            except Exception as e:
+                self.notify("Void Radio", str(e)[:80], "warning")
+        else:
+            self.notify("Void Radio",
+                        "Nessun canale nuovo da importare"
+                        if self.lang == "it" else
+                        "No new channels to import",
+                        "warning")
+        self.pop_state()
+
+    def radio_import_custom_url_input(self):
+        def done(v):
+            v = v.strip()
+            if v:
+                self.radio_import_url = v
+                self.radio_import_fetch_and_show(v)
+        self.osk_open(self.t("radio_custom_url"), "https://", done)
+
+    def radio_import_fetch_and_show(self, url):
+        channels = self.run_busy(
+            self.t("radio_loading"),
+            lambda: self.radio_import_fetch(url))
+        if channels:
+            self.radio_import_channels = channels
+            self.radio_import_marked = set()
+            self.radio_import_mode = "channels"
+            self.radio_import_sel = 0
+        else:
+            self.notify(self.t("radio_no_results"), "warning")
 
     def uplink_device_screenshot(self):
         """Codifica la schermata vera corrente come PNG base64, per
@@ -6983,6 +13528,21 @@ class App(object):
             if isinstance(f, dict) and f.get("name") and f.get("url"):
                 out.append((f["name"], f["url"], "xx", "general"))
         return out
+
+    def rss_add_custom(self, name, url):
+        import json as _j
+        try:
+            raw = _j.load(open(self.rss_custom_path()))
+        except (OSError, ValueError):
+            raw = []
+        if not isinstance(raw, list):
+            raw = []
+        raw.append({"name": name, "url": url})
+        try:
+            _j.dump(raw, open(self.rss_custom_path(), "w"), indent=1)
+        except OSError:
+            return False
+        return True
 
     def play_rss_intro(self):
         """Banner rosso 'BREAKING' che sbatte dentro con un lampo,
@@ -7516,50 +14076,71 @@ class App(object):
             pass
         return out
 
-    def wm_scan_iw(self):
+    def wm_scan_iw(self, retry=True):
         """Scansione diretta via nl80211 (iw), senza passare dal
         control socket di wpa_supplicant: quando wpa_cli non risponde,
-        questa e' l'unica via che resta per vedere le reti intorno."""
+        questa e' l'unica via che resta per vedere le reti intorno.
+        'iw scan' spesso torna vuoto con radio 'busy' (-16) se
+        wpa_supplicant ha appena lanciato una sua scansione sulla
+        stessa interfaccia: un retry dopo una breve attesa quasi
+        sempre risolve, invece di mostrare 'nessuna rete' a vuoto."""
         nets = {}
         try:
             subprocess.run(["ip", "link", "set", WM_IFACE, "up"],
                            capture_output=True, timeout=5)
-            out = subprocess.run(["iw", "dev", WM_IFACE, "scan"],
-                                 capture_output=True, text=True,
-                                 timeout=20).stdout
+            r = subprocess.run(["iw", "dev", WM_IFACE, "scan"],
+                               capture_output=True, text=True,
+                               timeout=20)
+            out = r.stdout
+            if not out.strip():
+                if retry:
+                    time.sleep(1.5)
+                    return self.wm_scan_iw(retry=False)
+                return nets
         except Exception:
             return nets
-        cur_sig = -90
-        for ln in out.splitlines():
-            ls = ln.strip()
-            if ls.startswith("BSS "):
-                cur_sig = -90
-            m = re.search(r"signal:\s*(-?\d+(?:\.\d+)?)\s*dBm", ls)
-            if m:
-                cur_sig = int(float(m.group(1)))
-            m = re.match(r"SSID:\s*(.*)", ls)
-            if m and m.group(1):
-                ssid = m.group(1)
-                sec = "capabilities: WPA" in out or True
-                if ssid not in nets or cur_sig > nets[ssid][0]:
-                    nets[ssid] = (cur_sig, True)
+        # un blocco per rete (parso l'intero blocco invece che riga
+        # per riga: SSID viene PRIMA di RSN/WPA nell'output di iw, quindi
+        # controllare la sicurezza sul posto avrebbe sempre dato "aperta")
+        for block in re.split(r"(?m)^BSS ", out)[1:]:
+            m = re.search(r"signal:\s*(-?\d+(?:\.\d+)?)\s*dBm", block)
+            sig = int(float(m.group(1))) if m else -90
+            m = re.search(r"(?m)^\s*SSID:\s*(.*)$", block)
+            if not m or not m.group(1).strip():
+                continue
+            ssid = m.group(1).strip()
+            sec = bool(re.search(r"(?m)^\s*(RSN|WPA):", block))
+            if ssid not in nets or sig > nets[ssid][0]:
+                nets[ssid] = (sig, sec)
         return nets
 
     def wm_scan(self):
         nets = {}
         try:
             self.wm_cli("scan")
-            time.sleep(2.5)
-            for ln in self.wm_cli("scan_results").splitlines()[1:]:
-                f = ln.split("\t")
-                if len(f) >= 5 and f[4]:
-                    sig = int(f[2]) if f[2].lstrip("-").isdigit() else -90
-                    if f[4] not in nets or sig > nets[f[4]][0]:
-                        nets[f[4]] = (sig, "WPA" in f[3] or
-                                      "RSN" in f[3])
+            # su reti affollate 2.5s a volte non bastano a far
+            # compilare i risultati: un secondo giro corto prima di
+            # arrendersi evita parecchi "nessuna rete" via wpa_cli
+            for wait in (2.5, 1.5):
+                time.sleep(wait)
+                for ln in self.wm_cli("scan_results").splitlines()[1:]:
+                    f = ln.split("\t")
+                    if len(f) >= 5 and f[4]:
+                        sig = (int(f[2]) if f[2].lstrip("-").isdigit()
+                               else -90)
+                        if f[4] not in nets or sig > nets[f[4]][0]:
+                            nets[f[4]] = (sig, "WPA" in f[3] or
+                                          "RSN" in f[3])
+                if nets:
+                    break
         except Exception:
             pass
         if not nets:
+            # piccola pausa: se la scan appena chiesta a wpa_cli e'
+            # ancora in corso, 'iw scan' subito dopo trova la radio
+            # occupata e torna vuoto (wm_scan_iw ha comunque il suo
+            # retry interno come ulteriore rete di sicurezza)
+            time.sleep(0.8)
             nets = self.wm_scan_iw()
         try:
             saved = self.wm_saved()
@@ -7645,6 +14226,10 @@ class App(object):
                 if wpa_ok:
                     self.wm_cli("select_network", nid)
                     self.wm_cli("enable_network", nid)
+                    # senza questo, save_config fallisce zitto zitto:
+                    # wpa_supplicant scrive il file solo se
+                    # update_config e' attivo, e qui non lo era mai
+                    self.wm_cli("set", "update_config", "1")
                     self.wm_cli("save_config")
                     time.sleep(3)
             except Exception:
@@ -7686,6 +14271,12 @@ class App(object):
             return []
         try:
             if scan:
+                # se una scansione precedente e' rimasta appesa (es. app
+                # chiusa a meta'), 'scan on' fallisce muto con "gia' in
+                # corso" e non si vede mai nulla di nuovo: la spengo
+                # prima, ignorando l'esito, e riparto pulita
+                subprocess.run(BTCTL + ["--", "scan", "off"],
+                               capture_output=True, timeout=5)
                 subprocess.run(BTCTL + ["--timeout", "8", "scan", "on"],
                                capture_output=True, timeout=14)
             paired = set()
@@ -7916,7 +14507,11 @@ class App(object):
     def hot_devices(self):
         """Dispositivi connessi all'hotspot, letti dai lease DHCP veri
         di dnsmasq (non un conteggio approssimato): MAC, IP, nome se
-        il device lo annuncia."""
+        il device lo annuncia. Se il file dei lease e' vuoto o nel
+        posto sbagliato (es. lo script lo scrive altrove) ma dei
+        device sono comunque collegati, la tabella neighbor del
+        kernel sull'interfaccia hotspot fa da rete di sicurezza cosi'
+        la lista non resta vuota senza motivo."""
         mode = "host"
         try:
             mode = open(os.path.join(DATA, ".hotspot_mode")).read().strip()
@@ -7942,6 +14537,21 @@ class App(object):
                            "host": host if host != "*" else ""})
         except OSError:
             pass
+        if out:
+            return out
+        iface = self.hot_conf().get("interface", "wlan1")
+        try:
+            res = subprocess.run(["ip", "neigh", "show", "dev", iface],
+                                 capture_output=True, text=True,
+                                 timeout=3).stdout
+            for ln in res.splitlines():
+                m = re.search(
+                    r"^(\S+)\s+dev\s+\S+\s+lladdr\s+(\S+)\s+(\S+)", ln)
+                if m and m.group(3) not in ("FAILED", "INCOMPLETE"):
+                    out.append({"mac": m.group(2), "ip": m.group(1),
+                               "host": ""})
+        except Exception:
+            pass
         return out
 
     def ani_cli_path(self):
@@ -7959,12 +14569,7 @@ class App(object):
         dbg = os.path.join(LOGS_DIR, "ani_cli.log")
 
         def log(msg):
-            try:
-                with open(dbg, "a") as f:
-                    f.write("%s %s\n" % (time.strftime("%H:%M:%S"), msg))
-            except OSError:
-                pass
-
+            log_mirror(dbg, msg)
         root = os.path.join(DATA, "xfce_mnt")
         was_mounted = imgmount.is_mounted(root)
         log("avvio: era gia' montato=%r" % was_mounted)
@@ -8075,6 +14680,22 @@ class App(object):
             pass
         return d
 
+    def hot_band(self, cf=None):
+        """'2.4' o '5' dedotti da hw_mode/channel di hostapd.conf:
+        hw_mode 'a' e' sempre 5GHz, 'b'/'g' sempre 2.4GHz; se manca o
+        e' ambiguo (es. hw_mode=a con vht per l'AC) decido dal numero
+        di canale (>=32 vuol dire 5GHz)."""
+        cf = cf if cf is not None else self.hot_conf()
+        hw = (cf.get("hw_mode") or "").strip().lower()
+        if hw == "a":
+            return "5"
+        if hw in ("b", "g"):
+            return "2.4"
+        try:
+            return "5" if int(cf.get("channel", "")) >= 32 else "2.4"
+        except ValueError:
+            return ""
+
     def hot_info_lines(self):
         it = (self.lang == "it")
         cf = self.hot_conf()
@@ -8088,6 +14709,9 @@ class App(object):
             L.append(("kv", "SSID", cf.get("ssid", "?"), FG))
             L.append(("kv", "PASSWORD",
                       cf.get("wpa_passphrase", "?"), DIM))
+            band = self.hot_band(cf)
+            L.append(("kv", "BANDA" if it else "BAND",
+                      (band + " GHz") if band else "?", FG))
             L.append(("kv", "CANALE" if it else "CHANNEL",
                       cf.get("channel", "?") +
                       ("  ·  " + cf.get("hw_mode", "")), DIM))
@@ -8490,6 +15114,77 @@ class App(object):
             progress_cb(100)
         return ok, ("simple" if ok else "failed")
 
+    def bgm_get_audio_info(self, filepath):
+        try:
+            cmd = ["ffprobe", "-v", "quiet", "-print_format", "json",
+                   "-show_format", "-show_streams", filepath]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            if res.returncode == 0 and res.stdout:
+                data = json.loads(res.stdout)
+                fmt = data.get("format", {})
+                streams = data.get("streams", [])
+                dur = float(fmt.get("duration", 0))
+                br = fmt.get("bit_rate", "?")
+                sz = int(fmt.get("size", 0))
+                ast = next((s for s in streams if s.get("codec_type") == "audio"), {})
+                sr = ast.get("sample_rate", "?")
+                ch = ast.get("channels", "?")
+                codec = ast.get("codec_name", "?")
+                return {"duration": dur, "bitrate": br, "size": sz,
+                        "sample_rate": sr, "channels": ch, "codec": codec}
+        except Exception:
+            pass
+        return None
+
+    def bgm_preview_play(self, filepath):
+        if self.bgm_preview_proc and self.bgm_preview_proc.poll() is None:
+            try:
+                self.bgm_preview_proc.terminate()
+                self.bgm_preview_proc.wait(timeout=1)
+            except Exception:
+                pass
+        if not os.path.exists(filepath):
+            return
+        self.bgm_preview_file = filepath
+        try:
+            self.bgm_preview_proc = subprocess.Popen(
+                ["ffplay", "-nodisp", "-autoexit", "-ss", "0", "-t", "15",
+                 filepath],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    def bgm_preview_stop(self):
+        if self.bgm_preview_proc and self.bgm_preview_proc.poll() is None:
+            try:
+                self.bgm_preview_proc.terminate()
+                self.bgm_preview_proc.wait(timeout=1)
+            except Exception:
+                pass
+        self.bgm_preview_file = None
+        self.bgm_preview_proc = None
+
+    def bgm_open_log_viewer(self):
+        log_path = os.path.join(DATA, "bgm_normalizer.log")
+        if os.path.exists(log_path):
+            with open(log_path, "r") as f:
+                self.bgm_log_view_lines = [l.rstrip("\r\n") for l in f.readlines()]
+        else:
+            self.bgm_log_view_lines = ["No log file found."]
+        self.bgm_log_view_scroll = max(0, len(self.bgm_log_view_lines) - 15)
+        self.push("bgmlogview")
+
+    def bgm_reset_defaults(self):
+        self.cfg["bgm_normalize"] = "true"
+        self.cfg["bgm_trim"] = "false"
+        self.cfg["bgm_ogg"] = "true"
+        self.cfg["bgm_delete"] = "false"
+        self.cfg["bgm_lufs"] = "-14.0"
+        self.cfg["bgm_source"] = "both"
+        self.cfg["bgm_out_mode"] = "default"
+        self.cfg["bgm_glitch"] = "true"
+        save_cfg(self.cfg)
+
     def ts_accent(self):
         return {"ciano": (90, 200, 220), "verde": (110, 210, 130),
                "ambra": (230, 180, 60),
@@ -8522,13 +15217,25 @@ class App(object):
                 "on": bool(p.get("Online")),
                 "os": p.get("OS", ""),
                 "exit": bool(p.get("ExitNodeOption")),
-                "using": bool(p.get("ExitNode"))})
+                "using": bool(p.get("ExitNode")),
+                "relay": p.get("Relay", "") or ""})
         peers.sort(key=lambda p: (not p["on"], p["name"].lower()))
+        tailnet = st.get("CurrentTailnet") or {}
         return {"state": st.get("BackendState", "?"),
                 "ip": (me.get("TailscaleIPs") or [""])[0],
                 "host": me.get("HostName", ""),
                 "ssh": bool((st.get("Self") or {}).get("SSH_HostKeys")),
-                "peers": peers}
+                "peers": peers,
+                "tailnet": tailnet.get("Name", ""),
+                "magicdns": bool(tailnet.get("MagicDNSEnabled", False)),
+                "key_expiry": me.get("KeyExpiry", "")}
+
+    def _ts_daemon_running(self):
+        try:
+            return subprocess.call(["pidof", "tailscaled"],
+                                   stdout=subprocess.DEVNULL) == 0
+        except Exception:
+            return False
 
     def ts_open(self):
         it = (self.lang == "it")
@@ -8543,8 +15250,26 @@ class App(object):
             self.info_title = "TAILSCALE"
             self.push("info")
             return
+        if not self._ts_daemon_running():
+            self.info_lines = self.stub_lines(
+                "TAILSCALE",
+                ["demone non raggiungibile (tailscaled non in esecuzione)" if it
+                 else "daemon not reachable (tailscaled not running)"])
+            self.scroll = 0
+            self.info_title = "TAILSCALE"
+            self.push("info")
+            return
         try:
-            self.ts = self.run_busy("tailscale...", self.ts_status)
+            self.ts = self.run_busy(
+                "tailscale..." if it else "tailscale...",
+                self.ts_status,
+                steps=[
+                    "querying tailscale..." if not it else "interrogando tailscale...",
+                    "parsing peers...",
+                    "loading status...",
+                ],
+                accent=(74, 206, 224),
+                icon="uplink")
         except Exception:
             self.ts = None
         if not self.ts:
@@ -8556,16 +15281,18 @@ class App(object):
             self.push("info")
             return
         self.ts_sel = 0
-        self.mon = {"cpu": [], "ram": [], "net": [], "tmp": [],
-                    "last": None, "t": 0}
-        self.py_ns = {}
-        self.py_out = [">>> "]
-        self.bak_sel = 0
-        self.viewer_live = False
-        self.wm_nets = []
-        self.wm_sel = 0
-        self.bt_devs = []
-        self.bt_sel = 0
+        self.ts_ssh_enabled = bool((self.ts or {}).get("ssh"))
+        self.ts_version_str = self.ts_version()
+        self.ts_exit_sel = 0
+        self.ts_theme_sel = 0
+        self.ts_peer_detail_msg = ""
+        self.ts_result_msg = ""
+        self.ts_loading_msg = ""
+        self.ts_browse_path = "/mnt/mmc/ROMS"
+        self.ts_browse_items = []
+        self.ts_browse_sel = 0
+        self.ts_browse_marked = set()
+        self.ts_send_target = ""
         if not hasattr(self, "ts_logo"):
             try:
                 img = pygame.image.load(
@@ -8573,57 +15300,80 @@ class App(object):
                 self.ts_logo = pygame.transform.smoothscale(img, (30, 30))
             except pygame.error:
                 self.ts_logo = None
-        self.push("tspanel")
+        self.push("tsgui")
 
     def ts_refresh(self):
         try:
-            self.ts = self.run_busy("tailscale...", self.ts_status)
+            self.ts = self.run_busy(
+                "tailscale...",
+                self.ts_status,
+                steps=[
+                    "querying tailscale...",
+                    "parsing peers...",
+                    "loading status...",
+                ],
+                accent=(74, 206, 224),
+                icon="uplink")
         except Exception:
             pass
 
     def ts_menu_items(self):
         it = (self.lang == "it")
-        run = (self.ts or {}).get("state") == "Running"
         A = []
-        if (self.ts or {}).get("state") == "NeedsLogin":
-            A.append(("login", "Login (mostra URL)" if it
-                      else "Login (show URL)"))
-        A.append(("down" if run else "up",
-                  ("Disconnetti" if run else "Connetti") if it else
-                  ("Disconnect" if run else "Connect")))
-        A.append(("exitoff", "Exit node: nessuno" if it
-                  else "Exit node: none"))
-        A.append(("netcheck", "Diagnostica rete" if it
-                  else "Network diagnostics"))
-        A.append(("recv", "Ricevi file (Taildrop)" if it
-                  else "Receive files (Taildrop)"))
-        A.append(("tstheme", "Tema Tailscale: %s" %
-                  self.cfg.get("ts_theme", "ciano").upper()))
-        A.append(("rtapp", "Apri Rt-Tailscale" if it
-                  else "Open Rt-Tailscale"))
-        A.append(("logout", "Logout"))
+        A.append(("connmgr", "Connection Manager" if not it
+                  else "Gestione Connessione"))
+        A.append(("peers", "Network Devices" if not it
+                  else "Dispositivi di Rete"))
+        A.append(("taildrop", "Taildrop" if not it
+                  else "Taildrop"))
+        A.append(("netcheck", "Netcheck" if not it
+                  else "Diagnostica Rete"))
+        A.append(("options", "Options" if not it
+                  else "Opzioni"))
+        A.append(("exit", "Exit" if not it
+                  else "Esci"))
         return A
 
     def ts_menu_do(self, key):
         it = (self.lang == "it")
-        if key == "up":
-            self.run_busy("tailscale up...",
-                          lambda: self.ts_cli("up", "--accept-dns=true",
-                                              "--accept-routes=true",
-                                              timeout=20))
-            self.ts_refresh()
-        elif key == "down":
-            self.run_busy("...", lambda: self.ts_cli("down"))
-            self.ts_refresh()
-        elif key == "exitoff":
-            self.run_busy("...",
-                          lambda: self.ts_cli("set", "--exit-node="))
-            self.ts_refresh()
+        if key == "connmgr":
+            self.hub_sel = 0
+            self.push("tsconnmgr")
+        elif key == "peers":
+            self.ts_sel = 0
+            self.push("tspanel")
+        elif key == "taildrop":
+            self.hub_sel = 0
+            self.push("tsfile")
         elif key == "netcheck":
             self.ts_netcheck_data = self.run_busy(
                 "netcheck..." if not it else "diagnostica...",
                 self.ts_netcheck)
             self.push("tsnetcheck")
+        elif key == "options":
+            self.hub_sel = 0
+            self.push("tsoptions")
+        elif key == "exit":
+            self.pop_state()
+        elif key == "up":
+            self.run_busy("tailscale up...",
+                          lambda: self.ts_cli("up", "--accept-dns=true",
+                                              "--accept-routes=true",
+                                              timeout=20),
+                          accent=(74, 206, 224),
+                          icon="uplink")
+            self.ts_refresh()
+        elif key == "down":
+            self.run_busy("...", lambda: self.ts_cli("down"),
+                          accent=(74, 206, 224),
+                          icon="uplink")
+            self.ts_refresh()
+        elif key == "exitoff":
+            self.run_busy("...",
+                          lambda: self.ts_cli("set", "--exit-node="),
+                          accent=(74, 206, 224),
+                          icon="uplink")
+            self.ts_refresh()
         elif key == "tstheme":
             order = ["ciano", "verde", "ambra", "cremisi"]
             cur = self.cfg.get("ts_theme", "ciano")
@@ -8640,7 +15390,9 @@ class App(object):
                 os.makedirs(dest, exist_ok=True)
             r = self.run_busy("taildrop...",
                               lambda: self.ts_cli("file", "get", dest,
-                                                  timeout=30))
+                                                  timeout=30),
+                              accent=(74, 206, 224),
+                              icon="uplink")
             self.info_lines = self.stub_lines(
                 "TAILDROP", [(r.stdout or r.stderr or "ok").strip()[:90],
                              dest])
@@ -8654,7 +15406,9 @@ class App(object):
                 self.launch_muos(hit[0])
         elif key == "logout":
             def go():
-                self.run_busy("...", lambda: self.ts_cli("logout"))
+                self.run_busy("...", lambda: self.ts_cli("logout"),
+                              accent=(74, 206, 224),
+                              icon="uplink")
                 self.ts_refresh()
             self.confirm = ("Tailscale logout", go)
             self.push("confirm")
@@ -8701,7 +15455,9 @@ class App(object):
             r = self.run_busy("ping %s..." % peer["name"],
                               lambda: self.ts_cli("ping", "-c", "3",
                                                   peer["ip"],
-                                                  timeout=20))
+                                                  timeout=20),
+                              accent=(74, 206, 224),
+                              icon="uplink")
             self.info_lines = self.stub_lines(
                 "PING " + peer["name"],
                 [(r.stdout or r.stderr or "?").strip().splitlines()[-1]
@@ -8711,7 +15467,9 @@ class App(object):
             self.push("info")
         elif key == "exit":
             self.run_busy("...", lambda: self.ts_cli(
-                "set", "--exit-node=" + peer["ip"]))
+                "set", "--exit-node=" + peer["ip"]),
+                accent=(74, 206, 224),
+                icon="uplink")
             self.ts_refresh()
         elif key == "send":
             def cb(local):
@@ -8719,7 +15477,9 @@ class App(object):
                                "sending to %s...") % peer["name"],
                               lambda: self.ts_cli(
                                   "file", "cp", local,
-                                  peer["name"] + ":", timeout=120))
+                                  peer["name"] + ":", timeout=120),
+                              accent=(74, 206, 224),
+                              icon="uplink")
             self.fm_open(pick=cb)
         elif key == "pinfo":
             self.info_lines = self.stub_lines(
@@ -8728,6 +15488,91 @@ class App(object):
                                 "online" if peer["on"] else "offline")])
             self.scroll = 0
             self.push("info")
+
+    def ts_version(self):
+        try:
+            r = self.ts_cli("version", timeout=5)
+            return r.stdout.splitlines()[0].strip() if r.stdout else "?"
+        except Exception:
+            return "?"
+
+    def ts_toggle_ssh(self, enable):
+        return self.ts_cli("set", "--ssh=%s" % ("true" if enable else "false"),
+                           timeout=8)
+
+    def ts_set_exit_node(self, ip_or_empty):
+        if ip_or_empty:
+            return self.ts_cli("set", "--exit-node=" + ip_or_empty,
+                               "--exit-node-allow-lan-access=true", timeout=8)
+        return self.ts_cli("set", "--exit-node=", timeout=8)
+
+    def ts_ping_peer(self, target):
+        return self.ts_cli("ping", "-c", "1", target, timeout=8)
+
+    def ts_browse_refresh(self, path, dirs_only=False):
+        self.ts_browse_path = path
+        self.ts_browse_dirs_only = dirs_only
+        entries = []
+        try:
+            if path != "/mnt/mmc":
+                entries.append(("..", True, 0))
+            for item in sorted(os.listdir(path)):
+                full = os.path.join(path, item)
+                if os.path.isdir(full):
+                    entries.append((item, True, 0))
+                elif not dirs_only:
+                    sz = os.path.getsize(full) if os.path.exists(full) else 0
+                    entries.append((item, False, sz))
+        except Exception as e:
+            entries.append(("ERR: %s" % e, False, 0))
+        self.ts_browse_items = entries
+        self.ts_browse_sel = min(self.ts_browse_sel,
+                                 max(0, len(entries) - 1))
+
+    def ts_browse_enter(self):
+        if not self.ts_browse_items:
+            return
+        name, is_dir, _ = self.ts_browse_items[self.ts_browse_sel]
+        if is_dir:
+            if name == "..":
+                parent = os.path.dirname(self.ts_browse_path)
+                self.ts_browse_refresh(parent,
+                                       dirs_only=self.ts_browse_dirs_only)
+            else:
+                full = os.path.join(self.ts_browse_path, name)
+                self.ts_browse_refresh(full,
+                                       dirs_only=self.ts_browse_dirs_only)
+            self.ts_browse_sel = 0
+
+    def ts_receive_files(self, directory):
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except OSError:
+            directory = os.path.join(DATA, "taildrop")
+            os.makedirs(directory, exist_ok=True)
+        r = self.ts_cli("file", "get", directory + "/", timeout=30)
+        return r.stdout or r.stderr or "ok", directory
+
+    def ts_send_files(self, target, filepaths):
+        results = []
+        for fp in filepaths:
+            r = self.ts_cli("file", "cp", fp, target + ":", timeout=120)
+            ok = "error" not in (r.stderr or "").lower()
+            results.append("%s %s" % ("OK" if ok else "ERR",
+                                      os.path.basename(fp)))
+        return results
+
+    def ts_key_expiry_days(self):
+        exp = (self.ts or {}).get("key_expiry", "")
+        if not exp or exp.startswith("0001-01-01"):
+            return None
+        try:
+            import datetime as _dt
+            dt = _dt.datetime.fromisoformat(exp.replace("Z", "+00:00"))
+            now = _dt.datetime.now(_dt.timezone.utc)
+            return (dt - now).days
+        except Exception:
+            return None
 
     # ================== SYNCTHING: pannello nativo ==================
     def sync_rest(self, url, key, path):
@@ -8858,7 +15703,14 @@ class App(object):
                 return None
         self.sync = self.run_busy(
             "interrogo syncthing..." if it else "querying syncthing...",
-            job)
+            job,
+            steps=[
+                "querying syncthing..." if not it else "interrogando syncthing...",
+                "parsing folders...",
+                "loading status...",
+            ],
+            accent=(112, 224, 122),
+            icon="remote")
         if not self.sync:
             self.info_lines = self.stub_lines(
                 "SYNCTHING",
@@ -9110,9 +15962,17 @@ class App(object):
                 seen_dirs[rest] = True
             else:
                 files.append((rest, False, size))
+
+        def _arc_sort_key(item):
+            name, is_dir, sz = item
+            if self.fm_sort == 1:
+                return (0 if is_dir else 1, -sz if self.fm_sort_rev else sz, name.lower())
+            return (0 if is_dir else 1, name.lower())
+
         dirs = [(d, True, 0) for d in sorted(seen_dirs,
                key=str.lower)]
-        files.sort(key=lambda a: a[0].lower())
+        dirs.sort(key=_arc_sort_key)
+        files.sort(key=_arc_sort_key)
         return [("..", True, 0)] + dirs + files
 
     def fm_list(self, path):
@@ -9125,13 +15985,30 @@ class App(object):
             p = os.path.join(path, n)
             try:
                 if os.path.isdir(p):
-                    dirs.append((n, True, 0))
+                    try:
+                        cnt = len(os.listdir(p))
+                    except OSError:
+                        cnt = 0
+                    dirs.append((n, True, cnt))
                 else:
                     files.append((n, False, os.path.getsize(p)))
             except OSError:
                 files.append((n, False, 0))
-        dirs.sort(key=lambda a: a[0].lower())
-        files.sort(key=lambda a: a[0].lower())
+
+        def _sort_key(item):
+            name, is_dir, sz = item
+            try:
+                mt = os.path.getmtime(os.path.join(path, name))
+            except OSError:
+                mt = 0
+            if self.fm_sort == 1:
+                return (0 if is_dir else 1, -sz if self.fm_sort_rev else sz, name.lower())
+            if self.fm_sort == 2:
+                return (0 if is_dir else 1, -mt if self.fm_sort_rev else mt, name.lower())
+            return (0 if is_dir else 1, name.lower())
+
+        dirs.sort(key=_sort_key)
+        files.sort(key=_sort_key)
         return [("..", True, 0)] + dirs + files
 
     def fm_open(self, pick=None, start_path=None, ext_filter=None):
@@ -9172,8 +16049,10 @@ class App(object):
                 "ini": "text", "json": "text", "sh": "terminal",
                 "py": "terminal", "zip": "archive", "muxapp": "archive",
                 "gz": "archive", "7z": "archive", "mp3": "music",
-                "ogg": "music", "wav": "music", "mp4": "video",
-                "mkv": "video", "pdf": "doc"}.get(e, "doc")
+                "ogg": "music", "wav": "music", "flac": "music",
+                "m4a": "music", "aac": "music", "opus": "music",
+                "mp4": "video", "mkv": "video", "avi": "video",
+                "mov": "video", "webm": "video", "pdf": "doc"}.get(e, "doc")
 
     def fm_enter(self):
         name, is_dir, _sz = self.fm_items[self.fm_sel]
@@ -9220,6 +16099,8 @@ class App(object):
                 self.push("imgview")
             elif ic in ("text", "terminal"):
                 self.ed_load(p)
+            elif ic in ("music", "video"):
+                self.play_media_file(p)
             else:
                 self.info_lines = self.stub_lines(
                     name, ["%s  ·  %s" % (human(_sz), p)])
@@ -9362,35 +16243,94 @@ class App(object):
         it = (self.lang == "it")
         n = len(self.fm_marked)
         cur = self.fm_items[self.fm_sel][0] if self.fm_items else ".."
-        A = []
+        is_archive = False
+        if self.fm_path and cur != "..":
+            full = os.path.join(self.fm_path, cur)
+            is_archive = self.fm_is_archive(full) if os.path.isfile(full) else False
+
+        items = []
+
+        # ---- Seleziona / deseleziona tutto (toggle) ----
+        if self.fm_path and self.fm_items:
+            all_paths = [os.path.join(self.fm_path, nm)
+                         for nm, isd, _sz in self.fm_items
+                         if nm != ".." and not isd]
+            if all_paths:
+                if len(self.fm_marked) == len(all_paths):
+                    items.append(("deselect_all", ("Deseleziona tutto" if it else "Deselect all"), "task"))
+                else:
+                    items.append(("select_all", ("Seleziona tutto" if it else "Select all"), "task"))
+
+        # ---- Copia / Taglia / Incolla ----
         if self.fm_clip:
-            A.append(("paste", ("Incolla qui (%d)" if it else
-                                "Paste here (%d)") % len(self.fm_clip[1])))
-        A.append(("copy", ("Copia (%d)" if it else "Copy (%d)")
-                  % max(1, n)))
-        A.append(("cut", ("Taglia (%d)" if it else "Cut (%d)")
-                  % max(1, n)))
+            items.append(("paste", ("Incolla qui (%d)" if it else "Paste here (%d)") % len(self.fm_clip[1]), "doc"))
+        items.append(("copy", ("Copia (%d)" if it else "Copy (%d)") % max(1, n), "doc"))
+        items.append(("cut", ("Taglia (%d)" if it else "Cut (%d)") % max(1, n), "trash"))
+
+        # ---- Azioni su singolo file/cartella ----
         if n <= 1 and cur != "..":
-            A.append(("rename", "Rinomina" if it else "Rename"))
-        A.append(("newdir", "Nuova cartella" if it else "New folder"))
-        A.append(("newfile", "Nuovo file di testo" if it else
-                  "New text file"))
-        A.append(("delete", ("Elimina (%d)" if it else "Delete (%d)")
-                  % max(1, n)))
-        if n <= 1 and cur.rsplit(".", 1)[-1].lower() in ("sh", "py"):
-            A.append(("frun", "Esegui" if it else "Run"))
-        A.append(("finfo", "Info" if it else "Info"))
-        return A
+            items.append(("rename", "Rinomina" if it else "Rename", "edit"))
+            items.append(("copypath", "Copia percorso" if it else "Copy path", "goto"))
+            items.append(("symlink", "Crea collegamento" if it else "Create symlink", "goto"))
+            if self.fm_path and os.path.isfile(os.path.join(self.fm_path, cur)):
+                items.append(("frun", "Esegui" if it else "Run", "terminal"))
+                if is_archive:
+                    items.append(("extract", "Estrai qui" if it else "Extract here", "archive"))
+
+        # ---- Azioni su selezione multipla ----
+        if n > 1:
+            items.append(("compress", "Compressa (%d)" % n if it else "Compress (%d)" % n, "archive"))
+
+        # ---- Azioni generali ----
+        items.append(("newdir", "Nuova cartella" if it else "New folder", "folder"))
+        items.append(("newfile", "Nuovo file" if it else "New file", "doc"))
+        items.append(("terminalhere", "Apri terminale qui" if it else "Open terminal here", "terminal"))
+        items.append(("delete", ("Elimina (%d)" if it else "Delete (%d)") % max(1, n), "trash"))
+        items.append(("finfo", "Info" if it else "Info", "info"))
+        if n <= 1 and cur != "..":
+            items.append(("bookmark", ("Aggiungi preferito" if it else "Add bookmark"), "book"))
+
+        # ---- Ordina ----
+        sort_labels = (("nome" if it else "name"),
+                       ("dimensione" if it else "size"),
+                       ("data" if it else "date"))
+        items.append(("sort", ("Ordina: %s %s" % (sort_labels[self.fm_sort],
+                         "▼" if self.fm_sort_rev else "▲")), "goto"))
+
+        return items
 
     def fm_menu_do(self, key):
         it = (self.lang == "it")
         if key in ("copy", "cut", "paste", "delete"):
             self.fm_do(key)
             return
+        if key in ("select_all", "deselect_all"):
+            if key == "select_all" and self.fm_path and self.fm_items:
+                for nm, isd, _sz in self.fm_items:
+                    if nm != ".." and not isd:
+                        self.fm_marked.add(os.path.join(self.fm_path, nm))
+            else:
+                self.fm_marked.clear()
+            return
+        if key == "sort":
+            if self.fm_sort == 0:
+                self.fm_sort = 1
+                self.fm_sort_rev = False
+            elif self.fm_sort == 1:
+                self.fm_sort_rev = not self.fm_sort_rev
+            else:
+                self.fm_sort = 0
+                self.fm_sort_rev = False
+            self.fm_refresh()
+            return
+
         cur = self.fm_items[self.fm_sel][0]
+        full = os.path.join(self.fm_path, cur) if self.fm_path else None
+
+        # ---- Rinomina ----
         if key == "rename":
             def rn(nm):
-                if nm and nm != cur:
+                if nm and nm != cur and self.fm_path:
                     try:
                         os.rename(os.path.join(self.fm_path, cur),
                                   os.path.join(self.fm_path, nm))
@@ -9398,20 +16338,22 @@ class App(object):
                         pass
                     self.fm_refresh()
             self.osk_open("RINOMINA" if it else "RENAME", cur, rn)
+
+        # ---- Nuova cartella ----
         elif key == "newdir":
             def nd(nm):
-                if nm:
+                if nm and self.fm_path:
                     try:
-                        os.makedirs(os.path.join(self.fm_path, nm),
-                                    exist_ok=True)
+                        os.makedirs(os.path.join(self.fm_path, nm), exist_ok=True)
                     except OSError:
                         pass
                     self.fm_refresh()
-            self.osk_open("NUOVA CARTELLA" if it else "NEW FOLDER",
-                          "", nd)
+            self.osk_open("NUOVA CARTELLA" if it else "NEW FOLDER", "", nd)
+
+        # ---- Nuovo file ----
         elif key == "newfile":
             def nf(nm):
-                if nm:
+                if nm and self.fm_path:
                     p = os.path.join(self.fm_path, nm)
                     try:
                         open(p, "a").close()
@@ -9419,28 +16361,124 @@ class App(object):
                         return
                     self.fm_refresh()
                     self.ed_load(p)
-            self.osk_open("NUOVO FILE" if it else "NEW FILE",
-                          "nuovo.txt" if it else "new.txt", nf)
+            self.osk_open("NUOVO FILE" if it else "NEW FILE", "nuovo.txt" if it else "new.txt", nf)
+
+        # ---- Esegui script ----
         elif key == "frun":
             self.run_script(os.path.join(self.fm_path, cur))
+
+        # ---- Info ----
         elif key == "finfo":
             p = os.path.join(self.fm_path, cur)
             L = [("sec", "folder", cur[:26])]
             try:
                 st = os.stat(p)
                 L.append(("kv", self.t("size"),
-                          human(self.app_size(p)
-                                if os.path.isdir(p) else st.st_size), FG))
+                          human(self.app_size(p) if os.path.isdir(p) else st.st_size), FG))
                 L.append(("kv", "mtime",
-                          time.strftime("%Y-%m-%d %H:%M",
-                                        time.localtime(st.st_mtime)),
-                          DIM))
+                          time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime)), DIM))
             except OSError:
                 pass
             L.append(("kv", "path", p, FAINT))
             self.info_lines = L
             self.scroll = 0
             self.push("info")
+
+        # ---- Preferito ----
+        elif key == "bookmark":
+            self.fm_bookmark_add(os.path.join(self.fm_path, cur) if self.fm_path else cur)
+            self.play("success")
+
+        # ---- COPIA PERCORSO ----
+        elif key == "copypath":
+            p = os.path.join(self.fm_path, cur) if self.fm_path else cur
+            self.clipboard_text = p
+            self.notify("Percorso copiato", p, "message")
+
+        # ---- CREA COLLEGAMENTO SIMBOLICO ----
+        elif key == "symlink":
+            if not self.fm_path or cur == "..":
+                return
+            src = os.path.join(self.fm_path, cur)
+            def create_symlink(link_name):
+                if link_name:
+                    dst = os.path.join(self.fm_path, link_name)
+                    try:
+                        os.symlink(src, dst)
+                        self.fm_refresh()
+                        self.notify("Collegamento creato", link_name, "success")
+                    except OSError as e:
+                        self.notify("Errore", str(e), "warning")
+            self.osk_open("NOME COLLEGAMENTO" if it else "LINK NAME",
+                          cur + "_link", create_symlink)
+
+        # ---- APRI TERMINALE QUI ----
+        elif key == "terminalhere":
+            self.rtsh_open(cwd=self.fm_path)
+
+        # ---- COMPRESS (ZIP) ----
+        elif key == "compress":
+            if not self.fm_path:
+                return
+            items_to_zip = []
+            if self.fm_marked:
+                items_to_zip = sorted(self.fm_marked)
+            else:
+                items_to_zip = [os.path.join(self.fm_path, cur)]
+            if not items_to_zip:
+                return
+            default_name = os.path.basename(self.fm_path) + ".zip"
+            def do_compress(zip_name):
+                if not zip_name:
+                    return
+                if not zip_name.endswith(".zip"):
+                    zip_name += ".zip"
+                zip_path = os.path.join(self.fm_path, zip_name)
+                try:
+                    import zipfile
+                    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                        for f in items_to_zip:
+                            if os.path.isfile(f):
+                                zf.write(f, os.path.basename(f))
+                            elif os.path.isdir(f):
+                                for root, dirs, files in os.walk(f):
+                                    for fn in files:
+                                        full = os.path.join(root, fn)
+                                        arcname = os.path.relpath(full, start=os.path.dirname(f))
+                                        zf.write(full, arcname)
+                    self.fm_refresh()
+                    self.notify("Archivio creato", zip_name, "success")
+                except Exception as e:
+                    self.notify("Errore", str(e), "warning")
+            self.osk_open("NOME ARCHIVIO" if it else "ARCHIVE NAME", default_name, do_compress)
+
+        # ---- ESTRAI ARCHIVIO QUI ----
+        elif key == "extract":
+            if not self.fm_path or cur == "..":
+                return
+            arc_path = os.path.join(self.fm_path, cur)
+            if not os.path.isfile(arc_path) or not self.fm_is_archive(arc_path):
+                return
+            def do_extract():
+                try:
+                    import zipfile
+                    import tarfile
+                    low = arc_path.lower()
+                    if low.endswith((".zip", ".muxapp")):
+                        with zipfile.ZipFile(arc_path, "r") as zf:
+                            zf.extractall(self.fm_path)
+                    elif low.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
+                        with tarfile.open(arc_path, "r:*") as tf:
+                            tf.extractall(self.fm_path)
+                    else:
+                        self.notify("Formato non supportato", "", "warning")
+                        return
+                    self.fm_refresh()
+                    self.notify("Estratto con successo", cur, "success")
+                except Exception as e:
+                    self.notify("Errore", str(e), "warning")
+            self.confirm = (f"Estrarre '{cur}' nella cartella corrente?", do_extract)
+            self.push("confirm")
 
     def mapp_quick_info(self, app):
         """Solo info a costo quasi zero: mai una du -sk qui dentro,
@@ -10933,7 +17971,7 @@ class App(object):
             self.load_log(p)
             self.push("viewer")
         elif key == "update":
-            self.comp_action("update")
+            self.forge_hub.comp_action("update")
         elif key == "remove":
             def go():
                 self.env_remove(env)
@@ -11108,552 +18146,8 @@ class App(object):
                     layout_items.append((j, x, y, colw, rowh))
                 y += rowh + 10
             idx += count
-        return headers, layout_items, y
-
-    def _nexus_curve(self, i, j, cx0, cy0, cx1, cy1):
-        """Punto di controllo della curva tra il nodo i e il nodo j:
-        sempre la stessa forma per quella coppia (seed sull'indice
-        della connessione), diversa da tutte le altre."""
-        rnd = random.Random(3100 + min(i, j) * 7 + max(i, j))
-        mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
-        dx, dy = cx1 - cx0, cy1 - cy0
-        dist = max(1, math.hypot(dx, dy))
-        nx, ny = -dy / dist, dx / dist
-        perp = rnd.uniform(-54, 54)
-        return mx + nx * perp, my + ny * perp
-
-    def _nexus_sphere(self, cx, cy, r, col, icon_key, t_now, pulse_extra=0.0,
-                      spin=False, seed=0, selected=False, idx=None):
-        """La sfera-nodo con un effetto di profondità un po' piu'
-        marcato: bordo in ombra, corpo pieno, riflesso freddo in alto
-        a sinistra, piccola aura esterna pulsante, contorno spesso e
-        un po' irregolare (stile inchiostro manga a mano libera,
-        stabile nel tempo grazie a seed invece di tremolare ad ogni
-        fotogramma). Con spin=True aggiunge meridiani che spazzano
-        il globo per dare davvero l'impressione di rotazione.
-        v10.6: se idx ha un decoro orbitale (NEXUS_NODE_DECO) lo
-        disegno PRIMA della sfera, cosi' il corpo opaco del pianeta
-        copre da solo la parte centrale dell'anello -- niente
-        maschere o clip circolari, solo ordine di disegno. Una
-        eventuale moonlet "davanti" (behind=False) va invece disegnata
-        DOPO, quindi il metodo ritorna a fine funzione per farlo."""
-        deco = NEXUS_NODE_DECO.get(idx) if idx is not None else None
-        moon = None
-        if deco is not None:
-            if deco[0] == "moonlet":
-                moon = self._nexus_moonlet_pos(cx, cy, r, t_now, seed)
-                if moon[0]:                       # dietro: disegno subito
-                    self._nexus_draw_moonlet(moon, col)
-            else:
-                ring_surf = self._nexus_ring_surf(deco, r, col)
-                if ring_surf is not None:
-                    rw, rh = ring_surf.get_size()
-                    self.surface.blit(ring_surf,
-                                      (int(cx - rw / 2), int(cy - rh / 2)))
-        pulse = 0.75 + 0.25 * abs(math.sin(t_now * 2.2)) + pulse_extra
-        glow = tuple(min(255, int(c * pulse)) for c in col)
-        pygame.draw.circle(self.surface, tuple(min(255, int(c * 0.5))
-                           for c in col), (int(cx) + 2, int(cy) + 3),
-                           r)
-        pygame.draw.circle(self.surface, (8, 9, 16), (int(cx), int(cy)),
-                           r + 4, 2)
-        pygame.draw.circle(self.surface, glow, (int(cx), int(cy)), r)
-        if spin and r > 14:
-            prev_clip = self.surface.get_clip()
-            self.surface.set_clip(pygame.Rect(int(cx - r), int(cy - r),
-                                              r * 2, r * 2))
-            for k in range(3):
-                phase = (t_now * 0.5 + k / 3.0) % 1.0
-                ang = phase * 2 * math.pi
-                mx = r * math.cos(ang)
-                if abs(mx) >= r - 1:
-                    continue
-                mw = max(2, int(r * abs(math.sin(ang)) * 0.85))
-                clip_h = int(2 * math.sqrt(max(0, r * r - mx * mx)))
-                if clip_h < 2:
-                    continue
-                shade = 0.78 if math.cos(ang) > 0 else 1.16
-                band = tuple(max(0, min(255, int(c * shade)))
-                            for c in glow)
-                pygame.draw.ellipse(self.surface, band,
-                                   (int(cx + mx - mw / 2),
-                                    int(cy - clip_h / 2), mw, clip_h))
-            self.surface.set_clip(prev_clip)
-        for k, (off, sz, add) in enumerate(((0.32, 0.42, 90),
-                                            (0.15, 0.18, 140))):
-            hi = tuple(min(255, c + add) for c in glow)
-            pygame.draw.circle(self.surface, hi,
-                               (int(cx - r * off), int(cy - r * off)),
-                               max(2, int(r * sz) - k * 2))
-        n_pts = 26
-        pts = []
-        for k in range(n_pts):
-            a = 2 * math.pi * k / n_pts
-            jitter = (1.6 * math.sin(k * 2.7 + seed * 1.3) +
-                     1.0 * math.sin(k * 5.1 + seed * 0.6))
-            rr = r + jitter
-            pts.append((int(cx + rr * math.cos(a)),
-                       int(cy + rr * math.sin(a))))
-        pygame.draw.polygon(self.surface, INK, pts, 3)
-        if selected:
-            # v10.4: nel planetario il nodo a fuoco e' il pianeta
-            # INTERO, mai un'icona -- deve leggersi chiaramente piu'
-            # grande della sua stessa icona nella targhetta (44px),
-            # altrimenti sembra un'icona anche qui. Cura in piu' per
-            # MUOS APPS: il suo artwork e' un satellite, non una
-            # sfera, e serve piu' spazio per restare leggibile.
-            psize = max(64, int(r * 2.4))
-        else:
-            # v10.5: anche i pianeti sullo sfondo (non a fuoco)
-            # restano pianeti interi, mai icone -- solo piu' piccoli
-            # per la prospettiva orbitale. Pavimento e moltiplicatore
-            # alzati rispetto a prima (era 12 / 1.3, taglia da icona).
-            psize = max(28, int(r * 1.9))
-        planet_img = self.nexus_planet_icon(icon_key, psize)
-        if planet_img:
-            self.surface.blit(planet_img,
-                              (int(cx - psize / 2), int(cy - psize / 2)))
-        else:
-            icons.draw(self.surface, icon_key, int(cx - r * 0.55),
-                      int(cy - r * 0.55), max(10, int(r * 1.1)), INK)
-        if moon is not None and not moon[0]:      # davanti: disegno ora
-            self._nexus_draw_moonlet(moon, col)
-
-    def _nexus_dust_tone(self, col):
-        """Tinta 'polvere/segnale' condivisa da tutti i decori
-        orbitali: il colore del pianeta mescolato a meta' con un
-        grigio-sabbia neutro, cosi' ogni anello sembra fatto dello
-        stesso detrito reale invece che di puro accento acceso --
-        la differenza fra un pianeta e l'altro resta nella tinta di
-        fondo, non in un colore sparato a piena saturazione."""
-        sand = (150, 140, 122)
-        return tuple(int(c * 0.5 + s * 0.5) for c, s in zip(col, sand))
-
-    def _nexus_ring_surf(self, deco, r, col):
-        """Superficie dell'anello orbitale di un pianeta (dust o
-        signal), ricostruita solo la prima volta per ogni
-        combinazione nodo/raggio-approssimato e poi solo blittata --
-        MAI ridisegnata pixel per pixel ad ogni fotogramma. r viene
-        arrotondato a multipli di 4px prima di entrare nella chiave
-        di cache: il raggio del pianeta oscilla di continuo con la
-        prospettiva orbitale (depth) e una cache esatta non farebbe
-        mai un solo hit, questa si'."""
-        kind, tilt, bands, dashed = deco
-        cache = getattr(self, "_nexus_ring_cache", None)
-        if cache is None:
-            cache = {}
-            self._nexus_ring_cache = cache
-        r_key = max(4, (int(r) // 4) * 4)
-        key = (kind, tilt, bands, dashed, r_key, col)
-        surf = cache.get(key)
-        if surf is not None:
-            return surf
-        squash = 0.34
-        outer = max(6, int(r_key * 2.0))
-        pad = 6
-        size = outer * 2 + pad * 2
-        base = pygame.Surface((size, size), pygame.SRCALPHA)
-        ccx = ccy = size // 2
-        dust = self._nexus_dust_tone(col)
-        widths = (outer, int(outer * 0.72)) if bands == 2 else (outer,)
-        for rw in widths:
-            rh = max(2, int(rw * squash))
-            rect = pygame.Rect(ccx - rw, ccy - rh, rw * 2, rh * 2)
-            if dashed:
-                n = 20
-                for k in range(0, n, 2):
-                    a0 = math.radians(360.0 * k / n)
-                    a1 = math.radians(360.0 * (k + 1) / n)
-                    pygame.draw.arc(base, dust, rect, a0, a1, 3)
-            else:
-                pygame.draw.ellipse(base, (6, 7, 12), rect, 4)
-                pygame.draw.ellipse(base, dust, rect.inflate(-3, -3), 2)
-        rotated = pygame.transform.rotate(base, tilt)
-        cache[key] = rotated
-        return rotated
-
-    def _nexus_moonlet_pos(self, cx, cy, r, t_now, seed):
-        """Posizione della piccola luna compagna (usata al posto di
-        un anello sui nodi troppo piccoli per portarne uno, es.
-        WORKSHOP): orbita propria attorno al pianeta, con uno
-        sfasamento per seed cosi' non gira in sincrono col pianeta
-        stesso. behind=True quando passa dietro -- va disegnata
-        prima della sfera anziche' dopo."""
-        orb_r = r * 2.2
-        ang = t_now * 0.6 + seed * 1.7
-        mx = cx + orb_r * math.cos(ang)
-        my = cy + orb_r * NEXUS_SQUASH * 1.4 * math.sin(ang)
-        behind = math.sin(ang) < 0
-        mr = max(2, int(r * 0.24))
-        return behind, mx, my, mr
-
-    def _nexus_draw_moonlet(self, moon, col):
-        _behind, mx, my, mr = moon
-        dust = self._nexus_dust_tone(col)
-        pygame.draw.circle(self.surface, (5, 6, 10),
-                           (int(mx), int(my)), mr + 1)
-        pygame.draw.circle(self.surface, dust, (int(mx), int(my)), mr)
-
-    def _nexus_stars_surf(self):
-        """Le posizioni sono fisse (seme 77), solo lo scintillio
-        cambia col tempo -- costruita a parte e aggiornata solo
-        5 volte al secondo invece di ad ogni fotogramma (30/s),
-        risparmio reale su hardware senza GPU."""
-        now = time.time()
-        cached = getattr(self, "_nexus_star_cache", None)
-        cached_t = getattr(self, "_nexus_star_cache_t", 0.0)
-        if cached is not None and now - cached_t < 0.2:
-            return cached
-        surf = pygame.Surface((W, H), pygame.SRCALPHA)
-        rnd = random.Random(77)
-        for i in range(140):
-            sx, sy = rnd.randrange(W), rnd.randrange(44, H)
-            phase = (now * 0.5 + i * 0.37) % 4.0
-            if phase > 2.6:
-                continue
-            tw = 0.3 + 0.7 * abs(math.sin(now * 1.3 + sx * 0.1))
-            v = int(70 * tw)
-            surf.set_at((sx, sy), (v, v, v + 22, 255))
-        self._nexus_star_cache = surf
-        self._nexus_star_cache_t = now
-        return surf
-
-    def _nexus_nebula_surf(self):
-        """Macchia di nebulosa con gradiente radiale dietro alle
-        orbite, colorata sul nodo selezionato -- ricostruita solo
-        quando cambia la selezione o ogni mezzo secondo per un
-        leggero respiro, non ad ogni fotogramma."""
-        now = time.time()
-        col = NEXUS_NODE_COLOR.get(self.sel, self.accent)
-        cache = getattr(self, "_nexus_neb_cache", None)
-        cache_key = getattr(self, "_nexus_neb_cache_key", None)
-        if cache is not None and cache_key == col and \
-                now - getattr(self, "_nexus_neb_cache_t", 0) < 0.5:
-            return cache
-        surf = pygame.Surface((W, H), pygame.SRCALPHA)
-        cx, cy, maxr = NEXUS_SELECT_ZONE[0], NEXUS_SELECT_ZONE[1], 220
-        for rr in range(maxr, 0, -6):
-            a = int(14 * (1 - rr / float(maxr)) ** 1.6)
-            if a > 0:
-                pygame.draw.circle(surf, col + (a,), (cx, cy), rr)
-        self._nexus_neb_cache = surf
-        self._nexus_neb_cache_key = col
-        self._nexus_neb_cache_t = now
-        return surf
-
-    def _nexus_bg(self):
-        pygame.draw.rect(self.surface, (4, 5, 10), (0, 44, W, H - 44))
-        t_now = time.time()
-        self.surface.blit(self._nexus_nebula_surf(), (0, 0))
-        self.surface.blit(self._nexus_stars_surf(), (0, 0))
-        for gy in range(H - 90, H, 18):
-            fade = (gy - (H - 90)) / 90.0
-            col = (10, 12, 22 + int(20 * fade))
-            pygame.draw.line(self.surface, col, (0, gy), (W, gy), 1)
-        # glitch digitale occasionale: una sottile fascia sfasata,
-        # compare a scatti imprevedibili, mai per piu' di un istante
-        gseed = int(t_now * 3.7)
-        grnd = random.Random(gseed)
-        if grnd.random() < 0.10:
-            gy2 = grnd.randrange(44, H - 6)
-            gh = grnd.randrange(2, 6)
-            shift = grnd.randrange(-14, 14)
-            band = self.surface.subsurface(
-                (0, gy2, W, gh)).copy()
-            self.surface.blit(band, (shift, gy2))
-            gcol = self.accent if grnd.random() < 0.5 else (200, 60, 90)
-            pygame.draw.line(self.surface, gcol, (0, gy2), (W, gy2), 1)
-
-    def _nexus_ring_list(self, ring):
-        return (NEXUS_RING_INNER, NEXUS_RING_MID, NEXUS_RING_OUT,
-                NEXUS_RING_FAR)[ring]
-
-    def _nexus_ring_step(self, ring):
-        """Gradi tra un nodo e il successivo su quell'anello -- NON
-        e' sempre 90: dipende da quanti nodi ci sono su
-        quell'orbita (l'esterna ne ha 4, la lontana di END NODE
-        uno solo)."""
-        n = len(self._nexus_ring_list(ring))
-        return 360.0 / n if n else 0.0
-
-    def _nexus_ring_rot(self, ring):
-        if ring == 1:
-            return self.nexus_rot_mid
-        if ring == 2:
-            return self.nexus_rot_out
-        if ring == 3:
-            return self.nexus_rot_far
-        return 0
-
-    def _nexus_set_ring_rot(self, ring, rot):
-        if ring == 1:
-            self.nexus_rot_mid = rot
-        elif ring == 2:
-            self.nexus_rot_out = rot
-        elif ring == 3:
-            self.nexus_rot_far = rot
-
-    def _nexus_sync_sel(self):
-        """Il resto dell'app (activate(), ecc.) ragiona ancora su un
-        indice piatto self.sel: lo tengo allineato al nodo che si
-        trova davvero al punto di aggancio dell'anello attivo."""
-        ring_list = self._nexus_ring_list(self.nexus_ring)
-        rot = self._nexus_ring_rot(self.nexus_ring)
-        self.sel = ring_list[rot % len(ring_list)]
-
-    def _nexus_orbit_point(self, ring, angle_deg, radius):
-        """Punto nel piano orbitale (prima di pan/zoom) per un dato
-        angolo e raggio. L'orbita esterna e' inclinata di
-        NEXUS_OUTER_TILT gradi sul proprio piano rispetto a quella
-        media, e la lontana (END NODE) di NEXUS_FAR_TILT -- in senso
-        opposto e piu' netto -- cosi' ogni orbita vive sul proprio
-        piano, mai tutte sullo stesso disco piatto."""
-        ang = math.radians(angle_deg)
-        x = radius * math.cos(ang)
-        y = radius * NEXUS_SQUASH * math.sin(ang)
-        tilt = NEXUS_OUTER_TILT if ring == 2 else (
-               NEXUS_FAR_TILT if ring == 3 else None)
-        if tilt is not None:
-            tr = math.radians(tilt)
-            x, y = (x * math.cos(tr) - y * math.sin(tr),
-                    x * math.sin(tr) + y * math.cos(tr))
-        return x, y
-
-    def _nexus_to_screen(self, wx, wy, sel_wx, sel_wy, zoom):
-        """Da coordinate di mondo a schermo: la zona di selezione
-        resta fissa a sinistra, e' il mondo che pan-na e si
-        ridimensiona per portarci dentro il nodo scelto -- il
-        pianeta selezionato finisce sempre esattamente li', qualunque
-        sia la sua posizione orbitale in quel momento."""
-        sx = NEXUS_SELECT_ZONE[0] + (wx - sel_wx) * zoom
-        sy = NEXUS_SELECT_ZONE[1] + (wy - sel_wy) * zoom
-        return sx, sy
-
-    def _nexus_select_zone_marker(self):
-        """Segna il punto fisso a sinistra dove il nodo selezionato
-        atterra sempre -- un mirino leggero, non un pannello, cosi'
-        non compete visivamente col pianeta che ci sta sopra."""
-        x, y = NEXUS_SELECT_ZONE
-        r = 8
-        col = self.accent
-        pygame.draw.circle(self.surface, col, (x, y), r, 1)
-        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            p0 = (x + dx * (r + 3), y + dy * (r + 3))
-            p1 = (x + dx * (r + 8), y + dy * (r + 8))
-            pygame.draw.line(self.surface, col, p0, p1, 1)
-
-    def _nexus_dashed_ring(self, ring, r, active, sel_wx, sel_wy, zoom):
-        """Orbita sottilissima bianca semi-trasparente, sempre
-        visibile, disegnata punto per punto (serve per far reggere
-        sia l'inclinazione dell'esterna sia il pan/zoom della
-        camera, cosa che un'ellisse dritta di pygame non saprebbe
-        fare da sola)."""
-        n_pts = 72
-        pts = [self._nexus_to_screen(
-                  *self._nexus_orbit_point(ring, 360.0 * k / n_pts, r),
-                  sel_wx, sel_wy, zoom)
-              for k in range(n_pts + 1)]
-        minx = min(p[0] for p in pts)
-        maxx = max(p[0] for p in pts)
-        miny = min(p[1] for p in pts)
-        maxy = max(p[1] for p in pts)
-        pad = 4
-        w = max(2, int(maxx - minx) + pad * 2)
-        h = max(2, int(maxy - miny) + pad * 2)
-        surf = pygame.Surface((w, h), pygame.SRCALPHA)
-        local = [(px - minx + pad, py - miny + pad) for px, py in pts]
-        alpha = 110 if active else 55
-        pygame.draw.lines(surf, (255, 255, 255, alpha), False, local, 1)
-        self.surface.blit(surf, (minx - pad, miny - pad))
-
-    def _nexus_world_angle(self, ring, i, t_now):
-        """Angolo di mondo dello slot i su quell'anello: posizione di
-        partenza fissa + deriva orbitale continua -- piu' vicino al
-        sole, piu' veloce, alla Keplero."""
-        step = self._nexus_ring_step(ring)
-        drift = NEXUS_ORBIT_SPEED.get(ring, 0.0) * t_now
-        return step * i + drift
-
-    def _nexus_camera_target_pos(self, ring, i_frac, t_now):
-        """Dove si trova, in coordinate di mondo, lo slot i_frac
-        (puo' essere frazionario durante un'animazione) in questo
-        istante -- il punto che la camera insegue per tenerlo fermo
-        nella zona di selezione. Usa il raggio vero dell'anello:
-        v10.6, END NODE ha una sua orbita dedicata (ring 3) quindi
-        non serve piu' nessun offset speciale per separarlo dal
-        resto -- atterra comunque esattamente dove il pianeta viene
-        davvero disegnato."""
-        if ring == 0:
-            return (0.0, 0.0)
-        angle = self._nexus_world_angle(ring, i_frac, t_now)
-        r = NEXUS_RING_RADIUS[ring]
-        return self._nexus_orbit_point(ring, angle, r)
-
-    def _nexus_draw_scene(self, sel_pos_override=None, zoom_override=None):
-        """Il planetario Net-Sphere: le orbite SEMPRE tutte e tre
-        visibili (media, esterna e la lontana di END NODE, ciascuna
-        inclinata sul proprio piano), i pianeti in moto continuo. La
-        zona di selezione resta fissa a sinistra -- e' tutto il
-        planetario che pan-na e si ridimensiona (in base a quanto e'
-        piccolo il nodo scelto) per portarcelo dentro, non il
-        contrario. Gli override sono usati solo dalle animazioni di
-        navigazione per uno spostamento continuo invece di uno
-        scatto."""
-        t_now = time.time()
-        if sel_pos_override is not None:
-            sel_wx, sel_wy = sel_pos_override
-        else:
-            sel_wx, sel_wy = self._nexus_camera_target_pos(
-                self.nexus_ring, self._nexus_ring_rot(self.nexus_ring),
-                t_now)
-        zoom = (zoom_override if zoom_override is not None else
-               NEXUS_ZOOM.get(self.sel, 1.0))
-        self._nexus_dashed_ring(1, NEXUS_RING_RADIUS[1],
-                                self.nexus_ring == 1, sel_wx, sel_wy, zoom)
-        self._nexus_dashed_ring(2, NEXUS_RING_RADIUS[2],
-                                self.nexus_ring == 2, sel_wx, sel_wy, zoom)
-        self._nexus_dashed_ring(3, NEXUS_RING_RADIUS[3],
-                                self.nexus_ring == 3, sel_wx, sel_wy, zoom)
-        positions = {}
-        for ring, ring_list in ((1, NEXUS_RING_MID), (2, NEXUS_RING_OUT),
-                                (3, NEXUS_RING_FAR)):
-            for i, idx in enumerate(ring_list):
-                r_node = NEXUS_RING_RADIUS[ring]
-                angle = self._nexus_world_angle(ring, i, t_now)
-                wx, wy = self._nexus_orbit_point(ring, angle, r_node)
-                sx, sy = self._nexus_to_screen(wx, wy, sel_wx, sel_wy,
-                                               zoom)
-                depth = (math.sin(math.radians(angle)) + 1) / 2
-                positions[idx] = (sx, sy, depth)
-        sun_sx, sun_sy = self._nexus_to_screen(0.0, 0.0, sel_wx, sel_wy,
-                                               zoom)
-        order = sorted(positions.items(), key=lambda kv: kv[1][2])
-        for idx, (sx, sy, depth) in order:
-            sel = (idx == self.sel)
-            base_r = NEXUS_NODE_R.get(idx, 18)
-            r = max(4, int(base_r * zoom * (0.75 + 0.32 * depth) *
-                          (1.12 if sel else 1.0)))
-            raw_col = NEXUS_NODE_COLOR.get(idx, self.accent)
-            shade = 0.60 + 0.40 * depth
-            col = tuple(min(255, int(c * shade)) for c in raw_col)
-            if sel:
-                halo_a = int(55 * (0.5 + 0.5 * math.sin(t_now * 3.0)))
-                for gr in (r + 12, r + 5):
-                    s = pygame.Surface((gr * 2 + 4, gr * 2 + 4),
-                                       pygame.SRCALPHA)
-                    pygame.draw.circle(s, col + (halo_a,),
-                                       (gr + 2, gr + 2), gr)
-                    self.surface.blit(s, (sx - gr - 2, sy - gr - 2))
-            spin_speed = 0.28 + (idx * 37 % 97) / 97.0 * 0.8
-            self._nexus_sphere(sx, sy, r, col, self.menu_icons[idx],
-                               t_now * spin_speed, 0.15 if sel else 0.0,
-                               spin=True, seed=idx, selected=sel, idx=idx)
-            if sel:
-                self.last_sel_rect = (sx - r, sy - r, r * 2, r * 2)
-        self._nexus_sun(sun_sx, sun_sy, t_now, zoom)
-        self._nexus_select_zone_marker()
-        return positions
-
-    def _nexus_sun(self, cx, cy, t_now, zoom=1.0):
-        """START SESSION come una piccola stella, non un pianeta: la
-        piu' grande di tutte, aura calda pulsante, corona di piccoli
-        brillamenti -- il centro attorno a cui gli altri girano
-        davvero (anche se sullo schermo si sposta pure lei, quando
-        il focus e' altrove, esattamente come il resto del
-        planetario)."""
-        col = NEXUS_NODE_COLOR.get(0, (255, 205, 120))
-        sel = (self.sel == 0)
-        r = max(6, int((46 if sel else 40) * zoom))
-        pulse = 0.85 + 0.15 * math.sin(t_now * 1.3)
-        for gr, a in ((r + 30, 22), (r + 18, 38), (r + 8, 58)):
-            s = pygame.Surface((gr * 2 + 4, gr * 2 + 4), pygame.SRCALPHA)
-            glow = tuple(min(255, int(c * pulse)) for c in col)
-            pygame.draw.circle(s, glow + (a,), (gr + 2, gr + 2), gr)
-            self.surface.blit(s, (cx - gr - 2, cy - gr - 2))
-        core = tuple(min(255, int(c * (pulse + 0.12))) for c in col)
-        for k in range(10):
-            fa = math.radians(k * 36 + t_now * 26)
-            fl = r + 5 + int(6 * abs(math.sin(t_now * 2.2 + k)))
-            pygame.draw.line(self.surface, core,
-                            (cx + r * 0.82 * math.cos(fa),
-                             cy + r * 0.82 * math.sin(fa)),
-                            (cx + fl * math.cos(fa),
-                             cy + fl * math.sin(fa)), 2)
-        pygame.draw.circle(self.surface, core, (int(cx), int(cy)), r)
-        hi = tuple(min(255, c + 60) for c in core)
-        pygame.draw.circle(self.surface, hi,
-                          (int(cx - r * 0.3), int(cy - r * 0.3)),
-                          max(3, int(r * 0.3)))
-        n_pts = 26
-        pts = []
-        for k in range(n_pts):
-            a = 2 * math.pi * k / n_pts
-            jitter = (1.6 * math.sin(k * 2.7) + 1.0 * math.sin(k * 5.1))
-            rr = r + jitter
-            pts.append((int(cx + rr * math.cos(a)),
-                       int(cy + rr * math.sin(a))))
-        pygame.draw.polygon(self.surface, INK, pts, 3)
-        pygame.draw.polygon(self.surface, INK, pts, 3)
-        sun_size = max(12, int(r * 1.3))
-        sun_img = self.nexus_planet_icon(self.menu_icons[0], sun_size)
-        if sun_img:
-            self.surface.blit(sun_img, (int(cx - sun_size / 2),
-                                        int(cy - sun_size / 2)))
-        else:
-            icons.draw(self.surface, self.menu_icons[0],
-                      int(cx - r * 0.5), int(cy - r * 0.5),
-                      max(10, int(r)), INK)
-        if sel:
-            self.last_sel_rect = (cx - r, cy - r, r * 2, r * 2)
-
-    def _nexus_side_panels(self, bx0=360):
-        """Targhetta e report del nodo. v10.3: icona del pianeta
-        nella targhetta, riquadro report piu' staccato e alto quanto
-        serve, voci separate da virgola come elenco puntato invece
-        di una riga sola troncata."""
-        idx = self.sel
-        label, sub = self.menu[idx]
-        col = NEXUS_NODE_COLOR.get(idx, self.accent)
-        icon_key = self.menu_icons[idx]
-        bx = bx0
-        bw = max(140, W - bx - 14)
-        by = 50
-        self.npanel(bx, by, bw, 62, border=col, fill=INK, cut=10)
-        picon = self.nexus_planet_icon(icon_key, 44)
-        text_x0 = bx + 12
-        if picon:
-            self.surface.blit(picon, (bx + 10, by + 9))
-            text_x0 = bx + 10 + 44 + 10
-        self.text(NEXUS_NODE_CODE.get(idx, "RAIL-?α"), (text_x0,
-                 by + 6), self.f_small, col)
-        avail_w = max(20, bx + bw - 12 - text_x0)
-        lw = self.f_med_b.size(label)[0]
-        self.text(label, (text_x0 + max(0, (avail_w - lw) // 2),
-                 by + 28), self.f_med_b, FG, maxw=avail_w)
-
-        by2 = by + 62 + 28   # v10.3: box piu' staccato (era +16)
-        raw_items = [p.strip() for p in sub.split(",") if p.strip()]
-        for pre in ("e ", "and "):
-            raw_items = [it[len(pre):] if it.lower().startswith(pre)
-                        else it for it in raw_items]
-        bullets = len(raw_items) > 1
-        rows = raw_items if bullets else self.note_wrap(
-            sub, bw - 24, self.f_med, 4)
-        line_h = 20
-        ph = 30 + max(1, len(rows)) * line_h + 8
-        self.npanel(bx, by2, bw, ph, border=LINE, fill=INK, cut=8)
-        self.text("NODE REPORT", (bx + 12, by2 + 6), self.f_small,
-                 self.accent)
-        ty = by2 + 30
-        for row in rows:
-            if bullets:
-                self.text("•", (bx + 12, ty), self.f_med, self.accent)
-                self.text(row, (bx + 28, ty), self.f_med, FAINT,
-                         maxw=bw - 40)
-            else:
-                self.text(row, (bx + 12, ty), self.f_med, FAINT,
-                         maxw=bw - 24)
-            ty += line_h
+        total_h = y
+        return headers, layout_items, total_h
 
     def render_home_nexus(self):
         """VOIDDESK 9.300 'Net-Sphere' -- planetario navigabile: le
@@ -11665,16 +18159,15 @@ class App(object):
         Destra sposta il focus su un'altra orbita, Su/Giu' al
         pianeta successivo/precedente su quella attiva."""
         self.header("__brand__")
-        self._nexus_bg()
-        self._nexus_draw_scene()
-        self._nexus_side_panels()
-        updown = "SU/GIÙ" if self.lang == "it" else "UP/DOWN"
-        orbita = "orbita" if self.lang == "it" else "orbit"
-        self.footer([("Y", self.t("view")),
-                     ("SX/DX", orbita),
-                     ("A", self.t("open")),
-                     ("SU/GIÙ", self.t("change")),
-                     ("R2", "USER ID")])
+        self.nexus_renderer._nexus_bg()
+        self.nexus_renderer._nexus_draw_scene()
+        self.nexus_renderer._nexus_side_panels()
+        hints = [("Y", self.t("view")), (self.t("k_lr"), self.t("orbit")),
+                ("A", self.t("open")), (self.t("k_ud"), self.t("change"))]
+        if NEXUS_SATELLITES.get(self.sel):
+            hints.append(("R1", "satellite"))
+        hints.append(("R2", "USER ID"))
+        self.footer(hints)
 
     def nexus_ring_rotate(self, direction):
         """Sposta il focus di uno scatto sull'orbita attiva (Su/
@@ -11682,28 +18175,28 @@ class App(object):
         dalla posizione del pianeta attuale a quella del successivo/
         precedente -- niente scatti, e la deriva orbitale continua a
         scorrere sotto durante il movimento."""
-        ring_list = self._nexus_ring_list(self.nexus_ring)
+        ring_list = self.nexus_renderer._nexus_ring_list(self.nexus_ring)
         if len(ring_list) < 2:
             return
-        self.play("nexus")
-        i0 = self._nexus_ring_rot(self.nexus_ring)
+        self.play(NEXUS_NODE_SOUND.get(self.sel, "dpad_nexus"))
+        i0 = self.nexus_renderer._nexus_ring_rot(self.nexus_ring)
         zoom0 = NEXUS_ZOOM.get(self.sel, 1.0)
         i1 = (i0 + direction) % len(ring_list)
-        self._nexus_set_ring_rot(self.nexus_ring, i1)
-        self._nexus_sync_sel()
+        self.nexus_renderer._nexus_set_ring_rot(self.nexus_ring, i1)
+        self.nexus_renderer._nexus_sync_sel()
         zoom1 = NEXUS_ZOOM.get(self.sel, 1.0)
         frames = 10
         for f in range(frames):
             k = (f + 1) / float(frames)
             t_now = time.time()
-            pos = self._nexus_camera_target_pos(
+            pos = self.nexus_renderer._nexus_camera_target_pos(
                 self.nexus_ring, i0 + direction * k, t_now)
             zoom = zoom0 + (zoom1 - zoom0) * k
             self.header("__brand__")
-            self._nexus_bg()
-            self._nexus_draw_scene(pos, zoom)
-            self._nexus_side_panels()
-            self.footer([("SU/GIÙ", self.t("change"))])
+            self.nexus_renderer._nexus_bg()
+            self.nexus_renderer._nexus_draw_scene(pos, zoom)
+            self.nexus_renderer._nexus_side_panels()
+            self.footer([(self.t("k_ud"), self.t("change"))])
             pygame.display.flip()
             self.clock.tick(40)
         self.render()
@@ -11713,50 +18206,1289 @@ class App(object):
         (Sinistra/Destra): il planetario pan-na dalla posizione del
         pianeta attivo dell'orbita attuale a quello dell'orbita
         nuova -- tutte le orbite restano visibili per tutto il
-        tempo, e' solo l'inquadratura (e lo zoom) che cambia. v10.6:
-        il limite arriva a 3, la nuova orbita lontana di END NODE."""
+        tempo, e' solo l'inquadratura (e lo zoom) che cambia. v10.14:
+        il limite arriva a 4, la quarta orbita VOID di LEGACY."""
         new_ring = self.nexus_ring + direction
-        if new_ring < 0 or new_ring > 3:
+        if new_ring < 0 or new_ring > 4:
             return
-        self.play("nexus")
+        self.play("nexus_switch")
         old_ring = self.nexus_ring
-        old_i = self._nexus_ring_rot(old_ring)
+        old_i = self.nexus_renderer._nexus_ring_rot(old_ring)
         zoom0 = NEXUS_ZOOM.get(self.sel, 1.0)
         self.nexus_ring = new_ring
-        self._nexus_sync_sel()
-        new_i = self._nexus_ring_rot(new_ring)
+        self.nexus_renderer._nexus_sync_sel()
+        new_i = self.nexus_renderer._nexus_ring_rot(new_ring)
         zoom1 = NEXUS_ZOOM.get(self.sel, 1.0)
         for f in range(8):
             k = (f + 1) / 8.0
             t_now = time.time()
-            wx0, wy0 = self._nexus_camera_target_pos(old_ring, old_i,
+            wx0, wy0 = self.nexus_renderer._nexus_camera_target_pos(old_ring, old_i,
                                                       t_now)
-            wx1, wy1 = self._nexus_camera_target_pos(new_ring, new_i,
+            wx1, wy1 = self.nexus_renderer._nexus_camera_target_pos(new_ring, new_i,
                                                       t_now)
             pos = (wx0 + (wx1 - wx0) * k, wy0 + (wy1 - wy0) * k)
             zoom = zoom0 + (zoom1 - zoom0) * k
             self.header("__brand__")
-            self._nexus_bg()
-            self._nexus_draw_scene(pos, zoom)
-            self._nexus_side_panels()
-            self.footer([("SX/DX", self.t("change"))])
+            self.nexus_renderer._nexus_bg()
+            self.nexus_renderer._nexus_draw_scene(pos, zoom)
+            self.nexus_renderer._nexus_side_panels()
+            self.footer([(self.t("k_lr"), self.t("change"))])
             pygame.display.flip()
             self.clock.tick(40)
         self.render()
 
+    def nexus_enter_satellite_view(self):
+        """R1 su un nodo che ha satelliti (es. TOOLBOX): il
+        planetario pan-na e si ingrandisce fino ad ancorare il
+        pianeta sul lato destro dello schermo invece che nella
+        normale zona di selezione -- stessa logica di camera di
+        nexus_ring_rotate/switch, solo che qui a cambiare sono
+        anchor e zoom invece della sola posizione di mondo. Il nodo
+        selezionato non cambia: la deriva orbitale continua a
+        scorrere sotto durante l'avvicinamento."""
+        if not NEXUS_SATELLITES.get(self.sel):
+            return
+        self.play("satellite_select")
+        i_now = self.nexus_renderer._nexus_ring_rot(self.nexus_ring)
+        zoom0 = NEXUS_ZOOM.get(self.sel, 1.0)
+        zoom1 = zoom0 * NEXUS_SAT_ZOOM_MULT
+        a0 = NEXUS_SELECT_ZONE
+        a1 = NEXUS_SAT_ANCHOR
+        frames = 16
+        for f in range(frames):
+            k = (f + 1) / float(frames)
+            ek = k * k * (3 - 2 * k)          # ease in/out
+            t_now = time.time()
+            pos = self.nexus_renderer._nexus_camera_target_pos(self.nexus_ring, i_now,
+                                                t_now)
+            zoom = zoom0 + (zoom1 - zoom0) * ek
+            anchor = (a0[0] + (a1[0] - a0[0]) * ek,
+                     a0[1] + (a1[1] - a0[1]) * ek)
+            self.header("__brand__")
+            self.nexus_renderer._nexus_bg()
+            self.nexus_renderer._nexus_draw_scene(pos, zoom, anchor)
+            self.footer([])
+            pygame.display.flip()
+            self.clock.tick(40)
+        self.nexus_sat_sel = 0
+        self.push("nexussat")
+        self.render()
+
+    def nexus_exit_satellite_view(self):
+        """Ritorno dalla vista satellite al planetario normale --
+        animazione inversa di nexus_enter_satellite_view."""
+        self.play("nexus_exit")
+        i_now = self.nexus_renderer._nexus_ring_rot(self.nexus_ring)
+        zoom1 = NEXUS_ZOOM.get(self.sel, 1.0)
+        zoom0 = zoom1 * NEXUS_SAT_ZOOM_MULT
+        a1 = NEXUS_SELECT_ZONE
+        a0 = NEXUS_SAT_ANCHOR
+        frames = 16
+        for f in range(frames):
+            k = (f + 1) / float(frames)
+            ek = k * k * (3 - 2 * k)
+            t_now = time.time()
+            pos = self.nexus_renderer._nexus_camera_target_pos(self.nexus_ring, i_now,
+                                                t_now)
+            zoom = zoom0 + (zoom1 - zoom0) * ek
+            anchor = (a0[0] + (a1[0] - a0[0]) * ek,
+                     a0[1] + (a1[1] - a0[1]) * ek)
+            self.header("__brand__")
+            self.nexus_renderer._nexus_bg()
+            self.nexus_renderer._nexus_draw_scene(pos, zoom, anchor)
+            self.footer([])
+            pygame.display.flip()
+            self.clock.tick(40)
+        self.pop_state()
+        self.render()
+
+    def render_nexus_satellite(self):
+        """Vista satellite: il pianeta scelto ancorato ingrandito a
+        destra (stessa scena del planetario, solo ri-ancorata), a
+        sinistra la targhetta ridotta del nodo con sotto il codice
+        RAIL, una linea a L che scende e si collega all'elenco dei
+        satelliti -- un cerchio con numero romano e nome sottolineato
+        per ciascuno, quello attivo evidenziato."""
+        it = (self.lang == "it")
+        idx = self.sel
+        self.header("__brand__")
+        self.nexus_renderer._nexus_bg()
+        zoom = NEXUS_ZOOM.get(idx, 1.0) * NEXUS_SAT_ZOOM_MULT
+        self.nexus_renderer._nexus_draw_scene(zoom_override=zoom,
+                               anchor_override=NEXUS_SAT_ANCHOR)
+
+        col = NEXUS_NODE_COLOR.get(idx, self.accent)
+        bx, by, bw, bh = 14, 50, 108, 84
+        self.npanel(bx, by, bw, bh, border=col, fill=INK, cut=6)
+        bkey = NEXUS_NODE_BADGE.get(idx)
+        bimg = self.badge_img(bkey, 60) if bkey else None
+        if bimg is not None:
+            iw, ih = bimg.get_size()
+            maxw = bw - 14
+            if iw > maxw:
+                ih = max(6, int(ih * maxw / float(iw)))
+                iw = maxw
+                bimg = pygame.transform.smoothscale(bimg, (iw, ih))
+            self.surface.blit(bimg, (bx + (bw - iw) // 2,
+                                     by + (bh - ih) // 2))
+        else:
+            picon = self.nexus_planet_icon(self.menu_icons[idx],
+                                           min(48, bh - 12))
+            if picon:
+                self.surface.blit(
+                    picon, (bx + (bw - picon.get_width()) // 2,
+                           by + (bh - picon.get_height()) // 2))
+        raw_code = NEXUS_NODE_CODE.get(idx, "RAIL-?α")
+        code = self.nexus_renderer._nexus_format_code(raw_code)
+        self.text(code, (bx, by + bh + 8), self.f_small, col)
+
+        sats = NEXUS_SATELLITES.get(idx, [])
+        lx = bx + 14
+        ly0 = by + bh + 26
+        row_h = 34
+        corner_y = ly0 + 18
+        pygame.draw.line(self.surface, col, (lx, ly0), (lx, corner_y), 2)
+        pygame.draw.line(self.surface, col, (lx, corner_y),
+                         (lx + 16, corner_y), 2)
+        for i, (roman, name, _state, icon) in enumerate(sats):
+            ry = corner_y + i * row_h
+            active = (i == self.nexus_sat_sel)
+            if i > 0:
+                pygame.draw.line(self.surface, col, (lx, corner_y),
+                                 (lx, ry), 2)
+            cx, cy, cr = lx + 16 + 14, ry + 14, 14
+            ccol = col if active else DIM
+            # icona satellite a sinistra del romano (se presente)
+            if icon:
+                iu = 14
+                icons.draw(self.surface, icon, lx - iu + 2, cy - iu // 2, iu, ccol)
+            pygame.draw.circle(self.surface, INK, (cx, cy), cr + 2)
+            pygame.draw.circle(self.surface, ccol, (cx, cy), cr, 2)
+            rn_w = self.f_small_b.size(roman)[0]
+            self.text(roman, (cx - rn_w // 2, cy - 9), self.f_small_b,
+                     ccol)
+            tx = cx + cr + 10
+            fnt = self.f_med_b if active else self.f_med
+            self.text(name, (tx, cy - 9), fnt, FG if active else DIM)
+            tw = fnt.size(name)[0]
+            uy = cy + 11
+            pygame.draw.line(self.surface,
+                             self.accent if active else DIM,
+                             (tx, uy), (tx + tw, uy), 2 if active else 1)
+
+        self.footer([(self.t("k_ud"), self.t("change")),
+                    ("A", self.t("open")), ("B", self.t("back"))])
+
+    def scan_outdesk(self):
+        """Costruisce la lista app Outer-Desk dall'registry OUTERDESK_APPS,
+        includendo per ciascuna il path relativo dello script (.py) cosi'
+        che _launch_outerdesk_app possa avviarla direttamente senza passare
+        per altri mux_launch.sh."""
+        apps = []
+        it = (self.lang == "it")
+        for app in OUTERDESK_APPS:
+            script_rel = app.get("script")
+            if not script_rel:
+                continue
+            script_path = os.path.join(APP_DIR, script_rel)
+            if not os.path.exists(script_path):
+                continue
+            name = app["name"][0] if it else app["name"][1]
+            desc = app["desc"][0] if it else app["desc"][1]
+            mux_rel = app.get("mux")
+            apps.append({
+                "key": app["key"],
+                "name": name,
+                "path": os.path.dirname(script_path),
+                "mux": os.path.join(APP_DIR, mux_rel) if mux_rel else None,
+                "desc": desc,
+                "icon": app.get("icon", "gear"),
+                "script": script_rel,
+                "req": app.get("req"),
+                "color": app.get("color"),
+                "logo": app.get("logo"),
+            })
+        return apps
+
+    def render_outerdesk(self):
+        """OuterDesk – lista di tutti i tool in outdesk/."""
+        surf = self.surface
+        col = OUTERDESK_COLOR
+        self.header("Outer-Desk", accent=col)
+        self._outer_bg_starfield(col)
+
+        apps = self.scan_outdesk()
+        win_x = 16
+        win_y = 80
+        win_w = W - 32
+        win_h = H - 120
+        self.npanel(win_x, win_y, win_w, win_h, border=col, fill=PANEL, cut=8)
+
+        per = 5
+        total = len(apps)
+        scroll = max(0, min(self.od_scroll, total - per))
+        y = win_y + 12
+        for i in range(scroll, min(scroll + per, total)):
+            app = apps[i]
+            sel = (i == self.od_sel)
+            rect = pygame.Rect(win_x + 8, y, win_w - 16, 50)
+            if sel:
+                self.sel_frame(rect.x, rect.y, rect.w, rect.h, color=col)
+            icons.draw(surf, app.get("icon", "gear"), rect.x + 12, rect.y + 10, 28,
+                      col if sel else DIM)
+            self.text(app["name"], (rect.x + 50, rect.y + 6), self.f_med,
+                     FG if sel else DIM)
+            self.text(app["desc"][:40], (rect.x + 50, rect.y + 28), self.f_tiny,
+                     FAINT)
+            y += 56
+
+        self.footer([("A", self.t("open")), ("B", self.t("back"))])
+
+    def _outer_bg_starfield(self, col):
+        """Sfondo spaziato per Outer-Desk: stelle sparse nell'area di
+        contenuto (tra header e footer)."""
+        if not hasattr(self, "_outer_stars_cache"):
+            ctop = 46
+            cbot = H - 28
+            _r = random.Random(42)
+            stars = []
+            for _ in range(70):
+                _sx = _r.randint(0, W - 1)
+                _sy = _r.randint(ctop, cbot - 1)
+                _br = _r.randint(10, 40)
+                _c = (max(0, col[0] - _br),
+                      max(0, col[1] - _br),
+                      min(255, col[2] + _br))
+                stars.append((_sx, _sy, _c))
+            for _ in range(14):
+                _sx = _r.randint(0, W - 1)
+                _sy = _r.randint(ctop, cbot - 1)
+                _sz = _r.randint(1, 3)
+                stars.append((_sx, _sy, col, _sz))
+            self._outer_stars_cache = stars
+        for item in self._outer_stars_cache:
+            if len(item) == 3:
+                sx, sy, c = item
+                self.surface.set_at((sx, sy), c)
+            else:
+                sx, sy, c, sz = item
+                pygame.draw.circle(self.surface, c, (sx, sy), sz)
+
+    def _outer_desk_app_list(self, it, col):
+        apps = OUTERDESK_APPS
+        n = len(apps)
+        sel = self.od_sel
+        self.last_sel_rect = (int(W * 0.38), 86, int(W * 0.58) - 8, 26)
+        win_x = int(W * 0.38) + 4
+        win_y = 86
+        win_w = int(W * 0.58) - 16
+        win_h = n * 46 + 16
+        self.npanel(win_x, win_y, win_w, win_h, border=col, fill=PANEL,
+                    cut=8)
+        ty = win_y - 22
+        icons.draw(self.surface, "outer", win_x + 4, ty, 20, col)
+        self.text("OUTER-DESK", (win_x + 28, ty - 1), self.f_med_b, col)
+        for i, app in enumerate(apps):
+            y = win_y + 10 + i * 46
+            row_sel = (i == sel)
+            if row_sel:
+                self.sel_frame(win_x, y - 2, win_w, 44, color=col, cut=6)
+            name = app["name"][0] if it else app["name"][1]
+            icon_key = app["icon"]
+            ic_col = col if row_sel else DIM
+            icons.draw(self.surface, icon_key, win_x + 10, y + 4, 24, ic_col)
+            name_col = FG if row_sel else DIM
+            self.text(name, (win_x + 44, y + 4),
+                      self.f_small_b if row_sel else self.f_small, name_col)
+            desc = app["desc"][0] if it else app["desc"][1]
+            self.text(desc, (win_x + 44, y + 22), self.f_tiny,
+                      self.accent if row_sel else FAINT,
+                      maxw=win_w - 56)
+            if i < n - 1:
+                _sy = y + 44
+                pygame.draw.line(self.surface, LINE,
+                                 (win_x + 4, _sy), (win_x + win_w - 4, _sy), 1)
+        self.last_sel_rect = (win_x, win_y + 10 + sel * 46 - 2,
+                              win_w, 44)
+
+    def _render_outer_logo(self):
+        t = time.time()
+        lx, ly = W - 72, H - 116
+        icons.draw(self.surface, "outer_full", lx, ly, 64, ACCENTS["ciano"],
+                   t=t)
+        _sw = self.f_tiny.size("OUTER")[0]
+        self.text("OUTER", (lx + 32 - _sw // 2, ly - 12), self.f_tiny,
+                  ACCENTS["ciano"])
+        _sw2 = self.f_tiny.size("DESK")[0]
+        self.text("DESK", (lx + 32 - _sw2 // 2, ly + 68), self.f_tiny,
+                  ACCENTS["ciano"])
+
+    def render_outerdesk_detail(self):
+        it = (self.lang == "it")
+        col = NEXUS_NODE_COLOR.get(4, self.accent)
+        app = OUTERDESK_APPS[self.od_sel % len(OUTERDESK_APPS)]
+        self.header("Outer-Desk", accent=col)
+        self._outer_bg_starfield(col)
+        self._draw_safety_tablet(16, 86, int(W * 0.33), H - 128, col, 1.0)
+        # --- Titolo in alto a destra ---
+        icons.draw(self.surface, "outer", int(W * 0.44) - 30, 82, 28, col)
+        label = app["name"][0] if it else app["name"][1]
+        self.text(label, (int(W * 0.44), 84), self.f_big_b, col)
+        # --- Pannello dettaglio a destra ---
+        dx, dy, dw, dh = int(W * 0.44) + 8, 106, int(W * 0.52) - 16, H - 140
+        self.npanel(dx, dy, dw, dh, border=col, fill=PANEL, cut=10)
+        # Logo/grande icona
+        logo_path = os.path.join(APP_DIR, "assets", "logos", app.get("logo", ""))
+        lg = None
+        if app.get("logo"):
+            try:
+                src = pygame.image.load(logo_path).convert_alpha()
+                lh = 48
+                lw = max(1, int(src.get_width() * lh / float(src.get_height())))
+                lg = pygame.transform.smoothscale(src, (lw, lh))
+            except Exception:
+                lg = None
+        if lg:
+            self.surface.blit(lg, (dx + (dw - lg.get_width()) // 2,
+                                   dy + 12))
+        else:
+            icons.draw(self.surface, app["icon"], dx + dw // 2 - 16,
+                       dy + 6, 32, app["color"])
+        iy = dy + 68
+        self.text(label, (dx + 10, iy), self.f_med_b, FG)
+        iy += 22
+        ver = "—"
+        self.text("v%s" % ver, (dx + 10, iy), self.f_small, DIM)
+        iy += 18
+        desc = app["desc"][0] if it else app["desc"][1]
+        self.text(desc, (dx + 10, iy), self.f_small, DIM, maxw=dw - 20)
+        # --- Dependency checklist ---
+        iy += 44
+        deps = self._check_outer_deps(app)
+        dl = it and "DIPENDENZE" or "DEPENDENCIES"
+        self.text(dl, (dx + 10, iy), self.f_small_b, col)
+        iy += 20
+        for dep in deps:
+            _st = dep["installed"]
+            self.mark(dx + 10, iy, _st)
+            dcol = OK_G if _st else NO_R
+            self.text(dep["name"], (dx + 26, iy - 2), self.f_small, dcol)
+            ver_s = dep.get("version", "")
+            if ver_s:
+                self.text(ver_s, (dx + dw - 10 - self.f_tiny.size(ver_s)[0],
+                                  iy + 2), self.f_tiny, FAINT)
+            iy += 24
+        # --- Launch / Install button ---
+        all_ok = all(d["installed"] for d in deps)
+        iy += 8
+        btn_h = 34
+        if all_ok:
+            btn_lbl = it and "AVVIA" or "LAUNCH"
+            btn_col = OK_G
+        else:
+            btn_lbl = it and "INSTALLA E AVVIA" or "INSTALL & LAUNCH"
+            btn_col = self.accent
+        bx = dx + 10
+        bw = dw - 20
+        pygame.draw.rect(self.surface, INK, (bx, iy, bw, btn_h),
+                         border_radius=6)
+        pygame.draw.rect(self.surface, btn_col, (bx, iy, bw, btn_h), 1,
+                         border_radius=6)
+        tw = self.f_med_b.size(btn_lbl)[0]
+        self.text(btn_lbl, (bx + (bw - tw) // 2, iy + 6),
+                  self.f_med_b, btn_col)
+        self.last_sel_rect = (bx, iy, bw, btn_h)
+        self._render_outer_logo()
+        self.footer([("A", it and "avvia" or "launch"),
+                     ("B", self.t("back"))])
+
+    def _check_outer_deps(self, app):
+        """Legge requirements.json (se presente) e verifica ogni
+        check_command. I risultati sono in cache per app-key in modo
+        che il pulsante B del controller non rilegge il file ogni frame."""
+        key = app["key"]
+        if key in self.od_deps_cache:
+            return self.od_deps_cache[key]
+        results = []
+        req_rel = app.get("req")
+        if req_rel:
+            req_path = os.path.join(APP_DIR, req_rel)
+            try:
+                with open(req_path) as _f:
+                    data = json.load(_f)
+                for cat in data.get("categories", []):
+                    for dep in cat.get("dependencies", []):
+                        chk = dep.get("check_command", "")
+                        installed = False
+                        if chk:
+                            try:
+                                rc = subprocess.call(
+                                    chk, shell=True,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL)
+                                installed = (rc == 0)
+                            except Exception:
+                                installed = False
+                        results.append({
+                            "id": dep.get("id", ""),
+                            "name": dep.get("name", ""),
+                            "version": dep.get("version", ""),
+                            "installed": installed,
+                        })
+            except Exception:
+                pass
+        self.od_deps_cache[key] = results
+        return results
+
+    def _launch_outerdesk_app(self, app, deps):
+        """Installa le dipendenze mancanti (se necessario) e poi
+        avvia l'app Outer-Desk, animando il logo in basso-destra
+        durante la transizione."""
+        all_ok = all(d["installed"] for d in deps) if deps else True
+        if not all_ok:
+            req_rel = app.get("req")
+            if req_rel:
+                req_path = os.path.join(APP_DIR, req_rel)
+                try:
+                    with open(req_path) as _f:
+                        _data = json.load(_f)
+                    for _cat in _data.get("categories", []):
+                        for _dep in _cat.get("dependencies", []):
+                            _chk = _dep.get("check_command", "")
+                            _ok = False
+                            if _chk:
+                                try:
+                                    _rc = subprocess.call(
+                                        _chk, shell=True,
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL)
+                                    _ok = (_rc == 0)
+                                except Exception:
+                                    _ok = False
+                            if not _ok:
+                                _inst = _dep.get("install_command", "")
+                                if _inst:
+                                    self.play("charge")
+                                    os.system(_inst)
+                except Exception:
+                    pass
+            self.od_deps_cache.pop(app["key"], None)
+            deps = self._check_outer_deps(app)
+            if not all(d["installed"] for d in deps) if deps else False:
+                return
+        if self.outer_panel_phase is not None:
+            self.outer_panel_phase = None
+            self.outerdesk_running_app = None
+        self.play("click")
+        os.makedirs(DATA, exist_ok=True)
+        with open(os.path.join(DATA, ".outdesk_sel"), "w") as f:
+            f.write(app["key"])
+        self.od_launched = True
+        self.od_launch_t = time.time()
+        self.vc_suspend_display()
+        script_rel = app.get("script")
+        if script_rel:
+            script_path = os.path.join(APP_DIR, script_rel)
+            if os.path.exists(script_path):
+                try:
+                    env = os.environ.copy()
+                    env["PYTHONPATH"] = RUNTIME_DIR + os.pathsep + env.get("PYTHONPATH", "")
+                    env["LD_LIBRARY_PATH"] = RUNTIME_DIR + os.pathsep + env.get("LD_LIBRARY_PATH", "")
+                    env.pop("SDL_VIDEODRIVER", None)
+                    proc = subprocess.Popen(
+                        ["python3", script_path],
+                        cwd=os.path.dirname(script_path),
+                        env=env,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    self.outerdesk_proc = proc
+                    self.outerdesk_running_app = app
+                    self.outer_log_lines = [
+                        "%s: %s" % (time.strftime("%H:%M:%S"),
+                                    app["name"])
+                    ]
+                except Exception:
+                    pass
+        self._animate_outer_logo_launch()
+        if getattr(self, "outerdesk_proc", None) is not None:
+            self.push("outerdesk_running")
+            self.exit_code = 0
+            self.running = True
+        else:
+            self.exit_code = EXIT_OUTERDESK
+            self.running = False
+
+    def _outer_panel_restart(self):
+        app = getattr(self, "outerdesk_running_app", None)
+        if not app:
+            return
+        self._outer_panel_terminate()
+        script_rel = app.get("script")
+        if script_rel:
+            script_path = os.path.join(APP_DIR, script_rel)
+            if os.path.exists(script_path):
+                try:
+                    env = os.environ.copy()
+                    env["PYTHONPATH"] = RUNTIME_DIR + os.pathsep + env.get("PYTHONPATH", "")
+                    env["LD_LIBRARY_PATH"] = RUNTIME_DIR + os.pathsep + env.get("LD_LIBRARY_PATH", "")
+                    env.pop("SDL_VIDEODRIVER", None)
+                    proc = subprocess.Popen(
+                        ["python3", script_path],
+                        cwd=os.path.dirname(script_path),
+                        env=env,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    self.outerdesk_proc = proc
+                    self.outer_log_lines = [
+                        "%s: %s" % (time.strftime("%H:%M:%S"),
+                                    self.t("outer_panel_restarting"))
+                    ]
+                except Exception:
+                    pass
+
+    def _outer_panel_close(self):
+        self._outer_panel_terminate()
+        self.outerdesk_running_app = None
+        self.outerdesk_proc = None
+        self.outer_log_lines = ["Outer-Desk ready."]
+        self.outer_panel_sel = 0
+        while len(self.stack) > 1 and self.stack[-1] in ("outerdesk_running", "outerdesk", "nexussat"):
+            self.stack.pop()
+        self.play("back")
+
+    def _outer_panel_terminate(self):
+        proc = getattr(self, "outerdesk_proc", None)
+        if proc is not None:
+            try:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            except Exception:
+                pass
+        self.outerdesk_proc = None
+
+    def _animate_outer_logo_launch(self):
+        """Spin veloce del logo OUTER-DESK in basso-destra per
+        0.6s prima dell'uscita, con effetto di allontanamento."""
+        col = OUTERDESK_COLOR
+        t_s = time.time()
+        for _frame in range(18):
+            k = (_frame + 1) / 18.0
+            self.render_outerdesk_logo_frame(col,
+                                             time.time(), 1.0 - k * 0.3,
+                                             scale=0.4 + 0.9 * k,
+                                             spin_boost=3.0 + 6.0 * k)
+            pygame.display.flip()
+            self.clock.tick(40)
+
+    def render_outerdesk_logo_frame(self, col, t, alpha_k=1.0,
+                                    scale=1.0, spin_boost=1.0):
+        """Redisegna lo sfondo spaziato + safety tablet + logo animato
+        con parametri di spin/scale/alpha per l'animazione di lancio."""
+        self.surface.fill((5, 8, 11))
+        self._outer_bg_starfield(col)
+        self._draw_safety_tablet(16, 86, int(W * 0.33), H - 128, col, 1.0)
+        ls = max(16, min(64, int(64 * scale)))
+        lx, ly = W - 72 + (64 - ls) // 2, H - 116 + (64 - ls) // 2
+        icons.draw(self.surface, "outer_full", lx, ly, ls, col,
+                   t=t * (1 + spin_boost))
+
+    def render_outerdesk_running(self):
+        app = getattr(self, "outerdesk_running_app", None)
+        if app is None:
+            return
+        proc = getattr(self, "outerdesk_proc", None)
+        col = OUTERDESK_COLOR
+        it = (self.lang == "it")
+        alive = (proc is not None and proc.poll() is None)
+        
+        # Check timeout for outer panel START held
+        if self.outer_panel_start_held:
+            elapsed = time.time() - self.outer_panel_start_t0
+            if elapsed > 5.0:  # Auto-disable after 5 seconds
+                self.outer_panel_start_held = False
+        
+        # If panel is NOT being shown (START not held), show minimal view
+        if not self.outer_panel_start_held:
+            self.surface.fill(OUTER_PANEL_BG)
+            self._outer_bg_starfield(col)
+            self.header(self.t("outer_panel_title"), accent=col)
+            # Minimal info without control buttons
+            if app:
+                icon = app.get("icon", "outer")
+                icons.draw(self.surface, icon, W // 2 - 32, 120, 64, col)
+                label = app["name"][0] if it else app["name"][1]
+                label_w = self.f_med_b.size(label)[0]
+                self.text(label, (W // 2 - label_w // 2, 200), self.f_med_b, FG)
+            status_txt = self.t("outer_panel_running") if alive else self.t("outer_panel_not_running")
+            status_col = OK_G if alive else NO_R
+            status_w = self.f_small.size(status_txt)[0]
+            self.text(status_txt, (W // 2 - status_w // 2, 250), self.f_small, status_col)
+            press_start = self.t("mecha_start") + ": " + self.t("open")
+            press_w = self.f_tiny.size(press_start)[0]
+            self.text(press_start, (W // 2 - press_w // 2, 300), self.f_tiny, DIM)
+            
+            if not alive and proc is not None:
+                while len(self.stack) > 1 and self.stack[-1] in ("outerdesk_running", "outerdesk", "nexussat"):
+                    self.stack.pop()
+            return
+        
+        # Otherwise, show full panel
+        state_key = (id(app), id(proc) if proc else None, alive, self.outer_panel_sel)
+        last_key = getattr(self, "_outerdesk_last_state", None)
+        if state_key == last_key and hasattr(self, "_outerdesk_surface"):
+            self.surface.blit(self._outerdesk_surface, (0, 0))
+            return
+        self._outerdesk_last_state = state_key
+        if not alive and proc is not None:
+            ts = time.strftime("%H:%M:%S")
+            self.outer_log_lines.append("%s: %s" % (ts, app["name"][0] if it else app["name"][1] if app else "app"))
+            self.outer_log_lines.append("%s: %s" % (ts, self.t("outer_panel_not_running")))
+            self.outerdesk_proc = None
+            self.outer_panel_sel = 0
+            while len(self.stack) > 1 and self.stack[-1] in ("outerdesk_running", "outerdesk", "nexussat"):
+                self.stack.pop()
+            return
+        self.outer_panel_sel = max(0, min(1, self.outer_panel_sel))
+        self.surface.fill(OUTER_PANEL_BG)
+        self._outer_bg_starfield(col)
+        # --- Header ---
+        self.header(self.t("outer_panel_title"), accent=col)
+        # --- App info ---
+        if app:
+            logo_path = os.path.join(APP_DIR, "assets", "logos", app.get("logo", ""))
+            lg = None
+            if app.get("logo"):
+                try:
+                    src = pygame.image.load(logo_path).convert_alpha()
+                    lh = 36
+                    lw = max(1, int(src.get_width() * lh / float(src.get_height())))
+                    lg = pygame.transform.smoothscale(src, (lw, lh))
+                except Exception:
+                    lg = None
+            if lg:
+                self.surface.blit(lg, (20, 52))
+            else:
+                icons.draw(self.surface, app["icon"], 20, 52, 36, app["color"])
+            label = app["name"][0] if it else app["name"][1]
+            self.text(label, (68, 56), self.f_med_b, FG)
+        else:
+            self.text(self.t("outer_panel_app"), (20, 56), self.f_med_b, DIM)
+        # --- Status ---
+        status_txt = self.t("outer_panel_running") if alive else self.t("outer_panel_not_running")
+        status_col = OK_G if alive else NO_R
+        self.text(status_txt, (W - 10 - self.f_small.size(status_txt)[0], 56),
+                  self.f_small, status_col)
+        # --- Divider ---
+        pygame.draw.line(self.surface, LINE, (16, 88), (W - 16, 88), 1)
+        # --- Action buttons ---
+        btn_y = 98
+        btn_h = 34
+        btn_w = 160
+        gap = 20
+        total_w = btn_w * 2 + gap
+        bx0 = (W - total_w) // 2
+        restart_rect = pygame.Rect(bx0, btn_y, btn_w, btn_h)
+        close_rect = pygame.Rect(bx0 + btn_w + gap, btn_y, btn_w, btn_h)
+        self._outer_btn_rects = {
+            "restart": restart_rect,
+            "close": close_rect,
+        }
+        sel = self.outer_panel_sel
+        # Restart button
+        rc = OUTER_PANEL_ACCENT if sel == 0 else DIM
+        pygame.draw.rect(self.surface, INK, restart_rect, border_radius=6)
+        pygame.draw.rect(self.surface, rc, restart_rect, 2, border_radius=6)
+        rt_lbl = self.t("outer_panel_restart")
+        self.text(rt_lbl, (restart_rect.x + (btn_w - self.f_med_b.size(rt_lbl)[0]) // 2,
+                           restart_rect.y + 6), self.f_med_b, rc)
+        # Close button
+        cc = NO_R if sel == 1 else DIM
+        pygame.draw.rect(self.surface, INK, close_rect, border_radius=6)
+        pygame.draw.rect(self.surface, cc, close_rect, 2, border_radius=6)
+        cl_lbl = self.t("outer_panel_close")
+        self.text(cl_lbl, (close_rect.x + (btn_w - self.f_med_b.size(cl_lbl)[0]) // 2,
+                           close_rect.y + 6), self.f_med_b, cc)
+        # --- Console log ---
+        log_y = btn_y + btn_h + 18
+        log_h = H - log_y - 60
+        self.npanel(16, log_y, W - 32, log_h, border=col, fill=PANEL, cut=8)
+        log_title = self.t("outer_panel_logs")
+        self.text(log_title, (28, log_y + 8), self.f_small_b, col)
+        log_lines = getattr(self, "outer_log_lines", [])
+        vis_lines = max(1, (log_h - 30) // 18)
+        start = max(0, len(log_lines) - vis_lines)
+        ly = log_y + 30
+        for line in log_lines[start:]:
+            self.text(line[:88], (28, ly), self.f_small, FAINT, maxw=W - 56)
+            ly += 18
+        # --- Footer ---
+        self.footer([
+            (self.t("k_ud"), self.t("change")),
+            ("A", self.t("select")),
+            ("B", self.t("back")),
+        ])
+        self._outerdesk_surface = self.surface.copy()
+
+    # ---------------------------------------------------- END NODE ring
+    def _endnode_corrupt_color(self, t_now):
+        """Colore instabile e inquietante che pulsa tra viola
+        velenoso e verde tossico, mai fermo su un colore solo --
+        usato per l'aura del nodo, il raggio di luce e i testi del
+        carosello sotto di lui."""
+        k = 0.5 + 0.5 * math.sin(t_now * 1.3)
+        a, b = ENDNODE_EERIE_A, ENDNODE_EERIE_B
+        return tuple(int(a[i] + (b[i] - a[i]) * k) for i in range(3))
+
+    def _endnode_node_sphere(self, cx, cy, r, t_now):
+        """Il pianeta END NODE corrotto: aura pulsante instabile
+        (piu' strati, ognuno respira a un ritmo leggermente diverso
+        cosi' non sembra un semplice lampeggio) attorno a una sfera
+        scura con la sua icona in ombra al centro, come un'eclissi."""
+        col = self._endnode_corrupt_color(t_now)
+        for i, gr in enumerate((r + 28, r + 17, r + 8)):
+            a_ = int((75 - i * 15) *
+                    (0.5 + 0.5 * math.sin(t_now * 2.1 - i * 0.7)))
+            a_ = max(0, a_)
+            s = pygame.Surface((gr * 2 + 4, gr * 2 + 4), pygame.SRCALPHA)
+            pygame.draw.circle(s, col + (a_,), (gr + 2, gr + 2), gr)
+            self.surface.blit(s, (int(cx - gr - 2), int(cy - gr - 2)))
+        shade_col = tuple(int(c * 0.82) for c in col)
+        pygame.draw.circle(self.surface, (8, 7, 10),
+                          (int(cx), int(cy)), int(r + 3))
+        pygame.draw.circle(self.surface, shade_col,
+                          (int(cx), int(cy)), int(r))
+        icons.draw(self.surface, self.menu_icons[9], int(cx - r * 0.55),
+                  int(cy - r * 0.55), int(r * 1.1), (14, 12, 16))
+
+    def _endnode_draw_beam(self, x, y_top, y_bot, k=1.0, t_now=None):
+        """Fascio verticale della stessa luce instabile, dal nodo
+        verso il carosello -- tre bande semitrasparenti innestate
+        invece di un vero gradiente pixel per pixel (troppo pesante
+        su un handheld)."""
+        if t_now is None:
+            t_now = time.time()
+        h = max(0, int((y_bot - y_top) * k))
+        if h <= 2:
+            return
+        col = self._endnode_corrupt_color(t_now)
+        s = pygame.Surface((28, h), pygame.SRCALPHA)
+        for wid, a_ in ((28, 24), (14, 46), (6, 72)):
+            pygame.draw.rect(s, col + (a_,), (14 - wid // 2, 0, wid, h))
+        self.surface.blit(s, (int(x - 14), int(y_top)))
+
+    def _endnode_wrap_center(self, s, cx, y0, maxw, col):
+        font = self.f_tiny
+        words = s.split(" ")
+        lines_, cur = [], ""
+        for w in words:
+            trial = (cur + " " + w).strip()
+            if not cur or font.size(trial)[0] <= maxw:
+                cur = trial
+            else:
+                lines_.append(cur)
+                cur = w
+        if cur:
+            lines_.append(cur)
+        for i, ln in enumerate(lines_[:3]):
+            lw = font.size(ln)[0]
+            self.text(ln, (int(cx - lw / 2), int(y0 + i * 13)), font, col)
+
+    def _endnode_draw_carousel(self, direction=0, k=0.0, alpha_mult=1.0):
+        """Le 4 voci in un piccolo carosello sotto il nodo: quella
+        centrale grande, a fuoco e con nome+descrizione, le vicine
+        smorzate ai lati -- SU/GIU' le fa scorrere passandosi il
+        posto (stessa logica a rotazione della versione precedente,
+        solo senza il meccanismo dell'anello). direction/k animano
+        uno scorrimento in corso; alpha_mult sfuma l'intero
+        carosello in/out (usato in ingresso e in uscita)."""
+        cx, cy = W // 2, 300
+        t_now = time.time()
+        col = self._endnode_corrupt_color(t_now)
+        it = (self.lang == "it")
+        n = len(ENDNODE_ITEMS)
+        for r in (-2, -1, 0, 1, 2):
+            slot = r - direction * k
+            ax = abs(slot)
+            if ax > 1.85:
+                continue
+            dx = slot * 170
+            scale = max(0.35, 1.0 - ax * 0.42)
+            item_alpha = max(0, 255 - int(ax * 140))
+            item_alpha = int(item_alpha * alpha_mult)
+            if item_alpha <= 2:
+                continue
+            active = ax < 0.08
+            idx = (self.endnode_ring_sel + r) % n
+            (_key, icon_name, name_it, name_en, desc_it,
+             desc_en) = ENDNODE_ITEMS[idx]
+            px, py = cx + dx, cy
+            rad = max(1, int(34 * scale))
+            ring_col = col if active else DIM
+            s = pygame.Surface((rad * 2 + 8, rad * 2 + 8),
+                              pygame.SRCALPHA)
+            pygame.draw.circle(s, (10, 9, 12, item_alpha),
+                              (rad + 4, rad + 4), rad)
+            pygame.draw.circle(s, ring_col + (item_alpha,),
+                              (rad + 4, rad + 4), rad, 2)
+            self.surface.blit(s, (int(px - rad - 4), int(py - rad - 4)))
+            icon_col = col if active else (110, 110, 116)
+            isz = max(1, int(rad * 1.1))
+            ic = pygame.Surface((isz + 4, isz + 4), pygame.SRCALPHA)
+            icons.draw(ic, icon_name, 2, 2, isz, icon_col)
+            ic.set_alpha(item_alpha)
+            self.surface.blit(ic, (int(px - isz / 2 - 2),
+                                   int(py - isz / 2 - 2)))
+            if active:
+                name = name_it if it else name_en
+                desc = desc_it if it else desc_en
+                nw = self.f_med_b.size(name)[0]
+                self.text(name, (int(px - nw / 2), int(py - rad - 30)),
+                         self.f_med_b, col)
+                self._endnode_wrap_center(desc, px, py + rad + 12, 190,
+                                          col)
+
+    def _endnode_veil(self, alpha=240):
+        veil = pygame.Surface((W, H), pygame.SRCALPHA)
+        veil.fill((0, 0, 0, alpha))
+        for i in range(20, 0, -2):
+            a = int(30 * (1 - i / 20.0))
+            pygame.draw.rect(veil, (0, 0, 0, a), (i, i, W - 2*i, H - 2*i), 2)
+        self.surface.blit(veil, (0, 0))
+
+    def _endnode_glitch_overlay(self, surf, intensity=1.0):
+        t = time.time()
+        rnd = random.Random(int(t * 100) % 99999)
+        for _ in range(int(8 * intensity)):
+            y = rnd.randint(0, H)
+            h = rnd.randint(1, 4)
+            off = rnd.randint(-8, 8)
+            band = surf.subsurface((0, y, W, h)).copy()
+            surf.blit(band, (off, y))
+        if rnd.random() < 0.3 * intensity:
+            s = surf.copy()
+            surf.fill((0, 0, 0))
+            surf.blit(s, (rnd.randint(-4, 4), 0))
+            surf.blit(s, (rnd.randint(-4, 4), 0), special_flags=pygame.BLEND_RGB_ADD)
+        for y in range(0, H, 2):
+            a = int(40 + 20 * abs(math.sin(t * 10 + y)))
+            pygame.draw.line(surf, (0, 0, 0, a), (0, y), (W, y), 1)
+        for i in range(30):
+            a = int(150 * (1 - i / 30.0))
+            pygame.draw.rect(surf, (0, 0, 0, a), (i, i, W - 2*i, H - 2*i), 2)
+
+    def endnode_ring_enter(self):
+        """Selezione di END NODE nel Nexus: nessun suono/transizione
+        da hub normale (ci pensa activate()) -- il pianeta stesso si
+        illumina di luce instabile, lo schermo si scurisce restando
+        lui l'unica cosa ben visibile, e sale dalla sua posizione
+        orbitale attuale fino al centro in alto. Poi un raggio della
+        stessa luce scende verso il carosello con le 4 azioni, che
+        si dissolve in vista."""
+        if getattr(self, "_rtcore_current_main", None):
+            self._rtcarousel_enter()
+            return
+        self.play("endnode_open")
+        self.endnode_ring_sel = 0
+        self.header("__brand__")
+        self.nexus_renderer._nexus_bg()
+        pos_map = self.nexus_renderer._nexus_draw_scene()
+        start_x, start_y, _d = pos_map.get(9, (W * 0.5, H * 0.32, 0.5))
+        target_x, target_y = W // 2, 82
+
+        frames_a = 22
+        for f in range(frames_a):
+            k = (f + 1) / float(frames_a)
+            ek = k * k * (3 - 2 * k)
+            cx = start_x + (target_x - start_x) * ek
+            cy = start_y + (target_y - start_y) * ek
+            r = 20 + (40 - 20) * ek
+            t_now = time.time()
+            self.header("__brand__")
+            self.nexus_renderer._nexus_bg()
+            self.nexus_renderer._nexus_draw_scene()
+            self._endnode_veil(int(205 * ek))
+            self._endnode_node_sphere(cx, cy, r, t_now)
+            self.footer([])
+            pygame.display.flip()
+            self.clock.tick(40)
+
+        frames_b = 16
+        for f in range(frames_b):
+            k = (f + 1) / float(frames_b)
+            t_now = time.time()
+            self.header("__brand__")
+            self.nexus_renderer._nexus_bg()
+            self.nexus_renderer._nexus_draw_scene()
+            self._endnode_veil()
+            self._endnode_node_sphere(target_x, target_y, 40, t_now)
+            self._endnode_draw_beam(target_x, target_y + 40, 300, k,
+                                    t_now)
+            self._endnode_draw_carousel(alpha_mult=k)
+            self.footer([])
+            pygame.display.flip()
+            self.clock.tick(40)
+
+        self.stack.append("endnodering")
+        self.trans = None
+        self.render()
+
+    def endnode_ring_rotate(self, direction):
+        """SU/GIU' sul carosello END NODE: le 4 voci scorrono di un
+        posto, quella che arriva al centro si accende e mostra nome
+        e descrizione."""
+        self.play("endnode_carousel")
+        n = len(ENDNODE_ITEMS)
+        frames = 10
+        for f in range(frames):
+            k = (f + 1) / float(frames)
+            t_now = time.time()
+            self.header("__brand__")
+            self.nexus_renderer._nexus_bg()
+            self.nexus_renderer._nexus_draw_scene()
+            self._endnode_veil()
+            self._endnode_node_sphere(W // 2, 82, 40, t_now)
+            self._endnode_draw_beam(W // 2, 122, 300, 1.0, t_now)
+            self._endnode_draw_carousel(direction=direction, k=k)
+            self.footer([])
+            pygame.display.flip()
+            self.clock.tick(40)
+        self.endnode_ring_sel = (self.endnode_ring_sel + direction) % n
+        self.render()
+
+    def endnode_ring_exit(self):
+        """B su END NODE: il nodo si spegne e ridiscende verso la
+        sua posizione orbitale mentre il carosello e il raggio
+        svaniscono e il velo si dissolve -- inversa di
+        endnode_ring_enter, un po' piu' rapida."""
+        self.play("endnode_back")
+        pos_map0 = self.nexus_renderer._nexus_draw_scene()
+        tx, ty, _d = pos_map0.get(9, (W * 0.5, H * 0.32, 0.5))
+        frames = 16
+        for f in range(frames):
+            k = (f + 1) / float(frames)
+            ek = k * k
+            t_now = time.time()
+            cx = W // 2 + (tx - W // 2) * ek
+            cy = 82 + (ty - 82) * ek
+            r = 40 - (40 - 20) * ek
+            self.header("__brand__")
+            self.nexus_renderer._nexus_bg()
+            self.nexus_renderer._nexus_draw_scene()
+            self._endnode_veil(int(205 * (1 - ek)))
+            self._endnode_node_sphere(cx, cy, r, t_now)
+            self._endnode_draw_beam(W // 2, 122, 300,
+                                    max(0.0, 1 - ek * 1.4), t_now)
+            self._endnode_draw_carousel(alpha_mult=max(0.0, 1 - ek * 1.6))
+            self.footer([])
+            pygame.display.flip()
+            self.clock.tick(40)
+        self.stack.pop()
+        self.trans = None
+        self.render()
+
+    def _rtcarousel_enter(self):
+        self.play("endnode_open")
+        self.rtcarousel_sel = 0
+        self.play_whisper(loop=True)
+        self.nexus_renderer._rtcarousel_glitch_transition()
+        self.stack.append("rtcarousel")
+        self.trans = None
+        self.render()
+
+    def _rtcarousel_exit(self):
+        self.play("endnode_back")
+        self.stop_whisper()
+        self.stack.pop()
+        self.trans = None
+        self.render()
+
+    def _rtcarousel_items(self):
+        it = (self.lang == "it")
+        core_name = getattr(self, "_rtcore_current_name", "Unknown")
+        return [
+            ("eject", "power", "Espelli Rt:CORE" if it else "Eject Rt:CORE"),
+            ("restart_core", "start", ("Riavvia %s" % core_name) if it else ("Restart %s" % core_name)),
+            ("sgrub", "terminal", "Torna allo SGrub Menu" if it else "Return to SGrub Menu"),
+            ("div", "", ""),
+            ("close", "monitor", "Chiudi app" if it else "Close app"),
+            ("restart_app", "gear", "Riavvia app" if it else "Restart app"),
+            ("reboot", "power", "Riavvia dispositivo" if it else "Reboot device"),
+            ("poweroff", "power", "Spegni dispositivo" if it else "Power off"),
+        ]
+
+    def _rtcarousel_exec(self, key):
+        items = self._rtcarousel_items()
+        for item in items:
+            if item[0] == key:
+                self._carousel_echo_text = item[2]
+                self._carousel_echo_pos = (W//2 - len(item[2])*6, 240)
+                self._carousel_echo_timer = time.time()
+                self._carousel_echo = True
+                break
+        it = (self.lang == "it")
+        core_name = getattr(self, "_rtcore_current_name", "Unknown")
+        if key == "eject":
+            try:
+                os.remove("/tmp/.vd_rtcore_sel")
+                os.remove("/tmp/.vd_rtcore_status")
+            except:
+                pass
+            self._rtcore_current_main = None
+            self._rtcore_current_name = None
+            self.shutdown_exec("restart_app")
+        elif key == "restart_core":
+            main_path = getattr(self, "_rtcore_current_main", None)
+            if main_path:
+                try:
+                    with open("/tmp/.vd_rtcore_sel", "w") as f:
+                        f.write(main_path)
+                except:
+                    pass
+            self.shutdown_exec("restart_app")
+        elif key == "sgrub":
+            try:
+                os.remove("/tmp/.vd_rtcore_sel")
+                os.remove("/tmp/.vd_rtcore_status")
+            except:
+                pass
+            self._rtcore_current_main = None
+            self._rtcore_current_name = None
+            self.exit_code = 21
+            self.running = False
+        elif key == "close":
+            self.shutdown_exec("close")
+        elif key == "restart_app":
+            self.shutdown_exec("restart_app")
+        elif key == "reboot":
+            self.shutdown_exec("reboot")
+        elif key == "poweroff":
+            self.shutdown_exec("poweroff")
+
+    def render_rtcarousel(self):
+        surf = self.surface
+        it = (self.lang == "it")
+        t_now = time.time()
+        W, H = surf.get_size()
+        surf.fill((3, 3, 6))
+        for x in range(0, W, 30):
+            alpha = int(20 + 10 * math.sin(t_now * 2 + x * 0.05))
+            pygame.draw.line(surf, (30, 30, 40, alpha), (x, 44), (x, H), 1)
+        for y in range(44, H, 30):
+            alpha = int(20 + 10 * math.sin(t_now * 1.8 + y * 0.05))
+            pygame.draw.line(surf, (30, 30, 40, alpha), (0, y), (W, y), 1)
+        self.nexus_renderer._rtcarousel_draw_residue(surf)
+        self.header("Rt:CAROUSEL", accent=(200, 100, 255), badge=None)
+        core_name = getattr(self, "_rtcore_current_name", "Unknown")
+        self.text("CORE: " + core_name, (20, 54), self.f_tiny, (200, 200, 220))
+        items = self._rtcarousel_items()
+        sel = getattr(self, "rtcarousel_sel", 0)
+        y = 80
+        row_h = 42
+        for i, (key, icon, label, *rest) in enumerate(items):
+            if key == "div":
+                y += 6
+                pygame.draw.line(surf, (60, 60, 80), (20, y), (W - 20, y), 1)
+                y += 6
+                continue
+            rect = pygame.Rect(20, y, W - 40, row_h)
+            if i == sel:
+                pygame.draw.rect(surf, (35, 30, 50), rect, border_radius=6)
+                pygame.draw.rect(surf, (200, 100, 255), rect, 2, border_radius=6)
+                col = (220, 220, 240)
+                self._draw_void_shadow(rect.centerx, rect.centery)
+            else:
+                pygame.draw.rect(surf, (15, 15, 25), rect, border_radius=6)
+                pygame.draw.rect(surf, (60, 60, 80), rect, 1, border_radius=6)
+                col = (180, 180, 200)
+            icons.draw(surf, icon, rect.x + 12, rect.y + (rect.h - 22)//2, 22,
+                      (200, 100, 255) if i == sel else (120, 120, 140))
+            self.text(label, (rect.x + 42, rect.y + 6), self.f_small, col)
+            y += row_h + 4
+        if getattr(self, "_carousel_echo", False) and time.time() - self._carousel_echo_timer < 0.8:
+            elapsed = time.time() - self._carousel_echo_timer
+            progress = elapsed / 0.8
+            alpha = int(200 * (1 - progress))
+            for i in range(3):
+                offset = int(10 * (i + 1) * progress)
+                dx = offset * math.sin(elapsed * 3 + i)
+                dy = offset * math.cos(elapsed * 2.5 + i * 0.7)
+                col = (200 - i*40, 100, 200, alpha // (i + 2))
+                f = self.f_med_b
+                img = f.render(self._carousel_echo_text, True, col)
+                img.set_alpha(alpha // (i + 2))
+                surf.blit(img, (self._carousel_echo_pos[0] + dx,
+                               self._carousel_echo_pos[1] + dy))
+        breath_alpha = int(10 + 8 * math.sin(t_now * 0.5))
+        if breath_alpha > 0:
+            veil = pygame.Surface((W, H), pygame.SRCALPHA)
+            veil.fill((255, 255, 255, breath_alpha))
+            surf.blit(veil, (0, 0))
+        if self._core_fragment:
+            self._draw_core_fragment(surf)
+        hints = [("▲▼", "seleziona"), ("A", "conferma"), ("B", "indietro")]
+        self.footer(hints)
+
+    def _draw_void_shadow(self, x, y, intensity=1.0):
+        t = time.time()
+        dx = int(3 * math.sin(t * 0.7 + x * 0.01))
+        dy = int(3 * math.cos(t * 0.5 + y * 0.01))
+        shadow = pygame.Surface((30, 30), pygame.SRCALPHA)
+        for r in range(15, 0, -3):
+            alpha = int(20 * intensity * (1 - r/15))
+            pygame.draw.circle(shadow, (0, 0, 0, alpha), (15, 15), r)
+        self.surface.blit(shadow, (x - 15 + dx, y - 15 + dy))
+
+    def _draw_core_fragment(self, surf):
+        if not self._core_fragment:
+            return
+        self._core_fragment_pos = (
+            self._core_fragment_pos[0] + self._core_fragment_velocity[0],
+            self._core_fragment_pos[1] + self._core_fragment_velocity[1]
+        )
+        if self._core_fragment_pos[0] < 20 or self._core_fragment_pos[0] > W - 20:
+            self._core_fragment_velocity = (-self._core_fragment_velocity[0], self._core_fragment_velocity[1])
+        if self._core_fragment_pos[1] < 20 or self._core_fragment_pos[1] > H - 20:
+            self._core_fragment_velocity = (self._core_fragment_velocity[0], -self._core_fragment_velocity[1])
+        f = self.f_tiny
+        txt = "◈ " + self._core_fragment[:8]
+        img = f.render(txt, True, (150, 100, 200, 120))
+        surf.blit(img, (self._core_fragment_pos[0] - img.get_width()//2,
+                       self._core_fragment_pos[1] - img.get_height()//2))
+        glow = pygame.Surface((40, 40), pygame.SRCALPHA)
+        pygame.draw.circle(glow, (150, 100, 200, 30), (20, 20), 20)
+        surf.blit(glow, (self._core_fragment_pos[0] - 20, self._core_fragment_pos[1] - 20))
+
+    def render_endnode_ring(self):
+        """Stato fermo della vista END NODE: nodo corrotto in alto,
+        raggio, carosello con la voce corrente a fuoco."""
+        t_now = time.time()
+        self.header("__brand__")
+        self.nexus_renderer._nexus_bg()
+        self.nexus_renderer._nexus_draw_scene()
+        self._endnode_veil()
+        self._endnode_node_sphere(W // 2, 82, 40, t_now)
+        self._endnode_draw_beam(W // 2, 122, 300, 1.0, t_now)
+        self._endnode_draw_carousel()
+        self._endnode_glitch_overlay(self.surface, intensity=0.7)
+        it = (self.lang == "it")
+        self.footer([(self.t("k_lr"), self.t("change")),
+                    ("A", self.t("open")), ("B", self.t("back"))])
+
+    # ------------------------------------------------------------- VOIDCAST
+    def voidcast_enter(self):
+        """Ingresso in VOIDCAST da Media Vault: il controller si crea la
+        prima volta sola (poi resta vivo in memoria -- playlist ed EPG
+        comprese -- per i rientri successivi) e va in cima allo stack.
+        Niente push() generico: ci ha gia' pensato play_media_boot('iptv')
+        appena chiamato dal chiamante come ingresso dedicato."""
+        self.vc_resume_display()
+        mpv, ffplay, _ = self.check_media_deps()
+        if not mpv and not ffplay:
+            self.notify(
+                "VOIDCAST",
+                "mpv/ffplay mancanti: installa i player multimediali",
+                "warning")
+            self.info_title = "VOIDCAST"
+            self.info_lines = self.stub_lines(
+                "DIPENDENZE MANCANTI" if self.lang == "it"
+                else "MISSING DEPENDENCIES",
+                ["mpv o ffplay non trovati sul sistema."
+                 if self.lang == "it"
+                 else "mpv or ffplay not found on system.",
+                 "Installa mpv o ffplay per riprodurre"
+                 " i canali IPTV."
+                 if self.lang == "it"
+                 else "Install mpv or ffplay to play IPTV channels.",
+                 "apt install mpv"])
+            self.push("info")
+            return
+        if self.voidcast is None:
+            self.voidcast = VCApp(self)
+        self.voidcast.bootstrap()
+        self.stack.append("voidcast")
+        self.trans = None
+        self.render()
+
+    def vc_suspend_display(self):
+        """Cede lo schermo (e l'input fisico) a mpv per la riproduzione
+        video: stessa tripletta evinput/fbdisplay/pygame.display che
+        l'app gestisce alla propria uscita, qui solo temporanea --
+        vc_resume_display() la rimette in piedi esattamente com'era."""
+        if getattr(self, "_vc_suspended", False):
+            return
+        self._vc_suspended = True
+        try:
+            evinput.stop()
+        except Exception as e:
+            sys.stderr.write("evinput.stop() in vc_suspend: %s\n" % e)
+        try:
+            fbdisplay.detach()
+        except Exception as e:
+            sys.stderr.write("fbdisplay.detach() in vc_suspend: %s\n" % e)
+        try:
+            pygame.display.quit()
+        except Exception as e:
+            sys.stderr.write("pygame.display.quit() in vc_suspend: %s\n" % e)
+
+    def vc_resume_display(self):
+        """Riprende lo schermo dopo che mpv ha finito, stessa sequenza
+        usata all'avvio dell'app."""
+        if not getattr(self, "_vc_suspended", False):
+            return
+        self._vc_suspended = False
+        try:
+            pygame.display.init()
+            self.surface = pygame.display.set_mode((W, H))
+            pygame.mouse.set_visible(False)
+        except Exception as e:
+            sys.stderr.write("pygame.display in vc_resume: %s\n" % e)
+        try:
+            if not fbdisplay.attach(self.surface):
+                sys.stderr.write("fbdisplay.attach fallito in vc_resume\n")
+        except Exception as e:
+            sys.stderr.write("fbdisplay.attach() in vc_resume: %s\n" % e)
+        try:
+            evinput.start()
+            evinput.poll()          # scarto l'input: niente code strane
+        except Exception as e:
+            sys.stderr.write("evinput.start() in vc_resume: %s\n" % e)
+        try:
+            pygame.event.clear()
+        except Exception:
+            pass
 
     def _tb_tile(self, j, item, x, y, w, h, icon_sz=24, big=False,
-                compact=False):
+                 compact=False, cut=8, slant=0):
         """Un riquadro del Rt:Toolbox: stesso disegno per tutti e
         quattro i layout dei gruppi, solo dimensioni/proporzioni
         diverse -- cosi' i quattro widget sembrano parenti, non
-        estranei."""
+        estranei. cut e slant permettono forme irregolari."""
         key, ic, lk, sk, kind = item
         sel = (j == self.hub_sel)
         if sel:
-            self.sel_frame(x, y, w, h)
+            self.sel_frame(x, y, w, h, cut=cut, slant=slant)
         else:
-            self.npanel(x, y, w, h, border=LINE, fill=INK, cut=8)
+            self.npanel(x, y, w, h, border=LINE, fill=INK, cut=cut, slant=slant)
+        # v10.7: targhetta al posto di icona+scritta per le voci che
+        # ne hanno una (TILE_BADGE) -- scalata per stare nella tile
+        # con un margine, poi ririscalata in larghezza se il rapporto
+        # d'aspetto del badge la farebbe uscire dal riquadro.
+        bkey = TILE_BADGE.get(key)
+        bimg = self.badge_img(bkey, min(h - 14, 40)) if bkey else None
+        if bimg is not None:
+            bw2, bh2 = bimg.get_size()
+            maxw = w - 12
+            if bw2 > maxw:
+                bh2 = max(8, int(bh2 * maxw / float(bw2)))
+                bw2 = maxw
+                bimg = pygame.transform.smoothscale(bimg, (bw2, bh2))
+            self.surface.blit(bimg, (x + (w - bw2) // 2, y + (h - bh2) // 2))
+            return
         if compact:
             icons.draw(self.surface, ic, x + (w - icon_sz) // 2, y + 6,
                       icon_sz, self.accent if sel else FAINT)
@@ -11785,11 +19517,13 @@ class App(object):
                       self.f_tiny, FG if sel else DIM,
                       maxw=w - icon_sz - 22)
 
-    def npanel(self, x, y, w, h, border=None, fill=PANEL, cut=9):
+    def npanel(self, x, y, w, h, border=None, fill=PANEL, cut=9, slant=0):
         """Pannello con taglio da HUD manga neon: bordo elettrico,
-        riflessi freddi e micro-illuminazione sottile."""
+        riflessi freddi e micro-illuminazione sottile. slant: offset
+        orizzontale del lato destro per forme a parallelogramma
+        (tetris distopico)."""
         pts = [(x, y), (x + w - cut, y), (x + w, y + cut),
-               (x + w, y + h), (x, y + h)]
+               (x + w + slant, y + h), (x + slant, y + h)]
         pygame.draw.polygon(self.surface, fill, pts)
         pygame.draw.polygon(self.surface, border or LINE, pts, 1)
         if w > 20 and h > 14:
@@ -11799,9 +19533,9 @@ class App(object):
             pygame.draw.line(self.surface, glow, (x + 2, y + 3),
                              (x + 2, y + h - 2), 1)
             pygame.draw.line(self.surface, INK, (x + 2, y + h - 2),
-                             (x + w - 2, y + h - 2), 1)
-            pygame.draw.line(self.surface, INK, (x + w - 2, y + cut + 2),
-                             (x + w - 2, y + h - 2), 1)
+                             (x + w + slant - 2, y + h - 2), 1)
+            pygame.draw.line(self.surface, INK, (x + w + slant - 2, y + cut + 2),
+                             (x + w + slant - 2, y + h - 2), 1)
             for rx, ry in ((x + 6, y + h - 6), (x + 6, y + 6)):
                 pygame.draw.circle(self.surface, INK, (rx, ry), 2)
                 pygame.draw.circle(self.surface, self.accent, (rx, ry), 2, 1)
@@ -11873,13 +19607,14 @@ class App(object):
                              (cx - tail * px, cy - tail * py),
                              max(2, int(w0 * 0.4)))
 
-    def sel_frame(self, x, y, w, h, color=None, cut=8):
+    def sel_frame(self, x, y, w, h, color=None, cut=8, slant=0):
         """Riquadro di selezione neon: barra hazard, contorno acceso,
-        glow laterale e tick pulsante da HUD underground."""
+        glow laterale e tick pulsante da HUD underground. slant: offset
+        orizzontale del lato destro per forme a parallelogramma."""
         self.last_sel_rect = (x, y, w, h)
         a = color or self.accent
         pts = [(x, y), (x + w - cut, y), (x + w, y + cut),
-               (x + w, y + h), (x, y + h)]
+               (x + w + slant, y + h), (x + slant, y + h)]
         pygame.draw.polygon(self.surface,
                             sel_tint(a) if color else self.sel_bg, pts)
         pygame.draw.polygon(self.surface, a, pts, 2)
@@ -11890,15 +19625,15 @@ class App(object):
             self.surface.blit(self.stripe_img, (x + 1, sy),
                               (0, 0, 6, hh))
             sy += hh
-        for cx, cy, dx, dy in ((x, y, 1, 1), (x + w, y + cut, -1, 1),
-                               (x, y + h, 1, -1), (x + w, y + h, -1, -1)):
+        for cx, cy, dx, dy in ((x, y, 1, 1), (x + w + slant, y + cut, -1, 1),
+                               (x + slant, y + h, 1, -1), (x + w + slant, y + h, -1, -1)):
             pygame.draw.line(self.surface, a, (cx, cy), (cx + 7 * dx, cy), 2)
             pygame.draw.line(self.surface, a, (cx, cy), (cx, cy + 6 * dy), 2)
-        tick = x + 10 + int((time.time() * 90) % max(1, w - 30))
+        tick = x + slant + 10 + int((time.time() * 90) % max(1, w - 30))
         pygame.draw.line(self.surface, a, (tick, y + h - 1),
                          (tick + 9, y + h - 1), 2)
         pygame.draw.line(self.surface, self.accent2, (x + 3, y + 4),
-                         (x + w - 6, y + 4), 1)
+                         (x + w + slant - 6, y + 4), 1)
 
     def spinner(self, cx, cy, r=11):
         """Rotore di caricamento: tre archi sfalsati, stile radar."""
@@ -11910,89 +19645,159 @@ class App(object):
                             a0, a0 + 3.6, wd)
         pygame.draw.circle(self.surface, self.accent, (cx, cy), 2)
 
+    def draw_gear(self, cx, cy, r, angle, color):
+        """Ingranaggio rotante con 12 denti."""
+        teeth = 12
+        inner_r = r * 0.78
+        outer_r = r
+        pts = []
+        for i in range(teeth * 2):
+            a = angle + i * math.pi / teeth
+            rr = outer_r if i % 2 == 0 else inner_r
+            pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
+        pygame.draw.polygon(self.surface, color, pts, 2)
+        pygame.draw.circle(self.surface, color, (cx, cy),
+                           max(2, int(r * 0.32)), 2)
+        pygame.draw.circle(self.surface, color, (cx, cy),
+                           max(1, int(r * 0.14)), 0)
+        for i in range(6):
+            a = angle + i * math.pi / 3
+            pygame.draw.line(self.surface, color,
+                             (cx, cy),
+                             (cx + inner_r * 0.65 * math.cos(a),
+                              cy + inner_r * 0.65 * math.sin(a)), 2)
+
     def render_busy(self):
         """Frame di attesa animato sopra la schermata corrente."""
         self.render(flip=False)
         veil = pygame.Surface((W, H), pygame.SRCALPHA)
-        veil.fill((0, 0, 0, 150))
+        veil.fill((0, 0, 0, 180))
         self.surface.blit(veil, (0, 0))
         lab = self.busy_label or ""
         if lab:
             lab = lab[:1].upper() + lab[1:]
         lab = lab.rstrip(".")
         dots = "." * (1 + int(time.time() * 2.5) % 3)
+        ac = self.busy_accent or self.accent
+        pw = 460
+        px = (W - pw) // 2
+        header_h = 40
+        gear_r = 36
+        gear_area_h = gear_r * 2 + 8
+        step_h = 0
         if self.busy_steps:
-            pw = 420
-            title = lab + dots
-            lines = [title] + ["• " + s for s in self.busy_steps]
-            wrapped = []
-            for ln in lines:
-                wrapped.extend(self.note_wrap(ln, pw - 92, self.f_med, 2))
-            ph = max(180, 24 + len(wrapped) * 22)
-            px, py = (W - pw) // 2, (H - ph) // 2
-            self.npanel(px, py, pw, ph, border=self.accent, fill=INK)
-            ly = py + 18
-            for idx, ln in enumerate(wrapped):
-                color = self.accent if idx == 0 else FG
-                self.text(ln, (px + 28, ly), self.f_med, color,
-                          maxw=pw - 56)
-                ly += 22
-            status = "%d step%s" % (len(self.busy_steps),
-                                      "" if len(self.busy_steps) == 1 else "s")
-            sw = self.f_tiny.size(status)[0]
-            self.text(status, (px + pw - 24 - sw, py + ph - 22),
-                      self.f_tiny, DIM)
+            step_h = 20 + len(self.busy_steps) * 26
+        bar_h = 28
+        footer_h = 24
+        content_h = header_h + gear_area_h + step_h + bar_h + footer_h
+        ph = max(220, content_h)
+        py = (H - ph) // 2
+        self.npanel(px, py, pw, ph, border=ac, fill=INK, cut=10)
+        self._busy_hazard_corner(px, py)
+        ly = py + 12
+        icon_name = self.busy_icon or "gear"
+        icons.draw(self.surface, icon_name, px + 20, ly, 28, ac)
+        self.text(lab + dots, (px + 58, ly + 5), self.f_med, ac,
+                  maxw=pw - 80)
+        gear_cx = px + pw // 2
+        gear_cy = py + header_h + gear_r + 4
+        angle = time.time() * 3.5
+        self.draw_gear(gear_cx, gear_cy, gear_r, angle, ac)
+        ly = gear_cy + gear_r + 10
+        if self.busy_steps:
+            for idx, step in enumerate(self.busy_steps):
+                done = (idx < len(self.busy_step_done) and
+                        self.busy_step_done[idx])
+                box_x = px + 24
+                box_y = ly + 3
+                box_sz = 14
+                pygame.draw.rect(self.surface, LINE,
+                                 (box_x, box_y, box_sz, box_sz), 1)
+                if done:
+                    pygame.draw.rect(self.surface, ac,
+                                     (box_x + 3, box_y + 3,
+                                      box_sz - 6, box_sz - 6))
+                color = FAINT if done else FG
+                font = self.f_tiny if done else self.f_small
+                self.text(step, (box_x + box_sz + 8, ly), font, color,
+                          maxw=pw - 60)
+                ly += 26
+        bar_y = py + ph - bar_h - footer_h - 2
+        bar_x = px + 24
+        bar_w = pw - 48
+        el = max(0.0, time.time() - self.busy_t0)
+        m_pct = re.search(r"(\d{1,3})\s*%", lab)
+        if m_pct:
+            pct = max(0, min(100, int(m_pct.group(1))))
         else:
-            pw = 380
-            lines = self.note_wrap(lab + dots, pw - 92, self.f_med, 2)
-            ph = 118 if len(lines) < 2 else 138
-            px, py = (W - pw) // 2, (H - ph) // 2
-            self.npanel(px, py, pw, ph, border=self.accent, fill=INK)
-            self.spinner(px + 34, py + 36)
-            ly = py + 22
-            for ln in lines:
-                self.text(ln, (px + 62, ly), self.f_med, FG,
-                          maxw=pw - 92)
-                ly += 22
-            el = max(0.0, time.time() - self.busy_t0)
-            bar_x, bar_w, bar_y = px + 30, pw - 60, py + ph - 36
-            est = "%d s" % int(el)
-            ew = self.f_tiny.size(est)[0]
-            self.text(est, (bar_x + bar_w - ew, bar_y - 17), self.f_tiny, DIM)
-            m_pct = re.search(r"(\d{1,3})\s*%", lab)
-            if m_pct:
-                pct = max(0, min(100, int(m_pct.group(1))))
-            else:
-                pct = min(96, int(100 * el / (el + 3.0))) if el > 0.05 else 3
-            pygame.draw.rect(self.surface, (14, 15, 19),
-                             (bar_x, bar_y, bar_w, 8))
-            pygame.draw.rect(self.surface, self.accent,
-                             (bar_x, bar_y, max(4, bar_w * pct // 100), 8))
-            pygame.draw.rect(self.surface, LINE, (bar_x, bar_y, bar_w, 8), 1)
+            pct = min(96, int(100 * el / (el + 3.0))) if el > 0.05 else 3
+        pct_text = "%d%%" % pct
+        pygame.draw.rect(self.surface, (14, 15, 19),
+                         (bar_x, bar_y, bar_w, 8))
+        pygame.draw.rect(self.surface, ac,
+                         (bar_x, bar_y, max(4, bar_w * pct // 100), 8))
+        pygame.draw.rect(self.surface, LINE, (bar_x, bar_y, bar_w, 8), 1)
+        pct_w = self.f_tiny.size(pct_text)[0]
+        self.text(pct_text, (bar_x + bar_w - pct_w, bar_y - 15),
+                  self.f_tiny, ac)
+        hint = ("[B] " + self.t("back")) if self.lang == "it" else "[B] Cancel"
+        hint_w = self.f_tiny.size(hint)[0]
+        self.text(hint, (px + pw - 24 - hint_w, py + ph - 20),
+                  self.f_tiny, DIM)
         pygame.display.flip()
 
-    def run_busy(self, label, fn, steps=None):
+    def _busy_hazard_corner(self, px, py):
+        """Tratti hazard in alto a sinistra del riquadro, la stessa
+        firma grafica dell'header -- cosi' ogni finestra di sistema
+        (attesa, handoff, header) porta lo stesso marchio SPDW."""
+        for hx in range(0, 22, 7):
+            pygame.draw.line(self.surface, self.accent,
+                             (px + hx, py), (px + hx + 4, py - 4), 2)
+
+    def busy_complete_step(self, idx):
+        if 0 <= idx < len(self.busy_step_done):
+            self.busy_step_done[idx] = True
+
+    def run_busy(self, label, fn, steps=None, accent=None, icon=None,
+                 timeout=None, err=False):
         """Esegue fn in un thread e anima lo spinner finche' non finisce:
-        mai piu' schermate incantate durante i lavori lunghi."""
+        mai piu' schermate incantate durante i lavori lunghi.
+
+        timeout: secondi massimi prima di ritornare (None = infinito).
+        err: se True, ritorna (risultato, eccezione) invece del solo
+        risultato. Utile per gestire errori senza try/esterni."""
         self.busy_label = label
         self.busy_steps = steps or []
+        self.busy_step_done = [False] * len(self.busy_steps)
         self.busy_t0 = time.time()
+        self.busy_accent = accent
+        self.busy_icon = icon
+        self.busy_cancelled = False
         box = {}
 
         def work():
             try:
                 box["v"] = fn()
-            except Exception as e:      # il chiamante decide cosa farne
+            except Exception as e:
                 box["e"] = e
 
         th = threading.Thread(target=work)
         th.daemon = True
         th.start()
         while th.is_alive():
-            evinput.poll()              # scarto l'input: niente code strane
+            if timeout and (time.time() - self.busy_t0) > timeout:
+                self.busy_cancelled = True
+                box["e"] = TimeoutError("timeout dopo %ds" % timeout)
+                break
+            ev = evinput.poll()
+            if "B" in ev:
+                self.busy_cancelled = True
+                break
             self.render_busy()
             self.clock.tick(30)
         evinput.poll()
+        if err:
+            return box.get("v"), box.get("e")
         return box.get("v")
 
     def handoff(self, label):
@@ -12002,6 +19807,7 @@ class App(object):
         pw, ph = 420, 120
         px, py = (W - pw) // 2, (H - ph) // 2
         self.npanel(px, py, pw, ph, border=self.accent, fill=INK)
+        self._busy_hazard_corner(px, py)
         self.spinner(px + 36, py + ph // 2)
         self.text(label, (px + 66, py + 30), self.f_med, FG, maxw=pw - 84)
         self.text("SPDW FACTORY // handoff", (px + 66, py + 62),
@@ -12010,7 +19816,8 @@ class App(object):
         pygame.display.flip()
 
     # --------------------------------------------------------------- disegno
-    def text(self, s, pos, f, color, maxw=None):
+    def text(self, s, pos, f, color, maxw=None, align="left"):
+        """Disegna testo con allineamento opzionale: 'left', 'right', 'center'."""
         if maxw:
             while s and f.size(s)[0] > maxw:
                 s = s[:-1]
@@ -12024,7 +19831,13 @@ class App(object):
                 cache.popitem(last=False)
         else:
             cache.move_to_end(key)
-        self.surface.blit(img, pos)
+        surf = self.surface
+        x, y = pos
+        if align == "right":
+            x -= img.get_width()
+        elif align == "center":
+            x -= img.get_width() // 2
+        surf.blit(img, (x, y))
 
     def mark(self, x, y, state):
         """Spunta verde / croce rossa / trattino grigio, disegnate a mano
@@ -12060,92 +19873,9 @@ class App(object):
                            "hot": self.hot_active()}, now)
         return self._stat[0]
 
-    def header(self, title, right="", icon=None):
+    def header(self, title, right="", icon=None, accent=None, badge=None):
         self.backdrop()
-        pygame.draw.rect(self.surface, INK, (0, 0, W, 42))
-        pygame.draw.line(self.surface, LINE, (0, 0), (W, 0), 1)
-        pygame.draw.line(self.surface, self.accent, (0, 42), (W, 42), 2)
-        pygame.draw.line(self.surface, INK, (0, 44), (W, 44), 2)
-        pygame.draw.line(self.surface, self.accent2, (10, 36), (W - 10, 36), 1)
-        for rx in range(60, W - 20, 58):
-            pygame.draw.circle(self.surface, self.accent2, (rx, 2), 1)
-        # tratti hazard che mordono la riga dell'header, come una tavola
-        for hx in range(0, 46, 9):
-            pygame.draw.line(self.surface, self.accent, (hx, 42),
-                             (hx + 5, 46), 2)
-        if title == "__brand__":
-            sym = self.brand_symbol(26)
-            tx0 = 13
-            if sym is not None:
-                self.surface.blit(sym, (10, 8))
-                tx0 = 10 + sym.get_width() + 6
-            # ghost cromatici sfalsati: la firma SPDW
-            self.text("Void-DESK", (tx0, 9), self.f_big, (150, 30, 30))
-            self.text("Void-DESK", (tx0 + 2, 7), self.f_big,
-                      (25, 90, 100))
-            self.text("Void-", (tx0 + 1, 8), self.f_big, FG)
-            bw = self.f_big.size("Void-")[0]
-            self.text("DESK", (tx0 + 1 + bw, 8), self.f_big, self.accent)
-        else:
-            tx0 = 14
-            if icon:
-                icons.draw(self.surface, icon, 12, 8, 28, self.accent)
-                tx0 = 48
-            else:
-                self.text("▚ ", (13, 9), self.f_big, (140, 30, 30))
-                self.text("▚ ", (14, 8), self.f_big, self.accent)
-                tx0 = 14 + self.f_big.size("▚ ")[0]
-            self.text(title, (tx0 - 1, 9), self.f_big, (140, 30, 30))
-            self.text(title, (tx0, 8), self.f_big, self.accent)
-        show_clock = self.cfg.get("clock_badge", True)
-        cw = 52 if show_clock else 0
-        x = W - 14 - (cw + 6 if show_clock else 0)
-        if right:
-            rw = self.f_small.size(right)[0]
-            x -= rw
-            self.text(right, (x, 14), self.f_small, DIM)
-            x -= 14
-        if self.cfg.get("battery", True):
-            st = self.status_snapshot()
-            # batteria (con percentuale e saetta se in carica), volume,
-            # bluetooth, wifi -- ognuno rispetta il proprio interruttore
-            if st["batt"] is not None and self.cfg.get("st_batt", True):
-                txt = "%d%%" % st["batt"]
-                tw = self.f_tiny.size(txt)[0]
-                x -= tw
-                self.text(txt, (x, 16), self.f_tiny,
-                          NO_R if st["batt"] <= 20 else DIM)
-                x -= 26
-                icons.battery_icon(self.surface, x, 8, 20, st["batt"],
-                                   st["chg"], OK_G, NO_R, DIM)
-            if self.cfg.get("st_vol", True):
-                x -= 28
-                icons.volume_icon(self.surface, x, 10, 20, st["vol"],
-                                  self.accent, FAINT)
-            if st.get("usb") and self.cfg.get("st_usb", True):
-                x -= 24
-                icons.draw(self.surface, "usb" if st["usb"] == "mtp"
-                           else "android", x, 10, 18, self.accent)
-            if st.get("hot") and self.cfg.get("st_hotspot", True):
-                x -= 26
-                icons.draw(self.surface, "uplink", x, 10, 20, OK_G)
-            if st["bt"] is not None and self.cfg.get("st_bt", True):
-                x -= 26
-                icons.bt_icon(self.surface, x, 10, 20, st["bt"],
-                              self.accent, FAINT)
-            if self.cfg.get("st_wifi", True):
-                x -= 26
-                icons.wifi_icon(self.surface, x, 10, 20, st["wifi"],
-                                self.accent, FAINT)
-                if self.stack and self.stack[-1] != "home":
-                    st["ip"] = None
-                lab = st.get("ip") or st.get("ssid")
-                if lab:
-                    sw = min(self.f_tiny.size(lab)[0], 108)
-                    x -= sw + 6
-                    self.text(lab, (x, 16), self.f_tiny, DIM, maxw=108)
-        if show_clock:
-            self.header_clock_badge()
+        draw_header(self.surface, self, title, right, icon, accent, badge)
 
     def header_clock_badge(self):
         """Orologio conficcato nell'angolo, cornice tonda: l'header
@@ -12218,28 +19948,33 @@ class App(object):
         rotondo) che altrimenti uscirebbe deformato sia in
         targhetta che nel planetario."""
         size = max(8, int(round(size / 2.0) * 2))
-        if not hasattr(self, "_nexus_planet_cache"):
-            self._nexus_planet_cache = {}
-        key = (icon_key, size)
-        if key in self._nexus_planet_cache:
-            return self._nexus_planet_cache[key]
+        return self.nexus_renderer._cached_planet_icon(icon_key, size)
+
+    def badge_img(self, key, height):
+        """Targhetta/logo (assets/logos/) scalata per altezza, in
+        cache per (key, altezza arrotondata) -- stesso pattern di
+        brand_symbol(). Ritorna None se il file manca o la chiave
+        non e' mappata, cosi' ogni chiamante puo' ripiegare
+        sull'icona+testo di sempre senza mai bloccarsi."""
+        fname = BADGE_FILES.get(key)
+        if not fname:
+            return None
+        height = max(8, int(round(height / 2.0) * 2))
+        if not hasattr(self, "_badge_cache"):
+            self._badge_cache = {}
+        ck = (key, height)
+        if ck in self._badge_cache:
+            return self._badge_cache[ck]
         img = None
-        fname = NEXUS_PLANET_FILES.get(icon_key)
-        if fname:
-            path = os.path.join(APP_DIR, "assets", "nexus_planets",
-                                fname)
-            try:
-                src = pygame.image.load(path).convert_alpha()
-                sw, sh = src.get_size()
-                fit = min(size / float(sw), size / float(sh))
-                nw = max(1, int(round(sw * fit)))
-                nh = max(1, int(round(sh * fit)))
-                scaled = pygame.transform.smoothscale(src, (nw, nh))
-                img = pygame.Surface((size, size), pygame.SRCALPHA)
-                img.blit(scaled, ((size - nw) // 2, (size - nh) // 2))
-            except Exception:
-                img = None
-        self._nexus_planet_cache[key] = img
+        path = os.path.join(APP_DIR, "assets", "logos", fname)
+        try:
+            src = pygame.image.load(path).convert_alpha()
+            sw, sh = src.get_size()
+            nw = max(1, int(round(sw * height / float(sh))))
+            img = pygame.transform.smoothscale(src, (nw, height))
+        except Exception:
+            img = None
+        self._badge_cache[ck] = img
         return img
 
     def brand_symbol(self, h):
@@ -12325,12 +20060,7 @@ class App(object):
         dbg = os.path.join(LOGS_DIR, "deps_check.log")
 
         def log(msg):
-            try:
-                with open(dbg, "a") as f:
-                    f.write("%s %s: %s\n" % (time.strftime("%H:%M:%S"),
-                                             feature_key, msg))
-            except OSError:
-                pass
+            log_mirror(dbg, msg)
         log("richiesto, needed=%r" % needed)
         if not needed:
             return []
@@ -12388,6 +20118,15 @@ class App(object):
         self.deps_feature_title = title
         self.push("depsmissing")
         return False
+
+    def check_media_deps(self):
+        """Controlla se i binari host necessari per la riproduzione
+        multimediale sono presenti. Ritorna (mpv, ffplay, ffmpeg)."""
+        return (
+            shutil.which("mpv"),
+            shutil.which("ffplay"),
+            shutil.which("ffmpeg"),
+        )
 
     def scan_status(self):
         """Monta l'immagine in sola lettura, verifica i file, poi smonta
@@ -12692,6 +20431,10 @@ class App(object):
                    % ", ".join(miss)), OK_G if not miss else NO_R))
         return L
 
+    def set_info_lines(self, lines):
+        self.info_lines = lines
+        self.scroll = 0
+
     def about_lines(self):
         it = (self.lang == "it")
         L = [("sec", "info", "VOID SUITE")]
@@ -12833,11 +20576,7 @@ class App(object):
         dbg = os.path.join(LOGS_DIR, "log_archive.log")
 
         def log(msg):
-            try:
-                with open(dbg, "a") as f:
-                    f.write("%s %s\n" % (time.strftime("%H:%M:%S"), msg))
-            except OSError:
-                pass
+            log_mirror(dbg, msg)
         try:
             log("avvio: dest_root=%r, self.logs ha %d voci" %
                 (dest_root, len(self.logs)))
@@ -12894,40 +20633,92 @@ class App(object):
                 pass
         return total, n
 
+    def cleanup_stale_logs(self):
+        it = (self.lang == "it")
+        merged = 0
+        removed = 0
+        now = time.time()
+        for name in ("vdiag_quick.log", "vdiag_selective.log", "vdiag_deep.log"):
+            p = os.path.join(LOGS_DIR, name)
+            if os.path.isfile(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        lines = f.read().splitlines()
+                    if lines:
+                        with open(LOG, "a", encoding="utf-8") as fh:
+                            fh.write("=== merged from %s ===\n" % name)
+                            for ln in lines:
+                                fh.write("%s\n" % ln)
+                        merged += 1
+                    os.remove(p)
+                except OSError:
+                    pass
+        for fn in os.listdir(LOGS_DIR):
+            fp = os.path.join(LOGS_DIR, fn)
+            if not os.path.isfile(fp):
+                continue
+            if fn == "voiddesk.log":
+                continue
+            try:
+                age = now - os.path.getmtime(fp)
+                if age > 7 * 86400:
+                    os.remove(fp)
+                    removed += 1
+                elif os.path.getsize(fp) == 0:
+                    os.remove(fp)
+                    removed += 1
+            except OSError:
+                pass
+        return merged, removed
+
     def build_logs(self):
         it = (self.lang == "it")
         H = lambda t_: ("hdr", t_)
         E = lambda n, p: (n, p)
-        return [
+        candidates = [
             H("VOID DESK"),
             E("voiddesk.log", LOG),
             E("vd_hotkey.log", os.path.join(LOGS_DIR, "vd_hotkey.log")),
             E("deps_check.log", os.path.join(LOGS_DIR, "deps_check.log")),
             E("log_archive.log", os.path.join(LOGS_DIR, "log_archive.log")),
+            E("vdiag_quick.log", os.path.join(LOGS_DIR, "vdiag_quick.log")),
+            E("vdiag_selective.log", os.path.join(LOGS_DIR, "vdiag_selective.log")),
+            E("vdiag_deep.log", os.path.join(LOGS_DIR, "vdiag_deep.log")),
             H("SESSIONI DESKTOP" if it else "DESKTOP SESSIONS"),
             E("session_xfce.log", os.path.join(LOGS_DIR, "session_xfce.log")),
             E("session_icewm.log", os.path.join(LOGS_DIR, "session_icewm.log")),
             E("session_lxde.log", os.path.join(LOGS_DIR, "session_lxde.log")),
-            E("storico sessioni" if it else "sessions history",
-              os.path.join(LOGS_DIR, "xfce_session.log")),
             H("CLI TOOLS"),
             E("xterm.log", os.path.join(LOGS_DIR, "xterm.log")),
             E("ani_cli.log", os.path.join(LOGS_DIR, "ani_cli.log")),
             H("INSTALLER"),
-            E("install.log (software)", os.path.join(LOGS_DIR, "install.log")),
-            E("bootstrap ambienti" if it else "env bootstrap",
-              os.path.join(LOGS_DIR, "bootstrap.log")),
+            E("install.log", os.path.join(LOGS_DIR, "install.log")),
+            E("bootstrap.log", os.path.join(LOGS_DIR, "bootstrap.log")),
             E("post_install_check.log",
               os.path.join(LOGS_DIR, "post_install_check.log")),
             H("RETE" if it else "NETWORK"),
             E("hotspot.log", os.path.join(LOGS_DIR, "hotspot.log")),
-            E("syncthing.log", os.path.join(LOGS_DIR, "syncthing.log")),
+            E("syncthing.log", os.path.join(DATA, "syncthing.log")),
             H("MEDIA"),
             E("voidcast.log", os.path.join(os.path.dirname(APP_DIR),
                                            "VoidCast", "voidcast.log")),
             E("mpv.log", os.path.join(os.path.dirname(APP_DIR),
                                       "VoidCast", "mpv.log")),
         ]
+        seen = set()
+        out = []
+        for entry in candidates:
+            if entry[0] == "hdr":
+                out.append(entry)
+                seen.clear()
+                continue
+            name, path = entry
+            if name in seen:
+                continue
+            if os.path.isfile(path):
+                out.append(entry)
+                seen.add(name)
+        return out
 
     def manifesto_lines(self):
         it = (self.lang == "it")
@@ -13062,6 +20853,7 @@ class App(object):
             ("opt_vfx_bg", "vfx_bg", [0, 1, 2, 3, 4, 5]),
             ("opt_vfx_trans", "vfx_trans", [0, 1, 2, 3, 4, 5]),
             ("opt_vfx_fx", "vfx_fx", [0, 1, 2, 3, 4, 5]),
+            ("opt_nexus_bg", "nexus_bg", [True]),
             ("hdr", "STATUS BAR", None),
             ("opt_st_clock", "clock_badge", [True, False]),
             ("opt_st_batt", "st_batt", [True, False]),
@@ -13075,7 +20867,210 @@ class App(object):
             ("opt_bgm", "bgm", [True, False]),
             ("hdr", "LINGUA APP" if it else "APP LANGUAGE", None),
             ("opt_lang", "lang", ["it", "en"]),
+            ("opt_dlang", "desk_lang", CYCLES["dlang"][1]),
         ]
+
+    def render_nexus_bg_customizer(self):
+        surf = self.surface
+        self.header(self.t("opt_nexus_bg"), icon="image", badge="info")
+
+        bg_cfg = self.cfg.setdefault("nexus_bg", dict(NEXUS_BG_DEFAULTS))
+        for k, v in NEXUS_BG_DEFAULTS.items():
+            if k not in bg_cfg:
+                bg_cfg[k] = v
+
+        if not hasattr(self, "_nexus_bg_ui"):
+            self._nexus_bg_ui = {
+                "sel": 0,
+                "scroll": 0,
+                "temp_opacity": bg_cfg.get("opacity", 0.6),
+                "temp_color": bg_cfg.get("orbit_color", (60, 120, 200)),
+            }
+        ui = self._nexus_bg_ui
+
+        panel_x, panel_y, panel_w, panel_h = 30, 50, W - 60, H - 90
+        self.npanel(panel_x, panel_y, panel_w, panel_h, border=self.accent, fill=PANEL, cut=10)
+
+        y = panel_y + 16
+        items = [
+            ("Attiva sfondo", "enabled", "bool"),
+            ("Scegli immagine", "image_path", "file"),
+            ("Opacita'", "opacity", "slider"),
+            ("---", None, "sep"),
+            ("Stelle", "stars", "bool"),
+            ("Comete", "comets", "bool"),
+            ("Nebulosa", "nebula", "bool"),
+            ("---", None, "sep"),
+            ("Colore orbite", "orbit_color", "color"),
+            ("Spessore orbite", "orbit_width", "slider_int"),
+            ("Stile orbite", "orbit_style", "cycle"),
+            ("---", None, "sep"),
+            ("Glitch", "glitch", "bool"),
+            ("Scanline", "scanlines", "bool"),
+            ("Vignetta", "vignette", "bool"),
+        ]
+
+        if bg_cfg.get("enabled", False) and bg_cfg.get("image_path"):
+            preview_size = 80
+            preview_x = panel_x + panel_w - preview_size - 16
+            preview_y = panel_y + 16
+            try:
+                img = pygame.image.load(bg_cfg["image_path"])
+                img = pygame.transform.smoothscale(img, (preview_size, preview_size))
+                if ui["temp_opacity"] < 1.0:
+                    img.set_alpha(int(ui["temp_opacity"] * 255))
+                surf.blit(img, (preview_x, preview_y))
+                pygame.draw.rect(surf, self.accent, (preview_x, preview_y, preview_size, preview_size), 2)
+            except Exception:
+                pass
+
+        visible_items = 12
+        start = max(0, min(ui["sel"] - visible_items // 2, len(items) - visible_items))
+        for i in range(start, min(start + visible_items, len(items))):
+            label, key, typ = items[i]
+            is_sel = (i == ui["sel"])
+            rect = pygame.Rect(panel_x + 8, y, panel_w - 16, 24)
+
+            if is_sel:
+                pygame.draw.rect(surf, sel_tint(self.accent), rect)
+                pygame.draw.rect(surf, self.accent, rect, 1)
+
+            if label == "---":
+                pygame.draw.line(surf, LINE, (panel_x + 12, y + 12), (panel_x + panel_w - 12, y + 12), 1)
+                y += 16
+                continue
+
+            self.text(label, (panel_x + 16, y + 3), self.f_small, FG if is_sel else DIM)
+
+            if typ == "bool":
+                val = bg_cfg.get(key, False)
+                self.text("ON" if val else "OFF", (panel_x + panel_w - 50, y + 3), self.f_small, self.accent if val else FAINT)
+            elif typ == "slider":
+                val = ui.get("temp_opacity", 0.6)
+                bar_x = panel_x + panel_w - 120
+                bar_w = 80
+                pygame.draw.rect(surf, LINE, (bar_x, y + 6, bar_w, 10))
+                fill = int(val * bar_w)
+                if fill > 0:
+                    pygame.draw.rect(surf, self.accent, (bar_x, y + 6, fill, 10))
+                self.text("%d%%" % int(val * 100), (bar_x + bar_w + 8, y + 3), self.f_tiny, FAINT)
+            elif typ == "slider_int":
+                val = bg_cfg.get(key, 1)
+                bar_x = panel_x + panel_w - 120
+                bar_w = 80
+                pygame.draw.rect(surf, LINE, (bar_x, y + 6, bar_w, 10))
+                fill = min(bar_w, val * 10)
+                if fill > 0:
+                    pygame.draw.rect(surf, self.accent, (bar_x, y + 6, fill, 10))
+                self.text(str(val), (bar_x + bar_w + 8, y + 3), self.f_tiny, FAINT)
+            elif typ == "color":
+                col = ui.get("temp_color", (60, 120, 200))
+                pygame.draw.rect(surf, col, (panel_x + panel_w - 40, y + 2, 24, 18))
+                self.text("#%02X%02X%02X" % col, (panel_x + panel_w - 80, y + 3), self.f_tiny, FAINT)
+            elif typ == "cycle":
+                val = bg_cfg.get(key, "solid")
+                self.text(val, (panel_x + panel_w - 80, y + 3), self.f_small, self.accent)
+            elif typ == "file":
+                path = bg_cfg.get(key, "")
+                self.text(os.path.basename(path) or "Nessuna", (panel_x + panel_w - 150, y + 3), self.f_tiny, FAINT if path else DIM)
+
+            y += 28
+
+        save_rect = pygame.Rect(panel_x + panel_w // 2 - 50, panel_y + panel_h - 34, 100, 28)
+        pygame.draw.rect(surf, self.accent, save_rect, border_radius=6)
+        self.text("SALVA", (save_rect.centerx - 20, save_rect.centery - 8), self.f_small, PANEL)
+
+        self.footer([
+            (self.t("k_ud"), "naviga"),
+            ("A", "modifica"),
+            ("X", self.t("open") if ui["sel"] == 1 else ""),
+            ("B", self.t("back")),
+        ])
+
+    def handle_nexus_bg_input(self, btn):
+        ui = self._nexus_bg_ui
+        bg_cfg = self.cfg.setdefault("nexus_bg", dict(NEXUS_BG_DEFAULTS))
+        items = [
+            ("enabled", "bool"),
+            ("image_path", "file"),
+            ("opacity", "slider"),
+            (None, "sep"),
+            ("stars", "bool"),
+            ("comets", "bool"),
+            ("nebula", "bool"),
+            (None, "sep"),
+            ("orbit_color", "color"),
+            ("orbit_width", "slider_int"),
+            ("orbit_style", "cycle"),
+            (None, "sep"),
+            ("glitch", "bool"),
+            ("scanlines", "bool"),
+            ("vignette", "bool"),
+        ]
+
+        if btn == "UP":
+            ui["sel"] = max(0, ui["sel"] - 1)
+        elif btn == "DOWN":
+            ui["sel"] = min(len(items) - 1, ui["sel"] + 1)
+        elif btn == "LEFT":
+            key, typ = items[ui["sel"]]
+            self._adj_nexus_bg(key, typ, -1, ui, bg_cfg)
+        elif btn == "RIGHT":
+            key, typ = items[ui["sel"]]
+            self._adj_nexus_bg(key, typ, 1, ui, bg_cfg)
+        elif btn == "A":
+            key, typ = items[ui["sel"]]
+            if typ == "bool":
+                bg_cfg[key] = not bg_cfg.get(key, False)
+            elif typ == "file":
+                self.fm_open(pick=self._nexus_bg_pick_image, ext_filter={".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"})
+            elif typ == "cycle":
+                styles = ["solid", "dashed", "glow"]
+                cur = bg_cfg.get(key, "solid")
+                idx = styles.index(cur) if cur in styles else 0
+                bg_cfg[key] = styles[(idx + 1) % len(styles)]
+            elif typ == "color":
+                def done(col_str):
+                    try:
+                        col_str = col_str.lstrip("#")
+                        r = int(col_str[0:2], 16)
+                        g = int(col_str[2:4], 16)
+                        b = int(col_str[4:6], 16)
+                        ui["temp_color"] = (r, g, b)
+                    except Exception:
+                        pass
+                cur_col = ui.get("temp_color", (60, 120, 200))
+                self.osk_open("Colore esadecimale (RRGGBB)", "%02X%02X%02X" % cur_col, done)
+        elif btn == "B":
+            bg_cfg["opacity"] = ui.get("temp_opacity", 0.6)
+            bg_cfg["orbit_color"] = ui.get("temp_color", (60, 120, 200))
+            self.cfg["nexus_bg"] = bg_cfg
+            save_cfg(self.cfg)
+            self.pop_state()
+
+    def _adj_nexus_bg(self, key, typ, direction, ui, cfg):
+        if typ == "slider":
+            ui["temp_opacity"] = max(0.0, min(1.0, ui.get("temp_opacity", 0.6) + direction * 0.05))
+            cfg[key] = ui["temp_opacity"]
+        elif typ == "slider_int":
+            cur = cfg.get(key, 1)
+            new = max(1, min(10, cur + direction))
+            cfg[key] = new
+        elif typ == "color":
+            col = ui.get("temp_color", (60, 120, 200))
+            import colorsys
+            r, g, b = col[0] / 255.0, col[1] / 255.0, col[2] / 255.0
+            h, s, v = colorsys.rgb_to_hsv(r, g, b)
+            h = (h + direction * 0.03) % 1.0
+            r, g, b = colorsys.hsv_to_rgb(h, s, v)
+            ui["temp_color"] = (int(r * 255), int(g * 255), int(b * 255))
+
+    def _nexus_bg_pick_image(self, path):
+        if path:
+            self.cfg.setdefault("nexus_bg", dict(NEXUS_BG_DEFAULTS))["image_path"] = path
+            self.cfg["nexus_bg"]["enabled"] = True
+            save_cfg(self.cfg)
+            self.notify("Immagine selezionata", os.path.basename(path), "success")
 
     # ---- mappatura tasti ---------------------------------------------
     def cur_map(self):
@@ -13109,44 +21104,114 @@ class App(object):
 
     # -------------------------------------------------------------- input
     def on_button(self, btn):
-        if btn in ("UP", "DOWN", "LEFT", "RIGHT"):
-            self.play("move")
         top = self.stack[-1]
+        style = self.cfg.get("home_style", DEFAULT_HOME_STYLE) if top == "home" else None
+        is_nexus = (top == "home" and style == "nexus")
+        if btn in ("UP", "DOWN", "LEFT", "RIGHT"):
+            if is_nexus or top in ("nexussat", "endnodering", "cursedevsecret"):
+                pass
+            else:
+                self.play("dpad_menu")
         # M e' un comando globale: fa scendere il controller dall'alto
         # senza cambiare il microcosmo in cui l'utente sta lavorando.
         if btn == "MENU" and top != "rtshell":
+            log("on_button: MENU pressed, media_phase=%s, mecha_phase=%s" %
+                (self.media_panel_phase, self.mecha_panel_phase))
             self._media_panel_toggle()
             return
+        if btn == "VOL+":
+            self.volume_level = min(100, self.volume_level + 5)
+            self.volume_overlay.show(self.volume_level)
+            self.play("click")
+            try:
+                import subprocess
+                subprocess.run(["amixer", "sset", "Master", "%d%%" % self.volume_level], capture_output=True)
+            except Exception:
+                pass
+            return
+        if btn == "VOL-":
+            self.volume_level = max(0, self.volume_level - 5)
+            self.volume_overlay.show(self.volume_level)
+            self.play("click")
+            try:
+                import subprocess
+                subprocess.run(["amixer", "sset", "Master", "%d%%" % self.volume_level], capture_output=True)
+            except Exception:
+                pass
+            return
         if self.media_panel_phase is not None:
+            log("on_button: media_panel active, routing to _media_panel_button btn=%s" % btn)
             self._media_panel_button(btn)
             return
+        # Combo riavvio rapido L2+R2+START (globale)
+        if btn == "L2":
+            self._combo_l2r2 = time.time()
+        elif btn == "R2" and getattr(self, "_combo_l2r2", None) is not None:
+            if time.time() - self._combo_l2r2 < 1.0:
+                self._combo_l2r2_start = time.time()
+        elif btn == "START" and getattr(self, "_combo_l2r2_start", None) is not None:
+            if time.time() - self._combo_l2r2_start < 1.5:
+                self._combo_l2r2 = None
+                self._combo_l2r2_start = None
+                self.handoff(("RIAVVIO..." if self.lang == "it" else "RESTARTING..."))
+                try:
+                    os.execv(sys.executable, [sys.executable] + sys.argv)
+                except Exception:
+                    self.running = False
+                return
         if top == "home":
             style = self.cfg.get("home_style", DEFAULT_HOME_STYLE)
             if btn == "R2" and self.l2_panel_phase is None:
                 if self.r2_tablet_phase is None:
                     self.r2_tablet_phase = "in"
                     self.r2_tablet_t0 = time.time()
-                    self.play("click")
+                    self.play("panel_open")
                 elif self.r2_tablet_phase == "show":
                     self.r2_tablet_phase = "out"
                     self.r2_tablet_t0 = time.time()
-                    self.play("click")
+                    self.play("panel_close")
                 return
             if btn == "L2" and self.r2_tablet_phase is None:
                 if self.l2_panel_phase is None:
                     self.l2_panel_phase = "in"
                     self.l2_panel_t0 = time.time()
-                    self.play("click")
+                    self.play("panel_open")
                 elif self.l2_panel_phase == "show":
                     self.l2_panel_phase = "out"
                     self.l2_panel_t0 = time.time()
-                    self.play("click")
+                    self.play("panel_close")
                 return
             if self.r2_tablet_phase is not None or \
                     self.l2_panel_phase is not None:
+                self.panel_combo_sequence.append(btn)
+                if len(self.panel_combo_sequence) > 7:
+                    self.panel_combo_sequence = self.panel_combo_sequence[-7:]
+                if self.panel_combo_sequence == self.panel_combo_target:
+                    if not self._panel_combo_triggered:
+                        self._panel_combo_triggered = True
+                        self.panel_combo_sequence = []
+                        txt_it = "La curiosità può fare brutti scherzi... o portarti ad un curse...dev"
+                        txt_en = "Curiosity can play nasty tricks... or lead you to a curse...dev"
+                        txt = txt_it if self.lang == "it" else txt_en
+                        try:
+                            self.play("rerezero")
+                        except Exception:
+                            pass
+                        try:
+                            self.notify(("critical", "CURSEDEV", txt, "notice"))
+                        except Exception:
+                            pass
+                        for _ in range(8):
+                            self.surface.fill((random.randint(0, 40), 0, 0))
+                            pygame.display.flip()
+                            time.sleep(0.04)
                 return
             if btn == "Y":
-                idx = (HOME_STYLES.index(style) + 1) % len(HOME_STYLES)
+                try:
+                    idx = HOME_STYLES.index(style)
+                except ValueError:
+                    idx = HOME_STYLES.index(DEFAULT_HOME_STYLE)
+                idx = (idx + 1) % len(HOME_STYLES)
                 self.cfg["home_style"] = HOME_STYLES[idx]
                 save_cfg(self.cfg)
                 self.sel = 0
@@ -13154,6 +21219,7 @@ class App(object):
                 self.nexus_rot_mid = 0
                 self.nexus_rot_out = 0
                 self.nexus_rot_far = 0
+                self.nexus_rot_void = 0
                 self.play("snap")
                 return
             if style == "blame":
@@ -13204,6 +21270,8 @@ class App(object):
                 elif btn == "START":
                     self.crt_off()
             elif style == "nexus":
+                if btn in ("LEFT", "RIGHT", "UP", "DOWN"):
+                    self.nexus_check_combo_taxis(btn)
                 if btn == "LEFT":
                     self.nexus_ring_switch(-1)
                 elif btn == "RIGHT":
@@ -13213,11 +21281,239 @@ class App(object):
                 elif btn == "DOWN":
                     self.nexus_ring_rotate(1)
                 elif btn == "A":
+                    if is_nexus:
+                        self.play("hub_open")
                     self.activate(self.sel)
+                elif btn == "R1" and NEXUS_SATELLITES.get(self.sel):
+                    self.nexus_enter_satellite_view()
+                elif btn == "L1":
+                    self._nexus_fast_travel = "waiting"
+                    self._nexus_fast_travel_t0 = time.time()
+                    self.notify(("Fast travel: premi un numero (0-9)" if self.lang == "it" else "Fast travel: press a number (0-9)",), "standard")
                 elif btn == "START":
                     self.crt_off()
+                # Fast travel: L1 attiva, poi numero seleziona nodo
+                ft = getattr(self, "_nexus_fast_travel", None)
+                if ft == "waiting":
+                    if time.time() - self._nexus_fast_travel_t0 > 3.0:
+                        self._nexus_fast_travel = None
+                        self.notify(("Fast travel annullato" if self.lang == "it" else "Fast travel cancelled",), "standard")
+                    elif btn in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
+                        target = int(btn)
+                        if 0 <= target < len(self.menu):
+                            self._nexus_fast_travel = None
+                            self._nexus_travel_to_node(target)
+                            self.play("snap")
             if style == "blame":
                 self._home_keep_selection_visible()
+        elif top == "nexussat":
+            sats = NEXUS_SATELLITES.get(self.sel, [])
+            n = len(sats)
+            if btn == "UP" and n:
+                self.nexus_sat_sel = (self.nexus_sat_sel - 1) % n
+                self.play("move")
+            elif btn == "DOWN" and n:
+                self.nexus_sat_sel = (self.nexus_sat_sel + 1) % n
+                self.play("move")
+            elif btn == "A" and n:
+                _, _, sat_state, _ = sats[self.nexus_sat_sel]
+                self.play("click")
+                if sat_state == "outerdesk":
+                    self.play_outerdesk_boot()
+                    self.push(sat_state)
+                elif sat_state == "deepvoiddesk":
+                    # Launch Deep VOID DESK
+                    try:
+                        import subprocess
+                        dvd_main = os.path.join(APP_DIR, "sgrub", "deepvoiddesk", "main.py")
+                        if os.path.exists(dvd_main):
+                            self.handoff(("AVVIO DEEP VOID DESK..." if self.lang == "it"
+                                          else "LAUNCHING DEEP VOID DESK..."))
+                            self.exit_code = EXIT_DEEP_VOID_DESK
+                            self.running = False
+                    except Exception:
+                        pass
+                elif sat_state == "sgrub":
+                    # Exit to launch Sgrub Menu via mux_launch.sh
+                    self.exit_code = EXIT_SGRUB
+                    self.running = False
+            elif btn == "B" or btn == "SELECT":
+                self.play("back")
+                self.nexus_exit_satellite_view()
+            elif btn == "START":
+                self.crt_off()
+        elif top == "cursedevsecret":
+            if getattr(self, "cursedev_submenu_active", False):
+                cats = getattr(self, "cursedev_menu_items", CURSEDEV_CATEGORIES)
+                keys = getattr(self, "cursedev_category_keys", list(cats.keys()))
+                cat_key = keys[self.cursedev_category_sel]
+                items = cats[cat_key]["items"]
+                if btn == "UP":
+                    self.cursedev_menu_sel = max(0, self.cursedev_menu_sel - 1)
+                    self.play("move")
+                elif btn == "DOWN":
+                    self.cursedev_menu_sel = min(len(items) - 1, self.cursedev_menu_sel + 1)
+                    self.play("move")
+                elif btn == "LEFT":
+                    self._cursedev_change_value(-1)
+                elif btn == "RIGHT":
+                    self._cursedev_change_value(1)
+                elif btn == "A":
+                    self._cursedev_apply_selected()
+                elif btn == "B":
+                    self.cursedev_submenu_active = False
+                    self.cursedev_menu_sel = 0
+                    self.play("click")
+            else:
+                cats = getattr(self, "cursedev_menu_items", CURSEDEV_CATEGORIES)
+                keys = getattr(self, "cursedev_category_keys", list(cats.keys()))
+                if btn == "UP":
+                    self.cursedev_category_sel = (self.cursedev_category_sel - 1) % len(keys)
+                    self.play("move")
+                elif btn == "DOWN":
+                    self.cursedev_category_sel = (self.cursedev_category_sel + 1) % len(keys)
+                    self.play("move")
+                elif btn == "A":
+                    self.cursedev_submenu_active = True
+                    self.cursedev_menu_sel = 0
+                    self.play("click")
+                elif btn == "B":
+                    self.pop_state()
+                    self.play("click")
+        elif top == "cursedev_zenoh":
+            if btn == "B" or btn == "SELECT":
+                self.pop_state()
+                self.play("back")
+        elif top == "mechaconfig":
+            items = ["L1", "L2", "R1", "R2", "START", "Y", "SELECT"]
+            actions = ["return_to_nexus", "goto_endnode", "goto_satellite",
+                        "goto_toolbox", "close", "none"]
+            if btn == "UP":
+                self.mecha_config_sel = (self.mecha_config_sel - 1) % len(items)
+                self.play("move")
+            elif btn == "DOWN":
+                self.mecha_config_sel = (self.mecha_config_sel + 1) % len(items)
+                self.play("move")
+            elif btn == "A":
+                key = items[self.mecha_config_sel]
+                cur = self.mecha_panel_config.get(key, "none")
+                cur_idx = actions.index(cur) if cur in actions else len(actions) - 1
+                new_idx = (cur_idx + 1) % len(actions)
+                self.mecha_panel_config[key] = actions[new_idx]
+                self.cfg["mecha_panel_config"] = self.mecha_panel_config
+                save_cfg(self.cfg)
+                self.play("click")
+            elif btn == "B":
+                self.pop_state()
+                self.play("click")
+        elif top == "mecha_panel_config":
+            items = ["L1", "L2", "R1", "R2", "START", "Y", "SELECT"]
+            actions = ["return_to_nexus", "goto_endnode", "goto_satellite",
+                        "goto_toolbox", "close", "none"]
+            if btn == "UP":
+                self.mecha_config_sel = (self.mecha_config_sel - 1) % len(items)
+                self.play("move")
+            elif btn == "DOWN":
+                self.mecha_config_sel = (self.mecha_config_sel + 1) % len(items)
+                self.play("move")
+            elif btn == "A":
+                key = items[self.mecha_config_sel]
+                cur = self.mecha_panel_config.get(key, "none")
+                cur_idx = actions.index(cur) if cur in actions else len(actions) - 1
+                new_idx = (cur_idx + 1) % len(actions)
+                self.mecha_panel_config[key] = actions[new_idx]
+                self.cfg["mecha_panel_config"] = self.mecha_panel_config
+                save_cfg(self.cfg)
+                self.play("click")
+            elif btn == "B":
+                self.pop_state()
+                self.play("click")
+        elif top in ("media_panel_config", "outer_panel_config"):
+            config_key = top.replace("_config", "")
+            items = self._get_panel_items(config_key)
+            n = len(items)
+            sel = getattr(self, "_panel_sel", 0)
+            if btn == "UP" and n:
+                sel = (sel - 1) % n
+                self.play("move")
+            elif btn == "DOWN" and n:
+                sel = (sel + 1) % n
+                self.play("move")
+            elif btn == "A" and n:
+                label, key, values = items[sel]
+                cfg = self.cfg.get(config_key, {})
+                if isinstance(values, list):
+                    cur = cfg.get(key, values[0])
+                    idx = values.index(cur) if cur in values else 0
+                    idx = (idx + 1) % len(values)
+                    cfg[key] = values[idx]
+                elif isinstance(values, range):
+                    cur = cfg.get(key, values[0])
+                    lst = list(values)
+                    idx = lst.index(cur) if cur in lst else 0
+                    idx = (idx + 1) % len(lst)
+                    cfg[key] = lst[idx]
+                self.cfg[config_key] = cfg
+                save_cfg(self.cfg)
+                self.play("click")
+            elif btn == "B":
+                self.pop_state()
+                self.play("click")
+        elif top == "outerdesk":
+            apps = self.scan_outdesk()
+            n = len(apps)
+            if btn == "UP" and n:
+                self.od_sel = (self.od_sel - 1) % n
+                self.play("move")
+            elif btn == "DOWN" and n:
+                self.od_sel = (self.od_sel + 1) % n
+                self.play("move")
+            elif btn == "A" and n:
+                self.play("click")
+                app = apps[self.od_sel % n]
+                deps = self._check_outer_deps(app)
+                self._launch_outerdesk_app(app, deps)
+            elif btn == "B":
+                self.pop_state()
+                self.play("click")
+        elif top == "outerdesk_detail":
+            app = OUTERDESK_APPS[self.od_sel % len(OUTERDESK_APPS)]
+            deps = self._check_outer_deps(app)
+            n_deps = len(deps)
+            if btn == "UP" and n_deps:
+                self.od_detail_sel = (self.od_detail_sel - 1) % n_deps
+                self.play("move")
+            elif btn == "DOWN" and n_deps:
+                self.od_detail_sel = (self.od_detail_sel + 1) % n_deps
+                self.play("move")
+            elif btn == "A":
+                self._launch_outerdesk_app(app, deps)
+            elif btn == "B":
+                self.od_detail_sel = 0
+                self.pop_state()
+                self.play("click")
+        elif top == "outerdesk_running":
+            n_btns = 2
+            if btn == "UP":
+                self.outer_panel_sel = (self.outer_panel_sel - 1) % n_btns
+                self.play("move")
+            elif btn == "DOWN":
+                self.outer_panel_sel = (self.outer_panel_sel + 1) % n_btns
+                self.play("move")
+            elif btn == "A":
+                self.play("click")
+                if self.outer_panel_sel == 0:
+                    self._outer_panel_restart()
+                elif self.outer_panel_sel == 1:
+                    self._outer_panel_close()
+            elif btn == "B" or btn == "SELECT":
+                self.play("back")
+                self._outer_panel_close()
+            elif btn == "START":
+                # Toggle outer panel visibility on START press
+                self.outer_panel_start_held = not self.outer_panel_start_held
+                self.outer_panel_start_t0 = time.time()
+                self.play("click")
         elif top == "muosapps":
             filtered = [app for app in self.mapps if self.mapp_sd_tab == "all" or app["sd"].lower() == self.mapp_sd_tab]
             n = len(filtered)
@@ -13296,6 +21592,8 @@ class App(object):
                 self.push("envdetail")
             elif btn == "B":
                 self.pop_state()
+        elif top == "media_vault":
+            self._handle_media_vault_input(btn)
         elif top == "diagscan":
             if btn == "B":
                 self.pop_state()
@@ -13305,7 +21603,11 @@ class App(object):
                 self.pop_state()
         elif top == "termid":
             if self.termid_result:
-                if btn in ("A", "START", "B"):
+                if btn == "SELECT":
+                    # SELECT apre direttamente CURSEDEV senza uscire da Terminal ID
+                    self.push("cursedevsecret")
+                    self.play("open")
+                elif btn in ("A", "START", "B"):
                     self.stack = ["home"]
             elif btn in ("A", "START"):
                 def done(v):
@@ -13776,13 +22078,13 @@ class App(object):
         elif top == "autostart":
             rows = [r for r in self.rows if r[0] == "item"]
             auto = set(self.cfg.get("autostart", []))
-            if btn == "UP":
+            if btn == "UP" and rows:
                 self.row_sel = (self.row_sel - 1) % len(rows)
-            elif btn == "DOWN":
+            elif btn == "DOWN" and rows:
                 self.row_sel = (self.row_sel + 1) % len(rows)
-            elif btn == "A":
-                name, exe = rows[self.row_sel][1], rows[self.row_sel][2]
-                if name == "-":
+            elif btn == "A" and rows:
+                name, exe, inst = rows[self.row_sel][1], rows[self.row_sel][2], rows[self.row_sel][5]
+                if not inst:
                     return
                 execs = set(self.cfg.get("autostart_exec", []))
                 if name in auto:
@@ -13819,6 +22121,15 @@ class App(object):
                 key, ck, vals = defs[self.opt_sel]
                 if key == "hdr" or not vals:
                     return
+                if ck == "nexus_bg":
+                    self._nexus_bg_ui = {
+                        "sel": 0,
+                        "scroll": 0,
+                        "temp_opacity": self.cfg.get("nexus_bg", {}).get("opacity", 0.6),
+                        "temp_color": self.cfg.get("nexus_bg", {}).get("orbit_color", (60, 120, 200)),
+                    }
+                    self.push("nexus_bg_customizer")
+                    return
                 cur = self.cfg.get(ck, vals[0])
                 nxt = vals[(vals.index(cur) + 1) % len(vals)
                            if cur in vals else 0]
@@ -13836,6 +22147,8 @@ class App(object):
             elif btn == "B":
                 save_cfg(self.cfg)
                 self.pop_state()
+        elif top == "nexus_bg_customizer":
+            self.handle_nexus_bg_input(btn)
         elif top == "map":
             rows = self.map_rows()
             if btn == "UP":
@@ -13894,12 +22207,15 @@ class App(object):
             elif btn == "X":
                 self.logarchive_sel = 0
                 self.push("logarchive")
+            elif btn == "Y":
+                self._logviewer_scroll = 0
+                self.push("logviewer")
             elif btn == "B":
                 self.pop_state()
         elif top == "logarchive":
             roots = self.fm_roots()
             actions = [("sd:" + p, lbl) for p, lbl in roots] + \
-                [("clear", None)]
+                [("cleanup", None), ("clear", None)]
             n = len(actions)
             if btn == "UP":
                 self.logarchive_sel = (self.logarchive_sel - 1) % n
@@ -13931,6 +22247,25 @@ class App(object):
                                      self.lang == "it" else
                                      "clear all logs?"), go)
                     self.push("confirm")
+                elif act == "cleanup":
+                    def go():
+                        m, r = self.cleanup_stale_logs()
+                        self.logs = self.build_logs()
+                        self.info_lines = self.stub_lines("LOG REGISTRY",
+                            [("uniti %d, rimossi %d log obsoleti" % (m, r))
+                             if self.lang == "it" else
+                             ("merged %d, removed %d stale logs" % (m, r))])
+                        self.scroll = 0
+                        self.pop_state()
+                        self.info_title = "LOG REGISTRY"
+                        self.push("info")
+                    self.confirm = (("unire i log vdiag in voiddesk.log e "
+                                     "rimuovere duplicati/log > 7gg?" if
+                                     self.lang == "it" else
+                                     "merge vdiag logs into voiddesk.log "
+                                     "and remove duplicates/logs > 7d?"),
+                                    go)
+                    self.push("confirm")
                 else:
                     dest = act[3:]
                     ok, res = self.run_busy(
@@ -13941,7 +22276,7 @@ class App(object):
                         msg = (("archivio creato: %s (%d file)" %
                                (path, cnt)) if self.lang == "it" else
                                ("archive created: %s (%d files)" %
-                               (path, cnt)))
+                                (path, cnt)))
                     else:
                         msg = res
                     self.info_lines = self.stub_lines("LOG REGISTRY",
@@ -13951,16 +22286,60 @@ class App(object):
                     self.push("info")
             elif btn == "B":
                 self.pop_state()
+        elif top == "logviewer":
+            entries = self.log_registry.get_entries(limit=300)
+            n = len(entries)
+            visible_rows = (H - 100) // 18
+            if btn == "UP":
+                self._logviewer_scroll = max(0, getattr(self, '_logviewer_scroll', 0) - 1)
+            elif btn == "DOWN":
+                self._logviewer_scroll = min(max(0, n - visible_rows), getattr(self, '_logviewer_scroll', 0) + 1)
+            elif btn == "A":
+                self.push("loggersummoner")
+            elif btn == "X":
+                try:
+                    zip_path = LogArchiver.create_archive()
+                    self.notify("Archivio creato" if self.lang == "it" else "Archive created",
+                                os.path.basename(zip_path), "success")
+                except Exception as e:
+                    self.notify("Errore archivio" if self.lang == "it" else "Archive error",
+                                str(e), "warning")
+            elif btn == "Y":
+                self.log_registry.clear()
+                self.notify("Registro pulito" if self.lang == "it" else "Registry cleared",
+                            "", "success")
+            elif btn == "B":
+                self.pop_state()
+        elif top == "loggersummoner":
+            all_loggers = self.logger_manager.get_all_loggers()
+            mods = sorted(all_loggers.keys())
+            n = len(mods)
+            if btn == "UP":
+                self._logger_sel = (self._logger_sel - 1) % n
+            elif btn == "DOWN":
+                self._logger_sel = (self._logger_sel + 1) % n
+            elif btn == "A":
+                mod = mods[self._logger_sel]
+                if not self.logger_manager.is_fundamental(mod):
+                    logger = all_loggers[mod]
+                    self.logger_manager.set_enabled(mod, not logger.enabled)
+                    self.play("click")
+            elif btn == "B":
+                self.pop_state()
+        elif top == "logdashboard":
+            self.handle_log_dashboard_input(btn)
+        elif top == "voiddecontext":
+            self.handle_voiddecontext_input(btn)
         elif top.startswith("hub:") and top[4:] == "uplink":
             items = HUBS["uplink"][2]
             n = len(items)
-            if self.hub_sel < 3:
+            if self.hub_sel < 2:
                 if btn == "LEFT":
-                    self.hub_sel = (self.hub_sel - 1) % 3
+                    self.hub_sel = (self.hub_sel - 1) % 2
                 elif btn == "RIGHT":
-                    self.hub_sel = (self.hub_sel + 1) % 3
+                    self.hub_sel = (self.hub_sel + 1) % 2
                 elif btn == "DOWN":
-                    self.hub_sel = 3
+                    self.hub_sel = 2
                 elif btn == "UP":
                     self.hub_sel = n - 1
                 elif btn == "A":
@@ -13968,15 +22347,15 @@ class App(object):
                     self.hub_action("uplink", k, kind)
                 elif btn == "B":
                     self.pop_state()
-            elif self.hub_sel < 5:
+            elif self.hub_sel < 4:
                 if btn == "LEFT":
-                    self.hub_sel = 3 + (self.hub_sel - 3 - 1) % 2
+                    self.hub_sel = 2 + (self.hub_sel - 2 - 1) % 2
                 elif btn == "RIGHT":
-                    self.hub_sel = 3 + (self.hub_sel - 3 + 1) % 2
+                    self.hub_sel = 2 + (self.hub_sel - 2 + 1) % 2
                 elif btn == "UP":
                     self.hub_sel = 0
                 elif btn == "DOWN":
-                    self.hub_sel = 5
+                    self.hub_sel = 4
                 elif btn == "A":
                     k, ic, lk, sk, kind = items[self.hub_sel]
                     self.hub_action("uplink", k, kind)
@@ -13985,7 +22364,7 @@ class App(object):
             else:
                 if btn == "UP":
                     self.hub_sel = self.hub_sel - 1 if \
-                        self.hub_sel > 5 else 3
+                        self.hub_sel > 4 else 3
                 elif btn == "DOWN":
                     self.hub_sel = self.hub_sel + 1 if \
                         self.hub_sel < n - 1 else 0
@@ -14105,7 +22484,8 @@ class App(object):
             elif btn == "B":
                 self.pop_state()
         elif top == "radio":
-            tabs = ["all", "italia", "tekno", "preferiti", "recenti"]
+            tabs = ["all", "italia", "tekno", "preferiti", "recenti",
+                    "custom"]
             lst = self.radio_list_for_tab()
             n = len(lst)
             if btn in ("L1", "R1"):
@@ -14113,6 +22493,10 @@ class App(object):
                 self.radio_tab = tabs[(tabs.index(self.radio_tab) +
                                        d) % len(tabs)]
                 self.radio_sel = 0
+            elif btn == "LEFT" and n:
+                self.radio_sel = max(0, self.radio_sel - self.radio_visible)
+            elif btn == "RIGHT" and n:
+                self.radio_sel = min(n - 1, self.radio_sel + self.radio_visible)
             elif btn == "UP" and n:
                 self.radio_sel = (self.radio_sel - 1) % n
             elif btn == "DOWN" and n:
@@ -14128,28 +22512,43 @@ class App(object):
                 else:
                     self.notify("Void Radio", "%s in riproduzione" %
                                 st["name"], "success")
-            elif btn == "Y" and n:
-                self.radio_toggle_favorite(lst[self.radio_sel])
+            elif btn == "Y":
+                if self.radio_tab == "custom" and n:
+                    name = lst[self.radio_sel].get("name", "")
+                    self.confirm = (name, lambda:
+                                    self.radio_remove_custom(name))
+                    self.push("confirm")
+                elif self.radio_tab == "custom" and not n:
+                    def done(v):
+                        q = v.strip()
+                        if not q:
+                            return
+                        parts = q.split("|", 1)
+                        name = parts[0].strip() if parts else q
+                        url = parts[1].strip() if len(parts) > 1 else q
+                        self.radio_add_custom(name, url)
+                        self.radio_sel = 0
+                    self.osk_open(self.t("radio_custom_add"), "", done)
+                elif n:
+                    self.radio_toggle_favorite(lst[self.radio_sel])
+            elif btn == "L2":
+                self.radio_filter_type = "country"
+                self.radio_filter_values = self.radio_get_countries()
+                self.radio_filter_idx = 0
+                self.push("radio_filter")
+            elif btn == "R2":
+                self.radio_filter_type = "language"
+                self.radio_filter_values = self.radio_get_languages()
+                self.radio_filter_idx = 0
+                self.push("radio_filter")
             elif btn == "X":
-                def done(v):
-                    q = v.strip()
-                    if not q:
-                        return
-                    self.radio_search_q = q
-                    try:
-                        self.radio_search_results = self.run_busy(
-                            self.t("checking"),
-                            lambda: self.radio_search(q)) or []
-                    except Exception as e:
-                        self.radio_search_results = []
-                        self.notify(("Ricerca fallita" if
-                                    self.lang == "it" else
-                                    "Search failed"), str(e)[:60],
-                                   "warning")
-                    self.radio_search_sel = 0
-                    self.push("radiosearch")
-                self.osk_open("CERCA STAZIONE" if self.lang == "it"
-                             else "SEARCH STATION", "", done)
+                self.radio_filter_type = "tag"
+                self.radio_filter_values = self.radio_get_tags()
+                self.radio_filter_idx = 0
+                self.push("radio_filter")
+            elif btn == "SELECT":
+                self.radio_options_sel = 0
+                self.push("radio_options")
             elif btn == "START" and self.radio_playing:
                 order = [0, 15, 30, 60, 90]
                 cur = self.radio_sleep_min
@@ -14159,6 +22558,83 @@ class App(object):
                 self.radio_sleep_t0 = time.time()
             elif btn == "B":
                 self.pop_state()
+        elif top == "radio_options":
+            opts = [("search", self.t("radio_search_title")),
+                    ("import", self.t("radio_import_title")),
+                    ("filter_country", self.t("radio_filter_country")),
+                    ("filter_tag", self.t("radio_filter_tag")),
+                    ("refresh", self.t("radio_refresh"))]
+            n_opts = len(opts)
+            if btn == "UP":
+                self.radio_options_sel = (self.radio_options_sel - 1) % n_opts
+            elif btn == "DOWN":
+                self.radio_options_sel = (self.radio_options_sel + 1) % n_opts
+            elif btn == "A":
+                sel_key = opts[self.radio_options_sel][0]
+                self.pop_state()
+                if sel_key == "search":
+                    self.radio_search_open()
+                elif sel_key == "import":
+                    self.radio_import_open()
+                elif sel_key == "filter_country":
+                    self.radio_filter_type = "country"
+                    self.radio_filter_values = self.radio_get_countries()
+                    self.radio_filter_idx = 0
+                    self.push("radio_filter")
+                elif sel_key == "filter_tag":
+                    self.radio_filter_type = "tag"
+                    self.radio_filter_values = self.radio_get_tags()
+                    self.radio_filter_idx = 0
+                    self.push("radio_filter")
+                elif sel_key == "refresh":
+                    self.run_busy(self.t("radio_refresh"),
+                                  self.radio_refresh_cache)
+            elif btn == "B":
+                self.pop_state()
+        elif top == "radio_import":
+            if self.radio_import_mode == "playlist":
+                n = len(self.radio_import_playlists)
+                if btn == "UP" and n:
+                    self.radio_import_sel = (self.radio_import_sel - 1) % n
+                elif btn == "DOWN" and n:
+                    self.radio_import_sel = (self.radio_import_sel + 1) % n
+                elif btn == "A" and n:
+                    entry = self.radio_import_playlists[
+                        self.radio_import_sel]
+                    if entry["category"] == "custom":
+                        self.radio_import_custom_url_input()
+                    else:
+                        self.radio_import_fetch_and_show(entry["url"])
+                elif btn == "B":
+                    self.pop_state()
+            else:
+                n = len(self.radio_import_channels)
+                if btn == "UP" and n:
+                    self.radio_import_sel = (
+                        self.radio_import_sel - 1) % n
+                elif btn == "DOWN" and n:
+                    self.radio_import_sel = (
+                        self.radio_import_sel + 1) % n
+                elif btn == "X":
+                    if self.radio_import_sel in \
+                            self.radio_import_marked:
+                        self.radio_import_marked.discard(
+                            self.radio_import_sel)
+                    else:
+                        self.radio_import_marked.add(
+                            self.radio_import_sel)
+                elif btn == "Y":
+                    if len(self.radio_import_marked) == n:
+                        self.radio_import_marked.clear()
+                    else:
+                        self.radio_import_marked = set(range(n))
+                elif btn == "START":
+                    self.radio_import_add()
+                elif btn == "A":
+                    self.radio_import_marked = set(range(n))
+                    self.radio_import_add()
+                elif btn == "B":
+                    self.pop_state()
         elif top == "radiosearch":
             n = len(self.radio_search_results)
             if btn == "UP" and n:
@@ -14181,6 +22657,23 @@ class App(object):
                 self.radio_toggle_favorite(
                     self.radio_search_results[self.radio_search_sel])
             elif btn == "B":
+                self.pop_state()
+        elif top == "radio_filter":
+            n = len(self.radio_filter_values)
+            if btn == "UP" and n:
+                self.radio_filter_idx = (self.radio_filter_idx -
+                                         1) % n
+            elif btn == "DOWN" and n:
+                self.radio_filter_idx = (self.radio_filter_idx +
+                                         1) % n
+            elif btn == "A" and n:
+                self.radio_filter_value = \
+                    self.radio_filter_values[self.radio_filter_idx]
+                self.radio_tab = "all"
+                self.radio_sel = 0
+                self.pop_state()
+            elif btn == "B":
+                self.radio_filter_value = None
                 self.pop_state()
         elif top == "worldclock":
             n = len(self.wc_cities)
@@ -14369,7 +22862,7 @@ class App(object):
         elif top == "depsmissing":
             if btn == "A":
                 self.pop_state()
-                self.comp_action("install")
+                self.forge_hub.comp_action("install")
                 self.marked.clear()
                 for j, r_ in enumerate(self.rows):
                     if r_[0] == "item" and r_[1] in self.deps_missing_list:
@@ -14807,6 +23300,29 @@ class App(object):
                     self.push("confirm")
             elif btn == "B":
                 self.pop_state()
+            elif btn == "R2":
+                path = self.rss_export_opml()
+                self.notify(("OPML esportato in %s" % path)
+                            if self.lang == "it" else
+                            ("OPML exported to %s" % path),
+                            "success")
+            elif btn == "L2":
+                def on_pick(filepath):
+                    if filepath:
+                        ok, msg = self.rss_import_opml(filepath)
+                        if ok:
+                            self.notify(("Import completato: %d feed" %
+                                        msg) if self.lang == "it" else
+                                        ("Import complete: %d feeds" %
+                                        msg), "success")
+                            self.rss_sel_sel = 0
+                        else:
+                            self.notify(("Errore: %s" % msg)
+                                        if self.lang == "it" else
+                                        ("Error: %s" % msg),
+                                        "warning")
+                self.fm_open(pick=on_pick,
+                             ext_filter={".opml"})
         elif top == "glyphpick":
             n = len(self.gp_list)
             C = 8
@@ -14849,8 +23365,16 @@ class App(object):
             elif btn == "DOWN" and n:
                 self.wm_sel = (self.wm_sel + 1) % n
             elif btn == "R1":
-                self.wm_nets = self.run_busy(self.t("wm_scan"),
-                                             self.wm_scan) or []
+                self.wm_nets = self.run_busy(
+                    self.t("wm_scan"),
+                    self.wm_scan,
+                    steps=[
+                        "scanning networks..." if not it else "scansionando reti...",
+                        "parsing results..." if not it else "parsing risultati...",
+                        "building list..." if not it else "costruendo lista...",
+                    ],
+                    accent=(74, 206, 224),
+                    icon="wifi") or []
                 self.wm_sel = 0
             elif btn == "A" and n:
                 net = self.wm_nets[self.wm_sel]
@@ -14865,6 +23389,7 @@ class App(object):
                 net = self.wm_nets[self.wm_sel]
                 if net.get("id") is not None:
                     self.wm_cli("remove_network", net["id"])
+                    self.wm_cli("set", "update_config", "1")
                     self.wm_cli("save_config")
                     net["saved"] = False
                     net["id"] = None
@@ -14875,8 +23400,16 @@ class App(object):
                 self.push("info")
             elif btn == "Y":
                 self.run_busy("wifi...", self.wm_radio_toggle)
-                self.wm_nets = self.run_busy(self.t("wm_scan"),
-                                             self.wm_scan) or []
+                self.wm_nets = self.run_busy(
+                    self.t("wm_scan"),
+                    self.wm_scan,
+                    steps=[
+                        "scanning networks..." if not it else "scansionando reti...",
+                        "parsing results..." if not it else "parsing risultati...",
+                        "building list..." if not it else "costruendo lista...",
+                    ],
+                    accent=(74, 206, 224),
+                    icon="wifi") or []
             elif btn == "B":
                 self.pop_state()
         elif top == "btmgr":
@@ -15169,6 +23702,28 @@ class App(object):
                     if rows[nxt][1] != "div":
                         break
                 self.updset_sel = nxt
+                row_heights = []
+                for j, (key_, kind, label, sub) in enumerate(rows):
+                    if kind == "div":
+                        row_heights.append(6)
+                        continue
+                    is_ethos = kind == "ethos"
+                    rh = 44 if not is_ethos else 54
+                    sub_lines = self.note_wrap(sub, W - 52 - 44,
+                                              self.f_tiny, 2)
+                    sub_h = 15 * len(sub_lines)
+                    item_h = max(rh, 20 + sub_h + 4)
+                    row_heights.append(item_h)
+                sel_top = sum(row_heights[:self.updset_sel])
+                sel_bot = sel_top + row_heights[self.updset_sel]
+                view_top = getattr(self, "updset_scroll", 0)
+                view_h = H - 40 - 62 - 14 - 14
+                view_bot = view_top + view_h
+                if sel_top < view_top:
+                    self.updset_scroll = max(0, sel_top - 10)
+                elif sel_bot > view_bot:
+                    self.updset_scroll = min(sel_bot - view_h + 10,
+                                             max(0, sum(row_heights) - view_h))
             elif btn == "A" and n:
                 key_, kind, _, _ = rows[self.updset_sel]
                 if kind == "act":
@@ -15197,13 +23752,28 @@ class App(object):
                 self.updset_open = False
                 self.pop_state()
         elif top == "voidupdate":
+            n_menu = 4
             if btn == "UP":
-                self.scroll = max(0, self.scroll - 1)
+                self.updmenu_sel = (self.updmenu_sel - 1) % n_menu
+                scroll_off = self.updmenu_scroll
+                item_h = 36
+                view_h = H - 46 - 14
+                visible = view_h // item_h
+                if self.updmenu_sel < scroll_off:
+                    self.updmenu_scroll = self.updmenu_sel
             elif btn == "DOWN":
-                self.scroll += 1
+                self.updmenu_sel = (self.updmenu_sel + 1) % n_menu
+                scroll_off = self.updmenu_scroll
+                item_h = 36
+                view_h = H - 46 - 14
+                visible = view_h // item_h
+                if self.updmenu_sel >= scroll_off + visible:
+                    self.updmenu_scroll = \
+                        self.updmenu_sel - visible + 1
             elif btn == "X":
                 self.updset_open = True
                 self.updset_sel = 0
+                self.updset_scroll = 0
                 self.push("updsettings")
                 return
             elif btn == "Y":
@@ -15213,57 +23783,87 @@ class App(object):
                 self.update_local_path, self.update_local_ver = \
                     self.update_scan_local()
                 self.update_checking = False
-                self.scroll = 0
-            elif btn == "A" and self.update_available():
-                latest = self.update_latest()
+            elif btn == "A":
                 it = (self.lang == "it")
-                asset_url = None
-                for a in (latest.get("assets") or []):
-                    name = (a.get("name") or "").lower()
-                    if name.endswith(".muxapp") or \
-                            name.endswith(".zip"):
-                        asset_url = a.get("browser_download_url")
-                        break
-                if asset_url:
-                    def go_install():
-                        ok, msg = self.run_busy(
-                            self.t("checking"),
-                            lambda: self.update_download_install(
-                                asset_url))
-                        L = [("sec", "gear", "OK" if ok else
-                             ("errore" if it else "error"))]
-                        L.append(("kv", "", msg,
-                                 OK_G if ok else NO_R))
+                avail = self.update_available()
+                sel = self.updmenu_sel
+                if sel == 0 and avail:
+                    latest = self.update_latest()
+                    asset_url = None
+                    for a in (latest.get("assets") or []):
+                        name = (a.get("name") or "").lower()
+                        if name.endswith(".muxapp") or \
+                                name.endswith(".zip"):
+                            asset_url = a.get("browser_download_url")
+                            break
+                    if asset_url:
+                        def go_install():
+                            ok, msg = self.run_busy(
+                                self.t("checking"),
+                                lambda: self.update_download_install(
+                                    asset_url))
+                            L = [("sec", "gear", "OK" if ok else
+                                 ("errore" if it else "error"))]
+                            L.append(("kv", "", msg,
+                                     OK_G if ok else NO_R))
+                            self.info_lines = L
+                            self.scroll = 0
+                            self.push("info")
+                        self.confirm = ((
+                            "Scaricare e installare %s? VoidDesk andrà "
+                            "riavviato a mano dopo." %
+                            latest.get("tag_name", "?") if it else
+                            "Download and install %s? You'll need to "
+                            "restart VoidDesk afterwards." %
+                            latest.get("tag_name", "?")),
+                            go_install, "AGGIORNAMENTO" if it else
+                            "UPDATE", "gear")
+                        self.push("confirm")
+                    else:
+                        L = [("sec", "gear",
+                              latest.get("tag_name", "?"))]
+                        L.append(("kv", "",
+                                  latest.get("html_url", ""), DIM))
+                        L.append(("kv", "",
+                                  ("nessun file scaricabile "
+                                   "allegato -- apri la pagina e scarica "
+                                   "a mano" if it else
+                                   "no downloadable file attached -- "
+                                   "open the page and download "
+                                   "manually"), FG))
                         self.info_lines = L
                         self.scroll = 0
                         self.push("info")
-                    self.confirm = ((
-                        "Scaricare e installare %s? VoidDesk andrà "
-                        "riavviato a mano dopo." %
-                        latest.get("tag_name", "?") if it else
-                        "Download and install %s? You'll need to "
-                        "restart VoidDesk afterwards." %
-                        latest.get("tag_name", "?")),
-                        go_install, "AGGIORNAMENTO" if it else
-                        "UPDATE", "gear")
-                    self.push("confirm")
-                else:
-                    L = [("sec", "gear", latest.get("tag_name", "?"))]
-                    L.append(("kv", "", latest.get("html_url", ""),
-                             DIM))
-                    L.append(("kv", "", ("nessun file scaricabile "
-                              "allegato -- apri la pagina e scarica "
-                              "a mano" if it else
-                              "no downloadable file attached -- "
-                              "open the page and download "
-                              "manually"), FG))
-                    self.info_lines = L
-                    self.scroll = 0
-                    self.push("info")
+                elif sel == 0:
+                    self.update_checking = True
+                    self.update_data = self.run_busy(
+                        self.t("checking"), self.gh_fetch_releases)
+                    self.update_local_path, self.update_local_ver = \
+                        self.update_scan_local()
+                    self.update_checking = False
+                elif sel == 1:
+                    releases = (self.update_data or {}).get("releases") or []
+                    self.storico_sel = 0
+                    self.storico_scroll = 0
+                    self.push("storico_release")
+                elif sel == 2:
+                    self.local_update_sel = 0
+                    self.local_update_log = []
+                    self.local_update_progress = 0
+                    self.local_update_installing = False
+                    self.update_scan_local_detailed()
+                    self.push("local_update")
+                elif sel == 3:
+                    self.updset_open = True
+                    self.updset_sel = 0
+                    self.updset_scroll = 0
+                    self.push("updsettings")
             elif btn == "SELECT" and self.update_local_path:
-                it = (self.lang == "it")
                 path = self.update_local_path
                 ver = self.update_local_ver
+                it = (self.lang == "it")
+                sd = "SD2" if "/mnt/sdcard" in path else "SD1"
+                sd_txt = ("su %s" % sd) if it else ("on %s" % sd)
 
                 def go_local_install():
                     ok, msg = self.run_busy(
@@ -15276,14 +23876,84 @@ class App(object):
                     self.scroll = 0
                     self.push("info")
                 self.confirm = ((
-                    "Installare v%s trovato su SD? VoidDesk andrà "
-                    "riavviato a mano dopo." % ver if it else
-                    "Install v%s found on SD? You'll need to "
-                    "restart VoidDesk afterwards." % ver),
+                    "Installare v%s %s? I dati personali nella cartella "
+                    "data NON verranno cancellati." % (ver, sd_txt)
+                    if it else
+                    "Install v%s %s? Personal data in the data folder "
+                    "will NOT be deleted." % (ver, sd_txt)),
                     go_local_install, "AGGIORNAMENTO LOCALE" if it
                     else "LOCAL UPDATE", "gear")
                 self.push("confirm")
             elif btn == "B":
+                self.pop_state()
+        elif top == "storico_release":
+            it = (self.lang == "it")
+            releases = (self.update_data or {}).get("releases") or []
+            releases = list(releases)
+            n = len(releases)
+            if btn == "UP" and n:
+                self.storico_sel = (self.storico_sel - 1) % n
+            elif btn == "DOWN" and n:
+                self.storico_sel = (self.storico_sel + 1) % n
+            elif btn == "B":
+                self.pop_state()
+        elif top == "local_update":
+            items = getattr(self, "local_update_items", [])
+            n = len(items)
+            if btn in ("UP", "DOWN") and n:
+                d = -1 if btn == "UP" else 1
+                self.local_update_sel = (self.local_update_sel + d) % n
+                scroll_off = getattr(self, "local_update_scroll", 0)
+                item_h = 52
+                view_h = H - 46 - 14 - 28
+                visible = max(1, view_h // item_h)
+                if self.local_update_sel < scroll_off:
+                    self.local_update_scroll = self.local_update_sel
+                elif self.local_update_sel >= scroll_off + visible:
+                    self.local_update_scroll = \
+                        self.local_update_sel - visible + 1
+            elif btn == "A" and n:
+                pkg = items[self.local_update_sel]
+                if pkg.get("is_newer"):
+                    path = pkg["path"]
+                    ver = pkg["ver"]
+                    it = (self.lang == "it")
+                    sd = pkg["source"]
+                    sd_txt = ("su %s" % sd) if it else ("on %s" % sd)
+
+                    def do_install():
+                        self.local_update_log = []
+                        self.local_update_progress = 0
+                        self.local_update_installing = True
+                        ok, msg = self.local_update_install(
+                            path, log_cb=lambda m: None)
+                        self.local_update_installing = False
+                        self.local_update_progress = 100 if ok else 0
+                        self.local_update_log.append(
+                            "[OK] %s" % msg if ok else
+                            "[ERR] %s" % msg)
+
+                    def start_install():
+                        self.local_update_sel = 0
+                        self.local_update_log = []
+                        self.local_update_progress = 0
+                        self.local_update_installing = False
+                        self.push("local_update_install")
+                        threading.Thread(target=do_install,
+                                         daemon=True).start()
+                    self.confirm = ((
+                        "Installare v%s %s? I dati personali nella "
+                        "cartella data NON verranno cancellati." %
+                        (ver, sd_txt) if it else
+                        "Install v%s %s? Personal data in the data "
+                        "folder will NOT be deleted." % (ver, sd_txt)),
+                        start_install, "AGGIORNAMENTO LOCALE" if it
+                        else "LOCAL UPDATE", "gear")
+                    self.push("confirm")
+            elif btn == "B":
+                self.pop_state()
+        elif top == "local_update_install":
+            if btn == "B":
                 self.pop_state()
         elif top == "pcupsrv":
             n = len(self.pc_servers)
@@ -15334,6 +24004,16 @@ class App(object):
                     self.basestation_serve_stop()
             elif btn == "B":
                 self.pop_state()
+            elif btn == "X":
+                it = (self.lang == "it")
+
+                def done(v):
+                    if v and v.strip():
+                        self.bstation_set_port(v)
+                self.osk_open("PORTA (1-65535)" if it else
+                              "PORT (1-65535)",
+                              str(self.cfg.get("bstation_port", 8765)),
+                              done)
         elif top == "ctrldevices":
             n = len(self.ctrl_devices)
             if btn == "UP" and n:
@@ -15522,6 +24202,37 @@ class App(object):
                 self.shutdown_exec(key_)
             elif btn == "B":
                 self.pop_state()
+        elif top == "endnodering":
+            if btn == "LEFT":
+                self.endnode_ring_rotate(-1)
+            elif btn == "RIGHT":
+                self.endnode_ring_rotate(1)
+            elif btn == "A":
+                self.play("endnode_select")
+                key_ = ENDNODE_ITEMS[self.endnode_ring_sel][0]
+                self.shutdown_exec(key_)
+            elif btn == "B":
+                self.endnode_ring_exit()
+            elif btn == "START":
+                self.crt_off()
+        elif top == "rtcarousel":
+            items = self._rtcarousel_items()
+            n = len(items)
+            if btn == "UP":
+                self.rtcarousel_sel = max(0, self.rtcarousel_sel - 1)
+            elif btn == "DOWN":
+                self.rtcarousel_sel = min(n - 1, self.rtcarousel_sel + 1)
+            elif btn == "A":
+                key_ = items[self.rtcarousel_sel][0]
+                if key_ != "div":
+                    self._rtcarousel_exec(key_)
+            elif btn == "B":
+                self._rtcarousel_exit()
+        elif top == "voidcast":
+            self.voidcast.dispatch(btn)
+            if not self.voidcast.running:
+                self.voidcast.running = True
+                self.pop_state()
         elif top == "pcuplink":
             cur = (self.pc_servers[self.pc_active_idx]
                   if self.pc_active_idx is not None and
@@ -15618,11 +24329,17 @@ class App(object):
             elif btn == "DOWN" and peers:
                 self.ts_sel = (self.ts_sel + 1) % len(peers)
             elif btn == "A" and peers:
+                peer = peers[self.ts_sel]
+                self.ts_detail_peer = peer
+                self.ts_detail_peer["self"] = (self.ts or {}).get("host", "") == peer.get("name", "")
+                self.ts_peer_detail_msg = ""
+                self.push("tspdetail")
+            elif btn == "X" and peers:
                 self.hub_sel = 0
                 self.push("tsact")
             elif btn == "Y":
                 self.hub_sel = 0
-                self.push("tsmenu")
+                self.push("tsgui")
             elif btn == "R1":
                 self.ts_refresh()
             elif btn == "B":
@@ -15640,7 +24357,8 @@ class App(object):
             elif btn == "B":
                 self.pop_state()
         elif top == "tsact":
-            peer = (self.ts or {}).get("peers", [])[self.ts_sel]
+            peers = (self.ts or {}).get("peers", [])
+            peer = peers[self.ts_sel] if 0 <= self.ts_sel < len(peers) else {}
             acts = [("ping", "Ping")]
             if peer.get("exit"):
                 acts.append(("exit", "Usa come exit node"
@@ -15665,6 +24383,280 @@ class App(object):
         elif top == "tsqr":
             if btn == "B":
                 self.pop_state()
+        elif top == "tsgui":
+            acts = self.ts_menu_items()
+            if btn == "UP":
+                self.hub_sel = (self.hub_sel - 1) % len(acts)
+            elif btn == "DOWN":
+                self.hub_sel = (self.hub_sel + 1) % len(acts)
+            elif btn == "A":
+                key = acts[self.hub_sel][0]
+                self.ts_menu_do(key)
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tsconnmgr":
+            items = 4
+            if btn == "UP":
+                self.hub_sel = (self.hub_sel - 1) % items
+            elif btn == "DOWN":
+                self.hub_sel = (self.hub_sel + 1) % items
+            elif btn == "A":
+                run = (self.ts or {}).get("state") == "Running"
+                if self.hub_sel == 0:
+                    if run:
+                        self.run_busy("disconnecting...",
+                                      lambda: self.ts_cli("down"))
+                    else:
+                        def do_up():
+                            import re as _re
+                            proc = subprocess.Popen(
+                                [TS_BIN, "--socket=" + TS_SOCK, "up",
+                                 "--accept-dns=true", "--accept-routes=true"],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True)
+                            url = ""
+                            t0 = time.time()
+                            for ln in proc.stdout:
+                                m = _re.search(
+                                    r"https://login\.tailscale\.com/\S+", ln)
+                                if m:
+                                    url = m.group(0)
+                                    break
+                                if time.time() - t0 > 12:
+                                    break
+                            return url
+                        url = self.run_busy("connecting...", do_up)
+                        if url:
+                            self.ts_login_url = url
+                            try:
+                                self.ts_qr_matrix = qrgen.encode(url)
+                            except Exception:
+                                self.ts_qr_matrix = None
+                            self.push("tsqr")
+                            return
+                    self.ts_refresh()
+                elif self.hub_sel == 1:
+                    self.ts_ssh_enabled = not self.ts_ssh_enabled
+                    self.run_busy(
+                        "SSH %s..." % ("on" if self.ts_ssh_enabled else "off"),
+                        lambda: self.ts_toggle_ssh(self.ts_ssh_enabled))
+                    self.ts_refresh()
+                elif self.hub_sel == 2:
+                    def do_reauth():
+                        import re as _re
+                        proc = subprocess.Popen(
+                            [TS_BIN, "--socket=" + TS_SOCK, "up",
+                             "--accept-dns=true", "--accept-routes=true",
+                             "--force-reauth"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)
+                        url = ""
+                        t0 = time.time()
+                        for ln in proc.stdout:
+                            m = _re.search(
+                                r"https://login\.tailscale\.com/\S+", ln)
+                            if m:
+                                url = m.group(0)
+                                break
+                            if time.time() - t0 > 12:
+                                break
+                        return url
+                    url = self.run_busy("re-authenticating...", do_reauth)
+                    if url:
+                        self.ts_login_url = url
+                        try:
+                            self.ts_qr_matrix = qrgen.encode(url)
+                        except Exception:
+                            self.ts_qr_matrix = None
+                        self.push("tsqr")
+                elif self.hub_sel == 3:
+                    self.pop_state()
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tsfile":
+            items = 3
+            if btn == "UP":
+                self.hub_sel = (self.hub_sel - 1) % items
+            elif btn == "DOWN":
+                self.hub_sel = (self.hub_sel + 1) % items
+            elif btn == "A":
+                it = (self.lang == "it")
+                if self.hub_sel == 0:
+                    dest = "/mnt/mmc/ROMS/Taildrop"
+                    def recv_job():
+                        out, d = self.ts_receive_files(dest)
+                        self.ts_result_msg = "Receive complete:\n\n%s\n\nSaved to:\n%s" % (out.strip()[:120], d)
+                    self.run_busy("receiving...", recv_job)
+                    self.push("tsresult")
+                elif self.hub_sel == 1:
+                    peers = [p for p in (self.ts or {}).get("peers", [])
+                              if p["on"]]
+                    if not peers:
+                        self.ts_result_msg = "No remote devices online."
+                        self.push("tsresult")
+                    else:
+                        self.ts_peers_online = peers
+                        self.hub_sel = 0
+                        self.push("tssendpick")
+                elif self.hub_sel == 2:
+                    self.pop_state()
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tssendpick":
+            peers = getattr(self, "ts_peers_online", [])
+            items = len(peers) + 1
+            if btn == "UP":
+                self.hub_sel = (self.hub_sel - 1) % items
+            elif btn == "DOWN":
+                self.hub_sel = (self.hub_sel + 1) % items
+            elif btn == "A":
+                if self.hub_sel < len(peers):
+                    self.ts_send_target = peers[self.hub_sel]["name"]
+                    self.ts_browse_marked = set()
+                    self.ts_browse_refresh("/mnt/mmc/ROMS")
+                    self.ts_browse_sel = 0
+                    self.push("tsbrowse")
+                else:
+                    self.pop_state()
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tsbrowse":
+            items = len(self.ts_browse_items)
+            if btn == "UP" and items:
+                self.ts_browse_sel = (self.ts_browse_sel - 1) % items
+            elif btn == "DOWN" and items:
+                self.ts_browse_sel = (self.ts_browse_sel + 1) % items
+            elif btn == "A" and items:
+                name, is_dir, _ = self.ts_browse_items[self.ts_browse_sel]
+                if is_dir:
+                    self.ts_browse_enter()
+                else:
+                    full = os.path.join(self.ts_browse_path, name)
+                    if full in self.ts_browse_marked:
+                        self.ts_browse_marked.discard(full)
+                    else:
+                        self.ts_browse_marked.add(full)
+            elif btn == "Y" and self.ts_browse_marked:
+                to_send = list(self.ts_browse_marked)
+                target = self.ts_send_target
+                def send_job():
+                    results = self.ts_send_files(target, to_send)
+                    self.ts_result_msg = "Taildrop to %s:\n\n%s" % (
+                        target, "\n".join(results[:10]))
+                self.run_busy("sending...", send_job)
+                self.ts_browse_marked = set()
+                self.push("tsresult")
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tsoptions":
+            items = 6
+            if btn == "UP":
+                self.hub_sel = (self.hub_sel - 1) % items
+            elif btn == "DOWN":
+                self.hub_sel = (self.hub_sel + 1) % items
+            elif btn == "A":
+                if self.hub_sel == 0:
+                    self.ts_browse_dirs_only = True
+                    self.ts_browse_refresh("/mnt/mmc")
+                    self.ts_browse_sel = 0
+                    self.push("tsbrowsedir")
+                elif self.hub_sel == 1:
+                    self.ts_exit_sel = 0
+                    self.push("tsexitnode")
+                elif self.hub_sel == 2:
+                    self.push("tsnetinfo")
+                elif self.hub_sel == 3:
+                    self.ts_theme_sel = 0
+                    self.push("tstheme")
+                elif self.hub_sel == 4:
+                    def do_logout():
+                        self.run_busy("...", lambda: self.ts_cli("logout"))
+                        self.ts_refresh()
+                    self.confirm = ("Tailscale logout", do_logout)
+                    self.push("confirm")
+                elif self.hub_sel == 5:
+                    self.pop_state()
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tsbrowsedir":
+            items = len(self.ts_browse_items)
+            if btn == "UP" and items:
+                self.ts_browse_sel = (self.ts_browse_sel - 1) % items
+            elif btn == "DOWN" and items:
+                self.ts_browse_sel = (self.ts_browse_sel + 1) % items
+            elif btn == "A" and items:
+                self.ts_browse_enter()
+            elif btn == "LEFT" and items:
+                self.ts_result_msg = "Download directory set to:\n%s" % self.ts_browse_path
+                self.push("tsresult")
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tsexitnode":
+            peers = [p for p in (self.ts or {}).get("peers", [])
+                      if p.get("exit")]
+            items = len(peers) + 1
+            if btn == "UP":
+                self.ts_exit_sel = (self.ts_exit_sel - 1) % items
+            elif btn == "DOWN":
+                self.ts_exit_sel = (self.ts_exit_sel + 1) % items
+            elif btn == "A":
+                target_ip = "" if self.ts_exit_sel == 0 else peers[self.ts_exit_sel - 1]["ip"]
+                label = "Direct Access" if self.ts_exit_sel == 0 else peers[self.ts_exit_sel - 1]["name"]
+                def set_exit():
+                    self.ts_set_exit_node(target_ip)
+                    self.ts_refresh()
+                    self.ts_result_msg = "Exit Node set to:\n%s" % label
+                self.run_busy("setting exit node...", set_exit)
+                self.push("tsresult")
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tspdetail":
+            peer = getattr(self, "ts_detail_peer", {})
+            is_self = peer.get("self", False)
+            if btn == "B":
+                self.pop_state()
+            elif btn == "A" and not is_self and peer.get("ip"):
+                def do_ping():
+                    r = self.ts_ping_peer(peer["ip"])
+                    self.ts_peer_detail_msg = (r.stdout or r.stderr or "?").strip().splitlines()[-1][:80]
+                self.run_busy("pinging...", do_ping)
+            elif btn == "Y" and not is_self and peer.get("exit"):
+                target_ip = "" if peer.get("using") else peer["ip"]
+                def toggle_exit():
+                    self.ts_set_exit_node(target_ip)
+                    self.ts_refresh()
+                    self.ts_result_msg = "Exit node %s." % ("disabled" if peer.get("using") else "enabled")
+                self.run_busy("toggling exit node...", toggle_exit)
+                self.push("tsresult")
+        elif top == "tsnetinfo":
+            if btn in ("A", "B"):
+                self.pop_state()
+        elif top == "tstheme":
+            items = 3
+            themes = ["tailscale", "spdw", "hybrid"]
+            if btn == "UP":
+                self.ts_theme_sel = (self.ts_theme_sel - 1) % items
+            elif btn == "DOWN":
+                self.ts_theme_sel = (self.ts_theme_sel + 1) % items
+            elif btn == "A":
+                chosen = themes[self.ts_theme_sel]
+                theme_map = {"tailscale": "ciano", "spdw": "verde",
+                             "hybrid": "ambra"}
+                self.cfg["ts_theme"] = theme_map.get(chosen, "ciano")
+                save_cfg(self.cfg)
+                self.pop_state()
+            elif btn == "B":
+                self.pop_state()
+        elif top == "tsresult":
+            if btn == "Y" and self.ts_login_url:
+                try:
+                    self.ts_qr_matrix = qrgen.encode(self.ts_login_url)
+                except Exception:
+                    self.ts_qr_matrix = None
+                self.push("tsqr")
+            elif btn in ("A", "B"):
+                self.ts_login_url = ""
+                self.pop_state()
         elif top == "bgmlist":
             n = len(self.bgm_files)
             if btn == "UP" and n:
@@ -15685,6 +24677,14 @@ class App(object):
                 it = (self.lang == "it")
 
                 def go():
+                    _, _, ffmpeg = self.check_media_deps()
+                    if not ffmpeg:
+                        self.notify(
+                            "BGM Normalizer",
+                            "ffmpeg mancante: installa ffmpeg per "
+                            "normalizzare",
+                            "warning")
+                        return
                     self.bgm_proc_idx = 0
                     self.bgm_proc_pct = 0
                     self.bgm_log = []
@@ -15699,11 +24699,152 @@ class App(object):
                     it else "BGM NORMALIZER", "speaker")
                 self.push("confirm")
             elif btn == "B":
+                self.bgm_preview_stop()
+                self.bgm_file_infos.clear()
                 self.pop_state()
         elif top == "bgmproc":
             if btn == "B" and self.bgm_proc_idx >= len(
                     self.bgm_marked):
+                self.bgm_preview_stop()
+                self.bgm_file_infos.clear()
                 self.pop_state()
+                self.pop_state()
+        elif top == "bgmmain":
+            items = 4
+            if btn == "UP":
+                self.bgm_menu_sel = (self.bgm_menu_sel - 1) % items
+            elif btn == "DOWN":
+                self.bgm_menu_sel = (self.bgm_menu_sel + 1) % items
+            elif btn == "CONFIRM":
+                if self.bgm_menu_sel == 0:
+                    self.push("bgmlist")
+                elif self.bgm_menu_sel == 1:
+                    self.bgm_conv_sel = 0
+                    self.push("bgmconv")
+                elif self.bgm_menu_sel == 2:
+                    self.bgm_opt_sel = 0
+                    self.push("bgmoptions")
+                elif self.bgm_menu_sel == 3:
+                    self.push("bgmexitconfirm")
+            elif btn == "BACK":
+                self.pop_state()
+        elif top == "bgmconv":
+            items = 8
+            if btn == "UP":
+                self.bgm_conv_sel = (self.bgm_conv_sel - 1) % items
+            elif btn == "DOWN":
+                self.bgm_conv_sel = (self.bgm_conv_sel + 1) % items
+            elif btn == "CONFIRM":
+                if self.bgm_conv_sel == 0:
+                    self.cfg["bgm_normalize"] = "false" if self.cfg.get("bgm_normalize", "true") == "true" else "true"
+                    save_cfg(self.cfg)
+                elif self.bgm_conv_sel == 1:
+                    self.cfg["bgm_trim"] = "false" if self.cfg.get("bgm_trim", "false") == "true" else "true"
+                    save_cfg(self.cfg)
+                elif self.bgm_conv_sel == 2:
+                    self.cfg["bgm_ogg"] = "false" if self.cfg.get("bgm_ogg", "true") == "true" else "true"
+                    save_cfg(self.cfg)
+                elif self.bgm_conv_sel == 3:
+                    self.cfg["bgm_delete"] = "false" if self.cfg.get("bgm_delete", "false") == "true" else "true"
+                    save_cfg(self.cfg)
+                elif self.bgm_conv_sel == 4:
+                    presets = [-14.0, -12.0, -10.0, -23.0]
+                    cur = float(self.cfg.get("bgm_lufs", "-14.0"))
+                    try:
+                        idx = presets.index(cur)
+                    except ValueError:
+                        idx = 0
+                    self.cfg["bgm_lufs"] = str(presets[(idx + 1) % len(presets)])
+                    save_cfg(self.cfg)
+                elif self.bgm_conv_sel == 5:
+                    sources = ["sd1", "sd2", "both"]
+                    cur = self.cfg.get("bgm_source", "both")
+                    idx = sources.index(cur) if cur in sources else 0
+                    self.cfg["bgm_source"] = sources[(idx + 1) % len(sources)]
+                    save_cfg(self.cfg)
+                elif self.bgm_conv_sel == 6:
+                    modes = ["default", "inplace", "custom"]
+                    cur = self.cfg.get("bgm_out_mode", "default")
+                    idx = modes.index(cur) if cur in modes else 0
+                    self.cfg["bgm_out_mode"] = modes[(idx + 1) % len(modes)]
+                    save_cfg(self.cfg)
+                elif self.bgm_conv_sel == 7:
+                    self.pop_state()
+            elif btn == "BACK":
+                self.pop_state()
+        elif top == "bgmoptions":
+            items = 7
+            if btn == "UP":
+                self.bgm_opt_sel = (self.bgm_opt_sel - 1) % items
+            elif btn == "DOWN":
+                self.bgm_opt_sel = (self.bgm_opt_sel + 1) % items
+            elif btn == "CONFIRM":
+                if self.bgm_opt_sel == 0:
+                    self.lang = "en" if self.lang == "it" else "it"
+                    self.cfg["lang"] = self.lang
+                    save_cfg(self.cfg)
+                elif self.bgm_opt_sel == 1:
+                    self.bgm_theme_sel = 0
+                    self.push("bgmtheme")
+                elif self.bgm_opt_sel == 2:
+                    self.cfg["bgm_glitch"] = "false" if self.cfg.get("bgm_glitch", "true") == "true" else "true"
+                    save_cfg(self.cfg)
+                elif self.bgm_opt_sel == 3:
+                    self.bgm_log_view_lines = []
+                    self.bgm_log_view_scroll = 0
+                    log_path = os.path.join(DATA, "bgm_normalizer.log")
+                    if os.path.exists(log_path):
+                        with open(log_path, "r") as f:
+                            self.bgm_log_view_lines = [l.rstrip("\r\n") for l in f.readlines()]
+                    if not self.bgm_log_view_lines:
+                        self.bgm_log_view_lines = ["No log file found."]
+                    self.bgm_log_view_scroll = max(0, len(self.bgm_log_view_lines) - 15)
+                    self.push("bgmlogview")
+                elif self.bgm_opt_sel == 4:
+                    self.cfg["bgm_normalize"] = "true"
+                    self.cfg["bgm_trim"] = "false"
+                    self.cfg["bgm_ogg"] = "true"
+                    self.cfg["bgm_delete"] = "false"
+                    self.cfg["bgm_lufs"] = "-14.0"
+                    self.cfg["bgm_source"] = "both"
+                    self.cfg["bgm_out_mode"] = "default"
+                    self.cfg["bgm_glitch"] = "true"
+                    save_cfg(self.cfg)
+                elif self.bgm_opt_sel == 5:
+                    self.push("bgmabout")
+                elif self.bgm_opt_sel == 6:
+                    self.pop_state()
+            elif btn == "BACK":
+                self.pop_state()
+        elif top == "bgmabout":
+            if btn in ("CONFIRM", "BACK"):
+                self.pop_state()
+        elif top == "bgmtheme":
+            items = 3
+            themes = ["spdw", "tailscale", "hybrid"]
+            if btn == "UP":
+                self.bgm_theme_sel = (self.bgm_theme_sel - 1) % items
+            elif btn == "DOWN":
+                self.bgm_theme_sel = (self.bgm_theme_sel + 1) % items
+            elif btn == "A":
+                chosen = themes[self.bgm_theme_sel]
+                self.cfg["bgm_theme"] = chosen
+                save_cfg(self.cfg)
+                self.pop_state()
+            elif btn == "B":
+                self.pop_state()
+        elif top == "bgmlogview":
+            cnt = len(self.bgm_log_view_lines)
+            if btn == "UP":
+                self.bgm_log_view_scroll = max(0, self.bgm_log_view_scroll - 1)
+            elif btn == "DOWN":
+                self.bgm_log_view_scroll = min(max(0, cnt - 15), self.bgm_log_view_scroll + 1)
+            elif btn in ("BACK", "CONFIRM"):
+                self.pop_state()
+        elif top == "bgmexitconfirm":
+            if btn == "CONFIRM":
+                self.pop_state()
+            elif btn == "BACK":
                 self.pop_state()
         elif top == "ftpprof":
             profs = self.cfg.get("ftp_profiles", [])
@@ -15905,7 +25046,9 @@ class App(object):
                     else:
                         self.fm_marked.add(p)
             elif btn == "Y" and self.fm_path and not self.fm_pick:
-                self.hub_sel = 0
+                self._fmenu_sel = 0
+                self._fmenu_scroll = 0
+                self._fmenu_anim_start = None
                 self.push("fmenu")
             elif btn == "B":
                 if self.fm_path is None:
@@ -15955,16 +25098,32 @@ class App(object):
             elif btn == "B":
                 self.pop_state()
         elif top == "fmenu":
-            acts = self.fm_menu_items()
+            n = getattr(self, "_fmenu_n_items", 0)
+            if n == 0:
+                if btn == "B":
+                    self.pop_state()
+                return
+
             if btn == "UP":
-                self.hub_sel = (self.hub_sel - 1) % len(acts)
+                self._fmenu_sel = (self._fmenu_sel - 1) % n
+                self.play("move")
             elif btn == "DOWN":
-                self.hub_sel = (self.hub_sel + 1) % len(acts)
+                self._fmenu_sel = (self._fmenu_sel + 1) % n
+                self.play("move")
+            elif btn == "LEFT":
+                self._fmenu_sel = max(0, self._fmenu_sel - 5)
+                self.play("move")
+            elif btn == "RIGHT":
+                self._fmenu_sel = min(n - 1, self._fmenu_sel + 5)
+                self.play("move")
             elif btn == "A":
-                key = acts[self.hub_sel][0]
-                self.pop_state()
-                self.fm_menu_do(key)
+                acts = self.fm_menu_items()
+                if self._fmenu_sel < len(acts):
+                    key = acts[self._fmenu_sel][0]
+                    self.play("click")
+                    self.fm_menu_do(key)
             elif btn == "B":
+                self.play("back")
                 self.pop_state()
         elif top == "imgview":
             if btn in ("B", "A"):
@@ -16026,6 +25185,51 @@ class App(object):
             elif btn == "DOWN":
                 self.scroll = min(max(0, n - 1), self.scroll + 1)
             elif btn == "B":
+                self.pop_state()
+        elif top == "netprobe":
+            if btn == "SELECT":
+                # SELECT apre direttamente l'hub UPLINK
+                self.push("hub:uplink")
+                self.play("open")
+            elif btn == "A":
+                self.netprobe_refresh()
+            elif btn == "B":
+                self.pop_state()
+        elif top == "devcheck":
+            if btn in ("L1", "R1"):
+                d = getattr(self, "devcheck_dept", 0)
+                if d == 1:
+                    m = getattr(self, "devcheck_diag_mode", 0)
+                    m = (m + (1 if btn == "R1" else -1)) % 3
+                    self.devcheck_diag_mode = m
+                else:
+                    d = (d + (1 if btn == "R1" else -1)) % 4
+                    self.devcheck_dept = d
+            elif btn == "UP":
+                if getattr(self, "devcheck_dept", 0) == 1 and getattr(self, "devcheck_diag_mode", 0) == 1:
+                    sel = getattr(self, "_dc_sel_sel", 0)
+                    self._dc_sel_sel = max(0, sel - 1)
+            elif btn == "DOWN":
+                if getattr(self, "devcheck_dept", 0) == 1 and getattr(self, "devcheck_diag_mode", 0) == 1:
+                    sel = getattr(self, "_dc_sel_sel", 0)
+                    self._dc_sel_sel = min(8, sel + 1)
+            elif btn == "A":
+                d = getattr(self, "devcheck_dept", 0)
+                if d == 1 and getattr(self, "devcheck_diag_mode", 0) == 1:
+                    cats = getattr(self, "_dc_sel_cats", ["image", "envs", "sys", "net", "storage"])
+                    all_cats = ["image", "envs", "sys", "net", "storage", "sessions", "deps", "ctrl", "voidcast"]
+                    sel = getattr(self, "_dc_sel_sel", 0)
+                    key = all_cats[sel]
+                    if key in cats:
+                        cats = [c for c in cats if c != key]
+                    else:
+                        cats.append(key)
+                    self._dc_sel_cats = cats
+                else:
+                    self.devcheck_action()
+            elif btn == "B":
+                self.devcheck_dept = 0
+                self.devcheck_diag_mode = 0
                 self.pop_state()
         elif top == "cliinfo":
             n = len(self.info_lines or [])
@@ -16090,39 +25294,23 @@ class App(object):
             elif btn == "B":
                 self.viewer_live = False
                 self.pop_state()
+        elif top == "radixeditor":
+            if hasattr(self, "_radix_editor"):
+                self._radix_editor.handle_button(btn)
+                if not self._radix_editor.running:
+                    self.pop_state()
+                    if hasattr(self, "_radix_editor"):
+                        del self._radix_editor
         else:
             # rete di sicurezza: uno stato senza gestore non deve MAI piu'
             # murare la console. B torna sempre indietro.
             if btn == "B" and len(self.stack) > 1:
                 self.pop_state()
+        if self.busy_cancelled:
+            self.busy_cancelled = False
+            if len(self.stack) > 1:
+                self.pop_state()
 
-    def comp_action(self, key):
-        if key in ("install", "remove", "autostart"):
-            if not os.path.exists(os.path.join(DATA, ".xfce_ready")):
-                self.info_lines = [("sec", "info", self.t("need_xfce"))]
-                self.push("info")
-                return
-            self.run_busy(self.t("mounting"), self.scan_status)
-            self.build_rows()
-            self.marked.clear()
-            self.mode = key
-            self.push("comp" if key != "autostart" else "autostart")
-            if key == "autostart":
-                self.auto_rows()
-        elif key == "update":
-            os.makedirs(DATA, exist_ok=True)
-            with open(os.path.join(DATA, ".install_pkg"), "w") as f:
-                f.write("update\n-\n")
-            self.handoff(self.t("ho_update"))
-            self.exit_code = EXIT_APT_UPDATE
-            self.running = False
-        elif key == "clean":
-            self.info_lines = self.run_busy(self.t("cleaning"),
-                                            self.apt_clean) or []
-            self.scroll = 0
-            self.push("info")
-        elif key == "shell":
-            self.open_real_terminal()
 
     # ================== VOID-DESK UPDATE ==================
     def update_check(self):
@@ -16275,6 +25463,108 @@ class App(object):
                 os.remove(tmp_zip)
             except OSError:
                 pass
+
+    def update_scan_local_detailed(self):
+        """Scans /mnt/mmc/ARCHIVE and /mnt/sdcard/ARCHIVE for .muxapp
+        files, returns list of dicts with path, name, ver, size, source,
+        is_newer."""
+        cur = tuple(int(p) for p in VERSION.split("."))
+        items = []
+        for mount, label in (("/mnt/mmc", "SD1"),
+                             ("/mnt/sdcard", "SD2")):
+            arch = os.path.join(mount, "ARCHIVE")
+            if not os.path.isdir(arch):
+                continue
+            try:
+                names = os.listdir(arch)
+            except OSError:
+                continue
+            for n in names:
+                if not n.lower().endswith(".muxapp"):
+                    continue
+                m = re.search(r"v?(\d+)[._](\d+)", n, re.IGNORECASE)
+                if not m:
+                    continue
+                try:
+                    found_ver = (int(m.group(1)), int(m.group(2)))
+                except ValueError:
+                    continue
+                fpath = os.path.join(arch, n)
+                try:
+                    sz = os.path.getsize(fpath)
+                except OSError:
+                    sz = 0
+                is_newer = found_ver > cur
+                items.append({
+                    "path": fpath,
+                    "name": n,
+                    "ver": "%d.%d" % found_ver,
+                    "size": human(sz),
+                    "source": label,
+                    "is_newer": is_newer,
+                })
+        items.sort(key=lambda x: x["ver"], reverse=True)
+        self.local_update_items = items
+        return items
+
+    def local_update_install(self, path, log_cb=None):
+        """Install from local path, calls log_cb with status messages.
+        Returns (ok, message)."""
+        def log(msg):
+            if log_cb:
+                log_cb(msg)
+            self.local_update_log.append(msg)
+        try:
+            log("[INST] reading %s" % os.path.basename(path))
+            import zipfile
+            import shutil
+            import tempfile
+            stage = os.path.join(tempfile.gettempdir(), "voiddesk_stage")
+            shutil.rmtree(stage, ignore_errors=True)
+            self.local_update_progress = 5
+            log("[EXT] extracting archive")
+            with zipfile.ZipFile(path) as z:
+                z.extractall(stage)
+            self.local_update_progress = 30
+            log("[OK] archive extracted")
+            root = None
+            for cand in [stage] + [os.path.join(stage, d)
+                                   for d in os.listdir(stage)
+                                   if os.path.isdir(os.path.join(stage, d))]:
+                if os.path.exists(os.path.join(cand, "desk", "main.py")):
+                    root = cand
+                    break
+            if not root:
+                shutil.rmtree(stage, ignore_errors=True)
+                log("[ERR] no desk/main.py found")
+                self.local_update_progress = 0
+                return False, "pacchetto trovato ma senza desk/main.py"
+            self.local_update_progress = 50
+            log("[CPY] copying files")
+            try:
+                for entry in os.listdir(root):
+                    if entry == "data":
+                        continue
+                    src = os.path.join(root, entry)
+                    dst = os.path.join(APP_DIR, entry)
+                    if os.path.isdir(src):
+                        shutil.rmtree(dst, ignore_errors=True)
+                        shutil.copytree(src, dst)
+                    else:
+                        shutil.copy2(src, dst)
+            except Exception as e:
+                shutil.rmtree(stage, ignore_errors=True)
+                log("[ERR] copy failed: %s" % str(e)[:60])
+                self.local_update_progress = 0
+                return False, "copia fallita: %s" % str(e)[:100]
+            shutil.rmtree(stage, ignore_errors=True)
+            self.local_update_progress = 100
+            log("[OK] update complete")
+            return True, "aggiornato: riavvia VoidDesk per applicarlo"
+        except Exception as e:
+            log("[ERR] %s" % str(e)[:60])
+            self.local_update_progress = 0
+            return False, "errore: %s" % str(e)[:100]
 
     def apt_clean(self):
         img = os.path.join(DATA, "xfce.img")
@@ -16492,16 +25782,20 @@ class App(object):
             imgmount.umount_tree(mnt, img)
 
     def auto_rows(self):
-        """Righe della schermata avvio al boot: solo programmi installati."""
+        """Righe della schermata avvio al boot: tutti i programmi
+        autostart-eligibili (quelli installati sono selezionabili, quelli
+        non installati sono mostrati in grigio)."""
         rows = []
         for cat, items in CATEGORIES:
             for name, pkgs, desc, paths, ic in items:
                 if name not in AUTOSTART_OK:
                     continue
-                if self.status.get(name) and not pkgs.startswith("!"):
-                    exe = paths.split()[0].split("/")[-1]
-                    rows.append(("item", name, exe, desc, ic))
-        self.rows = rows or [("item", "-", "-", "-", "pkg")]
+                if pkgs.startswith("!"):
+                    continue
+                inst = bool(self.status.get(name))
+                exe = paths.split()[0].split("/")[-1]
+                rows.append(("item", name, exe, desc, ic, inst))
+        self.rows = rows
         self.row_sel = 0
 
     def play_menu_transition(self, i):
@@ -16668,29 +25962,25 @@ class App(object):
             sys.exit(0)
 
     def activate(self, i):
-        if i < 10:
+        # Transizione di apertura
+        if i < 10 and not (i == 9 and self.cfg.get("home_style", DEFAULT_HOME_STYLE) == "nexus"):
             try:
                 self.play_menu_transition(i)
             except Exception as e:
-                sys.stderr.write(
-                    "transizione menu non riuscita: %s\n" % e)
-        # nelle viste orbitali (orbit/nexus) i nodi sono sfere: la
-        # transizione di apertura deve "esplodere" da un cerchio, non
-        # da un rettangolo, per restare coerente con la loro forma.
-        shape = "circle" if self.cfg.get("home_style", DEFAULT_HOME_STYLE) in (
-            "orbit", "nexus") else "rect"
+                sys.stderr.write("transizione menu non riuscita: %s\n" % e)
+
+        shape = "circle" if self.cfg.get("home_style", DEFAULT_HOME_STYLE) in ("orbit", "nexus") else "rect"
+
         if i == 0:
-            cur = self.cfg.get("desk_env", "xfce")
-            self.env_sel = next((j for j, e in enumerate(ENVS)
-                                 if e[0] == cur), 0)
             self.push("session", shape=shape)
         elif i == 1:
-            self.mapp_sel = 0
             self.mapps = self.scan_muos()
             self.push("muosapps", shape=shape)
         elif i == 2:
-            self.hub_sel = 0
-            self.push("hub:mediahub", shape=shape)
+            self.media_vault_phase = "intro"
+            self.media_vault_anim_t0 = time.time()
+            self.media_vault_sel = 0
+            self.push("media_vault", shape="circle")
         elif i in (3, 4, 5, 6):
             hub = ("forge", "toolbox", "uplink", "workshop")[i - 3]
             self.hub_sel = 0
@@ -16702,8 +25992,31 @@ class App(object):
             self.hub_sel = 0
             self.push("hub:infohub", shape=shape)
         elif i == 9:
-            self.shutdown_sel = 0
-            self.push("shutdownmenu", shape=shape)
+            if self.cfg.get("home_style", DEFAULT_HOME_STYLE) == "nexus":
+                self.endnode_ring_enter()
+            else:
+                self.shutdown_sel = 0
+                self.push("shutdownmenu", shape=shape)
+        elif i == 10:
+            self.hub_sel = 0
+            self.play_games_boot()
+            self.push("hub:games", shape=shape)
+        elif i == 11:
+            self.hub_sel = 0
+            self.play_develop_boot()
+            self.push("hub:develop", shape=shape)
+        elif i == 12:
+            self.hub_sel = 0
+            self.play_community_boot()
+            self.push("hub:community", shape=shape)
+        elif i == 13:
+            self.hub_sel = 0
+            self.play_outerdesk_boot()
+            self.push("hub:outerdesk", shape=shape)
+        elif i == 14:
+            self.hub_sel = 0
+            self.play_legacy_boot()
+            self.push("hub:legacy", shape=shape)
 
     # -------------------------------------------------------------- render
     def render_home_hud(self):
@@ -16854,12 +26167,453 @@ class App(object):
         self.text(sub, ((W - sw) // 2, 40), self.f_small, FAINT)
         self.f_small.set_italic(False)
         self.footer([("Y", self.t("view")),
-                     ("SX/DX", self.t("change")), ("A", self.t("open")),
+                     (self.t("k_lr"), self.t("change")), ("A", self.t("open")),
                      ("M", "MEDIA"), ("R2", "USER ID")])
+
+
+    def render_cursedev_secret(self):
+        """Render CURSEDEV secret menu."""
+        if self.cursedev_secret_glitch_phase == 0:
+            return
+        elif self.cursedev_secret_glitch_phase == 1:
+            self.cursedev_glitch_intro()
+        elif self.cursedev_secret_glitch_phase == 2:
+            self.surface.fill(BG)
+            self.cursedev_draw_background(self.surface, time.time())
+            if getattr(self, "cursedev_submenu_active", False):
+                self.cursedev_draw_submenu(self.surface, time.time())
+            else:
+                self.cursedev_draw_categories(self.surface, time.time())
+    
+    def cursedev_glitch_intro(self):
+        """CURSEDEV horror intro: fade -> glitch bars -> title animation."""
+        elapsed = time.time() - self.cursedev_secret_glitch_t0
+        if elapsed > 5.0:
+            self.cursedev_secret_glitch_phase = 2
+            if not self._cursedev_notif_sent:
+                self._cursedev_notif_sent = True
+                txt = ("La curiosità può fare brutti scherzi... "
+                       "o portarti ad un curse...dev") if self.lang == "it" else (
+                       "Curiosity can play nasty tricks... or lead you to a curse...dev")
+                try:
+                    self.notify(("critical", "CURSEDEV", txt, "notice"))
+                except Exception:
+                    pass
+            return
+        it = self.lang == "it"
+        if elapsed < 0.6:
+            k = elapsed / 0.6
+            a = int(255 * (1 - (1 - k) ** 3))
+            s = pygame.Surface((W, H), pygame.SRCALPHA)
+            s.fill((0, 0, 0, a))
+            self.surface.blit(s, (0, 0))
+        elif elapsed < 2.0:
+            for _ in range(6):
+                y = random.randint(0, H)
+                h = random.randint(1, 4)
+                glitch = pygame.Surface((W, h))
+                glitch.fill((random.randint(40, 120), 0, 0))
+                glitch.set_alpha(90)
+                self.surface.blit(glitch, (random.randint(-8, 8), y))
+            if random.random() < 0.35:
+                band = self.surface.subsurface(
+                    (0, random.randint(0, H - 4), W, random.randint(1, 4))
+                ).copy()
+                self.surface.blit(band, (random.randint(-12, 12), 0))
+        else:
+            self.cursedev_draw_background(self.surface, elapsed)
+            red = (200, 20, 20)
+            violet = (180, 50, 255)
+            f_horror = _get_horror_font(56)
+            f_dev = _get_horror_font(48)
+            shake_x = int(2 * math.sin(elapsed * 7.3))
+            shake_y = int(2 * math.cos(elapsed * 5.7))
+            curse_img = f_horror.render("CURSE", True, red)
+            dev_img = f_dev.render("DEV", True, violet)
+            glow = pygame.Surface((curse_img.get_width() + dev_img.get_width() + 20, 60), pygame.SRCALPHA)
+            pygame.draw.rect(glow, (*violet, 80), (0, 0, glow.get_width(), glow.get_height()), border_radius=10)
+            self.surface.blit(glow, (14 - 10, 10 - 10))
+            for i in range(3):
+                angle = elapsed * 2.0 + i * 2.1
+                dx = int(12 * math.cos(angle))
+                dy = int(12 * math.sin(angle))
+                start_x = 14 + curse_img.get_width() + 10 + int(dev_img.get_width() / 2)
+                start_y = 10 + 20
+                end_x = start_x + dx * 3
+                end_y = start_y + dy * 3
+                pygame.draw.line(self.surface, violet, (start_x, start_y), (end_x, end_y), 2)
+            pulse = 0.85 + 0.15 * math.sin(elapsed * 2.0)
+            curse_scaled = pygame.transform.smoothscale(curse_img, (int(curse_img.get_width() * pulse), int(curse_img.get_height() * pulse)))
+            self.surface.blit(curse_scaled, (14 + shake_x, 10 + shake_y))
+            dev_shadow = f_dev.render("DEV", True, (10, 10, 20))
+            self.surface.blit(dev_shadow, (14 + curse_img.get_width() + 4, 10 + 4))
+            self.surface.blit(dev_img, (14 + curse_img.get_width(), 10))
+            if int(elapsed * 3) % 2 == 0:
+                glitch_surf = pygame.Surface((curse_img.get_width() + dev_img.get_width(), 4), pygame.SRCALPHA)
+                glitch_surf.fill((*red, 120))
+                self.surface.blit(glitch_surf, (14, 10 + 20 + int(4 * math.sin(elapsed * 11))))
+    
+    def cursedev_draw_background(self, surf, t):
+        """Disegna lo sfondo animato per CURSEDEV."""
+        for i in range(8):
+            x = int((t * 30 + i * 90) % W)
+            y = int((t * 20 + i * 70) % H)
+            alpha = int(60 + 40 * math.sin(t * 2 + i))
+            for j in range(4):
+                a = max(10, alpha // (j + 1))
+                pygame.draw.line(surf, (a, a, a + 10),
+                                 (x - j * 10, y - j * 5),
+                                 (x - j * 10 - 30, y - j * 5 - 20), 1)
+        r = random.Random(42)
+        for _ in range(5):
+            x1 = r.randint(0, W)
+            y1 = r.randint(0, H)
+            x2 = x1 + r.randint(-60, 60)
+            y2 = y1 + r.randint(-20, 20)
+            alpha = int(80 + 40 * math.sin(t * 1.5 + r.random() * 10))
+            pygame.draw.line(surf, (alpha, 20, 20), (x1, y1), (x2, y2), 1)
+        for p in getattr(self, "_cursedev_particles", []):
+            p["x"] += p["vx"]
+            p["y"] += p["vy"]
+            p["life"] -= 0.01
+            if p["life"] > 0 and 0 < p["x"] < W and 0 < p["y"] < H:
+                a = int(180 * p["life"])
+                pygame.draw.circle(surf, (a, a, a + 10),
+                                   (int(p["x"]), int(p["y"])), p["size"])
+        if not hasattr(self, "_cursedev_particles") or len(self._cursedev_particles) < 30:
+            self._cursedev_particles = []
+            for _ in range(30):
+                self._cursedev_particles.append({
+                    "x": random.randint(0, W),
+                    "y": random.randint(0, H),
+                    "vx": random.uniform(-0.3, 0.3),
+                    "vy": random.uniform(-0.2, 0.2),
+                    "life": random.uniform(0.5, 2.0),
+                    "size": random.randint(1, 3),
+                })
+
+    def cursedev_draw_categories(self, surf, t):
+        """Disegna la griglia 3 colonne delle categorie del menu CURSEDEV."""
+        cursedev_logo = self.badge_img("cursedev", 56)
+        if cursedev_logo is not None:
+            bw_, bh_ = cursedev_logo.get_size()
+            bx = (W - bw_) // 2
+            self.surface.blit(cursedev_logo, (bx, 10))
+        else:
+            s1 = self.f_big_b.render("CURSED", True, (200, 20, 20))
+            s2 = self.f_big_b.render("ev", True, (140, 20, 180))
+            self.surface.blit(s1, ((W - s1.get_width() - s2.get_width()) // 2, 10))
+            self.surface.blit(s2, ((W - s2.get_width()) // 2 + s1.get_width() // 2, 10))
+        cats = getattr(self, "cursedev_menu_items", CURSEDEV_CATEGORIES)
+        keys = getattr(self, "cursedev_category_keys", list(cats.keys()))
+        sel = getattr(self, "cursedev_category_sel", 0)
+        n = len(keys)
+        cols = 3
+        cell_w = (W - 40) // cols
+        cell_h = 64
+        x0 = (W - (cols * cell_w + (cols - 1) * 10)) // 2
+        y0 = 90
+        gap = 10
+        for i, k in enumerate(keys):
+            data = cats[k]
+            name = data["name"][self.lang]
+            desc = data["desc"][self.lang]
+            icon = data.get("icon", "gear")
+            col = i % cols
+            row = i // cols
+            cx = x0 + col * (cell_w + gap)
+            cy = y0 + row * (cell_h + gap)
+            active = (i == sel)
+            if active:
+                pygame.draw.rect(surf, (20, 15, 25), (cx, cy, cell_w, cell_h), border_radius=8)
+                pygame.draw.rect(surf, (150, 20, 170), (cx, cy, cell_w, 4))
+            icons.draw(surf, icon, cx + 12, cy + 10, 24,
+                       self.accent if active else FAINT)
+            f_title = font_bold(14) if active else font(14)
+            f_desc = font(11)
+            self.text(name, (cx + 40, cy + 8), f_title,
+                      (220, 210, 220) if active else (150, 150, 160), maxw=cell_w - 48)
+            self.text(desc, (cx + 40, cy + 26), f_desc,
+                      (120, 110, 120) if active else (80, 80, 90), maxw=cell_w - 48)
+            if active:
+                for _ in range(3):
+                    yy = cy + random.randint(4, cell_h - 4)
+                    gl = pygame.Surface((cell_w - 4, random.randint(1, 2)))
+                    gl.fill((160, 20, 20))
+                    gl.set_alpha(100)
+                    self.surface.blit(gl, (cx + 2, yy))
+        self.footer([
+            (self.t("k_ud"), self.t("change")),
+            (self.t("k_lr"), self.t("change")),
+            ("A", "select"),
+            ("B", "back"),
+        ])
+
+    def cursedev_draw_submenu(self, surf, t):
+        """Disegna un sottomenu con opzioni e descrizione."""
+        cats = getattr(self, "cursedev_menu_items", CURSEDEV_CATEGORIES)
+        keys = getattr(self, "cursedev_category_keys", list(cats.keys()))
+        cat_key = keys[getattr(self, "cursedev_category_sel", 0)]
+        data = cats[cat_key]
+        title = data["name"][self.lang]
+        desc = data["desc"][self.lang]
+        items = data["items"]
+        panel_x, panel_y, panel_w, panel_h = 80, 120, W - 160, H - 200
+        self.npanel(panel_x, panel_y, panel_w, panel_h,
+                    border=(150, 20, 170), fill=(10, 8, 12), cut=12)
+        f_title = font_bold(20)
+        self.text(title, (panel_x + 20, panel_y + 12), f_title, (200, 40, 60))
+        desc_rect = pygame.Rect(panel_x + 16, panel_y + 42, panel_w - 32, 36)
+        pygame.draw.rect(surf, (6, 5, 8), desc_rect, border_radius=4)
+        pygame.draw.rect(surf, (100, 30, 120), desc_rect, 1, border_radius=4)
+        f_desc = font(12)
+        self.text(desc, (panel_x + 24, panel_y + 52), f_desc,
+                  (160, 150, 170), maxw=panel_w - 48)
+        sub_cols = 2
+        sub_cell_w = (panel_w - 32) // sub_cols
+        sub_cell_h = 32
+        sub_x0 = panel_x + 16
+        sub_y0 = panel_y + 88
+        sub_gap = 8
+        for i, item in enumerate(items):
+            col = i % sub_cols
+            row = i // sub_cols
+            cx = sub_x0 + col * (sub_cell_w + sub_gap)
+            cy = sub_y0 + row * (sub_cell_h + sub_gap)
+            selected = (i == self.cursedev_menu_sel)
+            if selected:
+                pygame.draw.rect(surf, (20, 15, 25),
+                                 (cx, cy, sub_cell_w, sub_cell_h),
+                                 border_radius=4)
+                pygame.draw.rect(surf, (150, 20, 170),
+                                 (cx, cy, 4, sub_cell_h))
+            label = item["label"][self.lang]
+            f_opt = font_bold(13) if selected else font(13)
+            self.text(label, (cx + 8, cy + 5), f_opt,
+                      (220, 210, 220) if selected else (150, 150, 160), maxw=sub_cell_w - 24)
+            value = self.cfg.get(item["key"], item.get("default", ""))
+            if item["type"] == "bool":
+                val_str = "ON" if value else "OFF"
+            elif item["type"] == "float":
+                val_str = f"{value:.1f}"
+            elif item["type"] == "action":
+                val_str = ">>"
+                val_color = (200, 40, 60)
+            elif item["type"] == "submenu":
+                val_str = ">"
+                val_color = self.accent
+            else:
+                val_str = str(value)
+            if item["type"] not in ("action", "submenu"):
+                val_color = (200, 40, 60) if (value if isinstance(value, bool) else True) else (100, 100, 110)
+            self.text(val_str, (cx + 8, cy + 19),
+                      font(11), val_color, maxw=sub_cell_w - 24)
+        self.footer([
+            (self.t("k_ud"), self.t("change")),
+            (self.t("k_lr"), self.t("change")),
+            ("A", "select"),
+            ("B", "back"),
+        ])
+
+    def render_cursedev_zenoh(self):
+        """ZENOH schematic: Nexus topology with orbits, nodes, satellites."""
+        self.surface.fill((4, 5, 10))
+        t_now = time.time()
+        cx, cy = W // 2, H // 2 + 10
+        col = self.accent
+        ring_colors = [
+            (80, 140, 200),
+            (120, 200, 140),
+            (200, 160, 80),
+            (160, 120, 200),
+        ]
+        ring_radii = [60, 110, 160, 210]
+        ring_nodes = [
+            NEXUS_RING_MID,
+            NEXUS_RING_OUT,
+            NEXUS_RING_FAR,
+            NEXUS_RING_VOID,
+        ]
+        for rr, rnodes, rcol in zip(ring_radii, ring_nodes, ring_colors):
+            pygame.draw.circle(self.app.surface, (8, 10, 18), (cx, cy), rr + 2, 2)
+            pygame.draw.circle(self.app.surface, rcol + (60,), (cx, cy), rr, 1)
+            ring_speed = {1: 7.0, 2: 3.0, 3: 1.3, 4: 0.5}.get(
+                ring_radii.index(rr) + 1, 3.0) * 0.3
+            for i, idx in enumerate(rnodes):
+                step = 360.0 / len(rnodes)
+                ang = math.radians(step * i + t_now * ring_speed)
+                px = cx + int(rr * math.cos(ang))
+                py = cy + int(rr * 0.46 * math.sin(ang))
+                ncol = NEXUS_NODE_COLOR.get(idx, col)
+                pygame.draw.circle(self.surface, ncol, (px, py), 6)
+                pygame.draw.circle(self.surface, INK, (px, py), 6, 1)
+                lbl = str(idx)
+                lw = self.f_tiny.size(lbl)[0]
+                self.text(lbl, (px - lw // 2, py - 22), self.f_tiny, ncol)
+        sun_r = 18
+        pygame.draw.circle(self.surface, (255, 205, 120), (cx, cy), sun_r)
+        pygame.draw.circle(self.surface, INK, (cx, cy), sun_r, 2)
+        self.text("START", (cx - self.f_tiny.size("START")[0] // 2, cy - 5),
+                  self.f_tiny, (255, 205, 120))
+        title = "ZENOH SCHEMATIC" if self.lang == "en" else "SCHEMA ZENOH"
+        tw = self.f_med_b.size(title)[0]
+        self.text(title, ((W - tw) // 2, 16), self.f_med_b, col)
+        hint = "B " + self.t("back")
+        hw = self.f_small.size(hint)[0]
+        self.text(hint, ((W - hw) // 2, H - 28), self.f_small, FAINT)
+
+    def _cursedev_change_value(self, direction):
+        cats = getattr(self, "cursedev_menu_items", CURSEDEV_CATEGORIES)
+        keys = getattr(self, "cursedev_category_keys", list(cats.keys()))
+        if not keys:
+            return
+        cat_key = keys[self.cursedev_category_sel]
+        cat = cats[cat_key]
+        items = cat["items"]
+        idx = self.cursedev_menu_sel
+        if idx >= len(items):
+            return
+        item = items[idx]
+        key = item["key"]
+        itype = item["type"]
+        if itype == "action":
+            return
+        if itype == "bool":
+            val = not self.cfg.get(key, item.get("default", False))
+            self.cfg[key] = val
+            if hasattr(self, key):
+                setattr(self, key, val)
+            save_cfg(self.cfg)
+        elif itype == "cycle":
+            vals = item.get("values", [])
+            cur = self.cfg.get(key, item.get("default", ""))
+            if cur in vals:
+                ci = vals.index(cur)
+                ni = (ci + direction) % len(vals)
+                nxt = vals[ni]
+            else:
+                nxt = vals[0] if vals else cur
+            self.cfg[key] = nxt
+            if hasattr(self, key):
+                setattr(self, key, nxt)
+            save_cfg(self.cfg)
+            if key == "font_scale":
+                self.build_fonts()
+            elif key == "lang":
+                self.lang = nxt
+                self.rebuild_menu()
+                self.logs = self.build_logs()
+        elif itype in ("float", "range"):
+            cur = self.cfg.get(key, item.get("default", 0))
+            step = item.get("step", 0.1)
+            mn = item.get("min", 0)
+            mx = item.get("max", 100)
+            if isinstance(cur, str):
+                try:
+                    cur = float(cur)
+                except ValueError:
+                    cur = mn
+            nxt = max(mn, min(mx, cur + direction * step))
+            if itype == "range":
+                nxt = int(nxt)
+            self.cfg[key] = nxt
+            if hasattr(self, key):
+                setattr(self, key, nxt)
+            save_cfg(self.cfg)
+        self.play("move")
+
+    def _cursedev_apply_selected(self):
+        cats = getattr(self, "cursedev_menu_items", CURSEDEV_CATEGORIES)
+        keys = getattr(self, "cursedev_category_keys", list(cats.keys()))
+        if not keys:
+            return
+        cat_key = keys[self.cursedev_category_sel]
+        cat = cats[cat_key]
+        items = cat["items"]
+        idx = self.cursedev_menu_sel
+        if idx >= len(items):
+            return
+        
+        # Apertura diretta per azioni singleton (es. RADIX VERITAS)
+        if len(items) == 1 and items[0]["type"] == "action":
+            item = items[0]
+            if item["key"] == "radix_editor":
+                from desk.radixeditor import RadixEditor
+                self._radix_editor = RadixEditor(self)
+                self.push("radixeditor")
+            return
+        
+        item = items[idx]
+        key = item["key"]
+        itype = item["type"]
+
+        if itype == "submenu":
+            submenu_key = item.get("submenu")
+            if submenu_key:
+                self.push(submenu_key)
+                self.play("open")
+            return
+
+        if itype == "action":
+            if key == "radix_editor":
+                from desk.radixeditor import RadixEditor
+                self._radix_editor = RadixEditor(self)
+                self.push("radixeditor")
+            elif key == "zenoh_schema":
+                self.push("cursedev_zenoh")
+            return
+
+        if itype == "text":
+            def done(v):
+                name = v.strip() or item.get("default", "")
+                self.cfg[key] = name
+                save_cfg(self.cfg)
+                if hasattr(self, key):
+                    setattr(self, key, name)
+                if key == "termid_name" and hasattr(self, "termid_result"):
+                    self.termid_result = (name, self.cfg.get("termid_id", ""))
+            self.osk_open(item["label"][self.lang],
+                          self.cfg.get(key, item.get("default", "")),
+                          done)
+            self.play("click")
+        else:
+            self.play("click")
+    
+    def nexus_check_combo_taxis(self, btn):
+        """Check secret combo in Nexus."""
+        if self.stack[-1] != "home":
+            return
+        self.nexus_combo_sequence.append(btn)
+        if len(self.nexus_combo_sequence) > 8:
+            self.nexus_combo_sequence = self.nexus_combo_sequence[-8:]
+        if self.nexus_combo_sequence == self.nexus_combo_target:
+            self.cursedev_secret_glitch_phase = 1
+            self.cursedev_secret_glitch_t0 = time.time()
+            self._cursedev_notif_sent = False
+            self.cursedev_menu_sel = 0
+            self.cursedev_category_sel = 0
+            self.cursedev_submenu_active = False
+            self.cursedev_menu_items = CURSEDEV_CATEGORIES
+            self.cursedev_category_keys = list(CURSEDEV_CATEGORIES.keys())
+            self.push("cursedevsecret")
+            self.nexus_combo_sequence = []
 
     def render_state(self):
         top = self.stack[-1]
-        home_style = self.cfg.get("home_style", DEFAULT_HOME_STYLE)
+        cfg = self.cfg
+        home_style = cfg.get("home_style", DEFAULT_HOME_STYLE)
+        surf = self.surface
+        accent = self.accent
+        sel = self.sel
+        menu = self.menu
+        menu_icons = self.menu_icons
+        f_big_b = self.f_big_b
+        f_med_b = self.f_med_b
+        f_small = self.f_small
+        f_med = self.f_med
+        f_tiny = self.f_tiny
+        last_sel_rect = self.last_sel_rect
+        home_scroll = self.home_scroll
         if top == "home" and home_style == "hud":
             self.render_home_hud()
         elif top == "home" and home_style == "terminal":
@@ -16868,6 +26622,34 @@ class App(object):
             self.render_home_orbit()
         elif top == "home" and home_style == "nexus":
             self.render_home_nexus()
+        elif top == "nexussat":
+            self.render_nexus_satellite()
+        elif top == "outerdesk":
+            self.render_outerdesk()
+        elif top == "outerdesk_detail":
+            self.render_outerdesk_detail()
+        elif top == "outerdesk_running":
+            self.render_outerdesk_running()
+        elif top == "endnodering":
+            self.render_endnode_ring()
+        elif top == "rtcarousel":
+            self.render_rtcarousel()
+        elif top == "voidcast":
+            self.voidcast.draw(self.surface)
+        elif top == "cursedevsecret":
+            self.render_cursedev_secret()
+        elif top == "cursedev_zenoh":
+            self.render_cursedev_zenoh()
+        elif top == "mechaconfig":
+            self._mecha_config_draw()
+        elif top == "media_panel_config" or top == "outer_panel_config":
+            self.render_panel_config(top.replace("_config", ""))
+        elif top == "mecha_panel_config":
+            self._mecha_config_draw()
+        elif top == "session":
+            self.render_session()
+        elif top == "media_vault":
+            self.render_media_vault()
         elif top == "home":
             self.header("__brand__")
             hy, hh = 50, 96
@@ -16944,29 +26726,23 @@ class App(object):
             gx0, gy0, colw, rowh, gap = 8, hy + hh + 10, 308, 67, 8
             grid_clip = pygame.Rect(0, gy0, W, H - 46 - gy0)
             self.surface.set_clip(grid_clip)
+            blame_irregular = [(14, 4), (16, -3), (10, 6), (12, -2), (8, 5), (14, -4), (11, 3), (9, -5), (13, 2), (7, 4)]
             for i in range(1, len(self.menu)):
                 r_, c_ = divmod(i - 1, 2)
                 x = gx0 + c_ * (colw + gap)
                 y = gy0 + r_ * (rowh + gap) - self.home_scroll
                 sel = (i == self.sel)
                 tile_r = 14
+                cut, slant = blame_irregular[(i - 1) % len(blame_irregular)]
                 if sel:
                     self.last_sel_rect = (x, y, colw, rowh)
-                    pygame.draw.rect(self.surface, self.sel_bg,
-                                     (x, y, colw, rowh),
-                                     border_radius=tile_r)
-                    pygame.draw.rect(self.surface, self.accent,
-                                     (x, y, colw, rowh), 2,
-                                     border_radius=tile_r)
+                    self.sel_frame(x, y, colw, rowh, color=self.accent,
+                                   cut=cut, slant=slant)
                     pygame.draw.circle(self.surface, self.accent,
                                        (x + colw - 10, y + 10), 3, 1)
                 else:
-                    pygame.draw.rect(self.surface, INK,
-                                     (x, y, colw, rowh),
-                                     border_radius=tile_r)
-                    pygame.draw.rect(self.surface, LINE,
-                                     (x, y, colw, rowh), 1,
-                                     border_radius=tile_r)
+                    self.npanel(x, y, colw, rowh, border=LINE, fill=INK,
+                               cut=cut, slant=slant)
                 isz = 34
                 icx = (x + colw - isz - 14) if c_ == 0 else (x + 14)
                 icy = y + (rowh - isz) // 2
@@ -17023,24 +26799,30 @@ class App(object):
                             cut=10 if big else 6)
                 f = self.f_big if big else self.f_small
                 cw = self.f_small.size(chip)[0]
-                self.npanel(x + 10, y + (h - 24) // 2, cw + 14, 24,
+                iw = 26 if big else 18
+                lw = f.size(label)[0]
+                chip_pw = cw + 14
+                gap = 12
+                total_w = chip_pw + gap + iw + gap + lw
+                cx = x + (w - total_w) // 2
+                cy_chip = y + (h - 24) // 2
+                cy_icon = y + (h - iw) // 2
+                cy_label = y + (h - f.get_height()) // 2
+                self.npanel(cx, cy_chip, chip_pw, 24,
                             border=col, fill=INK, cut=5)
-                self.text(chip, (x + 17, y + (h - 24) // 2 + 3),
+                self.text(chip, (cx + 7, cy_chip + 3),
                           self.f_small, col)
-                ix = x + 10 + cw + 26
-                icons.draw(self.surface, icon, ix,
-                           y + (h - (26 if big else 18)) // 2,
-                           26 if big else 18, col)
-                self.text(label, (ix + (34 if big else 26),
-                                  y + (h - f.get_height()) // 2), f,
-                          col)
+                icon_x = cx + chip_pw + gap
+                icons.draw(self.surface, icon, icon_x, cy_icon, iw, col)
+                self.text(label,
+                          (icon_x + iw + gap, cy_label), f, col)
             if not rm:
                 tab(10, 6, 366, 40, ac, "L1", "pkg", "INSTALLER",
                     True, True)
-                tab(404, 12, 226, 30, cc, "R1", "trash", "UNINSTALLER",
+                tab(404, 16, 226, 30, cc, "R1", "trash", "UNINSTALLER",
                     False, False)
             else:
-                tab(10, 12, 206, 30, ac, "L1", "pkg", "INSTALLER",
+                tab(10, 16, 206, 30, ac, "L1", "pkg", "INSTALLER",
                     False, False)
                 tab(264, 6, 366, 40, cc, "R1", "trash", "UNINSTALLER",
                     True, True)
@@ -17062,12 +26844,12 @@ class App(object):
                           (W - 26 - self.f_small.size(ptxt)[0], 57),
                           self.f_small,
                           mc if n else (NO_R if pct > 85 else DIM))
-                bw = W - 240
+                bw = W - 80
                 pygame.draw.rect(self.surface, (14, 15, 19),
-                                 (170, 72, bw, 5))
+                                 (40, 72, bw, 5))
                 pygame.draw.rect(self.surface,
                                  NO_R if pct > 85 else mc,
-                                 (170, 72, bw * pct // 100, 5))
+                                 (40, 72, bw * pct // 100, 5))
             else:
                 y0 = 52
             per = (H - 46 - y0) // 44
@@ -17118,9 +26900,9 @@ class App(object):
                     icons.draw(self.surface, ic_, 46, y + 8, 24,
                                mc if sel else FAINT)
                     self.text(name, (78, y + 2), self.f_med,
-                              FG if sel else DIM, maxw=W - 236)
+                              FG if sel else DIM, maxw=W - 120)
                     self.text(desc, (78, y + 23), self.f_tiny, FAINT,
-                              maxw=W - 256)
+                              maxw=W - 140)
                     st = "OK" if inst else "—"
                     self.text(st,
                               (W - 26 - self.f_small.size(st)[0],
@@ -17135,10 +26917,10 @@ class App(object):
                     icons.draw(self.surface, ic_, W - 96, y + 9, 20,
                                mc if sel else FAINT)
                     ncol = (FG if sel else DIM) if inst else FAINT
-                    nw = min(self.f_med.size(name)[0], W - 340)
+                    nw = min(self.f_med.size(name)[0], W - 160)
                     self.text(name, (W - 104 - nw, y + 2), self.f_med,
                               ncol, maxw=nw + 4)
-                    dw = min(self.f_tiny.size(desc)[0], W - 340)
+                    dw = min(self.f_tiny.size(desc)[0], W - 160)
                     self.text(desc, (W - 104 - dw, y + 23),
                               self.f_tiny, FAINT, maxw=dw + 4)
                 y += 44
@@ -17162,7 +26944,8 @@ class App(object):
             tabs = ["all", "sd1", "sd2"]
             tab_lbl = {"all": "TUTTE" if it else "ALL",
                        "sd1": "SD1", "sd2": "SD2"}
-            self.header(self.t("mapps_t"), "%s | %s" % (vtag, tab_lbl[self.mapp_sd_tab]))
+            self.header(self.t("mapps_t"), "%s | %s" %
+                       (vtag, tab_lbl[self.mapp_sd_tab]), badge="muosapps")
             self.npanel(8, 44, W - 16, 24, border=self.accent,
                         fill=(10, 12, 18), cut=6)
             self.text("MUOS APP DRAWER", (18, 49), self.f_tiny, self.accent)
@@ -17317,59 +27100,7 @@ class App(object):
                          ("R1", self.t("mapps_r1")),
                          ("B", self.t("back"))])
         elif top == "session":
-            it = (self.lang == "it")
-            self.header(self.t("sess"))
-            base, extra = self.read_envs()
-            cur = self.cfg.get("desk_env", "xfce")
-            imgtxt, imgcol = self.img_state_line()
-            CUTS = {"xfce": 20, "icewm": 30, "lxde": 10}
-            y = 50
-            bh = 122
-            for j, (env, _lbl, _pkgs) in enumerate(ENVS):
-                col = self.env_color(env)
-                inst = base and (env == "xfce" or env in extra)
-                sel = (j == self.env_sel)
-                dim = col if (inst or not base) else FAINT
-                if sel:
-                    self.sel_frame(8, y, W - 16, bh, color=col,
-                                   cut=CUTS[env])
-                else:
-                    self.npanel(8, y, W - 16, bh, border=LINE, fill=INK,
-                                cut=CUTS[env])
-                self.env_box_motif(env, 8, y, W - 16, bh, dim)
-                icx, icy, icsz = 20, y + 15, 60
-                fillbox = sel_tint(col) if sel else INK
-                self.env_icon_frame(env, icx, icy, icsz, dim, fillbox)
-                self.env_glyph(env, icx + 8, icy + 7, 3, dim)
-                nbx = icx + icsz + 4
-                nbw = 216
-                self.env_name_frame(env, nbx, icy, nbw, icsz, dim,
-                                    fillbox)
-                self.text(env.upper(), (nbx + 18, icy + 8), self.f_big,
-                          dim)
-                self.text(ENV_CODENAME.get(env, ""), (nbx + 19,
-                          icy + 42), self.f_small,
-                          DIM if (inst or not base) else FAINT)
-                if not base:
-                    btxt, bcol = self.t("e_base"), DIM
-                elif env == cur and inst:
-                    btxt, bcol = "\u25b6 " + self.t("e_active"), OK_G
-                elif inst:
-                    btxt, bcol = "\u2713 " + self.t("e_inst"), OK_G
-                else:
-                    btxt, bcol = "\u2715 " + self.t("e_missing"), NO_R
-                bw_ = self.f_small.size(btxt)[0]
-                bx = W - 26 - bw_
-                self.npanel(bx - 14, y + 15, bw_ + 24, 26, border=bcol,
-                            fill=INK, cut=6)
-                self.text(btxt, (bx - 4, y + 19), self.f_small, bcol)
-                pygame.draw.line(self.surface, LINE, (18, y + bh - 24),
-                                 (W - 18, y + bh - 24), 1)
-                self.text(imgtxt, (18, y + bh - 19), self.f_tiny, imgcol)
-                y += bh + 8
-            self.footer([("A", self.t("sess_a")),
-                         ("X", "dettagli" if it else "details"),
-                         ("B", self.t("back"))])
+            self.draw_session()
         elif top == "diagscan":
             it = (self.lang == "it")
             self.header("VOID DIAG", icon="gear")
@@ -17458,7 +27189,7 @@ class App(object):
                         ("B", self.t("back"))])
         elif top == "chdrun":
             it = (self.lang == "it")
-            self.header("DISC CRUSHER", icon="cd_disc")
+            self.header("DISC CRUSHER", icon="cd_disc", badge="disc_crusher")
             snap = self.chd_snapshot()
             self.content_panel(46, H - 40)
             done, rc = snap["done"], snap["rc"]
@@ -17730,8 +27461,8 @@ class App(object):
                 "".join(str(s) for s in self.rtsh_symbol_map))
             self.text(prev, (bx + 12, by + 140), self.f_small, FG,
                       maxw=bw - 24)
-            self.footer([("SX/DX", "cifra" if it else "digit"),
-                        ("SU/GIU", "simbolo" if it else "symbol"),
+            self.footer([(self.t("k_lr"), "cifra" if it else "digit"),
+                        (self.t("k_ud"), "simbolo" if it else "symbol"),
                         ("B", self.t("back"))])
         elif top == "rtshhk":
             it = (self.lang == "it")
@@ -17764,7 +27495,7 @@ class App(object):
             it = (self.lang == "it")
             chd_gold = (210, 165, 70)
             sd2_col = (70, 210, 225)
-            self.header("DISC CRUSHER", icon="cd_disc")
+            self.header("DISC CRUSHER", icon="cd_disc", badge="disc_crusher")
             pygame.draw.rect(self.surface, (18, 15, 8), (0, 44, W,
                              H - 44))
             has_sd1 = len(self.chd_sd_list) > 0
@@ -17850,7 +27581,7 @@ class App(object):
             fd = self.chd_detail_file
             sd_col = self.accent if self.chd_detail_sd_idx == 0 else \
                 (70, 210, 225)
-            self.header("DISC CRUSHER", icon="cd_disc")
+            self.header("DISC CRUSHER", icon="cd_disc", badge="disc_crusher")
             pygame.draw.rect(self.surface, sd_col, (0, 42, W, 3))
             pygame.draw.rect(self.surface, (18, 15, 8), (0, 45, W,
                              H - 45))
@@ -17960,7 +27691,7 @@ class App(object):
         elif top == "chdconvprep":
             it = (self.lang == "it")
             chd_gold = (210, 165, 70)
-            self.header("DISC CRUSHER", icon="cd_disc")
+            self.header("DISC CRUSHER", icon="cd_disc", badge="disc_crusher")
             pygame.draw.rect(self.surface, (18, 15, 8), (0, 44, W,
                              H - 44))
             files = self.chd_conv_files
@@ -18006,7 +27737,7 @@ class App(object):
         elif top == "chdconv":
             it = (self.lang == "it")
             chd_gold = (210, 165, 70)
-            self.header("DISC CRUSHER", icon="cd_disc")
+            self.header("DISC CRUSHER", icon="cd_disc", badge="disc_crusher")
             pygame.draw.rect(self.surface, (18, 15, 8), (0, 44, W,
                              H - 44))
             snap = self.chd_snapshot()
@@ -18226,25 +27957,31 @@ class App(object):
             first = max(0, min(self.row_sel - per // 2, len(rows) - per))
             y = 54
             for i in range(first, min(first + per, len(rows))):
-                _t0, name, exe, desc, ic = rows[i]
+                _t0, name, exe, desc, ic, inst = rows[i]
                 on = name in auto
+                sel = (i == self.row_sel)
+                ic_col = (self.accent if on else
+                          (DIM if not inst else FAINT))
                 if i == self.row_sel:
                     self.sel_frame(8, y, W - 16, 44)
-                icons.draw(self.surface, ic, 20, y + 11, 22,
-                           self.accent if on else DIM)
-                self.text(name, (54, y + 3), self.f_med,
-                          FG if i == self.row_sel else DIM)
+                icons.draw(self.surface, ic, 20, y + 11, 22, ic_col)
+                name_col = FG if sel else DIM
+                self.text(name, (54, y + 3), self.f_med, name_col)
                 self.text(exe, (54, y + 24), self.f_tiny, FAINT)
-                lab = self.t("auto_on") if on else self.t("auto_off")
+                if not inst:
+                    lab = self.t("auto_off")
+                else:
+                    lab = self.t("auto_on") if on else self.t("auto_off")
                 lw = self.f_small.size(lab)[0]
                 self.npanel(W - lw - 34, y + 10, lw + 18, 24,
-                            border=(OK_G if on else LINE), fill=INK, cut=6)
+                            border=(OK_G if on else (LINE if inst else FAINT)),
+                            fill=INK, cut=6)
                 self.text(lab, (W - lw - 25, y + 13), self.f_small,
-                          OK_G if on else FAINT)
+                          OK_G if on else (FAINT if not inst else FAINT))
                 y += 46
             self.footer([("A", self.t("change")), ("B", self.t("back"))])
         elif top == "map":
-            self.header(self.t("title_map"))
+            self.header(self.t("title_map"), accent=UPLINK_ACCENT)
             rows = self.map_rows()
             per = 8
             first = max(0, min(self.map_sel - per // 2, len(rows) - per))
@@ -18252,17 +27989,17 @@ class App(object):
             for i in range(first, min(first + per, len(rows))):
                 key = rows[i]
                 if i == self.map_sel:
-                    self.sel_frame(8, y, W - 16, 44)
+                    self.sel_frame(8, y, W - 16, 44, color=UPLINK_ACCENT)
                 if key == "__stick__":
                     icons.draw(self.surface, "gamepad", 20, y + 10, 24,
-                               self.accent)
+                               UPLINK_ACCENT)
                     self.text(self.t("map_stick"), (54, y + 3), self.f_med,
                               FG if i == self.map_sel else DIM)
                     val = self.cfg.get("mouse_stick", "sinistro")
                 else:
                     f = FUNC_BY_KEY[key]
                     icons.draw(self.surface, f[3], 20, y + 10, 24,
-                               self.accent)
+                               UPLINK_ACCENT)
                     lab = f[1] if self.lang == "it" else f[2]
                     self.text(lab, (54, y + 3), self.f_med,
                               FG if i == self.map_sel else DIM)
@@ -18275,18 +28012,18 @@ class App(object):
                 self.npanel(W - vw - 34, y + 8, vw + 16, 26,
                             border=LINE, fill=INK, cut=6)
                 self.text(val, (W - vw - 26, y + 11), self.f_med,
-                          self.accent)
+                          UPLINK_ACCENT)
                 y += 46
             self.footer([("A", self.t("assign")), ("Y", self.t("reset")),
                          ("X", self.t("reset_all")), ("B", self.t("back"))])
         elif top == "capture":
-            self.header(self.t("title_map"))
+            self.header(self.t("title_map"), accent=UPLINK_ACCENT)
             key = self.map_rows()[self.map_sel]
             f = FUNC_BY_KEY[key]
             lab = f[1] if self.lang == "it" else f[2]
-            self.npanel(60, 150, W - 120, 170, border=self.accent,
+            self.npanel(60, 150, W - 120, 170, border=UPLINK_ACCENT,
                         fill=INK, cut=14)
-            icons.draw(self.surface, f[3], W // 2 - 16, 172, 32, self.accent)
+            icons.draw(self.surface, f[3], W // 2 - 16, 172, 32, UPLINK_ACCENT)
             t1 = self.t("press")
             self.text(t1, (W // 2 - self.f_small.size(t1)[0] // 2, 218),
                       self.f_small, DIM)
@@ -18298,7 +28035,7 @@ class App(object):
                       self.f_tiny, FAINT)
         elif top == "swap":
             key, ev, other = self.pending
-            self.header(self.t("title_map"))
+            self.header(self.t("title_map"), accent=UPLINK_ACCENT)
             fk = FUNC_BY_KEY[key]
             fo = FUNC_BY_KEY[other]
             lk = fk[1] if self.lang == "it" else fk[2]
@@ -18310,7 +28047,7 @@ class App(object):
                       self.f_med, FG, maxw=W - 100)
             m2 = "%s  →  %s" % (EV2NAME.get(ev, "?"), lk)
             self.text(m2, (W // 2 - self.f_med.size(m2)[0] // 2, 222),
-                      self.f_med, self.accent)
+                      self.f_med, UPLINK_ACCENT)
             m3 = self.t("swap_q")
             self.text(m3, (W // 2 - self.f_small.size(m3)[0] // 2, 270),
                       self.f_small, DIM)
@@ -18350,6 +28087,12 @@ class App(object):
                                          0 if on else 1)
                     y += 40
                     continue
+                if ck == "nexus_bg":
+                    arrow = ">"
+                    vw = self.f_med.size(arrow)[0]
+                    self.text(arrow, (W - vw - 30, y + 8), self.f_med, self.accent)
+                    y += 40
+                    continue
                 val = self.cfg.get(ck, vals[0] if vals else "")
                 vs = self.tx(VAL_EN, self.t("yes") if val is True else
                              self.t("no") if val is False else str(val))
@@ -18374,9 +28117,11 @@ class App(object):
                             border=LINE, fill=INK, cut=6)
                 self.text(vs, (W - vw - 30, y + 8), self.f_med, self.accent)
                 y += 40
-            self.footer([("SX/DX", "regola" if self.lang == "it"
+            self.footer([(self.t("k_lr"), "regola" if self.lang == "it"
                          else "adjust"), ("A", self.t("change")),
                         ("B", self.t("back"))])
+        elif top == "nexus_bg_customizer":
+            self.render_nexus_bg_customizer()
         elif top == "logs":
             self.header(self.t("w_logs"), icon="doc")
             per = max(1, (H - 40 - 50) // 42)
@@ -18409,13 +28154,17 @@ class App(object):
                 y += 42
             self.footer([("A", self.t("open")),
                          ("X", "archivio" if self.lang == "it" else
-                         "archive"), ("B", self.t("back"))])
+                         "archive"),
+                         ("Y", "registro" if self.lang == "it" else
+                         "registry"),
+                         ("B", self.t("back"))])
         elif top == "logarchive":
             it = (self.lang == "it")
+            AMB = (255, 200, 90)
             self.header("LOG REGISTRY", icon="doc")
             roots = self.fm_roots()
             actions = [("sd:" + p, lbl) for p, lbl in roots] + \
-                [("clear", None)]
+                [("cleanup", None), ("clear", None)]
             total, cnt = self.logs_total_size()
             self.text(("archivio di TUTTI i log in un file .zip -- "
                       "%d log, %s totali" % (cnt, human(total))) if it
@@ -18437,6 +28186,15 @@ class App(object):
                               it else "empties the content, files "
                               "remain", (54, y + 26), self.f_tiny,
                               FAINT, maxw=W - 80)
+                elif act == "cleanup":
+                    icons.draw(self.surface, "shield", 18, y + 10, 24,
+                              AMB if sel else FAINT)
+                    self.text("pulisci log obsoleti" if it else
+                              "cleanup stale logs", (54, y + 6), self.f_med,
+                              AMB if sel else DIM)
+                    self.text("rimuove duplicati e log > 7gg" if it else
+                              "removes duplicates and logs > 7d", (54, y + 26),
+                              self.f_tiny, FAINT, maxw=W - 80)
                 else:
                     icons.draw(self.surface, "download", 18, y + 10, 24,
                               self.accent if sel else FAINT)
@@ -18448,10 +28206,114 @@ class App(object):
                               maxw=W - 80)
                 y += 52
             self.footer([("A", self.t("confirm")), ("B", self.t("back"))])
+        elif top == "logviewer":
+            it = (self.lang == "it")
+            self.header("REGISTRO LOG" if it else "LOG REGISTRY", icon="doc")
+            filter_src = self._logviewer_filter_source
+            filter_lvl = self._logviewer_filter_level
+            entries = self.log_registry.get_entries(
+                source_filter=filter_src,
+                level_filter=filter_lvl,
+                limit=300)
+            level_colors = {
+                "DEBUG": FAINT, "INFO": FG,
+                "WARNING": (230, 200, 60), "ERROR": (230, 80, 80),
+                "CRITICAL": (255, 50, 50),
+            }
+            y = 56
+            visible_rows = (H - 100) // 18
+            total = len(entries)
+            start = max(0, getattr(self, '_logviewer_scroll', 0))
+            start = min(start, max(0, total - visible_rows))
+            for i in range(start, min(start + visible_rows, total)):
+                e = entries[i]
+                col = level_colors.get(e["level"], FG)
+                src = e["source"][:8]
+                line = "[%s] [%s] [%s] %s" % (e["timestamp"][11:], e["level"][:4], src, e["message"][:55])
+                self.text(line, (10, y), self.f_tiny, col, maxw=W - 20)
+                y += 18
+            filter_label = ""
+            if filter_src:
+                filter_label += "src=%s " % filter_src[:6]
+            if filter_lvl:
+                filter_lvl += "lvl=%s" % filter_lvl
+            if filter_label:
+                self.text(filter_label.strip(), (10, H - 42), self.f_tiny, FAINT, maxw=W - 20)
+            self.footer([("A", "filtri" if it else "filters"),
+                         ("X", "archivio" if it else "archive"),
+                         ("Y", "pulisci" if it else "clear"),
+                         ("B", self.t("back"))])
+        elif top == "loggersummoner":
+            it = (self.lang == "it")
+            self.header("LOGGER SUMMONER" if it else "LOGGER SUMMONER", icon="gear")
+            all_loggers = self.logger_manager.get_all_loggers()
+            mods = sorted(all_loggers.keys())
+            y = 56
+            item_h = 26
+            visible = self._logger_visible
+            n = len(mods)
+            if self._logger_sel < self._logger_scroll:
+                self._logger_scroll = self._logger_sel
+            elif self._logger_sel >= self._logger_scroll + visible:
+                self._logger_scroll = self._logger_sel - visible + 1
+            start = self._logger_scroll
+            for i in range(start, min(start + visible, n)):
+                mod = mods[i]
+                logger = all_loggers[mod]
+                sel = (i == self._logger_sel)
+                if sel:
+                    pygame.draw.rect(self.surface, sel_tint(self.accent),
+                                     (8, y - 2, W - 16, item_h), border_radius=4)
+                    pygame.draw.rect(self.surface, self.accent,
+                                     (8, y - 2, W - 16, item_h), 1, border_radius=4)
+                is_fundamental = self.logger_manager.is_fundamental(mod)
+                if is_fundamental:
+                    label_color = (200, 200, 210)
+                    stato = "ON*" if it else "ON*"
+                    stat_col = self.accent
+                else:
+                    label_color = FG if sel else DIM
+                    stato = "ON" if logger.enabled else "OFF"
+                    stat_col = OK_G if logger.enabled else NO_R
+                desc = self.logger_manager.get_description(mod)
+                self.text(mod[:12].upper(), (18, y + 4), self.f_small, label_color)
+                if desc and sel:
+                    self.text(desc[:35], (120, y + 4), self.f_tiny, FAINT, maxw=200)
+                self.text(stato, (W - 60, y + 4), self.f_small, stat_col)
+                y += item_h
+            if n > visible:
+                bar_x = W - 6
+                bar_y = 56
+                bar_h = visible * item_h
+                thumb_h = max(20, int(bar_h * visible / n))
+                thumb_y = bar_y + int((bar_h - thumb_h) * start / max(1, n - visible))
+                pygame.draw.rect(self.surface, LINE, (bar_x, bar_y, 4, bar_h))
+                pygame.draw.rect(self.surface, self.accent, (bar_x, thumb_y, 4, thumb_h))
+            self.footer([(self.t("k_ud"), "seleziona" if it else "select"),
+                         ("A", "toggle ON/OFF" if it else "toggle ON/OFF"),
+                         ("B", self.t("back"))])
+        elif top == "logdashboard":
+            self.render_log_dashboard()
+        elif top == "voiddecontext":
+            self.render_voiddecontext()
         elif top == "info":
-            self.header(self.info_title or self.t("title_info"))
+            # v10.7: la targhetta SPDW compare solo qui, sulla
+            # schermata About -- info_title e' condiviso da una
+            # cinquantina di altre schermate (WIFI, BLUETOOTH, log,
+            # diagnosi...) che non devono cambiare.
+            about_screen = self.info_title in ("INFO PROGETTO",
+                                               "PROJECT INFO")
+            guide_screen = self.info_title in ("GUIDA CONTROLLI",
+                                               "CONTROLS GUIDE")
+            self.header(self.info_title or self.t("title_info"),
+                        badge="info" if about_screen else
+                        ("guide" if guide_screen else None))
             self.render_info_rows(self.accent)
             self.footer([(self.t("k_ud"), self.t("page")), ("B", self.t("back"))])
+        elif top == "netprobe":
+            self.draw_netprobe()
+        elif top == "devcheck":
+            self.draw_devcheck()
         elif top == "cliinfo":
             self.cli_backdrop()
             pygame.draw.rect(self.surface, (2, 5, 2), (0, 0, W, 42))
@@ -18464,7 +28326,7 @@ class App(object):
             self.render_info_rows(self.cli_accent)
             self.footer([(self.t("k_ud"), self.t("page")), ("B", self.t("back"))])
         elif top == "manifesto":
-            self.header("MANIFESTO", icon="terminal")
+            self.header("MANIFESTO", icon="terminal", badge="manifesto")
             self.surface.fill((4, 5, 7), (0, 44, W, H - 44))
             for sy in range(44, H, 3):
                 pygame.draw.line(self.surface, (2, 3, 4), (0, sy),
@@ -18531,8 +28393,9 @@ class App(object):
             items = HUBS["mediahub"][2]
             media_cols = [(80, 220, 200), (218, 68, 96),
                           (105, 155, 245), (245, 185, 64)]
+            media_irregular = [(14, 4), (16, -3), (10, 6), (12, -2)]
             self.surface.fill((5, 10, 15))
-            self.header("MEDIA VAULT", icon="speaker")
+            self.header("MEDIA VAULT", icon="speaker", badge="media")
             # segnali verticali: ogni tool riceve la sua frequenza/tonalita'.
             for x in range(0, W, 16):
                 h = 8 + int(12 * abs(math.sin(time.time() * 2 + x)))
@@ -18543,16 +28406,28 @@ class App(object):
                 col = media_cols[j]
                 sel = (j == self.hub_sel)
                 card_h = 78
+                cut, slant = media_irregular[j % len(media_irregular)]
                 if sel:
                     self.npanel(12, y, W - 24, card_h, border=col,
-                                fill=sel_tint(col), cut=14)
+                                fill=sel_tint(col), cut=cut, slant=slant)
                     pygame.draw.rect(self.surface, col, (20, y + 12, 5,
                                      card_h - 24))
                 else:
                     self.npanel(12, y, W - 24, card_h, border=(28, 45, 55),
-                                fill=(7, 15, 21), cut=14)
-                icons.draw(self.surface, ic, 40, y + 20, 38,
-                          col if sel else tuple(max(35, c // 2) for c in col))
+                                fill=(7, 15, 21), cut=cut, slant=slant)
+                bkey = MEDIA_VAULT_BADGES.get(_key)
+                bimg = self.badge_img(bkey, 36) if bkey else None
+                if bimg is not None:
+                    bw_, bh_ = bimg.get_size()
+                    maxw = 70
+                    if bw_ > maxw:
+                        bh_ = max(8, int(bh_ * maxw / float(bw_)))
+                        bw_ = maxw
+                        bimg = pygame.transform.smoothscale(bimg, (bw_, bh_))
+                    self.surface.blit(bimg, (44, y + (card_h - bh_) // 2))
+                else:
+                    icons.draw(self.surface, ic, 40, y + 20, 38,
+                              col if sel else tuple(max(35, c // 2) for c in col))
                 self.text(self.t(lk), (98, y + 14), self.f_med_b,
                           FG if sel else DIM)
                 self.text(self.t(sk), (98, y + 42), self.f_small,
@@ -18564,49 +28439,11 @@ class App(object):
                 y += 86
             self.footer([("A", self.t("open")), ("B", self.t("back"))])
         elif top.startswith("hub:") and top[4:] == "forge":
-            icon, tkey, items = HUBS["forge"]
-            self.header(self.t(tkey), icon=icon)
-            self.forge_backdrop()
-            n = len(items)
-            tw_, th_ = 260, 46
-            gap = 18
-            total_h = n * th_ + (n - 1) * gap
-            y0 = max(50, (H - 40 - total_h) // 2 + 44)
-            cx = W // 2
-            # catena verticale che collega i riquadri: una serie di
-            # anelli ovali alternati orizzontale/verticale, come una
-            # catena vera vista di lato
-            if n > 1:
-                ly = y0 + th_
-                link = 0
-                while ly < y0 + total_h - th_ + 2:
-                    horiz = (link % 2 == 0)
-                    rw_, rh_ = (14, 8) if horiz else (8, 14)
-                    pygame.draw.ellipse(self.surface, STEEL,
-                                       (cx - rw_ // 2, ly, rw_, rh_), 2)
-                    ly += 10
-                    link += 1
-            for j, (k, ic, lk, sk, kind) in enumerate(items):
-                ty = y0 + j * (th_ + gap)
-                sel = (j == self.hub_sel)
-                x0 = cx - tw_ // 2
-                col = self.accent if sel else LINE
-                if sel:
-                    self.sel_frame(x0, ty, tw_, th_)
-                else:
-                    self.npanel(x0, ty, tw_, th_, border=col, fill=INK,
-                               cut=10)
-                icons.draw(self.surface, ic, x0 + 14, ty + (th_ - 28) //
-                          2, 28, self.accent if sel else FAINT)
-                self.text(self.t(lk), (x0 + 54, ty + 8), self.f_med,
-                          FG if sel else DIM)
-                self.text(self.t(sk), (x0 + 54, ty + 32), self.f_small,
-                          FAINT, maxw=tw_ - 66)
-            self.footer([("A", self.t("open")), ("B", self.t("back"))])
+            self.render_forge()
         elif top.startswith("hub:") and top[4:] == "workshop":
             it = (self.lang == "it")
             items = HUBS["workshop"][2]
-            self.header(self.t("h_work"), icon="workshop")
+            self.header(self.t("h_work"), icon="workshop", badge="workshop")
             self.mon_sample()
             m = self.mon
             widgets = [("CPU", m["cpu"], self.accent, "pill"),
@@ -18614,10 +28451,12 @@ class App(object):
                       ("TEMP", m["tmp"], NO_R, "thermo")]
             ww = (W - 24) // 3
             wy = 48
+            workshop_irregular = [(8, 0), (10, 3), (12, -2)]
             for i2, (lbl, data, col, kind) in enumerate(widgets):
                 x = 8 + i2 * (ww + 4)
+                cut, slant = workshop_irregular[i2 % len(workshop_irregular)]
                 self.npanel(x, wy, ww, 56, border=LINE, fill=INK,
-                           cut=8)
+                           cut=cut, slant=slant)
                 self.text(lbl, (x + 8, wy + 6), self.f_tiny, col)
                 cur = data[-1] if data else 0
                 vs = ("%d°C" % m.get("tempc", 0) if lbl == "TEMP"
@@ -18636,10 +28475,12 @@ class App(object):
             y = wy + 64
             per = 7
             first = max(0, min(self.hub_sel - per // 2, len(items) - per))
+            workshop_item_irregular = [(8, 0), (10, 2), (12, -3), (9, 4), (11, -1), (7, 3), (13, -2)]
             for j in range(first, min(first + per, len(items))):
                 k, ic, lk, sk, kind = items[j]
                 if j == self.hub_sel:
-                    self.sel_frame(8, y, W - 16, 42)
+                    cut, slant = workshop_item_irregular[j % len(workshop_item_irregular)]
+                    self.sel_frame(8, y, W - 16, 42, cut=cut, slant=slant)
                 icons.draw(self.surface, ic, 18, y + 9, 24,
                           self.accent if j == self.hub_sel else FAINT)
                 self.text(self.t(lk), (54, y + 4), self.f_med,
@@ -18675,17 +28516,30 @@ class App(object):
                 title = title_it if it else title_en
                 pygame.draw.line(self.surface, LINE, (10, sy + 16),
                                  (W - 10, sy + 16), 1)
-                icons.draw(self.surface, gic, 8, sy, 20, self.accent)
-                self.text(title, (34, sy + 2), self.f_small, self.accent)
+                # v10.7: il gruppo PRODUTTIVITA'/PRODUCTIVITY (calc,
+                # clock, calendario, note) e' l'unico ad avere un
+                # nome in-lore proprio -- targhetta OfficeRT al
+                # posto di icona+scritta, se carica.
+                obadge = (self.badge_img("officert", 24)
+                         if gic == "calc" else None)
+                if obadge is not None:
+                    self.surface.blit(obadge, (8, sy - 5))
+                else:
+                    icons.draw(self.surface, gic, 8, sy, 20, self.accent)
+                    self.text(title, (34, sy + 2), self.f_small,
+                              self.accent)
             for j, lx, ly, lw, lh in layout_items:
                 sy = vtop + ly - scroll
                 if sy + lh < vtop - 4 or sy > vbot:
                     continue
+                tb_irregular = [(8, 0), (10, 2), (12, -3), (9, 4), (11, -1), (7, 3), (13, -2)]
+                cut, slant = tb_irregular[j % len(tb_irregular)]
                 self._tb_tile(j, items[j], lx, sy, lw, lh,
                               icon_sz=(28 if lh >= 64 else
                                       24 if lh <= 58 else 26),
                               big=(lh >= 64 and lw > 250),
-                              compact=(lh == 58))
+                              compact=(lh == 58),
+                              cut=cut, slant=slant)
             self.surface.set_clip(None)
             if total_h > vh:
                 bar_h = max(20, int(vh * vh / total_h))
@@ -18699,124 +28553,124 @@ class App(object):
         elif top.startswith("hub:") and top[4:] == "uplink":
             it = (self.lang == "it")
             items = HUBS["uplink"][2]
-            self.header(self.t("h_up"), icon="uplink")
+            self.header(self.t("h_up"), icon="uplink", accent=UPLINK_ACCENT,
+                        badge="uplink")
             st = self.status_snapshot()
             hot_on = self.hot_active()
-            row_defs = [("wifi", "wifi", bool(st.get("conn"))),
-                       ("hotspot", "uplink", hot_on),
-                       ("bt", "bt", bool(st.get("bt")))]
-            rw = (W - 24) // 3
-            for i, (key, ic, on) in enumerate(row_defs):
+
+            # --- Panel 1: Syncthing + Tailscale (indici 0 e 1) ---
+            rw = (W - 24) // 2
+            y = 50
+            panel_items = [
+                (0, "sync", "remote", self.t("u_sync")),
+                (1, "tsgui", "uplink", self.t("u_ts")),
+            ]
+            uplink_panel_irregular = [(10, 3), (12, -2)]
+            for i, (idx, key, ic, label) in enumerate(panel_items):
                 x = 8 + i * (rw + 4)
-                y = 50
-                sel = (self.hub_sel == i)
-                lk = items[i][2]
+                sel = (self.hub_sel == idx)
+                cut, slant = uplink_panel_irregular[i % len(uplink_panel_irregular)]
                 if sel:
-                    self.sel_frame(x, y, rw, 84)
+                    self.sel_frame(x, y, rw, 84, color=UPLINK_ACCENT,
+                                   cut=cut, slant=slant)
                 else:
-                    self.npanel(x, y, rw, 84, border=LINE, fill=INK,
-                                cut=10)
-                icons.draw(self.surface, ic, x + (rw - 30) // 2, y + 8,
-                          30, self.accent if sel else
-                          (OK_G if on else FAINT))
-                lab = self.t(lk)
-                lw = self.f_small.size(lab)[0]
-                self.text(lab, (x + (rw - lw) // 2, y + 44),
+                    self.npanel(x, y, rw, 84, border=LINE, fill=INK, cut=cut, slant=slant)
+                icons.draw(self.surface, ic, x + (rw - 30) // 2, y + 8, 30,
+                           UPLINK_ACCENT if sel else FAINT)
+                self.text(label, (x + (rw - self.f_small.size(label)[0]) // 2, y + 44),
                           self.f_small, FG if sel else DIM)
-                dot_col = OK_G if on else (70, 72, 78)
-                pygame.draw.circle(self.surface, dot_col,
+                pygame.draw.circle(self.surface, (70, 72, 78),
                                    (x + rw // 2, y + 68), 5)
                 pygame.draw.circle(self.surface, INK,
                                    (x + rw // 2, y + 68), 5, 1)
-                onoff = ("ON" if on else "OFF")
-                ow = self.f_tiny.size(onoff)[0]
-                self.text(onoff, (x + rw // 2 + 10, y + 62), self.f_tiny,
-                          OK_G if on else FAINT)
-            # riquadri PC Uplink / Basestation -- stesso trattamento
-            # visivo della riga sopra, sotto wifi/hotspot/bt. Restano
-            # attivi finche' non li spegni tu (v10: fix del bug che
-            # fermava basestation all'uscita dalla schermata).
-            pcup_on = any(s.get("client") and
-                         s["client"].snapshot().get("online")
-                         for s in self.pc_servers)
-            base_on = self.bstation_srv is not None
-            row2_defs = [("pcup", "monitor", pcup_on),
-                        ("basestation", "remote", base_on)]
-            rw2 = (W - 24) // 2
-            y2 = 50 + 84 + 8
-            for i, (key, ic, on) in enumerate(row2_defs):
-                x = 8 + i * (rw2 + 4)
-                idx = 3 + i
+                self.text("→", (x + rw // 2 + 12, y + 62), self.f_tiny, FAINT)
+
+            # --- Panel 2: FTP + Network Probe (indici 2 e 3) ---
+            y2 = y + 84 + 8
+            panel2_items = [
+                (2, "ftp", "download", self.t("u_ftp")),
+                (3, "netdiag", "globe", self.t("u_netdiag")),
+            ]
+            uplink_panel2_irregular = [(8, -3), (14, 2)]
+            for i, (idx, key, ic, label) in enumerate(panel2_items):
+                x = 8 + i * (rw + 4)
                 sel = (self.hub_sel == idx)
-                lk = items[idx][2]
+                cut, slant = uplink_panel2_irregular[i % len(uplink_panel2_irregular)]
                 if sel:
-                    self.sel_frame(x, y2, rw2, 76)
+                    self.sel_frame(x, y2, rw, 84, color=UPLINK_ACCENT,
+                                   cut=cut, slant=slant)
                 else:
-                    self.npanel(x, y2, rw2, 76, border=LINE, fill=INK,
-                                cut=10)
-                icons.draw(self.surface, ic, x + 14, y2 + 14, 26,
-                          self.accent if sel else
-                          (OK_G if on else FAINT))
-                lab = self.t(lk)
-                self.text(lab, (x + 50, y2 + 12), self.f_small,
-                          FG if sel else DIM)
-                dot_col = OK_G if on else (70, 72, 78)
-                pygame.draw.circle(self.surface, dot_col,
-                                   (x + 56, y2 + 48), 5)
+                    self.npanel(x, y2, rw, 84, border=LINE, fill=INK, cut=cut, slant=slant)
+                icons.draw(self.surface, ic, x + (rw - 30) // 2, y2 + 8, 30,
+                           UPLINK_ACCENT if sel else FAINT)
+                self.text(label, (x + (rw - self.f_small.size(label)[0]) // 2, y2 + 44),
+                          self.f_small, FG if sel else DIM)
+                pygame.draw.circle(self.surface, (70, 72, 78),
+                                   (x + rw // 2, y2 + 68), 5)
                 pygame.draw.circle(self.surface, INK,
-                                   (x + 56, y2 + 48), 5, 1)
-                onoff = ("ON" if on else "OFF")
-                self.text(onoff, (x + 66, y2 + 42), self.f_tiny,
-                          OK_G if on else FAINT)
-            y = y2 + 76 + 12
-            avail = (H - 40) - y
+                                   (x + rw // 2, y2 + 68), 5, 1)
+                self.text("→", (x + rw // 2 + 12, y2 + 62), self.f_tiny, FAINT)
+
+            # --- Elenco delle voci rimanenti (indici 4..n-1) ---
+            y_list = y2 + 84 + 12
+            avail = (H - 40) - y_list
             per = max(1, avail // 44)
-            list_items = items[5:]
-            first = max(0, min(self.hub_sel - 5 - per // 2,
+            list_start = 4  # primo indice da visualizzare in lista
+            list_items = items[list_start:]
+            first = max(0, min(self.hub_sel - list_start - per // 2,
                                len(list_items) - per))
+            uplink_list_irregular = [(8, 0), (10, 2), (12, -3), (9, 4), (11, -1), (7, 3), (13, -2)]
             for j in range(first, min(first + per, len(list_items))):
-                real_j = j + 5
+                real_j = j + list_start
                 k, ic, lk, sk, kind = items[real_j]
                 sel = (real_j == self.hub_sel)
                 if sel:
-                    self.sel_frame(8, y, W - 16, 42)
-                icons.draw(self.surface, ic, 18, y + 9, 24,
-                          self.accent if sel else FAINT)
-                self.text(self.t(lk), (54, y + 4), self.f_med,
+                    cut, slant = uplink_list_irregular[real_j % len(uplink_list_irregular)]
+                    self.sel_frame(8, y_list, W - 16, 42, color=UPLINK_ACCENT,
+                                   cut=cut, slant=slant)
+                icons.draw(self.surface, ic, 18, y_list + 9, 24,
+                           UPLINK_ACCENT if sel else FAINT)
+                self.text(self.t(lk), (54, y_list + 4), self.f_med,
                           FG if sel else DIM)
-                self.text(self.t(sk), (54, y + 24), self.f_tiny, FAINT,
+                self.text(self.t(sk), (54, y_list + 24), self.f_tiny, FAINT,
                           maxw=W - 200)
-                if kind == "cycle":
-                    ck, vals = CYCLES[k]
-                    vs = self.tx(VAL_EN, str(self.cfg.get(ck, vals[0])))
-                    vw = self.f_small.size(vs)[0]
-                    self.npanel(W - vw - 38, y + 8, vw + 18, 26,
-                                border=LINE, fill=INK, cut=6)
-                    self.text(vs, (W - vw - 29, y + 13), self.f_small,
-                              self.accent)
-                y += 44
+                y_list += 44
+
             self.footer([("A", self.t("open")),
-                        ("SX/DX", "rete" if it else "network"),
-                        ("B", self.t("back"))])
+                         (self.t("k_ud"), "rete" if it else "network"),
+                         ("B", self.t("back"))])
         elif top.startswith("hub:"):
             hub = top[4:]
             icon, tkey, items = HUBS[hub]
-            self.header(self.t(tkey), icon=icon)
+            hub_acc = _HUB_ACCENTS.get(hub, self.accent)
+            self.header(self.t(tkey), icon=icon, accent=_HUB_ACCENTS.get(hub),
+                       badge=_HUB_BADGES.get(hub))
             y = 52
             per = 9
             first = max(0, min(self.hub_sel - per // 2, len(items) - per))
             shown = min(per, len(items))
             self.content_panel(y - 4, y - 4 + shown * 44 + 8)
+            generic_irregular = [(8, 0), (10, 2), (12, -3), (9, 4), (11, -1), (7, 3), (13, -2), (8, 1), (10, -4)]
             for j in range(first, min(first + per, len(items))):
                 k, ic, lk, sk, kind = items[j]
                 if j == self.hub_sel:
-                    self.sel_frame(8, y, W - 16, 42)
+                    cut, slant = generic_irregular[j % len(generic_irregular)]
+                    self.sel_frame(8, y, W - 16, 42,
+                                   color=_HUB_ACCENTS.get(hub),
+                                   cut=cut, slant=slant)
                 icons.draw(self.surface, ic, 18, y + 9, 24,
-                           self.accent if j == self.hub_sel else FAINT)
+                           hub_acc if j == self.hub_sel else FAINT)
                 self.text(self.t(lk), (54, y + 4), self.f_med,
                           FG if j == self.hub_sel else DIM)
                 self.text(self.t(sk), (54, y + 24), self.f_tiny, FAINT,
                           maxw=W - 200)
+                if k == "cursedev" and j == self.hub_sel:
+                    for _ in range(4):
+                        yy = y + random.randint(-2, 42)
+                        gl = pygame.Surface((W - 16, random.randint(1, 3)))
+                        gl.fill((160, 20, 20))
+                        gl.set_alpha(90)
+                        self.surface.blit(gl, (8, yy))
                 if kind == "cycle":
                     ck, vals = CYCLES[k]
                     vs = self.tx(VAL_EN, str(self.cfg.get(ck, vals[0])))
@@ -18824,7 +28678,7 @@ class App(object):
                     self.npanel(W - vw - 38, y + 8, vw + 18, 26,
                                 border=LINE, fill=INK, cut=6)
                     self.text(vs, (W - vw - 29, y + 13), self.f_small,
-                              self.accent)
+                              hub_acc)
                 y += 44
             self.footer([("A", self.t("open")), ("B", self.t("back"))])
 
@@ -18863,7 +28717,8 @@ class App(object):
             it = (self.lang == "it")
             layout = CLOCK_LAYOUTS[self.cfg.get("clock_layout", 0)
                                    % len(CLOCK_LAYOUTS)]
-            self.header(self.t("t_clock"), layout.upper(), icon="clock")
+            self.header(self.t("t_clock"), layout.upper(), icon="clock",
+                       badge="clock")
             self.clock_backdrop()
             face_w, face_h = W, 380
             face_surf = pygame.Surface((face_w, face_h))
@@ -18986,19 +28841,20 @@ class App(object):
         elif top == "radio":
             it = (self.lang == "it")
             radio_col = (90, 200, 190)
-            self.header("VOID RADIO", icon="speaker")
+            self.header("VOID RADIO", icon="speaker", badge="void_radio")
             self.surface.fill((10, 16, 15), (0, 44, W, H - 44))
             self.npanel(8, 44, W - 16, 24, border=radio_col,
                         fill=(10, 16, 15), cut=6)
             self.text("LIVE STREAMS / FAVORITES / RECENT", (18, 49),
                       self.f_tiny, radio_col)
-            tabs = ["all", "italia", "tekno", "preferiti", "recenti"]
+            tabs = ["all", "italia", "tekno", "preferiti", "recenti",
+                    "custom"]
             tab_lbl = {"all": "TUTTE" if it else "ALL",
                       "italia": "ITALIA" if it else "ITALY",
                       "tekno": "TEKNO" if it else "TEKNO",
                       "preferiti": "PREFERITI" if it else
                       "FAVORITES", "recenti": "RECENTI" if it else
-                      "RECENT"}
+                      "RECENT", "custom": self.t("radio_custom_tab")}
             tw2 = (W - 20) // len(tabs)
             for j, tb in enumerate(tabs):
                 active = (tb == self.radio_tab)
@@ -19013,47 +28869,65 @@ class App(object):
                 lw2 = self.f_tiny.size(lbl)[0]
                 self.text(lbl, (tx + (tw2 - 4 - lw2) // 2, 54),
                          self.f_tiny, INK if active else radio_col)
+            if self.radio_filter_value:
+                filt_txt = ("Filtro: %s" %
+                            self.radio_filter_value) if it else \
+                           ("Filter: %s" % self.radio_filter_value)
+                self.text(filt_txt, (18, 74), self.f_tiny,
+                          (230, 195, 60))
             lst = self.radio_list_for_tab()
             fav_urls = {f["url"] for f in self.radio_favorites()}
             y = 84
+            if self.radio_filter_value:
+                y = 100
             playing_h = 56 if self.radio_playing else 0
-            max_y = H - 44 - playing_h
+            max_y = H - 44 - playing_h - 34
             if not lst:
                 self.text(("nessuna stazione qui" if it else
                           "no stations here"), (20, y), self.f_small,
                          DIM)
+                if self.radio_tab == "custom":
+                    self.text("Y: " + ("aggiungi" if it else "add"),
+                              (20, y + 20), self.f_tiny, FAINT)
+            row_h = 40
             for j, st in enumerate(lst):
-                if y > max_y - 30:
+                if y + row_h > max_y:
                     break
                 sel = (j == self.radio_sel)
                 if sel:
-                    self.npanel(8, y, W - 16, 46, border=radio_col,
+                    self.npanel(8, y, W - 16, row_h, border=radio_col,
                                 fill=(12, 20, 18), cut=8)
                     pygame.draw.rect(self.surface, radio_col,
-                                     (16, y + 8, 4, 30))
+                                     (16, y + 6, 4, row_h - 12))
                 else:
-                    self.npanel(8, y, W - 16, 46, border=LINE,
+                    self.npanel(8, y, W - 16, row_h, border=LINE,
                                 fill=(10, 16, 15), cut=8)
                 is_fav = st["url"] in fav_urls
                 is_playing = (self.radio_playing and
                              self.radio_playing["url"] == st["url"])
                 col2 = radio_col if is_playing else (
                     FG if sel else DIM)
-                flag = st.get("country", "?").upper()[:2]
-                self.npanel(16, y + 8, 30, 28, border=LINE, fill=(12, 18, 20), cut=6)
-                self.text(flag, (22, y + 14), self.f_tiny, FAINT)
-                self.text(st["name"], (60, y + 8), self.f_small,
-                         col2, maxw=W - 130)
-                if st.get("tags"):
-                    self.text(st["tags"], (60, y + 24), self.f_tiny,
-                             FAINT, maxw=W - 130)
+                flag = st.get("countrycode", st.get("country", "?")).upper()[:2]
+                self.npanel(16, y + 6, 28, row_h - 12, border=LINE, fill=(12, 18, 20), cut=6)
+                self.text(flag, (20, y + (row_h - 12) // 2 - 2), self.f_tiny, FAINT)
+                tags_str = st.get("tags", "")
+                genre_icon = self._radio_genre_icon(tags_str)
+                gx = 48
+                if genre_icon:
+                    icons.draw(self.surface, genre_icon, gx, y + (row_h - 14) // 2, 14, radio_col if sel else FAINT)
+                    gx += 18
+                self.text(st["name"], (gx, y + 4), self.f_small,
+                         col2, maxw=W - gx - 70)
+                if tags_str:
+                    self.text(tags_str[:28], (gx, y + 22), self.f_tiny,
+                             FAINT, maxw=W - gx - 70)
                 if is_fav:
-                    self.text("*", (W - 30, y + 12), self.f_med,
+                    self.text("*", (W - 30, y + 8), self.f_med,
                              (230, 195, 60))
                 if is_playing:
                     icons.draw(self.surface, "speaker", W - 54,
-                              y + 12, 16, radio_col)
-                y += 50
+                              y + (row_h - 16) // 2, 16, radio_col)
+                y += row_h + 4
             if self.radio_playing:
                 py = H - 44 - playing_h
                 self.npanel(8, py, W - 16, playing_h - 4,
@@ -19084,9 +28958,103 @@ class App(object):
                         self.radio_stop()
             self.footer([("A", "riproduci" if it else "play"),
                         ("Y", "preferito" if it else "favorite"),
-                        ("X", "cerca" if it else "search"),
-                        ("L1/R1", "schede" if it else "tabs"),
+                        ("X", "genere" if it else "genre"),
+                        ("L2", "paese" if it else "country"),
+                        ("R2", "lingua" if it else "language"),
+                         ("SELECT", "menu"),
+                         ("<->", "pagina" if it else "page"),
+                         ("B", self.t("back"))])
+        elif top == "radio_import":
+            it = (self.lang == "it")
+            radio_col = (90, 200, 190)
+            if self.radio_import_mode == "playlist":
+                self.header(self.t("radio_import_title"), icon="speaker")
+                self.surface.fill((10, 16, 15), (0, 44, W, H - 44))
+                y = 56
+                for i, pl in enumerate(self.radio_import_playlists):
+                    sel = (i == self.radio_import_sel)
+                    if sel:
+                        self.sel_frame(8, y, W - 16, 36)
+                    self.text(pl["name"], (20, y + 8), self.f_med,
+                              FG if sel else DIM)
+                    y += 40
+                self.footer([("A", self.t("radio_import_select")),
+                             ("B", self.t("back"))])
+            else:
+                n = len(self.radio_import_channels)
+                self.header(self.t("radio_import_channels"),
+                            "%d %s" % (n,
+                                       "canali" if it else "channels"))
+                self.surface.fill((10, 16, 15), (0, 44, W, H - 44))
+                y = 56
+                per = 8
+                first = max(0, min(self.radio_import_sel - per // 2,
+                                   n - per))
+                for i in range(first, min(first + per, n)):
+                    ch = self.radio_import_channels[i]
+                    sel = (i == self.radio_import_sel)
+                    marked = i in self.radio_import_marked
+                    if sel:
+                        self.sel_frame(8, y, W - 16, 36)
+                    prefix = "[X] " if marked else "[ ] "
+                    self.text(prefix + ch["name"], (20, y + 4),
+                              self.f_small, FG if sel else DIM,
+                              maxw=W - 120)
+                    if ch.get("group"):
+                        self.text(ch["group"], (W - 120, y + 20),
+                                  self.f_tiny, FAINT)
+                    y += 40
+                self.footer([("X", "mark"), ("Y", "all/none"),
+                             ("START", "import marked"),
+                             ("A", "import all"),
+                             ("B", self.t("back"))])
+        elif top == "radio_filter":
+            it = (self.lang == "it")
+            radio_col = (90, 200, 190)
+            title = self.t("radio_filter_%s" % self.radio_filter_type)
+            self.header(title, icon="speaker")
+            self.surface.fill((10, 16, 15), (0, 44, W, H - 44))
+            n = len(self.radio_filter_values)
+            per = 10
+            first = max(0, min(self.radio_filter_idx - per // 2,
+                               n - per))
+            y = 56
+            for j in range(first, min(first + per, n)):
+                sel = (j == self.radio_filter_idx)
+                if sel:
+                    self.sel_frame(8, y, W - 16, 36)
+                self.text(self.radio_filter_values[j], (20, y + 8),
+                          self.f_med, FG if sel else DIM)
+                y += 38
+            if not n:
+                self.text(self.t("radio_no_results"), (20, 80),
+                          self.f_med, DIM)
+            self.footer([("A", "sel" if it else "select"),
                         ("B", self.t("back"))])
+        elif top == "radio_options":
+            it = (self.lang == "it")
+            radio_col = (90, 200, 190)
+            opts = [("search", self.t("radio_search_title"), "search"),
+                    ("import", self.t("radio_import_title"), "download"),
+                    ("filter_country", self.t("radio_filter_country"), "globe"),
+                    ("filter_tag", self.t("radio_filter_tag"), "tag"),
+                    ("refresh", self.t("radio_refresh"), "refresh")]
+            self.header("MENU", icon="speaker")
+            self.surface.fill((10, 16, 15), (0, 44, W, H - 44))
+            box_w = min(360, W - 40)
+            box_h = 40 + len(opts) * 38
+            bx = (W - box_w) // 2
+            by = (H - box_h) // 2
+            self.npanel(bx, by, box_w, box_h, border=radio_col, fill=(12, 18, 20), cut=8)
+            self.text("SELECT OPTION", (bx + 14, by + 10), self.f_small, radio_col)
+            for i, (key, label, icon_name) in enumerate(opts):
+                oy = by + 40 + i * 38
+                sel = (i == self.radio_options_sel)
+                if sel:
+                    self.npanel(bx + 8, oy, box_w - 16, 32, border=radio_col, fill=sel_tint(radio_col), cut=6)
+                icons.draw(self.surface, icon_name, bx + 16, oy + 7, 18, radio_col if sel else FG)
+                self.text(label, (bx + 42, oy + 7), self.f_small, INK if sel else FG)
+            self.footer([("A", "ok" if it else "ok"), ("B", self.t("back"))])
         elif top == "radiosearch":
             it = (self.lang == "it")
             radio_col = (90, 200, 190)
@@ -19195,7 +29163,7 @@ class App(object):
                 self.text(val, (W - 24 - vw, y + 6), self.f_small,
                          self.accent if sel else FAINT)
                 y += 48
-            self.footer([("SX/DX", "cambia" if it else "change"),
+            self.footer([(self.t("k_lr"), "cambia" if it else "change"),
                         ("B", self.t("back"))])
         elif top == "alarmlist":
             it = (self.lang == "it")
@@ -19253,7 +29221,7 @@ class App(object):
                           self.accent)
                 self.text("▸", (W - 30, y + 14), self.f_med,
                           self.accent if j == self.aw_f else FAINT)
-            self.footer([("SX/DX", self.t("change")),
+            self.footer([(self.t("k_lr"), self.t("change")),
                          ("Y", "etichetta" if it else "label"),
                          ("A", "salva" if it else "save"),
                          ("B", self.t("back"))])
@@ -19442,7 +29410,7 @@ class App(object):
                           self.accent)
                 self.text("▸", (W - 30, y + 12), self.f_med,
                           self.accent if j == self.clock_f else FAINT)
-            self.footer([("SX/DX", self.t("change")),
+            self.footer([(self.t("k_lr"), self.t("change")),
                          ("A", self.t("clock_set")),
                          ("B", self.t("back"))])
         elif top == "calc":
@@ -19452,7 +29420,7 @@ class App(object):
             calc_dark = (60, 54, 42)
             lcd_bg = (150, 168, 130)
             lcd_fg = (30, 40, 20)
-            self.header(self.t("t_calc"), icon="calc")
+            self.header(self.t("t_calc"), icon="calc", badge="calc")
             self.surface.fill(calc_body, (0, 44, W, H - 44))
             pygame.draw.rect(self.surface, calc_dark, (0, 44, W,
                              H - 44), 4)
@@ -19631,7 +29599,7 @@ class App(object):
             self.footer([("L1/R1", "pagina" if it else "page"),
                         ("B", self.t("back"))])
         elif top == "manual":
-            self.header(self.t("i_man"), icon="book")
+            self.header(self.t("i_man"), icon="book", badge="manual")
             y = 54
             self.content_panel(46, 46 + len(MANUAL) * 42 + 8)
             for j, (key, ic) in enumerate(MANUAL):
@@ -19856,12 +29824,12 @@ class App(object):
                 self.text(vs, (W - vw - 44, y + 12), self.f_med, col)
                 self.text("▸", (W - 30, y + 12), self.f_med,
                           self.accent if j == self.cw_f else FAINT)
-            self.footer([("SX/DX", self.t("change")),
+            self.footer([(self.t("k_lr"), self.t("change")),
                          ("A", "salva" if it else "save"),
                          ("B", self.t("back"))])
         elif top == "notes":
             it = (self.lang == "it")
-            self.header(self.t("t_note"), icon="text")
+            self.header(self.t("t_note"), icon="text", badge="notes")
             rects = self.note_layout()
             sel_r = rects[min(self.note_sel, len(rects) - 1)]
             off = 0
@@ -20029,6 +29997,8 @@ class App(object):
                       (14, H - 30), self.f_tiny, FAINT, maxw=W - 28)
             self.footer([("A/X", "on/off"),
                          ("Y", "rimuovi" if it else "remove"),
+                         ("L2", self.t("rss_import_opml")),
+                         ("R2", self.t("rss_export_opml")),
                          ("B", self.t("back"))])
         elif top == "glyphpick":
             it = (self.lang == "it")
@@ -20046,10 +30016,6 @@ class App(object):
                 self.text("—", (34, 62), self.f_med, FAINT)
             self.text(app["name"], (74, 54), self.f_med, FG,
                       maxw=W - 260)
-            self.text(("originale salvato" if it else "original saved")
-                      if os.path.exists(bak) else
-                      ("X: ripristina" if it else "X: restore")
-                      if False else "", (74, 78), self.f_tiny, OK_G)
             if os.path.exists(bak):
                 tag = "X: " + ("ripristina orig." if it
                                else "restore orig.")
@@ -20145,7 +30111,7 @@ class App(object):
                          ("B", "no")])
         elif top == "wifimgr":
             it = (self.lang == "it")
-            self.header("WIFI", icon="wifi")
+            self.header("WIFI", icon="wifi", accent=UPLINK_ACCENT)
             st = self.wm_status()
             ron = self.wm_radio_on()
             self.npanel(8, 44, W - 16, 46, border=LINE, fill=INK)
@@ -20176,11 +30142,11 @@ class App(object):
                                       len(self.wm_nets))):
                 nt = self.wm_nets[j]
                 if j == self.wm_sel:
-                    self.sel_frame(8, y, W - 16, 46)
+                    self.sel_frame(8, y, W - 16, 46, color=UPLINK_ACCENT)
                 bars = max(1, min(4, (nt["sig"] + 90) // 12))
                 for b2 in range(4):
                     hh = 5 + b2 * 5
-                    col = (self.accent if b2 < bars else LINE)
+                    col = (UPLINK_ACCENT if b2 < bars else LINE)
                     pygame.draw.rect(self.surface, col,
                                      (20 + b2 * 7, y + 34 - hh, 5, hh))
                 self.text(nt["ssid"], (56, y + 5), self.f_med,
@@ -20206,7 +30172,7 @@ class App(object):
                          ("R1", "scan"), ("B", self.t("back"))])
         elif top == "btmgr":
             it = (self.lang == "it")
-            self.header("BLUETOOTH", icon="bt")
+            self.header("BLUETOOTH", icon="bt", accent=UPLINK_ACCENT)
             bon = self.bt_powered()
             self.npanel(8, 44, W - 16, 46, border=LINE, fill=INK)
             self.switch(22, 52, bon)
@@ -20228,10 +30194,10 @@ class App(object):
                                       len(self.bt_devs))):
                 d = self.bt_devs[j]
                 if j == self.bt_sel:
-                    self.sel_frame(8, y, W - 16, 44)
+                    self.sel_frame(8, y, W - 16, 44, color=UPLINK_ACCENT)
                 icons.draw(self.surface, "bt", 18, y + 10, 24,
                            OK_G if d.get("connected") else
-                           (self.accent if d["paired"] else FAINT))
+                           (UPLINK_ACCENT if d["paired"] else FAINT))
                 self.text(d["name"], (52, y + 4), self.f_med,
                           FG if j == self.bt_sel else DIM,
                           maxw=W - 220)
@@ -20251,7 +30217,7 @@ class App(object):
                          ("R1", "scan"), ("B", self.t("back"))])
         elif top == "hotmgr":
             it = (self.lang == "it")
-            self.header("HOTSPOT", icon="uplink")
+            self.header("HOTSPOT", icon="uplink", accent=UPLINK_ACCENT)
             sc = getattr(self, "hot_scripts", None)
             if not isinstance(sc, dict):
                 sc = self.hot_scripts = self.hot_find()
@@ -20265,12 +30231,21 @@ class App(object):
                       (104, 54), self.f_med, OK_G if on else FAINT)
             if cf:
                 sub = cf.get("ssid", "")
+                band = self.hot_band(cf)
+                if band:
+                    sub += "  ·  %sGHz" % band
                 if cf.get("interface"):
                     sub += "  ·  " + cf["interface"]
             else:
                 sub = ("Y: accendi/spegni   ·   L1: info" if it
                        else "Y: power on/off   ·   L1: info")
             self.text(sub, (104, 80), self.f_tiny, DIM, maxw=W - 140)
+            if on:
+                n_dev = len(self.hot_devices())
+                self.text(("%d client connessi" % n_dev) if it else
+                          ("%d clients connected" % n_dev),
+                          (16, 116), self.f_tiny,
+                          OK_G if n_dev else FAINT)
             acts = [k for k in ("start", "start5", "stop")
                     if sc.get(k)]
             labs = {"start": "Avvia hotspot (2.4GHz)" if it
@@ -20557,9 +30532,9 @@ class App(object):
                 self.text(lab, (ax + 12, ay + 7), self.f_small,
                           FG if sel else self.cli_accent)
                 ax += lw + 10
-            self.footer([("SX/DX", self.t("change")),
+            self.footer([(self.t("k_lr"), self.t("change")),
                         ("A", self.t("confirm")),
-                        ("SU/GIU", "scroll")])
+                        (self.t("k_ud"), "scroll")])
         elif top == "hotcfg":
             it = (self.lang == "it")
             self.header("HOTSPOT", icon="uplink")
@@ -20662,13 +30637,43 @@ class App(object):
                              (px0 + pw - 16, dy), 1)
             rows = self.updset_rows()
             ry = dy + 14
+            row_heights = []
             for j, (key_, kind, label, sub) in enumerate(rows):
+                if kind == "div":
+                    row_heights.append(6)
+                    continue
+                is_ethos = kind == "ethos"
+                rh = 44 if not is_ethos else 54
+                sub_lines = self.note_wrap(sub, pw - 44, self.f_tiny, 2)
+                sub_h = 15 * len(sub_lines)
+                item_h = max(rh, 20 + sub_h + 4)
+                row_heights.append(item_h)
+            total_h = sum(row_heights)
+            scroll_px = max(0, getattr(self, "updset_scroll", 0))
+            max_scroll = max(0, total_h - (ph - dy - 14))
+            scroll_px = max(0, min(scroll_px, max_scroll))
+            self.updset_scroll = scroll_px
+            y_acc = 0
+            first = 0
+            for j, h in enumerate(row_heights):
+                if y_acc + h > scroll_px:
+                    first = j
+                    break
+                y_acc += h
+            else:
+                first = len(rows) - 1
+            ry = dy + 14 - (scroll_px - y_acc) if first < len(rows) else dy + 14
+            bottom_limit = py0 + ph - 14
+            for j in range(first, len(rows)):
+                if ry > bottom_limit:
+                    break
+                key_, kind, label, sub = rows[j]
                 if kind == "div":
                     ry += 6
                     continue
                 sel = (j == self.updset_sel)
                 is_ethos = kind == "ethos"
-                rh = 44 if not is_ethos else 54
+                rh = row_heights[j]
                 if sel:
                     self.sel_frame(px0 + 12, ry, pw - 24, rh - 4)
                 lcol = ((200, 130, 220) if is_ethos else
@@ -20696,185 +30701,182 @@ class App(object):
                     self.text("[ VERAMETHOS ]",
                              (px0 + pw - 130, ry + 4), self.f_tiny,
                              OK_G)
-                for wl in self.note_wrap(sub, pw - 44, self.f_tiny,
-                                         2):
-                    ry += 15
-                    self.text(wl, (px0 + 22, ry + 20), self.f_tiny,
+                sub_lines = self.note_wrap(sub, pw - 44, self.f_tiny, 2)
+                for i_wl, wl in enumerate(sub_lines):
+                    self.text(wl, (px0 + 22, ry + 20 + i_wl * 15),
+                             self.f_tiny,
                              (170, 130, 190) if is_ethos else FAINT,
                              maxw=pw - 44)
-                ry += rh - (15 if not is_ethos else 0)
+                ry += rh
+            if total_h > ph - dy - 14:
+                bar_h = max(20, int((ph - dy - 14) * (ph - dy - 14) / total_h))
+                bar_y = py0 + dy + int((ph - dy - 14 - bar_h) * scroll_px / max_scroll)
+                pygame.draw.rect(self.surface, LINE,
+                                 (px0 + pw - 6, py0 + dy, 4, ph - dy - 14))
+                pygame.draw.rect(self.surface, up_cyan,
+                                 (px0 + pw - 6, bar_y, 4, bar_h))
             self.footer([("A", "attiva/conferma" if it else
                         "toggle/confirm"),
                         ("X", "chiudi" if it else "close")])
         elif top == "voidupdate":
+            self.draw_voidupdate()
+        elif top == "storico_release":
             it = (self.lang == "it")
             up_cyan = (60, 210, 220)
-            self.header(self.t("i_update"), icon="gear")
             self.surface.fill((8, 12, 14), (0, 44, W, H - 44))
             for ln in range(44, H, 26):
                 pygame.draw.line(self.surface, (14, 20, 22),
                                  (0, ln), (W, ln), 1)
-            sy = 50 - self.scroll
-            card_h = 108
-            self.npanel(8, sy, W - 16, card_h, border=up_cyan,
-                       fill=(12, 16, 18), cut=10)
-            icons.draw(self.surface, "gear", 20, sy + 14, 46, up_cyan)
-            tid = self.cfg.get("termid_id")
-            tname = self.cfg.get("termid_name") or "OPERATOR"
-            bx = 84
-            self.text(tname.upper(), (bx, sy + 10), self.f_med,
-                      FG, maxw=W - bx - 16)
-            vtxt = "v" + VERSION
-            self.text(vtxt, (bx, sy + 32), self.f_small, up_cyan)
-            avail = self.update_available()
-            if self.update_checking:
-                stxt = "verifica in corso..." if it else "checking..."
-                scol = FAINT
-            elif avail:
-                stxt = "aggiornamento disponibile" if it else \
-                    "update available"
-                scol = OK_G
-            elif self.update_data and self.update_data.get("ok") and \
-                    not self.update_latest():
-                stxt = "nessuna release pubblicata" if it else \
-                    "no releases published"
-                scol = FAINT
-            elif self.update_data and self.update_data.get("ok"):
-                stxt = "sei aggiornato" if it else "up to date"
-                scol = OK_G
-            else:
-                stxt = "verifica non riuscita" if it else \
-                    "check failed"
-                scol = NO_R
-            self.text(stxt, (bx, sy + 50), self.f_small, scol,
-                      maxw=W - bx - 16)
-            if tid:
-                self.draw_barcode(bx, sy + 74, W - bx - 20, 26, tid,
-                                  (200, 205, 210))
-            else:
-                self.text("Terminal I.D. non impostato" if it else
-                          "Terminal I.D. not set", (bx, sy + 80),
-                          self.f_tiny, FAINT)
-            sy += card_h + 12
-            gh_h = 156
-            self.npanel(8, sy, W - 16, gh_h, border=LINE,
-                       fill=(12, 16, 18), cut=10)
-            icons.draw(self.surface, "globe", 20, sy + 12, 22, FG)
-            self.text("SilverCrow2323", (48, sy + 14), self.f_small,
-                      FG)
-            self.text(("progetto: muOS-Void-Desk" if it else
-                      "project: muOS-Void-Desk"), (48, sy + 34),
-                      self.f_tiny, FAINT)
-            qr_box = 3
-            qr_mod = qrgen.encode(
-                "https://github.com/SilverCrow2323/muOS-Void-Desk")
-            qr_total = (len(qr_mod) + 4) * qr_box
-            self.draw_qr(W - qr_total - 16, sy + 10, qr_box, qr_mod,
-                        (10, 10, 10))
-            ly = sy + 116
-            if self.update_data is None or self.update_checking:
-                self.text("Latest Release: ...", (20, ly),
-                          self.f_small, FAINT)
-            elif not self.update_data.get("ok"):
-                self.text("Latest Release: -", (20, ly), self.f_small,
-                          FAINT)
-                self.text(("problema di connessione: %s" %
-                          self.update_data.get("error", "")) if it
-                          else ("connection problem: %s" %
-                               self.update_data.get("error", "")),
-                          (20, ly + 18), self.f_tiny, NO_R,
-                          maxw=W - 40)
-            else:
-                latest = self.update_latest()
-                if latest:
-                    self.text("Latest Release: " +
-                              latest.get("tag_name", "?"),
-                              (20, ly), self.f_small, up_cyan)
-                else:
-                    self.text(("Latest Release: nessuna ancora" if it
-                              else "Latest Release: none yet"),
-                              (20, ly), self.f_small, FAINT)
-            sy += gh_h + 12
-            latest = self.update_latest()
-            self.npanel(8, sy, W - 16, 30, border=LINE,
-                       fill=(16, 20, 22), cut=6)
-            self.text(("CHANGELOG ULTIMA VERSIONE" if it else
-                      "LATEST VERSION CHANGELOG"), (18, sy + 8),
-                      self.f_small, up_cyan)
-            sy += 34
-            if latest:
-                body = (latest.get("body") or "").strip() or (
-                    "(nessuna descrizione)" if it else
-                    "(no description)")
-                lines_w = self.note_wrap(body, W - 40, self.f_tiny, 8)
-                for wl in lines_w:
-                    self.text(wl, (20, sy), self.f_tiny, FG,
-                              maxw=W - 40)
-                    sy += 16
-                sy += 8
-            else:
-                msg = ("il changelog comparira' qui alla prima "
-                      "release pubblicata" if it else
-                      "the changelog will appear here once the "
-                      "first release is published")
-                for wl in self.note_wrap(msg, W - 40, self.f_small,
-                                         6):
-                    self.text(wl, (20, sy), self.f_small, FAINT,
-                              maxw=W - 40)
-                    sy += 18
-                sy += 10
+            self.header("STORICO RELEASE", icon="clock")
             releases = (self.update_data or {}).get("releases") or []
-            prev = releases[1:6]
-            if prev:
-                self.npanel(8, sy, W - 16, 30, border=LINE,
-                           fill=(16, 20, 22), cut=6)
-                self.text(("CHANGELOG PRECEDENTI" if it else
-                          "PREVIOUS CHANGELOG"), (18, sy + 8),
-                          self.f_small, DIM)
-                sy += 34
-                for rel in prev:
+            releases = list(releases)
+            n = len(releases)
+            if n == 0:
+                self.text(("nessuna release" if it else "no releases"),
+                          (20, 60), self.f_med, FAINT)
+                self.footer([("B", self.t("back"))])
+            else:
+                item_h = 52
+                view_h = H - 46 - 14 - 28
+                visible = max(1, view_h // item_h)
+                scroll_off = getattr(self, "storico_scroll", 0)
+                sel = getattr(self, "storico_sel", 0)
+                sel = min(sel, n - 1)
+                self.storico_sel = sel
+                max_scroll = max(0, n - visible)
+                scroll_off = max(0, min(scroll_off, max_scroll))
+                self.storico_scroll = scroll_off
+                if sel < scroll_off:
+                    self.storico_scroll = sel
+                    scroll_off = sel
+                elif sel >= scroll_off + visible:
+                    self.storico_scroll = sel - visible + 1
+                    scroll_off = self.storico_scroll
+                for j in range(scroll_off, min(scroll_off + visible, n)):
+                    iy = 50 + (j - scroll_off) * item_h
+                    rel = releases[j]
                     tag = rel.get("tag_name", "?")
                     date = (rel.get("published_at") or "")[:10]
-                    self.text("%s  ·  %s" % (tag, date), (20, sy),
-                              self.f_tiny, FG)
-                    sy += 15
-                    body1 = (rel.get("body") or "").strip()
-                    first_line = body1.split("\n")[0][:70] if \
-                        body1 else ("(nessuna descrizione)" if it
-                                   else "(no description)")
-                    self.text(first_line, (26, sy), self.f_tiny,
-                              FAINT, maxw=W - 46)
-                    sy += 20
-                if len(releases) > 6:
-                    more = ("+ %d release precedenti" %
-                           (len(releases) - 6)) if it else \
-                        ("+ %d earlier releases" %
-                        (len(releases) - 6))
-                    self.text(more, (20, sy), self.f_tiny, FAINT)
-                    sy += 20
-            if self.update_local_path:
-                sy += 6
-                self.npanel(8, sy, W - 16, 34, border=OK_G,
-                           fill=(10, 16, 12), cut=8)
-                icons.draw(self.surface, "storage", 16, sy + 7, 20,
-                          OK_G)
-                loc_txt = (("v%s trovato su SD -- SELECT per "
-                          "installare" % self.update_local_ver) if
-                          it else ("v%s found on SD -- SELECT to "
-                          "install" % self.update_local_ver))
-                self.text(loc_txt, (44, sy + 10), self.f_tiny, OK_G,
-                         maxw=W - 60)
-                sy += 38
-            self._voidupdate_content_h = sy + self.scroll - 50
-            self.footer([("A", "aggiorna" if avail else
-                        ("nessun aggiornamento" if it else
-                         "no update")),
-                        ("X", "impostazioni" if it else "settings"),
-                        ("Y", "riscansiona" if it else "rescan")] +
-                       ([("SELECT", "installa locale" if it else
-                         "install local")] if self.update_local_path
-                        else []) +
-                       [("B", self.t("back"))])
+                    body = (rel.get("body") or "").strip() or (
+                        "(nessuna descrizione)" if it else
+                        "(no description)")
+                    if j == sel:
+                        self.sel_frame(8, iy, W - 16, item_h - 4,
+                                       color=up_cyan)
+                    self.npanel(12, iy + 4, W - 24, item_h - 8,
+                                border=LINE, fill=INK, cut=8)
+                    self.text(tag, (20, iy + 8), self.f_med_b,
+                              up_cyan if j == sel else FG)
+                    self.text(date, (W - 20 - self.f_tiny.size(date)[0],
+                              iy + 12), self.f_tiny, FAINT)
+                    self.text(body[:60] + ("..." if len(body) > 60 else ""),
+                              (20, iy + 28), self.f_tiny, DIM,
+                              maxw=W - 40)
+                    if j == sel:
+                        pygame.draw.polygon(self.surface, up_cyan,
+                            [(W - 18, iy + 16), (W - 10, iy + 22),
+                             (W - 18, iy + 28)])
+                if max_scroll > 0:
+                    bar_x = W - 8
+                    bar_y = 50
+                    bar_h = view_h
+                    thumb_h = max(20, int(bar_h * visible / n))
+                    thumb_y = bar_y + int((bar_h - thumb_h) * scroll_off / max_scroll)
+                    pygame.draw.rect(self.surface, LINE, (bar_x, bar_y, 3, bar_h))
+                    pygame.draw.rect(self.surface, up_cyan,
+                                     (bar_x, thumb_y, 3, thumb_h))
+                self.footer([(self.t("k_ud"), "scroll" if n > 1 else ""),
+                             ("B", self.t("back"))])
+        elif top == "local_update":
+            it = (self.lang == "it")
+            up_cyan = (60, 210, 220)
+            self.surface.fill((8, 12, 14), (0, 44, W, H - 44))
+            for ln in range(44, H, 26):
+                pygame.draw.line(self.surface, (14, 20, 22),
+                                 (0, ln), (W, ln), 1)
+            self.header("LOCAL UPDATE", icon="storage")
+            items = getattr(self, "local_update_items", [])
+            n = len(items)
+            if n == 0:
+                self.text(("nessun pacchetto trovato" if it else
+                          "no packages found"), (20, 60), self.f_med,
+                          FAINT)
+                self.text(("controlla /mnt/mmc/ARCHIVE e "
+                          "/mnt/sdcard/ARCHIVE" if it else
+                          "check /mnt/mmc/ARCHIVE and "
+                          "/mnt/sdcard/ARCHIVE"), (20, 90),
+                          self.f_tiny, FAINT, maxw=W - 40)
+                self.footer([("B", self.t("back"))])
+            else:
+                item_h = 52
+                view_h = H - 46 - 14 - 28
+                visible = max(1, view_h // item_h)
+                scroll_off = getattr(self, "local_update_scroll", 0)
+                sel = getattr(self, "local_update_sel", 0)
+                sel = min(sel, n - 1)
+                self.local_update_sel = sel
+                max_scroll = max(0, n - visible)
+                scroll_off = max(0, min(scroll_off, max_scroll))
+                self.local_update_scroll = scroll_off
+                if sel < scroll_off:
+                    self.local_update_scroll = sel
+                    scroll_off = sel
+                elif sel >= scroll_off + visible:
+                    self.local_update_scroll = sel - visible + 1
+                    scroll_off = self.local_update_scroll
+                for j in range(scroll_off, min(scroll_off + visible, n)):
+                    iy = 50 + (j - scroll_off) * item_h
+                    if j == sel:
+                        self.sel_frame(8, iy, W - 16, item_h - 4)
+                    pkg = items[j]
+                    name = pkg.get("name", "?")
+                    ver = pkg.get("ver", "?")
+                    size = pkg.get("size", "?")
+                    source = pkg.get("source", "?")
+                    newer = pkg.get("is_newer", False)
+                    icons.draw(self.surface, "storage", 16, iy + 8, 20,
+                               up_cyan if newer else FAINT)
+                    self.text(name, (46, iy + 4), self.f_small,
+                              FG if j == sel else DIM, maxw=W - 100)
+                    self.text("v%s  ·  %s  ·  %s" % (ver, size, source),
+                              (46, iy + 24), self.f_tiny,
+                              OK_G if newer else FAINT, maxw=W - 100)
+                    if newer:
+                        self.text("NEWER", (W - 60, iy + 16),
+                                  self.f_small, OK_G)
+                self.footer([("A", "installa" if any(
+                    p.get("is_newer") for p in items) else "seleziona"),
+                             ("B", self.t("back"))])
+        elif top == "local_update_install":
+            it = (self.lang == "it")
+            up_cyan = (60, 210, 220)
+            self.surface.fill((8, 12, 14), (0, 44, W, H - 44))
+            for ln in range(44, H, 26):
+                pygame.draw.line(self.surface, (14, 20, 22),
+                                 (0, ln), (W, ln), 1)
+            self.header("AGGIORNAMENTO LOCALE", icon="gear")
+            logs = getattr(self, "local_update_log", [])
+            progress = getattr(self, "local_update_progress", 0)
+            y = 60
+            for ln in logs:
+                col = OK_G if ln.startswith("[OK]") else \
+                    NO_R if ln.startswith("[ERR]") else FG
+                self.text(ln, (20, y), self.f_tiny, col,
+                          maxw=W - 40)
+                y += 18
+            bar_y = H - 70
+            bar_x = 20
+            bar_w = W - 40
+            bar_h = 10
+            pygame.draw.rect(self.surface, LINE,
+                             (bar_x, bar_y, bar_w, bar_h), 1)
+            fill_w = int(bar_w * max(0, min(100, progress)) / 100)
+            pygame.draw.rect(self.surface, up_cyan,
+                             (bar_x + 1, bar_y + 1, max(0, fill_w - 2),
+                              bar_h - 2))
+            self.text("%d%%" % progress, (bar_x + bar_w + 8, bar_y),
+                      self.f_tiny, up_cyan)
+            self.footer([("B", self.t("back"))])
         elif top == "pcupsrv":
             it = (self.lang == "it")
             self.header("PC UPLINK", icon="monitor")
@@ -20953,7 +30955,8 @@ class App(object):
                      OK_G if running else DIM)
             if running:
                 ip = self.own_ip() or "?"
-                url = "http://%s:8765/" % ip
+                port = self.cfg.get("bstation_port", 8765)
+                url = "http://%s:%d/" % (ip, port)
                 self.text(("apri questo indirizzo su un browser "
                           "del PC:" if it else "open this address "
                           "on a PC browser:"), (46, 144),
@@ -20994,10 +30997,22 @@ class App(object):
                         self.f_small, 4):
                     self.text(wl, (46, 144), self.f_small, DIM,
                              maxw=W - 92)
+                port = self.cfg.get("bstation_port", 8765)
+                self.text(("porta: %d  ·  X per cambiare" % port)
+                         if it else
+                         ("port: %d  ·  X to change" % port),
+                         (46, 204), self.f_small, bs_col)
+                err = getattr(self, "bstation_last_error", None)
+                if err:
+                    self.text(("avvio fallito: %s" % err) if it
+                             else ("start failed: %s" % err),
+                             (46, 226), self.f_tiny, NO_R,
+                             maxw=W - 92)
             a_label = ("ferma" if running else "avvia") if it else \
                 ("stop" if running else "start")
             self.footer([("A", a_label),
                         ("SELECT", "auto" if it else "auto"),
+                        ("X", "porta" if it else "port"),
                         ("B", self.t("back"))])
         elif top == "ctrldevices":
             it = (self.lang == "it")
@@ -21571,6 +31586,316 @@ class App(object):
                           "QR not available", (40, 120),
                          self.f_med, DIM)
             self.footer([("B", self.t("back"))])
+        elif top == "tsgui":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("TAILSCALE")
+            if getattr(self, "ts_logo", None):
+                pygame.draw.rect(self.surface, INK, (10, 5, 36, 34))
+                self.surface.blit(self.ts_logo, (13, 7))
+            ts = self.ts or {}
+            run = ts.get("state") == "Running"
+            self.npanel(8, 46, W - 16, 54, border=ac, fill=INK, cut=9)
+            stt = ts.get("state", "?")
+            self.text(stt, (22, 52), self.f_med, OK_G if run else NO_R)
+            self.text(ts.get("ip") or "-", (22, 76), self.f_small, TS_GRAY)
+            online = sum(1 for p in ts.get("peers", []) if p["on"])
+            total_peers = len(ts.get("peers", []))
+            self.text("%d/%d Peers Online" % (online, total_peers),
+                      (W - 28 - self.f_small.size("%d/%d Peers Online" % (online, total_peers))[0], 52),
+                      self.f_small, ac)
+            menu = [
+                ("Connection Manager", "Toggle Connect / SSH / Auth"),
+                ("Network Devices", "View status, peers & ping"),
+                ("Taildrop", "Send & receive files via mesh"),
+                ("Netcheck Diagnostics", "NAT, DERP Latency & UDP test"),
+                ("System Options", "Themes, download path & auth"),
+                ("Exit", "Back to previous screen"),
+            ]
+            my = 110
+            mh = 50
+            for i, (label, sub) in enumerate(menu):
+                sel = (i == self.hub_sel)
+                y = my + i * mh
+                if sel:
+                    self.sel_frame(8, y, W - 16, mh - 4, color=ac)
+                self.text(label, (22, y + 6), self.f_med,
+                          FG if sel else DIM, maxw=W - 200)
+                if sub:
+                    self.text(sub, (22, y + 28), self.f_tiny, TS_GRAY)
+            self.footer([("A", "select" if not it else "seleziona"),
+                         ("B", self.t("back"))])
+        elif top == "tsconnmgr":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("CONNECTION MANAGER")
+            ts = self.ts or {}
+            run = ts.get("state") == "Running"
+            conn_status = "Connected" if run else "Disconnected"
+            ssh_status = "ENABLED" if self.ts_ssh_enabled else "DISABLED"
+            opts = [
+                ("Tailscale Connection: %s" % conn_status,
+                 "Toggle mesh network status"),
+                ("Tailscale SSH: %s" % ssh_status,
+                 "Allow secure SSH shell access via Tailnet"),
+                ("Re-Authenticate Node",
+                 "Generate new web login URL / QR code"),
+                ("Back to Main Menu", ""),
+            ]
+            by = 75
+            rh = 65
+            for i, (label, sub) in enumerate(opts):
+                sel = (i == self.hub_sel)
+                y = by + i * rh
+                if sel:
+                    self.sel_frame(8, y, W - 16, rh - 4, color=ac)
+                self.text(label, (22, y + 10), self.f_med,
+                          FG if sel else DIM)
+                if sub:
+                    self.text(sub, (22, y + 36), self.f_tiny, TS_GRAY)
+            self.footer([("A", "toggle" if not it else "azione"),
+                         ("B", self.t("back"))])
+        elif top == "tsfile":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("TAILDROP")
+            opts = [
+                ("Receive Incoming Files",
+                 "Fetch files sent to Taildrop folder"),
+                ("Send File to Peer",
+                 "Select files from SD card and dispatch"),
+                ("Back to Main Menu", ""),
+            ]
+            by = 90
+            for i, (label, sub) in enumerate(opts):
+                sel = (i == self.hub_sel)
+                y = by + i * 66
+                if sel:
+                    self.sel_frame(8, y, W - 16, 60, color=ac)
+                self.text(label, (22, y + 12), self.f_med,
+                          FG if sel else DIM)
+                if sub:
+                    self.text(sub, (22, y + 36), self.f_tiny, TS_GRAY)
+            self.footer([("A", "select" if not it else "seleziona"),
+                         ("B", self.t("back"))])
+        elif top == "tssendpick":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("SELECT TARGET DEVICE")
+            peers = getattr(self, "ts_peers_online", [])
+            if not peers:
+                self.text("No remote devices online" if not it
+                          else "Nessun dispositivo online", (40, 120),
+                          self.f_med, DIM)
+            for i, peer in enumerate(peers[:6]):
+                sel = (i == self.hub_sel)
+                y = 90 + i * 46
+                if sel:
+                    self.sel_frame(8, y, W - 16, 42, color=ac)
+                self.text(peer["name"], (22, y + 4), self.f_med,
+                          FG if sel else DIM)
+                self.text("%s (%s)" % (peer["ip"], peer.get("os", "?")),
+                          (22, y + 22), self.f_tiny, TS_GRAY)
+            self.footer([("A", "select" if not it else "seleziona"),
+                         ("B", self.t("back"))])
+        elif top == "tsbrowse":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("BROWSE FILES")
+            path_disp = self.ts_browse_path.replace("/mnt/mmc", "SD:")
+            self.text(path_disp, (20, 56), self.f_tiny, TS_GRAY)
+            pygame.draw.line(self.surface, LINE, (20, 72), (W - 20, 72), 1)
+            visible = 9
+            items = self.ts_browse_items
+            total = len(items)
+            start = max(0, min(self.ts_browse_sel - visible + 3,
+                               max(0, total - visible)))
+            for i, (name, is_dir, sz) in enumerate(items[start:start + visible]):
+                real_i = start + i
+                sel = (real_i == self.ts_browse_sel)
+                y = 80 + i * 36
+                if sel:
+                    self.sel_frame(8, y, W - 16, 34, color=ac)
+                full = os.path.join(self.ts_browse_path, name)
+                marked = full in self.ts_browse_marked
+                prefix = "[x] " if marked else ("[D] " if is_dir else "[F] ")
+                col = ac if marked else (FG if sel else DIM)
+                self.text(prefix + name, (22, y + 6), self.f_small,
+                          col, maxw=W - 100)
+            self.footer([("A", "mark/open" if not it else "marca/apri"),
+                         ("Y", "send (%d)" % len(self.ts_browse_marked)),
+                         ("B", self.t("back"))])
+        elif top == "tsoptions":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("OPTIONS")
+            opts = [
+                ("Change Download Location", "Set Taildrop receive folder"),
+                ("Exit Node Settings", "Select exit node peer"),
+                ("Network Information", "MagicDNS, Key Expiry, Tailnet"),
+                ("Theme Selection", "Choose visual theme"),
+                ("Force Account Logout", "Unlink this device"),
+                ("Back", ""),
+            ]
+            by = 65
+            rh = 58
+            for i, (label, sub) in enumerate(opts):
+                sel = (i == self.hub_sel)
+                y = by + i * rh
+                if sel:
+                    self.sel_frame(8, y, W - 16, rh - 4, color=ac)
+                self.text(label, (22, y + 8), self.f_med,
+                          FG if sel else DIM)
+                if sub:
+                    self.text(sub, (22, y + 30), self.f_tiny, TS_GRAY)
+            self.footer([("A", "select" if not it else "seleziona"),
+                         ("B", self.t("back"))])
+        elif top == "tsbrowsedir":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("SELECT DOWNLOAD FOLDER")
+            path_disp = self.ts_browse_path.replace("/mnt/mmc", "SD:")
+            self.text(path_disp, (20, 56), self.f_tiny, TS_GRAY)
+            pygame.draw.line(self.surface, LINE, (20, 72), (W - 20, 72), 1)
+            visible = 9
+            items = self.ts_browse_items
+            total = len(items)
+            start = max(0, min(self.ts_browse_sel - visible + 3,
+                               max(0, total - visible)))
+            for i, (name, is_dir, sz) in enumerate(items[start:start + visible]):
+                real_i = start + i
+                sel = (real_i == self.ts_browse_sel)
+                y = 80 + i * 36
+                if sel:
+                    self.sel_frame(8, y, W - 16, 34, color=ac)
+                prefix = "[D] " if is_dir else "    "
+                self.text(prefix + name, (22, y + 6), self.f_small,
+                          FG if sel else DIM, maxw=W - 100)
+            self.footer([("A", "open" if not it else "apri"),
+                         ("<", "select here" if not it else "seleziona qui"),
+                         ("B", self.t("back"))])
+        elif top == "tsexitnode":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("EXIT NODE")
+            peers = [p for p in (self.ts or {}).get("peers", [])
+                      if p.get("exit")]
+            rows = [("Disabled (Direct Internet Access)", "")] + \
+                   [(p["name"], p["ip"]) for p in peers]
+            for i, (label, sub) in enumerate(rows[:7]):
+                sel = (i == self.ts_exit_sel)
+                y = 80 + i * 44
+                if sel:
+                    self.sel_frame(8, y, W - 16, 40, color=ac)
+                self.text(label, (22, y + 4), self.f_med,
+                          FG if sel else DIM)
+                if sub:
+                    self.text(sub, (22, y + 24), self.f_tiny, TS_GRAY)
+            self.footer([("A", "apply" if not it else "applica"),
+                         ("B", self.t("back"))])
+        elif top == "tspdetail":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("PEER DETAILS")
+            peer = getattr(self, "ts_detail_peer", {})
+            is_self = peer.get("self", False)
+            lines = [
+                ("Host Name", peer.get("name", "?")),
+                ("Tailscale IP", peer.get("ip") or "?"),
+                ("Operating System", (peer.get("os") or "?").capitalize()),
+                ("Status", "Online" if peer.get("on") else "Offline"),
+                ("Relay DERP", peer.get("relay") or "Direct WireGuard"),
+                ("Exit Node Capable", "Yes" if peer.get("exit") else "No"),
+            ]
+            self.npanel(8, 64, W - 16, 220, border=ac, fill=INK, cut=10)
+            for i, (k, v) in enumerate(lines):
+                y = 80 + i * 30
+                self.text(k, (24, y), self.f_tiny, TS_GRAY)
+                self.text(str(v), (220, y), self.f_small, FG)
+            if self.ts_peer_detail_msg:
+                pygame.draw.line(self.surface, LINE, (24, 260), (W - 24, 260), 1)
+                self.text("Diagnostic:", (24, 270), self.f_tiny, TS_GRAY)
+                self.text(self.ts_peer_detail_msg[:50], (24, 290),
+                          self.f_small, ac)
+            footer = [("A", "ping" if not it else "ping")]
+            if not is_self and peer.get("exit"):
+                footer.append(("Y", "toggle exit" if not it else "exit node"))
+            footer.append(("B", self.t("back")))
+            self.footer(footer)
+        elif top == "tsnetinfo":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("NETWORK INFO")
+            ts = self.ts or {}
+            expiry_days = self.ts_key_expiry_days()
+            expiry_str = "Expires in %d days" % expiry_days if expiry_days else "No Expiry"
+            rows = [
+                ("Current Tailnet", ts.get("tailnet") or "-"),
+                ("MagicDNS Status", "Enabled" if ts.get("magicdns") else "Disabled"),
+                ("Device IP", ts.get("ip") or "-"),
+                ("Tailscale Version", getattr(self, "ts_version_str", "?")),
+                ("Key Expiry", expiry_str),
+            ]
+            self.npanel(8, 64, W - 16, 220, border=ac, fill=INK, cut=10)
+            for i, (k, v) in enumerate(rows):
+                y = 80 + i * 32
+                self.text(k, (24, y), self.f_tiny, TS_GRAY)
+                self.text(str(v), (220, y), self.f_small, FG)
+            self.footer([("A/B", self.t("back"))])
+        elif top == "tstheme":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("THEME SELECTION")
+            themes = [("tailscale", "Tailscale Classic"),
+                      ("spdw", "SPDW Cyberpunk"),
+                      ("hybrid", "SPDW Hybrid")]
+            cur_theme = self.cfg.get("ts_theme", "ciano")
+            theme_map = {"ciano": 0, "verde": 1, "ambra": 2}
+            cur_idx = theme_map.get(cur_theme, 0)
+            for i, (key, name) in enumerate(themes):
+                sel = (i == self.ts_theme_sel)
+                active = (i == cur_idx)
+                y = 80 + i * 60
+                if sel:
+                    self.sel_frame(8, y, W - 16, 54, color=ac)
+                label = name + (" (Active)" if active else "")
+                self.text(label, (22, y + 12), self.f_med,
+                          OK_G if active else (FG if sel else DIM))
+            self.footer([("A", "apply" if not it else "applica"),
+                         ("B", self.t("back"))])
+        elif top == "tsresult":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("RESULT")
+            self.npanel(8, 60, W - 16, H - 120, border=ac, fill=INK, cut=10)
+            lines = self.ts_result_msg.split("\n")[:11]
+            y = 78
+            for i, line in enumerate(lines):
+                col = FG
+                if i == 0:
+                    col = ac
+                if "error" in line.lower() or "fail" in line.lower():
+                    col = NO_R
+                elif "success" in line.lower() or "connected" in line.lower():
+                    col = OK_G
+                self.text(line, (24, y), self.f_small if i else self.f_med,
+                          col, maxw=W - 48)
+                y += 26
+            footer = [("A", "ok" if not it else "ok")]
+            if self.ts_login_url:
+                footer.append(("Y", "QR code" if not it else "codice QR"))
+            self.footer(footer)
+        elif top == "tsloading":
+            it = (self.lang == "it")
+            ac = self.ts_accent()
+            self.header("PROCESSING...")
+            pw, ph = 400, 120
+            px, py = (W - pw) // 2, (H - ph) // 2
+            self.npanel(px, py, pw, ph, border=ac, fill=INK, cut=10)
+            self.text(self.ts_loading_msg or "Please wait...",
+                      (px + 20, py + ph // 2 - 10), self.f_med, FG,
+                      maxw=pw - 40)
+            self.spinner(px + pw - 50, py + ph // 2)
         elif top == "bgmlist":
             it = (self.lang == "it")
             bgm_col = (200, 160, 230)
@@ -21584,7 +31909,23 @@ class App(object):
                         "music folders", W - 40, self.f_small, 3):
                     self.text(wl, (20, 60), self.f_small, DIM,
                              maxw=W - 40)
-            y = 50
+            else:
+                info = None
+                if self.bgm_sel < len(self.bgm_files):
+                    fdata = self.bgm_files[self.bgm_sel]
+                    if self.bgm_sel not in self.bgm_file_infos:
+                        self.bgm_file_infos[self.bgm_sel] = self.bgm_get_audio_info(fdata["full_path"])
+                    info = self.bgm_file_infos.get(self.bgm_sel)
+                if info:
+                    dur = info.get("duration", 0)
+                    dur_str = "%d:%02d" % (int(dur // 60), int(dur % 60)) if dur else "?:??"
+                    info_txt = "%s | %s | %s" % (
+                        dur_str,
+                        human(info.get("size", 0)),
+                        info.get("codec", "?"))
+                    self.text(info_txt, (20, 58), self.f_tiny, bgm_col, maxw=W - 40)
+                    self.line(20, 74, W - 20, 74, LINE)
+            y = 80
             for j, f in enumerate(self.bgm_files):
                 if y > H - 60:
                     break
@@ -21624,9 +31965,20 @@ class App(object):
                          (20, 60), self.f_med, bgm_col)
                 self.text(f["rel_path"][:50], (20, 88),
                          self.f_small, DIM, maxw=W - 40)
+                pct = self.bgm_proc_pct
+                bar_w = int((W - 40) * pct / 100.0)
+                self.rect(20, 120, W - 40, 8, INK)
+                self.rect(20, 120, bar_w, 8, bgm_col)
+                self.rect(20, 120, W - 40, 8, LINE, fill=False)
+                self.text("%.1f%%" % pct, (W // 2, 138), self.f_small,
+                          bgm_col, center=True)
                 pygame.display.flip()
+                def _prog(p):
+                    self.bgm_proc_pct = p
                 ok, method = self.bgm_process_file(
-                    f["full_path"], outfile)
+                    f["full_path"], outfile,
+                    target_lufs=float(self.cfg.get("bgm_lufs", "-14.0")),
+                    progress_cb=_prog)
                 self.bgm_log.append((f["rel_path"], ok, method))
                 self.bgm_proc_idx += 1
             else:
@@ -21642,7 +31994,136 @@ class App(object):
                              maxw=W - 40)
                     ly += 18
                 self.footer([("B", self.t("back"))])
-        elif top == "tspanel":
+        elif top == "bgmmain":
+            it = (self.lang == "it")
+            bgm_col = (200, 160, 230)
+            self.header("BGM NORMALIZER", icon="speaker", badge="bgm_norm")
+            scan_text = self.t("bgm_scan_info").format(len(self.bgm_files), self.cfg.get("bgm_source", "both").upper())
+            self.text(scan_text, (20, 56), self.f_small, DIM, maxw=W - 40)
+            self.line(20, 76, W - 20, 76, LINE)
+            menu = [
+                ("folder", self.t("bgm_menu_file"), self.t("bgm_menu_file_s")),
+                ("settings", self.t("bgm_menu_settings"), self.t("bgm_menu_settings_s")),
+                ("options", self.t("bgm_menu_options"), self.t("bgm_menu_options_s")),
+                ("exit", self.t("bgm_menu_exit"), self.t("bgm_menu_exit_s")),
+            ]
+            my = 90
+            for i, (icon_type, lbl, sub) in enumerate(menu):
+                sel = (i == self.bgm_menu_sel)
+                ry = my + i * 54
+                self.rect(16, ry, W - 32, 50, self.sel_bg if sel else BG)
+                if sel:
+                    self.rect(16, ry, 4, 50, bgm_col)
+                icons.draw(self.surface, icon_type, 28, ry + 10, 30,
+                           bgm_col if sel else FAINT)
+                self.text(lbl, (72, ry + 10), self.f_med_b,
+                          FG if sel else DIM)
+                if sub:
+                    self.text(sub, (72, ry + 32), self.f_small,
+                              bgm_col if sel else FAINT, maxw=W - 100)
+            self.footer([("A", self.t("open")), ("B", self.t("back"))])
+        elif top == "bgmconv":
+            it = (self.lang == "it")
+            bgm_col = (200, 160, 230)
+            self.header(self.t("bgm_menu_settings"), icon="settings")
+            items = [
+                (self.t("bgm_conv_norm"), "ON" if self.cfg.get("bgm_normalize", "true") == "true" else "OFF"),
+                (self.t("bgm_conv_trim"), "ON" if self.cfg.get("bgm_trim", "false") == "true" else "OFF"),
+                (self.t("bgm_conv_ogg"), "ON" if self.cfg.get("bgm_ogg", "true") == "true" else "OFF"),
+                (self.t("bgm_conv_del"), "ON" if self.cfg.get("bgm_delete", "false") == "true" else "OFF"),
+                (self.t("bgm_conv_lufs"), self.cfg.get("bgm_lufs", "-14.0") + " LUFS"),
+                (self.t("bgm_conv_input"), self.cfg.get("bgm_source", "both").upper()),
+                (self.t("bgm_conv_output"), {"default": "Default", "inplace": "In-place", "custom": "Custom"}.get(self.cfg.get("bgm_out_mode", "default"), "Default")),
+                (self.t("back"), ""),
+            ]
+            y = 56
+            for j, (lbl, val) in enumerate(items):
+                sel = (j == self.bgm_conv_sel)
+                if sel:
+                    self.sel_frame(8, y, W - 16, 40, color=bgm_col)
+                self.text(lbl, (24, y + 8), self.f_med,
+                          FG if sel else DIM, maxw=W - 160)
+                if val:
+                    self.text(val, (W - 32 - self.f_med.size(val)[0], y + 8),
+                              self.f_med, bgm_col if sel else FAINT)
+                y += 44
+            self.footer([("A", self.t("open")), ("B", self.t("back"))])
+        elif top == "bgmoptions":
+            it = (self.lang == "it")
+            bgm_col = (200, 160, 230)
+            self.header(self.t("bgm_menu_options"), icon="options")
+            items = [
+                (self.t("bgm_opt_lang"), ("IT" if self.lang == "it" else "EN")),
+                (self.t("bgm_opt_theme"), self.cfg.get("bgm_theme", "spdw").upper()),
+                (self.t("bgm_opt_glitch"), "ON" if self.cfg.get("bgm_glitch", "true") == "true" else "OFF"),
+                (self.t("bgm_opt_log"), ""),
+                (self.t("bgm_opt_reset"), ""),
+                (self.t("bgm_opt_about"), ""),
+                (self.t("back"), ""),
+            ]
+            y = 56
+            for j, (lbl, val) in enumerate(items):
+                sel = (j == self.bgm_opt_sel)
+                if sel:
+                    self.sel_frame(8, y, W - 16, 40, color=bgm_col)
+                self.text(lbl, (24, y + 8), self.f_med,
+                          FG if sel else DIM, maxw=W - 160)
+                if val:
+                    self.text(val, (W - 32 - self.f_med.size(val)[0], y + 8),
+                              self.f_med, bgm_col if sel else FAINT)
+                y += 44
+            self.footer([("A", self.t("open")), ("B", self.t("back"))])
+        elif top == "bgmabout":
+            it = (self.lang == "it")
+            bgm_col = (200, 160, 230)
+            self.header(self.t("bgm_about_title"), icon="music")
+            self.npanel(20, 56, W - 40, H - 116, border=bgm_col, fill=INK, cut=10)
+            y = 72
+            self.text(self.t("bgm_about_title"), (W // 2, y), self.f_med_b, bgm_col, center=True)
+            y += 40
+            self.text(self.t("bgm_about_ver"), (W // 2, y), self.f_small, DIM, center=True)
+            y += 36
+            for line in self.note_wrap(self.t("bgm_about_desc"), W - 60, self.f_small, 3):
+                self.text(line, (30, y), self.f_small, FG, maxw=W - 60)
+                y += 18
+            y += 12
+            self.text(self.t("bgm_about_engine"), (30, y), self.f_small, DIM, maxw=W - 60)
+            y += 24
+            self.text(self.t("bgm_about_author"), (30, y), self.f_small, bgm_col, maxw=W - 60)
+            self.footer([("B", self.t("back"))])
+        elif top == "bgmtheme":
+            it = (self.lang == "it")
+            bgm_col = (200, 160, 230)
+            self.header(self.t("bgm_opt_theme"), icon="settings")
+            themes = ["spdw", "tailscale", "hybrid"]
+            theme_names = {"spdw": "SPDW Megastructure", "tailscale": "Tailscale Classic", "hybrid": "SPDW Hybrid"}
+            y = 56
+            for j, key in enumerate(themes):
+                sel = (j == self.bgm_theme_sel)
+                active = (key == self.cfg.get("bgm_theme", "spdw"))
+                if sel:
+                    self.sel_frame(8, y, W - 16, 40, color=bgm_col)
+                self.text(theme_names.get(key, key) + (" (Active)" if active else ""), (24, y + 10), self.f_med,
+                          OK_G if active else (FG if sel else DIM))
+                y += 44
+            self.footer([("A", self.t("open")), ("B", self.t("back"))])
+        elif top == "bgmlogview":
+            it = (self.lang == "it")
+            bgm_col = (200, 160, 230)
+            self.header("LOG", icon="terminal")
+            self.content_panel(46, H - 40)
+            y = 50
+            for ln in self.bgm_log_view_lines[self.bgm_log_view_scroll:self.bgm_log_view_scroll + 15]:
+                self.text(ln, (20, y), self.f_tiny, DIM, maxw=W - 40)
+                y += 16
+            self.footer([(self.t("k_ud"), self.t("row")), ("B", self.t("back"))])
+        elif top == "bgmexitconfirm":
+            it = (self.lang == "it")
+            bgm_col = (200, 160, 230)
+            self.header(self.t("bgm_menu_exit"), icon="exit")
+            self.npanel(100, 140, W - 200, 100, border=bgm_col, fill=INK, cut=10)
+            self.text(self.t("bgm_menu_exit_s"), (W // 2, 170), self.f_med, FG, center=True)
+            self.footer([("A", "si" if it else "yes"), ("B", self.t("back"))])
             it = (self.lang == "it")
             self.header("TAILSCALE")
             if getattr(self, "ts_logo", None):
@@ -21703,7 +32184,8 @@ class App(object):
             if top == "tsmenu":
                 acts = self.ts_menu_items()
             else:
-                peer = (self.ts or {}).get("peers", [])[self.ts_sel]
+                peers = (self.ts or {}).get("peers", [])
+                peer = peers[self.ts_sel] if 0 <= self.ts_sel < len(peers) else {}
                 acts = [("ping", "Ping")]
                 if peer.get("exit"):
                     acts.append(("exit", "Usa come exit node"
@@ -21871,7 +32353,8 @@ class App(object):
                          ("START", "OK")])
         elif top == "files" and self.fm_path is None:
             it = (self.lang == "it")
-            self.header("FILE GRID-DIVER", icon="folder")
+            self.header("FILE GRID-DIVER", icon="folder",
+                       badge="file_grid_diver")
             self.fm_backdrop()
             entries = self.fm_root_entries()
             self.fm_sel = min(self.fm_sel, len(entries) - 1)
@@ -21913,7 +32396,8 @@ class App(object):
             it = (self.lang == "it")
             in_arc = self.fm_archive is not None
             self.header("FILE GRID-DIVER",
-                       icon="zip" if in_arc else "folder")
+                       icon="zip" if in_arc else "folder",
+                       badge="file_grid_diver")
             self.fm_backdrop()
             if in_arc:
                 arc_path, internal = self.fm_archive
@@ -22020,18 +32504,106 @@ class App(object):
             self.footer([("A", self.t("open")), ("X", "rimuovi" if it
                          else "remove"), ("B", self.t("back"))])
         elif top == "fmenu":
-            self.render_prev_dim()
+            # ---- Animazione di apertura ----
+            if self._fmenu_anim_start is None:
+                self._fmenu_anim_start = time.time()
+                self._fmenu_anim_progress = 0.0
+            elapsed = time.time() - self._fmenu_anim_start
+            duration = 0.2
+            if elapsed < duration:
+                self._fmenu_anim_progress = min(1.0, elapsed / duration)
+            else:
+                self._fmenu_anim_progress = 1.0
+
             acts = self.fm_menu_items()
-            hgt = 24 + len(acts) * 40
-            self.npanel(150, 110, W - 300, hgt, border=self.accent,
-                        fill=INK, cut=10)
-            for j, (k, lab) in enumerate(acts):
-                y = 122 + j * 40
-                if j == self.hub_sel:
-                    self.sel_frame(158, y, W - 316, 36)
-                self.text(lab, (176, y + 8), self.f_med,
-                          FG if j == self.hub_sel else DIM)
-            self.footer([("A", self.t("open")), ("B", self.t("back"))])
+            n = len(acts)
+
+            max_h = H - 100
+            item_h = 30
+            total_h = n * item_h + 10
+            visible_h = min(total_h, max_h)
+            visible_items = max(1, visible_h // item_h)
+
+            if not hasattr(self, "_fmenu_scroll"):
+                self._fmenu_scroll = 0
+            max_scroll = max(0, n - visible_items)
+            if self._fmenu_sel < self._fmenu_scroll:
+                self._fmenu_scroll = self._fmenu_sel
+            elif self._fmenu_sel >= self._fmenu_scroll + visible_items:
+                self._fmenu_scroll = self._fmenu_sel - visible_items + 1
+            self._fmenu_scroll = max(0, min(self._fmenu_scroll, max_scroll))
+
+            slide_offset = int((1 - self._fmenu_anim_progress) * (visible_h + 20))
+            alpha = int(255 * self._fmenu_anim_progress)
+
+            veil = pygame.Surface((W, H), pygame.SRCALPHA)
+            veil.fill((0, 0, 0, int(120 * self._fmenu_anim_progress)))
+            self.surface.blit(veil, (0, 0))
+
+            panel_x = 10
+            panel_w = W - 20
+            panel_y = 44 + slide_offset
+            panel_h = visible_h + 8
+
+            pygame.draw.rect(self.surface, (12, 14, 18), (panel_x, panel_y, panel_w, panel_h),
+                             border_radius=6)
+            pygame.draw.rect(self.surface, LINE, (panel_x, panel_y, panel_w, panel_h), 1,
+                             border_radius=6)
+            pygame.draw.line(self.surface, (40, 44, 52), (panel_x + 4, panel_y + 1),
+                             (panel_x + panel_w - 4, panel_y + 1), 1)
+
+            f_title = self.f_small
+            title = "AZIONI" if self.lang == "it" else "ACTIONS"
+            tw = f_title.size(title)[0]
+            self.text(title, (panel_x + panel_w // 2 - tw // 2, panel_y + 4),
+                      f_title, FAINT)
+            pygame.draw.line(self.surface, LINE, (panel_x + 8, panel_y + 20),
+                             (panel_x + panel_w - 8, panel_y + 20), 1)
+
+            y_start = panel_y + 24
+            for i in range(self._fmenu_scroll, min(self._fmenu_scroll + visible_items, n)):
+                key, label, icon_key = acts[i]
+                y = y_start + (i - self._fmenu_scroll) * item_h
+                sel = (i == self._fmenu_sel)
+
+                if sel:
+                    pygame.draw.rect(self.surface, (30, 34, 44),
+                                     (panel_x + 4, y, panel_w - 8, item_h - 2),
+                                     border_radius=4)
+                    pygame.draw.rect(self.surface, self.accent,
+                                     (panel_x + 4, y, panel_w - 8, item_h - 2), 1,
+                                     border_radius=4)
+
+                icol = self.accent if sel else DIM
+                icon_size = 16
+                icons.draw(self.surface, icon_key, panel_x + 10, y + (item_h - icon_size) // 2 + 1,
+                           icon_size, icol)
+
+                color = FG if sel else DIM
+                self.text(label, (panel_x + 32, y + (item_h - f_title.get_height()) // 2 + 1),
+                          f_title, color, maxw=panel_w - 50)
+
+                if i < n - 1:
+                    pygame.draw.line(self.surface, (20, 22, 28),
+                                     (panel_x + 8, y + item_h - 1),
+                                     (panel_x + panel_w - 8, y + item_h - 1), 1)
+
+            if n > visible_items:
+                bar_x = panel_x + panel_w - 6
+                bar_y = panel_y + 8
+                bar_h = panel_h - 16
+                thumb_h = max(20, int(bar_h * visible_items / n))
+                thumb_y = bar_y + int((bar_h - thumb_h) * self._fmenu_scroll / max(1, max_scroll))
+                pygame.draw.rect(self.surface, LINE, (bar_x, bar_y, 4, bar_h))
+                pygame.draw.rect(self.surface, self.accent, (bar_x, thumb_y, 4, thumb_h))
+
+            self._fmenu_visible_items = visible_items
+            self._fmenu_n_items = n
+            self._fmenu_max_scroll = max_scroll
+
+            self.footer([(self.t("k_ud"), "scorri" if self.lang == "it" else "scroll"),
+                         ("A", self.t("open")),
+                         ("B", self.t("back"))])
         elif top == "imgview":
             self.surface.fill((0, 0, 0))
             try:
@@ -22076,6 +32648,12 @@ class App(object):
                          ("Y", "+riga" if it else "+line"), ("X", "-"),
                          ("START", "salva" if it else "save"),
                          ("B", self.t("back"))])
+        elif top == "radixeditor":
+            if hasattr(self, "_radix_editor"):
+                self._radix_editor.draw()
+            else:
+                self.text("RADIX VERITAS - Loading...", (20, 200),
+                          self.f_med, (200, 100, 100))
         else:
             # stato senza schermata: meglio dirlo che congelarsi
             self.header("VOID-DESK")
@@ -22137,8 +32715,11 @@ class App(object):
         self._radio_health_update()
         self._notif_draw()
         self._media_panel_draw()
+        self._mecha_panel_draw()
         self._r2_tablet_draw()
         self._l2_panel_draw()
+        self.volume_overlay.update()
+        self.volume_overlay.draw(self.surface)
         if flip:
             pygame.display.flip()
 
@@ -22152,42 +32733,141 @@ class App(object):
         mono13 = font_mono(13)
         mono15 = font_mono(15)
         mono_b16 = font_mono(16, bold=True)
+        mono9 = font_mono(9)
         try:
             evinput.poll()
-            # ── FASE 1: log TUI nero, righe una alla volta ──────────
-            lines = [
-                "BOOT",
-                "I.R. Minoru7 operativo (stato: green/default)",
-                "Minoru avvia il sistema con la risonanza migliore",
-                "Rintro-Wave agganciata -- breccia in corso "
-                "nell'infrastruttura FDVD-Automatelite",
-                "VOID cosciente e in funzione",
+
+            boot_lines = [
+                "BOOT SEQUENCE v10.0.0 \"NEXUS\"",
+                ("[I.R.] Minoru", "7", "  online  //  status: green/default"),
+                "Neural resonance calibration... OK",
+                "Rintro-Wave locked -- breaching FDVD-Automatelite",
+                "VOID consciousness: ACTIVE",
+                "muOS kernel handshake... OK",
+                "Mounting NEXUS orbital frames... OK",
+                "Loading SPDW Factory core modules...",
             ]
+
             self.surface.fill((0, 0, 0))
             real_flip()
-            time.sleep(0.15)
+            time.sleep(0.10)
+
             y = 24
-            for ln in lines:
-                for c in range(0, len(ln) + 1, 3):
-                    self.surface.fill((0, 0, 0),
-                                     (0, y, W, mono13.get_height() + 2))
-                    partial = ln[:c]
-                    img = mono13.render(partial, True,
-                                        (225, 225, 225))
-                    self.surface.blit(img, (18, y))
+            for entry in boot_lines:
+                if isinstance(entry, tuple):
+                    base, sup, rest = entry
+                    # Type base text (faster chunk)
+                    for c in range(0, len(base) + 1, 2):
+                        self.surface.fill((0, 0, 0),
+                                         (0, y, W, mono13.get_height() + 4))
+                        img = mono13.render(base[:c], True, (210, 210, 210))
+                        self.surface.blit(img, (18, y))
+                        real_flip()
+                        time.sleep(0.003)
+                    # Superscript 7
+                    base_w = mono13.size(base)[0]
+                    sup_img = mono9.render(sup, True, (140, 255, 140))
+                    self.surface.blit(sup_img, (18 + base_w, y - 3))
                     real_flip()
-                    time.sleep(0.006)
-                img = mono13.render(ln, True, (225, 225, 225))
-                self.surface.blit(img, (18, y))
-                real_flip()
+                    time.sleep(0.02)
+                    # Type rest
+                    rest_x = 18 + base_w + sup_img.get_width() + 2
+                    for c in range(0, len(rest) + 1, 2):
+                        self.surface.fill((0, 0, 0),
+                                         (rest_x, y, W - rest_x,
+                                          mono13.get_height() + 4))
+                        img = mono13.render(rest[:c], True, (120, 120, 120))
+                        self.surface.blit(img, (rest_x, y))
+                        real_flip()
+                        time.sleep(0.003)
+                    # Final paint (full line)
+                    self.surface.fill((0, 0, 0),
+                                     (0, y, W, mono13.get_height() + 4))
+                    self.surface.blit(
+                        mono13.render(base, True, (210, 210, 210)), (18, y))
+                    self.surface.blit(sup_img, (18 + base_w, y - 3))
+                    self.surface.blit(
+                        mono13.render(rest, True, (120, 120, 120)),
+                        (rest_x, y))
+                    real_flip()
+                else:
+                    ln = entry
+                    for c in range(0, len(ln) + 1, 3):
+                        self.surface.fill((0, 0, 0),
+                                         (0, y, W, mono13.get_height() + 4))
+                        partial = ln[:c]
+                        # Status-aware colour
+                        if "... OK" in partial:
+                            col = (140, 255, 140)
+                        elif "ACTIVE" in partial:
+                            col = (140, 255, 140)
+                        elif "breaching" in partial:
+                            col = (255, 180, 60)
+                        else:
+                            col = (225, 225, 225)
+                        img = mono13.render(partial, True, col)
+                        self.surface.blit(img, (18, y))
+                        real_flip()
+                        time.sleep(0.004)
                 y += mono13.get_height() + 5
-                time.sleep(0.09)
-            time.sleep(0.45)
-            for i in range(6):
+                time.sleep(0.04)
+
+            # ── PHASE 1b: integrity progress bar ──────────
+            bar_y = y + 10
+            bar_w = 360
+            bar_h = 11
+            steps = 16
+            label = mono13.render("SYSTEM INTEGRITY CHECK", True,
+                                  (110, 110, 110))
+            self.surface.blit(label, (18, bar_y - 16))
+            real_flip()
+            time.sleep(0.08)
+
+            for i in range(steps + 1):
+                pct = int((i / steps) * 100)
+                fill_w = int((i / steps) * (bar_w - 4))
+                self.surface.fill((0, 0, 0),
+                                 (0, bar_y - 2, W, bar_h + 8))
+                # Bracket shell
+                pygame.draw.rect(self.surface, (55, 55, 55),
+                                 (18, bar_y, bar_w, bar_h), 1)
+                # Green fill
+                if fill_w > 0:
+                    pygame.draw.rect(
+                        self.surface, (60, 255, 110),
+                        (20, bar_y + 2, fill_w, bar_h - 4))
+                # Percentage
+                pct_txt = mono13.render("%3d%%" % pct, True,
+                                        (225, 225, 225))
+                self.surface.blit(pct_txt, (18 + bar_w + 10, bar_y - 1))
+                real_flip()
+                time.sleep(0.018)
+
+            # Blink nominal status
+            nominal_y = bar_y + 20
+            for _ in range(2):
+                nom = mono13.render("ALL SYSTEMS NOMINAL", True,
+                                    (60, 255, 110))
+                self.surface.blit(nom, (18, nominal_y))
+                real_flip()
+                time.sleep(0.14)
+                self.surface.fill((0, 0, 0),
+                                 (0, nominal_y, W,
+                                  mono13.get_height() + 4))
+                real_flip()
+                time.sleep(0.08)
+            nom = mono13.render("ALL SYSTEMS NOMINAL", True,
+                                (60, 255, 110))
+            self.surface.blit(nom, (18, nominal_y))
+            real_flip()
+            time.sleep(0.25)
+
+            # CRT power-on flicker
+            for i in range(4):
                 self.surface.fill((0, 0, 0))
                 real_flip()
-                time.sleep(0.02)
-
+                time.sleep(0.018)
+                
             # ── FASE 2: box SPDW/BLAME centrato, controllo vero ─────
             def blame_frame(status_lines, glitch=True):
                 self.surface.fill((2, 2, 3))
@@ -22331,10 +33011,19 @@ class App(object):
         t_start = time.time()
 
         def can_skip():
-            if time.time() - t_start < 0.8:
+            if time.time() - t_start < 1.5:
                 evinput.poll()
                 return False
-            return bool(evinput.poll())
+            buttons = evinput.poll()
+            try:
+                import intro
+                intro._LAST_BUTTONS = buttons
+            except Exception:
+                pass
+            for b in buttons:
+                if b in ("A", "B", "START"):
+                    return True
+            return False
 
         jingle = None
         if self.cfg.get("sfx", True):
@@ -22342,7 +33031,7 @@ class App(object):
         intro.play(self.surface, pygame.display.flip, "Void-DESK",
                    self.accent, skip_check=can_skip, font_path=FONT_PATH,
                    duration=0.45, menu_surf=menu_img,
-                   jingle=jingle)
+                   jingle=jingle, lang=self.lang, sfx=self.sfx)
 
     # ---------------------------------------------------------------- loop
     def handle_capture(self):
@@ -22440,36 +33129,1331 @@ class App(object):
             self.ctrl_capturing = False
             self.pop_state()
 
+    # --- Media Vault ---
+    def render_media_vault(self):
+        """Punto di ingresso per il rendering di Media Vault."""
+        surf = self.surface
+        if self.media_vault_phase == "intro":
+            self._draw_media_vault_intro(surf)
+        elif self.media_vault_phase == "flash":
+            self._draw_media_vault_flash(surf)
+        elif self.media_vault_phase == "quadrants":
+            self._draw_media_vault_quadrants(surf, 1.0)
+        else:
+            self.media_vault_phase = "quadrants"
+            self._draw_media_vault_quadrants(surf, 1.0)
+
+    def _draw_media_vault_intro(self, surf):
+        """Animazione di apertura: fendenti di spada diagonali."""
+        elapsed = time.time() - self.media_vault_anim_t0
+        duration = 1.8
+
+        progress = min(1.0, elapsed / duration)
+
+        if progress < 0.6:
+            p = progress / 0.6
+            x1_v = int(W * 0.1 + p * W * 0.8)
+            y1_v = 44
+            x2_v = int(W * 0.1 + p * W * 0.8)
+            y2_v = H - 28
+
+            x1_h = W
+            y1_h = int(44 + p * (H - 28 - 44))
+            x2_h = 0
+            y2_h = int(44 + p * (H - 28 - 44))
+
+            glow_color = (180, 230, 255)
+            glow_alpha = int(200 * (1 - p * 0.3))
+
+            for width in range(6, 0, -2):
+                alpha = int(glow_alpha * (1 - (6 - width) / 8))
+                c = (*glow_color, alpha)
+                pygame.draw.line(surf, c, (x1_v, y1_v), (x2_v, y2_v), width)
+                pygame.draw.line(surf, c, (x1_h, y1_h), (x2_h, y2_h), width)
+
+            for i in range(3):
+                offset = int(10 * (1 - p) * (i + 1))
+                alpha = int(60 * (1 - p) * (1 - i / 3))
+                c = (*glow_color, alpha)
+                pygame.draw.line(surf, c, (x1_v - offset, y1_v), (x2_v - offset, y2_v), 2)
+                pygame.draw.line(surf, c, (x1_h, y1_h - offset), (x2_h, y2_h - offset), 2)
+
+        elif progress < 0.8:
+            flash_p = (progress - 0.6) / 0.2
+            flash_alpha = int(255 * (1 - flash_p))
+            flash = pygame.Surface((W, H), pygame.SRCALPHA)
+            flash.fill((255, 255, 255, flash_alpha))
+            surf.blit(flash, (0, 0))
+
+            cx, cy = W // 2, H // 2
+            pygame.draw.line(surf, (180, 230, 255), (cx - 80, 44), (cx + 80, H - 28), 2)
+            pygame.draw.line(surf, (180, 230, 255), (cx - 80, H - 28), (cx + 80, 44), 2)
+
+        else:
+            reveal_p = (progress - 0.8) / 0.2
+            self.media_vault_phase = "quadrants"
+            self._draw_media_vault_quadrants(surf, reveal_p)
+            return
+
+        self.footer([("", "Animazione in corso...")])
+
+    def _draw_media_vault_flash(self, surf):
+        """Flash effect placeholder."""
+        surf.fill((0, 0, 0), (0, 44, W, H - 44 - 28))
+
+    def _draw_media_vault_quadrants(self, surf, reveal=1.0):
+        """Disegna i 4 quadranti con loghi e descrizioni brevi."""
+        items = HUBS["mediahub"][2]
+
+        quadrants = [
+            {"idx": 0, "x": 0, "y": 44, "w": W // 2, "h": (H - 44 - 28) // 2, "diag": -1},
+            {"idx": 1, "x": W // 2, "y": 44, "w": W // 2, "h": (H - 44 - 28) // 2, "diag": 1},
+            {"idx": 2, "x": 0, "y": 44 + (H - 44 - 28) // 2, "w": W // 2, "h": (H - 44 - 28) // 2, "diag": -1},
+            {"idx": 3, "x": W // 2, "y": 44 + (H - 44 - 28) // 2, "w": W // 2, "h": (H - 44 - 28) // 2, "diag": 1},
+        ]
+
+        surf.fill((4, 5, 10), (0, 44, W, H - 44 - 28))
+
+        for q in quadrants:
+            idx = q["idx"]
+            key, icon, lk, sk, kind = items[idx]
+            color = MEDIA_VAULT_COLORS.get(key, self.accent)
+            rect = pygame.Rect(q["x"], q["y"], q["w"], q["h"])
+
+            if reveal < 1.0:
+                scale = 0.5 + 0.5 * reveal
+                alpha = int(255 * reveal)
+                cx, cy = rect.centerx, rect.centery
+                new_w = int(rect.w * scale)
+                new_h = int(rect.h * scale)
+                rect = pygame.Rect(cx - new_w // 2, cy - new_h // 2, new_w, new_h)
+            else:
+                alpha = 255
+
+            badge_key = MEDIA_VAULT_BADGE_KEYS.get(key)
+            badge_img = self.badge_img(badge_key, min(rect.w, rect.h) // 2 - 10) if badge_key else None
+
+            draw_cyber_quadrant(
+                surf, rect, color, alpha,
+                badge_img=badge_img,
+                icon_key=icon,
+                title=self.t(lk),
+                desc=self.t(MEDIA_VAULT_SHORT_DESC[key]["it"] if self.lang == "it" else MEDIA_VAULT_SHORT_DESC[key]["en"]),
+                selected=(idx == self.media_vault_sel),
+                font_small=self.f_small,
+                font_tiny=self.f_tiny,
+                font_med=self.f_med
+            )
+
+            if q["diag"] == -1:
+                pts = [
+                    (q["x"], q["y"] + q["h"]),
+                    (q["x"] + q["w"] // 3, q["y"] + q["h"] // 2),
+                    (q["x"] + q["w"] // 2, q["y"] + q["h"] // 4),
+                    (q["x"] + q["w"], q["y"])
+                ]
+            else:
+                pts = [
+                    (q["x"], q["y"]),
+                    (q["x"] + q["w"] // 4, q["y"] + q["h"] // 3),
+                    (q["x"] + q["w"] // 2, q["y"] + q["h"] // 2),
+                    (q["x"] + q["w"], q["y"] + q["h"])
+                ]
+            for i in range(len(pts) - 1):
+                pygame.draw.line(surf, (*color, int(80 * alpha / 255)), pts[i], pts[i + 1], 1)
+                pygame.draw.line(surf, (*color, int(30 * alpha / 255)),
+                                 (pts[i][0] + 1, pts[i][1] + 1), (pts[i + 1][0] + 1, pts[i + 1][1] + 1), 1)
+
+        for x in range(0, W, 40):
+            pygame.draw.line(surf, (15, 20, 30), (x, 44), (x, H - 28), 1)
+        for y in range(44, H - 28, 40):
+            pygame.draw.line(surf, (15, 20, 30), (0, y), (W, y), 1)
+
+        self.footer([("D-Pad", "Naviga"), ("A", "Apri"), ("B", "Indietro")])
+
+    def _handle_media_vault_input(self, btn):
+        """Gestisce l'input quando Media Vault e' attivo."""
+        if self.media_vault_phase != "quadrants":
+            if btn == "B":
+                self.media_vault_phase = None
+                self.pop_state()
+            return
+
+        items = HUBS["mediahub"][2]
+        n = len(items)
+
+        if btn == "UP":
+            self.media_vault_sel = (self.media_vault_sel - 2) % n
+            self.play("move")
+        elif btn == "DOWN":
+            self.media_vault_sel = (self.media_vault_sel + 2) % n
+            self.play("move")
+        elif btn == "LEFT":
+            self.media_vault_sel = (self.media_vault_sel - 1) % n
+            self.play("move")
+        elif btn == "RIGHT":
+            self.media_vault_sel = (self.media_vault_sel + 1) % n
+            self.play("move")
+        elif btn == "A":
+            key = items[self.media_vault_sel][0]
+            self.play("hub_open")
+            self.media_vault_phase = None
+            self.hub_action("mediahub", key, "act")
+        elif btn == "B":
+            self.media_vault_phase = None
+            self.pop_state()
+            self.play("back")
+
+    # --- Start Session ridisegnata ---
+    def render_session(self):
+        """Start Session ridisegnato in stile cyberpunk."""
+        surf = self.surface
+        surf.fill((5, 5, 10))
+        self.header(self.t("sess"), badge="start")
+
+        base, extra = self.read_envs()
+        cur = self.cfg.get("desk_env", "xfce")
+
+        envs = [
+            ("xfce", "XFCE", "CORE", (60, 200, 130)),
+            ("icewm", "IceWM", "TURBO", (74, 206, 224)),
+            ("lxde", "LXDE", "LIGHT", (255, 176, 46)),
+        ]
+
+        y = 60
+        for i, (key, name, codename, color) in enumerate(envs):
+            inst = base and (key == "xfce" or key in extra)
+            active = (key == cur and inst)
+            sel = (i == self.env_sel)
+
+            rect = pygame.Rect(20, y, W - 40, 90)
+
+            if sel:
+                pygame.draw.rect(surf, (20, 22, 35), rect, border_radius=6)
+                pygame.draw.rect(surf, color, rect, 2, border_radius=6)
+                glow = pygame.Surface((rect.w + 8, rect.h + 8), pygame.SRCALPHA)
+                glow.fill((*color, 30))
+                surf.blit(glow, (rect.x - 4, rect.y - 4))
+            else:
+                pygame.draw.rect(surf, (10, 12, 18), rect, border_radius=6)
+                pygame.draw.rect(surf, (40, 45, 60), rect, 1, border_radius=6)
+
+            icons.draw(surf, "start" if key == "xfce" else "window",
+                       rect.x + 16, rect.y + 16, 48, color if sel else (60, 70, 90))
+
+            self.text(name, (rect.x + 80, rect.y + 16), self.f_big,
+                      FG if sel else (150, 150, 160))
+            self.text(codename, (rect.x + 80, rect.y + 48), self.f_small,
+                      color if sel else (80, 90, 110))
+
+            if active:
+                stato = "ATTIVO" if self.lang == "it" else "ACTIVE"
+                stat_col = OK_G
+            elif inst:
+                stato = "INSTALLATO" if self.lang == "it" else "INSTALLED"
+                stat_col = OK_G
+            else:
+                stato = "NON INSTALLATO" if self.lang == "it" else "NOT INSTALLED"
+                stat_col = NO_R
+
+            pygame.draw.circle(surf, stat_col, (W - 30, rect.y + 20), 6)
+            self.text(stato, (W - 80, rect.y + 16), self.f_small, stat_col)
+
+            self.text("X " + ("dettagli" if self.lang == "it" else "details"),
+                      (W - 80, rect.y + 56), self.f_tiny, DIM)
+
+            y += 100
+
+        self.footer([("A", self.t("sess_a")), ("X", "dettagli" if self.lang == "it" else "details"),
+                     ("B", self.t("back"))])
+
+    # --- The Forge ridisegnata ---
+    def render_forge(self):
+        """The Forge ridisegnato in stile cyberpunk con griglia."""
+        surf = self.surface
+        surf.fill((10, 6, 4))
+        self.header(self.t("h_forge"), icon="forge", accent=FORGE_ACCENT, badge="forge")
+
+        self.forge_backdrop()
+
+        items = HUBS["forge"][2]
+        cols = 3
+        cell_w = (W - 40) // cols
+        cell_h = 80
+        gap = 8
+
+        for idx, (k, ic, lk, sk, kind) in enumerate(items):
+            x = 16 + (idx % cols) * (cell_w + gap)
+            y = 64 + (idx // cols) * (cell_h + gap)
+            sel = (idx == self.hub_sel)
+
+            rect = pygame.Rect(x, y, cell_w, cell_h)
+
+            if sel:
+                pygame.draw.rect(surf, (30, 20, 15), rect, border_radius=4)
+                pygame.draw.rect(surf, FORGE_ACCENT, rect, 2, border_radius=4)
+                glow = pygame.Surface((rect.w + 8, rect.h + 8), pygame.SRCALPHA)
+                glow.fill((*FORGE_ACCENT, 40))
+                surf.blit(glow, (rect.x - 4, rect.y - 4))
+            else:
+                pygame.draw.rect(surf, (10, 8, 6), rect, border_radius=4)
+                pygame.draw.rect(surf, (60, 50, 40), rect, 1, border_radius=4)
+
+            icons.draw(surf, ic, rect.x + 12, rect.y + 12, 40,
+                      FORGE_ACCENT if sel else (80, 70, 60))
+
+            self.text(self.t(lk), (rect.x + 60, rect.y + 12), self.f_med,
+                      FG if sel else (150, 140, 130))
+            self.text(self.t(sk), (rect.x + 60, rect.y + 44), self.f_small,
+                      FORGE_ACCENT if sel else (80, 70, 60), maxw=cell_w - 70)
+
+        self.footer([("A", self.t("open")), ("B", self.t("back"))])
+
+    def _check_memory(self):
+        """Se la RAM libera scende sotto 100MB, pulisce le cache e forza
+        garbage collection per evitare crash su dispositivi con 1GB di RAM."""
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemAvailable:"):
+                        avail = int(line.split()[1]) // 1024
+                        if avail < 100:
+                            self._text_cache.clear()
+                            if hasattr(self, "nexus_renderer"):
+                                self.nexus_renderer.clear_caches()
+                            gc.collect()
+                        break
+        except Exception:
+            pass
+
+    def _cleanup_caches_if_needed(self):
+        """Pulisce le cache di texture e font se la RAM scende sotto 120 MB
+        o ogni 100 frame."""
+        self._cache_cleanup_counter += 1
+        if self._cache_cleanup_counter % 100 != 0:
+            return
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemAvailable:"):
+                        avail = int(line.split()[1]) // 1024
+                        if avail < 120:
+                            self._text_cache.clear()
+                            if hasattr(self, "nexus_renderer"):
+                                self.nexus_renderer.clear_caches()
+                            gc.collect()
+                        break
+        except Exception:
+            pass
+        if hasattr(pygame, "cache"):
+            try:
+                if len(pygame.cache) > 200:
+                    pygame.cache.clear()
+            except Exception:
+                pass
+
+    def _nexus_travel_to_node(self, target_idx):
+        """Animazione di viaggio fluido verso un nodo specifico del Nexus."""
+        if not hasattr(self, "nexus_renderer"):
+            return
+        ring_list = self.nexus_renderer._nexus_ring_list(self.nexus_ring)
+        if target_idx not in ring_list:
+            return
+        i0 = self.nexus_renderer._nexus_ring_rot(self.nexus_ring)
+        i1 = ring_list.index(target_idx)
+        direction = 1 if (i1 - i0) % len(ring_list) < len(ring_list) // 2 else -1
+        steps = abs(i1 - i0) if direction > 0 else len(ring_list) - abs(i1 - i0)
+        for _ in range(steps):
+            self.nexus_ring_rotate(direction)
+
+    def render_log_dashboard(self):
+        surf = self.surface
+        surf.fill(BG)
+        it = (self.lang == "it")
+        self.header("LOG DASHBOARD", icon="doc")
+        registry = LogRegistry.get_instance()
+        manager = LoggerManager.get_instance()
+        all_loggers = manager.get_all_loggers()
+        mod_names = sorted(all_loggers.keys())
+        if not hasattr(self, "_logdash"):
+            self._logdash = {
+                "tab": 0,
+                "selected": 0,
+                "scroll": 0,
+                "filter_level": None,
+                "filter_module": None,
+                "remote_config": self.cfg.get("log_remote_config", {
+                    "syslog_host": "127.0.0.1",
+                    "syslog_port": 514,
+                    "webhook_url": "",
+                    "webhook_headers": "{}",
+                    "basestation_port": 8765,
+                }),
+                "analysis_limit": 200,
+                "analysis_result": None,
+                "viewer_lines": 20,
+            }
+        d = self._logdash
+        tabs = ["VIEW", "SETTINGS", "REMOTE", "ANALYSIS"]
+        tab_w = W // len(tabs)
+        for i, tab in enumerate(tabs):
+            x = i * tab_w
+            col = self.accent if i == d["tab"] else DIM
+            bg_tab = (10, 12, 18) if i == d["tab"] else (5, 5, 10)
+            pygame.draw.rect(surf, bg_tab, (x, 44, tab_w, 26))
+            pygame.draw.line(surf, col, (x, 44), (x + tab_w, 44), 2 if i == d["tab"] else 1)
+            tw = self.f_small.size(tab)[0]
+            self.text(tab, (x + (tab_w - tw) // 2, 48), self.f_small, col)
+        if d["tab"] == 0:
+            self._render_log_view(surf, d, registry)
+        elif d["tab"] == 1:
+            self._render_log_settings(surf, d, mod_names, all_loggers, it)
+        elif d["tab"] == 2:
+            self._render_log_remote(surf, d, it)
+        elif d["tab"] == 3:
+            self._render_log_analysis(surf, d, registry, it)
+        self.footer([
+            ("L1/R1", "tab" if it else "tab"),
+            (self.t("k_ud"), "scroll" if it else "scroll"),
+            ("A", "select" if it else "select"),
+            ("B", self.t("back"))
+        ])
+
+    def _render_log_view(self, surf, d, registry):
+        entries = registry.get_entries(
+            source_filter=d["filter_module"],
+            level_filter=d["filter_level"],
+            limit=300)
+        visible = d["viewer_lines"]
+        total = len(entries)
+        scroll = d["scroll"]
+        if scroll > total - visible:
+            scroll = max(0, total - visible)
+        d["scroll"] = scroll
+        y = 80
+        level_colors = {
+            "DEBUG": FAINT, "INFO": FG,
+            "WARNING": (230, 200, 60),
+            "ERROR": (230, 80, 80),
+            "CRITICAL": (255, 50, 50),
+        }
+        for i in range(scroll, min(scroll + visible, total)):
+            e = entries[i]
+            col = level_colors.get(e["level"], FG)
+            time_str = e["timestamp"][11:19]
+            src = e["source"][:8]
+            msg = e["message"][:80]
+            line = "[%s] [%s] [%s] %s" % (time_str, e["level"][:4], src, msg)
+            self.text(line, (10, y), self.f_tiny, col, maxw=W - 20)
+            y += 18
+        filter_text = ""
+        if d["filter_module"]:
+            filter_text += "mod:%s " % d["filter_module"][:6]
+        if d["filter_level"]:
+            filter_text += "lvl:%s" % d["filter_level"]
+        if filter_text:
+            self.text(("Filtri: %s" if self.lang == "it" else "Filters: %s") % filter_text.strip(),
+                      (10, H - 50), self.f_tiny, FAINT)
+        if total > visible:
+            bar_h = max(20, int((H - 100) * visible / total))
+            bar_y = 80 + int((H - 100 - bar_h) * scroll / max(1, total - visible))
+            pygame.draw.rect(surf, LINE, (W - 6, 80, 4, H - 100))
+            pygame.draw.rect(surf, self.accent, (W - 6, bar_y, 4, bar_h))
+
+    def _render_log_settings(self, surf, d, mod_names, all_loggers, it):
+        y = 80
+        sel = d["selected"]
+        for i, name in enumerate(mod_names):
+            col = self.accent if i == sel else FG
+            self.text(name[:15], (20, y), self.f_small, col)
+            logger = all_loggers[name]
+            level = logger.level.name
+            size_mb = logger.max_size_bytes // (1024 * 1024)
+            self.text("%s | %dMB" % (level, size_mb), (W - 120, y), self.f_small, DIM)
+            if i == sel:
+                pygame.draw.rect(surf, sel_tint(self.accent),
+                                 (8, y - 2, W - 16, 22), border_radius=4)
+                pygame.draw.rect(surf, self.accent,
+                                 (8, y - 2, W - 16, 22), 1, border_radius=4)
+            y += 24
+            if y > H - 40:
+                break
+        filter_lvl = d["filter_level"] or "ALL"
+        filter_mod = d["filter_module"] or "ALL"
+        self.text(("Filter Level: %s | Filter Module: %s" if it else "Filter Level: %s | Filter Module: %s") % (filter_lvl, filter_mod),
+                  (20, H - 30), self.f_tiny, FAINT)
+
+    def _render_log_remote(self, surf, d, it):
+        y = 80
+        config = d["remote_config"]
+        items = [
+            ("Syslog Host", "syslog_host", config["syslog_host"]),
+            ("Syslog Port", "syslog_port", str(config["syslog_port"])),
+            ("Webhook URL", "webhook_url", config["webhook_url"]),
+            ("Webhook Headers", "webhook_headers", config["webhook_headers"]),
+            ("Basestation Port", "basestation_port", str(config["basestation_port"])),
+        ]
+        sel = d["selected"]
+        for i, (label, key, val) in enumerate(items):
+            col = self.accent if i == sel else FG
+            self.text(label, (20, y), self.f_small, col)
+            display_val = val[:35] if val else ("(vuoto)" if it else "(empty)")
+            self.text(display_val, (W - 220, y), self.f_small, DIM)
+            if i == sel:
+                pygame.draw.rect(surf, sel_tint(self.accent),
+                                 (8, y - 2, W - 16, 22), border_radius=4)
+                pygame.draw.rect(surf, self.accent,
+                                 (8, y - 2, W - 16, 22), 1, border_radius=4)
+            y += 28
+        self.text(("A: modifica | X: invia test" if it else "A: edit | X: send test"),
+                  (20, H - 30), self.f_tiny, FAINT)
+
+    def _render_log_analysis(self, surf, d, registry, it):
+        y = 80
+        if d["analysis_result"] is None:
+            self.text(("Premi A per eseguire l'analisi" if it else "Press A to run analysis"),
+                      (20, y), self.f_med, DIM)
+            return
+        counts = d["analysis_result"]
+        level_colors = {
+            "DEBUG": FAINT, "INFO": FG,
+            "WARNING": (230, 200, 60),
+            "ERROR": (230, 80, 80),
+            "CRITICAL": (255, 50, 50),
+        }
+        for level, count in counts.items():
+            col = level_colors.get(level, FG)
+            self.text("%s: %d" % (level, count), (20, y), self.f_small, col)
+            y += 22
+        total = sum(counts.values())
+        y += 8
+        self.text(("Totale analizzati: %d" if it else "Total analyzed: %d") % total,
+                  (20, y), self.f_small, FG)
+        y += 30
+        if counts.get("ERROR", 0) > 0 or counts.get("CRITICAL", 0) > 0:
+            self.text(("⚠️ Rilevati errori critici: controlla i log" if it else "⚠️ Critical errors detected: check logs"),
+                      (20, y), self.f_small, NO_R)
+        elif counts.get("WARNING", 0) > 5:
+            self.text(("⚠️ Molti warning: regola i livelli di log" if it else "⚠️ Many warnings: adjust log levels"),
+                      (20, y), self.f_small, (230, 200, 60))
+        else:
+            self.text(("✅ Sistema log in salute" if it else "✅ Log system healthy"),
+                      (20, y), self.f_small, OK_G)
+
+    def handle_log_dashboard_input(self, btn):
+        d = self._logdash
+        tab = d["tab"]
+        manager = LoggerManager.get_instance()
+        all_loggers = manager.get_all_loggers()
+        mod_names = sorted(all_loggers.keys())
+        if btn == "L1":
+            d["tab"] = (d["tab"] - 1) % 4
+            d["selected"] = 0
+            d["scroll"] = 0
+            return
+        if btn == "R1":
+            d["tab"] = (d["tab"] + 1) % 4
+            d["selected"] = 0
+            d["scroll"] = 0
+            return
+        if btn == "B":
+            self.cfg["log_remote_config"] = d["remote_config"]
+            self.pop_state()
+            return
+        if tab == 0:
+            registry = LogRegistry.get_instance()
+            entries = registry.get_entries(
+                source_filter=d["filter_module"],
+                level_filter=d["filter_level"],
+                limit=300)
+            total = len(entries)
+            visible = d["viewer_lines"]
+            if btn == "UP":
+                d["scroll"] = max(0, d["scroll"] - 1)
+            elif btn == "DOWN":
+                d["scroll"] = min(max(0, total - visible), d["scroll"] + 1)
+        elif tab == 1:
+            n = len(mod_names)
+            if btn == "UP":
+                d["selected"] = (d["selected"] - 1) % n
+            elif btn == "DOWN":
+                d["selected"] = (d["selected"] + 1) % n
+            elif btn == "A":
+                sel = d["selected"]
+                if sel < n:
+                    logger = all_loggers[mod_names[sel]]
+                    levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL]
+                    try:
+                        idx = levels.index(logger.level)
+                    except ValueError:
+                        idx = 1
+                    new_level = levels[(idx + 1) % len(levels)]
+                    manager.set_level(mod_names[sel], new_level)
+            elif btn == "X":
+                sel = d["selected"]
+                if sel < n:
+                    logger = all_loggers[mod_names[sel]]
+                    cur_mb = logger.max_size_bytes // (1024 * 1024)
+                    new_mb = cur_mb + 1 if cur_mb < 20 else 1
+                    manager.set_max_size(mod_names[sel], new_mb)
+        elif tab == 2:
+            config = d["remote_config"]
+            items = list(config.keys())
+            n = len(items)
+            if btn == "UP":
+                d["selected"] = (d["selected"] - 1) % n
+            elif btn == "DOWN":
+                d["selected"] = (d["selected"] + 1) % n
+            elif btn == "A":
+                key = items[d["selected"]]
+                val = str(config[key])
+
+                def make_callback(k):
+                    def callback(new_val):
+                        if k in ("syslog_port", "basestation_port"):
+                            try:
+                                config[k] = int(new_val)
+                            except ValueError:
+                                pass
+                        else:
+                            config[k] = new_val
+                    return callback
+
+                self.osk_open(key, val, make_callback(key))
+            elif btn == "X":
+                from desk.logging_system import LogSender
+                test_msg = "Test log from VoidDesk %s" % datetime.now().isoformat()
+                key = items[d["selected"]]
+                ok = False
+                if key == "syslog_host":
+                    ok = LogSender.syslog(test_msg, config["syslog_host"], config["syslog_port"])
+                elif key == "webhook_url":
+                    try:
+                        headers = json.loads(config["webhook_headers"]) if config["webhook_headers"] else {}
+                    except json.JSONDecodeError:
+                        headers = {}
+                    ok = LogSender.webhook(test_msg, config["webhook_url"], headers)
+                elif key == "basestation_port":
+                    ok = LogSender.basestation(test_msg, config["basestation_port"])
+                if ok:
+                    self.notify("Invio test riuscito" if self.lang == "it" else "Test send succeeded", "", "success")
+                else:
+                    self.notify("Invio test fallito" if self.lang == "it" else "Test send failed", "", "warning")
+        elif tab == 3:
+            if btn == "A":
+                counts = LogRegistry.get_instance().analyze(limit=d["analysis_limit"])
+                d["analysis_result"] = counts
+
+    # ========== VOID DECONTEXTUALIZED ==========
+
+    def _vd_config_path(self):
+        return os.path.join(DATA, "voiddecontext_config.json")
+
+    def _vd_load_config(self):
+        default = {
+            "delete_previous": True,
+            "included_folders": [],
+            "auto_execute": False,
+            "cadence_days": 7,
+            "last_run": None,
+        }
+        try:
+            with open(self._vd_config_path(), "r") as f:
+                cfg = json.load(f)
+                for k, v in default.items():
+                    if k not in cfg:
+                        cfg[k] = v
+                return cfg
+        except Exception:
+            return default
+
+    def _vd_save_config(self):
+        if hasattr(self, "_vd_state"):
+            try:
+                with open(self._vd_config_path(), "w") as f:
+                    json.dump(self._vd_state["config"], f, indent=2)
+            except Exception as e:
+                log("Errore salvataggio config VoidDecontext: %s" % e, "ERROR")
+
+    def render_voiddecontext(self):
+        surf = self.surface
+        surf.fill(BG)
+        it = (self.lang == "it")
+        self.header("VOID DECONTEXTUALIZED", icon="doc", badge="info")
+        if not hasattr(self, "_vd_state"):
+            self._vd_state = {
+                "running": False,
+                "progress": 0.0,
+                "current_file": "",
+                "total_files": 0,
+                "processed_files": 0,
+                "done": False,
+                "output_path": "",
+                "error": "",
+                "file_list": [],
+                "selected_file_idx": 0,
+                "config": self._vd_load_config(),
+                "menu_open": False,
+                "menu_sel": 0,
+                "folder_sel": -1,
+                "option_sel": 0,
+            }
+        state = self._vd_state
+        cfg = state["config"]
+        if not state["running"] and not state["done"]:
+            self._vd_refresh_file_list()
+        panel_w, panel_h = W - 80, 180
+        panel_x, panel_y = 40, 80
+        self.npanel(panel_x, panel_y, panel_w, panel_h, border=self.accent, fill=INK, cut=10)
+        self.text("CONTEXT PACK DISPONIBILI" if it else "AVAILABLE CONTEXT PACKS",
+                  (panel_x + 16, panel_y + 8), self.f_small_b, self.accent)
+        file_list = state["file_list"]
+        sel_idx = state["selected_file_idx"]
+        if file_list:
+            start_idx = max(0, min(sel_idx - 2, len(file_list) - 5))
+            visible_files = file_list[start_idx:start_idx + 5]
+            y = panel_y + 36
+            for i, f in enumerate(visible_files):
+                idx = start_idx + i
+                is_sel = (idx == sel_idx)
+                if is_sel:
+                    pygame.draw.rect(surf, sel_tint(self.accent),
+                                     (panel_x + 8, y - 2, panel_w - 16, 26))
+                    pygame.draw.rect(surf, self.accent,
+                                     (panel_x + 8, y - 2, panel_w - 16, 26), 1)
+                self.text(f["name"][:45], (panel_x + 16, y), self.f_small, FG if is_sel else DIM)
+                info = "%s  %s" % (f["date"], f["size"])
+                iw = self.f_tiny.size(info)[0]
+                self.text(info, (panel_x + panel_w - 16 - iw, y + 2), self.f_tiny, FAINT)
+                y += 28
+            if len(file_list) > 5:
+                bar_h = max(20, int((panel_h - 50) * 5 / len(file_list)))
+                bar_y = panel_y + 36 + int((panel_h - 50 - bar_h) * sel_idx / max(1, len(file_list) - 5))
+                pygame.draw.rect(surf, LINE, (panel_x + panel_w - 6, panel_y + 36, 4, panel_h - 50))
+                pygame.draw.rect(surf, self.accent, (panel_x + panel_w - 6, bar_y, 4, bar_h))
+        else:
+            self.text("Nessun context pack trovato" if it else "No context packs found",
+                      (panel_x + 16, panel_y + 50), self.f_small, FAINT)
+        opt_y = panel_y + panel_h + 10
+        opt_w = panel_w
+        opt_h = H - opt_y - 36
+        self.npanel(panel_x, opt_y, opt_w, opt_h, border=LINE, fill=INK, cut=6)
+        if state["running"]:
+            cx = panel_x + opt_w // 2
+            cy = opt_y + opt_h // 2 - 20
+            r = 35
+            angle = time.time() * 3.0
+            for i in range(1, 24):
+                t = i / 24.0
+                a = angle + t * 8
+                rr = r * t
+                px = cx + rr * math.cos(a)
+                py = cy + rr * math.sin(a)
+                sz = max(1, int(3 * (1 - t)))
+                pygame.draw.circle(surf, self.accent, (int(px), int(py)), sz)
+            pct = int(state["progress"] * 100)
+            self.text("%d%%" % pct, (cx - 25, cy - 10), self.f_big, self.accent)
+            self.text("%d / %d file" % (state["processed_files"], state["total_files"]),
+                      (cx - 50, cy + 30), self.f_small, FG)
+            cfile = state["current_file"][:40] if state["current_file"] else ""
+            self.text(cfile, (cx - 80, cy + 50), self.f_tiny, FAINT)
+        elif state["done"]:
+            self.text("✅ CONTEXT PACK CREATO!" if it else "✅ CONTEXT PACK CREATED!",
+                      (panel_x + 20, opt_y + 15), self.f_med_b, OK_G)
+            self.text(state["output_path"] if it else state["output_path"],
+                      (panel_x + 20, opt_y + 45), self.f_small, FG)
+        else:
+            y = opt_y + 10
+            self._vd_render_option(surf, panel_x, y, opt_w,
+                                   "Elimina precedente" if it else "Delete previous",
+                                   cfg["delete_previous"], 0, state["option_sel"])
+            y += 28
+            self._vd_render_option(surf, panel_x, y, opt_w,
+                                   "Esecuzione automatica" if it else "Auto execute",
+                                   cfg["auto_execute"], 1, state["option_sel"])
+            y += 28
+            if cfg["auto_execute"]:
+                self._vd_render_option(surf, panel_x, y, opt_w,
+                                       "Cadenza: %.1f giorni" % cfg["cadence_days"] if it else "Cadence: %.1f days" % cfg["cadence_days"],
+                                       None, 2, state["option_sel"], editable=True)
+                y += 28
+            folders = self._vd_get_folders()
+            is_expand = (state["option_sel"] == 4)
+            self._vd_render_option(surf, panel_x, y, opt_w,
+                                   "Cartelle incluse (%d)" % len(folders) if it else "Included folders (%d)" % len(folders),
+                                   None, 4, state["option_sel"], expand=is_expand)
+            if is_expand:
+                y += 28
+                for i, (folder, enabled) in enumerate(folders[:6]):
+                    col = self.accent if enabled else FAINT
+                    fsel = (state["folder_sel"] == i)
+                    if fsel:
+                        pygame.draw.rect(surf, sel_tint(self.accent),
+                                         (panel_x + 12, y - 2, opt_w - 24, 22))
+                    self.text("%s %s" % ("[x]" if enabled else "[ ]", folder),
+                              (panel_x + 24, y), self.f_small, col)
+                    y += 24
+            y += 10
+            btn_rect = pygame.Rect(panel_x + opt_w // 2 - 60, y, 120, 30)
+            pygame.draw.rect(surf, self.accent, btn_rect, border_radius=5)
+            self.text("▶ AVVIA" if it else "▶ START",
+                      (btn_rect.centerx - 35, btn_rect.centery - 8), self.f_med, INK)
+        footer_hints = [
+            (self.t("k_ud"), "naviga" if it else "navigate"),
+            ("A", "toggle/avvia" if it else "toggle/start"),
+            ("X", "menu"),
+            ("B", self.t("back")),
+        ]
+        if state["running"]:
+            footer_hints = [("B", "...")]
+        self.footer(footer_hints)
+        if state["menu_open"]:
+            self._vd_render_menu(surf)
+
+    def _vd_render_option(self, surf, x, y, w, label, value, idx, sel_idx,
+                          editable=False, expand=False):
+        is_sel = (idx == sel_idx)
+        if is_sel:
+            pygame.draw.rect(surf, sel_tint(self.accent),
+                             (x + 4, y - 2, w - 8, 22))
+            pygame.draw.rect(surf, self.accent,
+                             (x + 4, y - 2, w - 8, 22), 1)
+        color = FG if is_sel else DIM
+        self.text(label, (x + 12, y + 2), self.f_small, color)
+        if isinstance(value, bool):
+            self.text("ON" if value else "OFF", (x + w - 40, y + 2),
+                      self.f_small, self.accent if value else FAINT)
+        elif editable:
+            self.text(str(value), (x + w - 60, y + 2), self.f_small, self.accent)
+            if is_sel:
+                self.text("◀ ▶", (x + w - 90, y + 2), self.f_tiny, self.accent)
+        elif expand:
+            self.text("▼" if is_sel else "▶", (x + w - 30, y + 2),
+                      self.f_small, self.accent if is_sel else FAINT)
+
+    def _vd_get_folders(self):
+        cfg = self._vd_state["config"] if hasattr(self, "_vd_state") else self._vd_load_config()
+        exclude = {"data", "runtime", "__pycache__", ".git", "assets", "outdesk", "sgrub", "bin"}
+        folders = []
+        try:
+            for item in sorted(os.listdir(APP_DIR)):
+                if item.startswith("."):
+                    continue
+                if os.path.isdir(os.path.join(APP_DIR, item)) and item not in exclude:
+                    enabled = item in cfg.get("included_folders", []) or len(cfg.get("included_folders", [])) == 0
+                    folders.append((item, enabled))
+        except Exception:
+            pass
+        return folders
+
+    def _vd_refresh_file_list(self):
+        state = self._vd_state
+        context_dir = os.path.join(DATA, "logs", "Context_Void")
+        file_list = []
+        if os.path.exists(context_dir):
+            for f in sorted(os.listdir(context_dir), reverse=True):
+                if f.endswith(".txt"):
+                    path = os.path.join(context_dir, f)
+                    try:
+                        st = os.stat(path)
+                        file_list.append({
+                            "name": f,
+                            "path": path,
+                            "size": self._human_size(st.st_size),
+                            "date": time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime)),
+                            "mtime": st.st_mtime,
+                        })
+                    except Exception:
+                        pass
+        state["file_list"] = file_list
+        if file_list and state["selected_file_idx"] >= len(file_list):
+            state["selected_file_idx"] = 0
+
+    def _human_size(self, size):
+        for unit in ["B", "KB", "MB", "GB"]:
+            if size < 1024.0:
+                return "%.1f %s" % (size, unit)
+            size /= 1024.0
+        return "%.1f TB" % size
+
+    def handle_voiddecontext_input(self, btn):
+        state = self._vd_state
+        cfg = state["config"]
+        it = (self.lang == "it")
+        if state["menu_open"]:
+            self._vd_handle_menu_input(btn)
+            return
+        if btn == "UP":
+            if state["option_sel"] == 4 and state["folder_sel"] >= 0:
+                state["folder_sel"] = max(-1, state["folder_sel"] - 1)
+            else:
+                state["option_sel"] = max(0, state["option_sel"] - 1)
+                state["folder_sel"] = -1
+        elif btn == "DOWN":
+            if state["option_sel"] == 4:
+                folders = self._vd_get_folders()
+                state["folder_sel"] = min(state["folder_sel"] + 1, len(folders) - 1)
+            else:
+                max_opt = 4
+                state["option_sel"] = min(max_opt, state["option_sel"] + 1)
+        elif btn == "LEFT":
+            if state["option_sel"] == 2 and cfg["auto_execute"]:
+                cfg["cadence_days"] = max(0.5, cfg["cadence_days"] - 0.5)
+                self._vd_save_config()
+        elif btn == "RIGHT":
+            if state["option_sel"] == 2 and cfg["auto_execute"]:
+                cfg["cadence_days"] = min(60, cfg["cadence_days"] + 0.5)
+                self._vd_save_config()
+        elif btn == "A":
+            if state["running"]:
+                return
+            if state["option_sel"] == 0:
+                cfg["delete_previous"] = not cfg["delete_previous"]
+                self._vd_save_config()
+            elif state["option_sel"] == 1:
+                cfg["auto_execute"] = not cfg["auto_execute"]
+                self._vd_save_config()
+            elif state["option_sel"] == 3:
+                self._vd_start_generation()
+            elif state["option_sel"] == 4:
+                folders = self._vd_get_folders()
+                if state["folder_sel"] >= 0 and state["folder_sel"] < len(folders):
+                    folder_name, enabled = folders[state["folder_sel"]]
+                    if folder_name in cfg["included_folders"]:
+                        cfg["included_folders"].remove(folder_name)
+                    else:
+                        cfg["included_folders"].append(folder_name)
+                    self._vd_save_config()
+                else:
+                    self._vd_start_generation()
+            elif state["option_sel"] is None or state["option_sel"] == 3:
+                self._vd_start_generation()
+        elif btn == "X":
+            state["menu_open"] = True
+            state["menu_sel"] = 0
+        elif btn == "B":
+            if state["running"]:
+                return
+            self._vd_save_config()
+            self.pop_state()
+            self._vd_state = {
+                "running": False, "progress": 0.0, "current_file": "",
+                "total_files": 0, "processed_files": 0, "done": False,
+                "output_path": "", "error": "", "file_list": [],
+                "selected_file_idx": 0, "config": self._vd_load_config(),
+                "menu_open": False, "menu_sel": 0, "folder_sel": -1, "option_sel": 0,
+            }
+
+    def _vd_start_generation(self):
+        state = self._vd_state
+        if state["running"]:
+            return
+        if state["config"]["delete_previous"] and state["file_list"]:
+            for f in state["file_list"]:
+                try:
+                    os.remove(f["path"])
+                except Exception:
+                    pass
+            state["file_list"] = []
+        state["running"] = True
+        state["progress"] = 0.0
+        state["current_file"] = ""
+        state["total_files"] = 0
+        state["processed_files"] = 0
+        state["done"] = False
+        state["error"] = ""
+        import threading
+        threading.Thread(target=self._vd_generate, daemon=True).start()
+
+    def _vd_generate(self):
+        state = self._vd_state
+        cfg = state["config"]
+        try:
+            exclude_dirs = {"data", "runtime", "__pycache__", ".git", "assets", "outdesk", "sgrub", "bin"}
+            included_folders = cfg.get("included_folders", [])
+            if not included_folders:
+                all_folders = []
+                for d in os.listdir(APP_DIR):
+                    if os.path.isdir(os.path.join(APP_DIR, d)) and not d.startswith(".") and d not in exclude_dirs:
+                        all_folders.append(d)
+                included_folders = all_folders
+            exclude_ext = {".pyc", ".so", ".dll", ".exe", ".png", ".jpg", ".jpeg", ".gif",
+                           ".ico", ".ttf", ".otf", ".woff", ".woff2", ".mp3", ".wav"}
+            text_ext = {".py", ".sh", ".json", ".md", ".txt", ".cfg", ".ini", ".xml",
+                        ".css", ".html", ".js", ".yaml", ".yml", ".conf", ".toml"}
+            all_files = []
+            for folder in included_folders:
+                root = os.path.join(APP_DIR, folder)
+                if not os.path.isdir(root):
+                    continue
+                for dirpath, _, filenames in os.walk(root):
+                    if any(ex in dirpath for ex in exclude_dirs):
+                        continue
+                    for f in filenames:
+                        ext = os.path.splitext(f)[1].lower()
+                        if ext in exclude_ext:
+                            continue
+                        is_text = ext in text_ext
+                        full_path = os.path.join(dirpath, f)
+                        all_files.append({
+                            "path": full_path,
+                            "rel_path": os.path.relpath(full_path, APP_DIR),
+                            "is_text": is_text,
+                            "size": os.path.getsize(full_path),
+                        })
+            state["total_files"] = len(all_files)
+            state["processed_files"] = 0
+            output_lines = []
+            output_lines.append("# VOID DESK CONTEXT PACK")
+            output_lines.append("# Versione: %s" % VERSION)
+            output_lines.append("# Generato: %s" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            output_lines.append("# Cartelle incluse: %s" % ", ".join(included_folders))
+            output_lines.append("# Totale file: %d" % len(all_files))
+            output_lines.append("")
+            output_lines.append("## STRUTTURA DELLE CARTELLE")
+            output_lines.append("```")
+            tree = {}
+            for f in all_files:
+                parts = f["rel_path"].split(os.sep)
+                current = tree
+                for p in parts[:-1]:
+                    current = current.setdefault(p, {})
+                current[parts[-1]] = None
+
+            def print_tree(node, indent=""):
+                lines = []
+                for key in sorted(node.keys()):
+                    if node[key] is None:
+                        lines.append("%s|-- %s" % (indent, key))
+                    else:
+                        lines.append("%s|-- %s/" % (indent, key))
+                        lines.extend(print_tree(node[key], indent + "    "))
+                return lines
+
+            output_lines.extend(print_tree(tree))
+            output_lines.append("```")
+            output_lines.append("")
+            output_lines.append("## CONTENUTO DEI FILE")
+            output_lines.append("")
+            for i, f in enumerate(all_files):
+                state["current_file"] = f["rel_path"]
+                state["processed_files"] = i + 1
+                state["progress"] = (i + 1) / max(1, len(all_files))
+                output_lines.append("### FILE: %s" % f["rel_path"])
+                ext = os.path.splitext(f["rel_path"])[1][1:] or "txt"
+                output_lines.append("```%s" % ext)
+                if f["is_text"]:
+                    try:
+                        with open(f["path"], "r", encoding="utf-8", errors="ignore") as fh:
+                            content = fh.read()
+                            if len(content) > 100000:
+                                content = content[:100000] + "\n... (file troncato)"
+                            output_lines.append(content)
+                    except Exception as e:
+                        output_lines.append("ERRORE LETTURA: %s" % e)
+                else:
+                    output_lines.append("[File binario - contenuto non incluso]")
+                output_lines.append("```")
+                output_lines.append("")
+                if i % 10 == 0:
+                    time.sleep(0.01)
+            context_dir = os.path.join(DATA, "logs", "Context_Void")
+            os.makedirs(context_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = "void_context_v%s_%s.txt" % (VERSION, timestamp)
+            output_path = os.path.join(context_dir, filename)
+            with open(output_path, "w", encoding="utf-8") as fh:
+                fh.write("\n".join(output_lines))
+            state["output_path"] = output_path
+            state["done"] = True
+            state["running"] = False
+            cfg["last_run"] = timestamp
+            self._vd_save_config()
+            self.notify("Context Pack creato!" if it else "Context Pack created!",
+                        os.path.basename(filename), "success")
+            self._vd_refresh_file_list()
+        except Exception as e:
+            state["error"] = str(e)
+            state["running"] = False
+            self.notify("Errore" if it else "Error", str(e), "critical")
+
+    def _vd_render_menu(self, surf):
+        state = self._vd_state
+        it = (self.lang == "it")
+        menu_items = [
+            ("Elimina tutti i context pack" if it else "Delete all context packs", "delete_all"),
+            ("Esporta come ZIP" if it else "Export as ZIP", "export_zip"),
+            ("Invia via Basestation" if it else "Send via Basestation", "send_basestation"),
+            ("Apri cartella" if it else "Open folder", "open_folder"),
+            ("Ricostruisci indice" if it else "Rebuild index", "refresh"),
+            ("Info dettagliate" if it else "Detailed info", "info"),
+            ("Chiudi menu" if it else "Close menu", "close"),
+        ]
+        mw, mh = 280, 30 * len(menu_items) + 16
+        mx, my = W - mw - 20, 60
+        self.npanel(mx, my, mw, mh, border=self.accent, fill=INK, cut=6)
+        y = my + 8
+        for i, (label, _) in enumerate(menu_items):
+            sel = (i == state["menu_sel"])
+            if sel:
+                pygame.draw.rect(surf, sel_tint(self.accent), (mx + 4, y - 2, mw - 8, 24))
+                pygame.draw.rect(surf, self.accent, (mx + 4, y - 2, mw - 8, 24), 1)
+            self.text(label, (mx + 12, y + 2), self.f_small, FG if sel else DIM)
+            y += 30
+
+    def _vd_handle_menu_input(self, btn):
+        state = self._vd_state
+        if btn == "UP":
+            state["menu_sel"] = max(0, state["menu_sel"] - 1)
+        elif btn == "DOWN":
+            state["menu_sel"] = min(6, state["menu_sel"] + 1)
+        elif btn == "A":
+            self._vd_menu_action(state["menu_sel"])
+            state["menu_open"] = False
+        elif btn in ("B", "X"):
+            state["menu_open"] = False
+
+    def _vd_menu_action(self, idx):
+        state = self._vd_state
+        it = (self.lang == "it")
+        if idx == 0:
+            def confirm():
+                context_dir = os.path.join(DATA, "logs", "Context_Void")
+                if os.path.exists(context_dir):
+                    for f in os.listdir(context_dir):
+                        if f.endswith(".txt"):
+                            try:
+                                os.remove(os.path.join(context_dir, f))
+                            except Exception:
+                                pass
+                self._vd_refresh_file_list()
+                self.notify("Context pack eliminati" if it else "Context packs deleted", "", "success")
+            self.confirm = ("Eliminare tutti i context pack?" if it else "Delete all context packs?", confirm)
+            self.push("confirm")
+        elif idx == 1:
+            import zipfile
+            context_dir = os.path.join(DATA, "logs", "Context_Void")
+            if os.path.exists(context_dir):
+                files = [f for f in os.listdir(context_dir) if f.endswith(".txt")]
+                if files:
+                    zip_path = os.path.join(DATA, "logs", "context_pack_%s.zip" % time.strftime("%Y%m%d_%H%M%S"))
+                    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                        for f in files:
+                            zf.write(os.path.join(context_dir, f), f)
+                    self.notify("Archivio ZIP creato" if it else "ZIP archive created",
+                                os.path.basename(zip_path), "success")
+                else:
+                    self.notify("Nessun file da esportare" if it else "No files to export", "", "warning")
+        elif idx == 2:
+            from desk.logging_system import LogSender
+            if state["file_list"] and state["selected_file_idx"] < len(state["file_list"]):
+                selected = state["file_list"][state["selected_file_idx"]]
+                try:
+                    with open(selected["path"], "r", encoding="utf-8", errors="ignore") as fh:
+                        content = fh.read(2000)
+                    ok = LogSender.basestation("ContextPack: %s\n%s" % (selected["name"], content), port=8765)
+                    if ok:
+                        self.notify("File inviato alla Basestation" if it else "File sent to Basestation", "", "success")
+                    else:
+                        self.notify("Invio fallito" if it else "Send failed", "", "warning")
+                except Exception as e:
+                    self.notify("Errore" if it else "Error", str(e), "warning")
+            else:
+                self.notify("Nessun file selezionato" if it else "No file selected", "", "warning")
+        elif idx == 3:
+            path = os.path.join(DATA, "logs", "Context_Void")
+            self.notify("Cartella" if it else "Folder", path, "message")
+        elif idx == 4:
+            self._vd_refresh_file_list()
+            self.notify("Indice ricostruito" if it else "Index rebuilt", "", "success")
+        elif idx == 5:
+            if state["file_list"] and state["selected_file_idx"] < len(state["file_list"]):
+                f = state["file_list"][state["selected_file_idx"]]
+                lines = [
+                    "Nome: %s" % f["name"],
+                    "Dimensione: %s" % f["size"],
+                    "Data: %s" % f["date"],
+                    "Percorso: %s" % f["path"],
+                ]
+                self.info_lines = [("sec", "doc", "INFO CONTEXT PACK")]
+                self.info_lines += [("kv", "", line, FG) for line in lines]
+                self.scroll = 0
+                self.push("info")
+            else:
+                self.notify("Nessun file selezionato" if it else "No file selected", "", "warning")
+
+    def _vd_check_auto_execute(self):
+        """Check if auto-execution of Void Decontextualized is due."""
+        try:
+            cfg = self._vd_load_config()
+            if not cfg.get("auto_execute", False):
+                return
+            last_run = cfg.get("last_run")
+            cadence = cfg.get("cadence_days", 7)
+            if last_run:
+                try:
+                    last = datetime.strptime(last_run, "%Y%m%d_%H%M%S")
+                    elapsed = (datetime.now() - last).total_seconds()
+                    if elapsed <= cadence * 86400:
+                        return
+                except Exception:
+                    pass
+            threading.Thread(target=self._vd_generate_background, daemon=True).start()
+        except Exception as e:
+            log("VoidDecontext auto-execute check error: %s" % e, "ERROR")
+
+    def _vd_generate_background(self):
+        """Generate context pack in background without UI."""
+        try:
+            from desk.logging_system import LoggerManager, LogLevel
+            log("VoidDecontext: auto-generating context pack", "INFO")
+            cfg = self._vd_load_config()
+            exclude_dirs = {"data", "runtime", "__pycache__", ".git", "assets", "outdesk", "sgrub", "bin"}
+            included_folders = cfg.get("included_folders", [])
+            if not included_folders:
+                all_folders = []
+                for d in os.listdir(APP_DIR):
+                    if os.path.isdir(os.path.join(APP_DIR, d)) and not d.startswith(".") and d not in exclude_dirs:
+                        all_folders.append(d)
+                included_folders = all_folders
+            exclude_ext = {".pyc", ".so", ".dll", ".exe", ".png", ".jpg", ".jpeg", ".gif",
+                           ".ico", ".ttf", ".otf", ".woff", ".woff2", ".mp3", ".wav"}
+            text_ext = {".py", ".sh", ".json", ".md", ".txt", ".cfg", ".ini", ".xml",
+                        ".css", ".html", ".js", ".yaml", ".yml", ".conf", ".toml"}
+            all_files = []
+            for folder in included_folders:
+                root = os.path.join(APP_DIR, folder)
+                if not os.path.isdir(root):
+                    continue
+                for dirpath, _, filenames in os.walk(root):
+                    if any(ex in dirpath for ex in exclude_dirs):
+                        continue
+                    for f in filenames:
+                        ext = os.path.splitext(f)[1].lower()
+                        if ext in exclude_ext:
+                            continue
+                        is_text = ext in text_ext
+                        full_path = os.path.join(dirpath, f)
+                        all_files.append({
+                            "path": full_path,
+                            "rel_path": os.path.relpath(full_path, APP_DIR),
+                            "is_text": is_text,
+                            "size": os.path.getsize(full_path),
+                        })
+            output_lines = []
+            output_lines.append("# VOID DESK CONTEXT PACK (AUTO)")
+            output_lines.append("# Versione: %s" % VERSION)
+            output_lines.append("# Generato: %s" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            output_lines.append("# Cartelle incluse: %s" % ", ".join(included_folders))
+            output_lines.append("# Totale file: %d" % len(all_files))
+            output_lines.append("")
+            output_lines.append("## STRUTTURA DELLE CARTELLE")
+            output_lines.append("```")
+            tree = {}
+            for f in all_files:
+                parts = f["rel_path"].split(os.sep)
+                current = tree
+                for p in parts[:-1]:
+                    current = current.setdefault(p, {})
+                current[parts[-1]] = None
+
+            def print_tree(node, indent=""):
+                lines = []
+                for key in sorted(node.keys()):
+                    if node[key] is None:
+                        lines.append("%s|-- %s" % (indent, key))
+                    else:
+                        lines.append("%s|-- %s/" % (indent, key))
+                        lines.extend(print_tree(node[key], indent + "    "))
+                return lines
+
+            output_lines.extend(print_tree(tree))
+            output_lines.append("```")
+            output_lines.append("")
+            output_lines.append("## CONTENUTO DEI FILE")
+            output_lines.append("")
+            for f in all_files:
+                output_lines.append("### FILE: %s" % f["rel_path"])
+                ext = os.path.splitext(f["rel_path"])[1][1:] or "txt"
+                output_lines.append("```%s" % ext)
+                if f["is_text"]:
+                    try:
+                        with open(f["path"], "r", encoding="utf-8", errors="ignore") as fh:
+                            content = fh.read()
+                            if len(content) > 100000:
+                                content = content[:100000] + "\n... (file troncato)"
+                            output_lines.append(content)
+                    except Exception as e:
+                        output_lines.append("ERRORE LETTURA: %s" % e)
+                else:
+                    output_lines.append("[File binario - contenuto non incluso]")
+                output_lines.append("```")
+                output_lines.append("")
+            context_dir = os.path.join(DATA, "logs", "Context_Void")
+            os.makedirs(context_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = "void_context_v%s_%s.txt" % (VERSION, timestamp)
+            output_path = os.path.join(context_dir, filename)
+            with open(output_path, "w", encoding="utf-8") as fh:
+                fh.write("\n".join(output_lines))
+            cfg["last_run"] = timestamp
+            try:
+                with open(os.path.join(DATA, "voiddecontext_config.json"), "w") as f:
+                    json.dump(cfg, f, indent=2)
+            except Exception:
+                pass
+            log("VoidDecontext: auto-generated %s" % filename, "INFO")
+        except Exception as e:
+            log("VoidDecontext auto-generate error: %s" % e, "ERROR")
+
     def run(self):
-        while self.running:
-            if self.stack[-1] == "capture":
-                self.handle_capture()
-                self.render()
-                self.clock.tick(30)
-                continue
-            if self.alarms():
-                self.check_alarms()
-            for btn in evinput.poll():
-                self.on_button(btn)
-            hx, hy = evinput.hat()
-            now = time.time()
-            if (hx or hy) and now - self._dpad_t > 0.15:
-                self._dpad_t = now
-                if hy > 0:
-                    self.on_button("UP")
-                elif hy < 0:
-                    self.on_button("DOWN")
-                if hx < 0:
-                    self.on_button("LEFT")
-                elif hx > 0:
-                    self.on_button("RIGHT")
-            for e in pygame.event.get():
-                if e.type == pygame.QUIT:
-                    self.running = False
-            self.render()
-            self.clock.tick(30)
-        evinput.stop()
-        fbdisplay.detach()
+        log("VOID DESK started, stack=%s" % self.stack)
+        self._vd_check_auto_execute()
+        try:
+            while self.running:
+                try:
+                    if self.stack[-1] == "capture":
+                        self.handle_capture()
+                        self.render()
+                        self.clock.tick(30)
+                        continue
+                    if self.alarms():
+                        self.check_alarms()
+                    for btn in evinput.poll():
+                        self.on_button(btn)
+                    hx, hy = evinput.hat()
+                    now = time.time()
+                    if (hx or hy) and now - self._dpad_t > 0.15:
+                        self._dpad_t = now
+                        if hy > 0:
+                            self.on_button("UP")
+                        elif hy < 0:
+                            self.on_button("DOWN")
+                        if hx < 0:
+                            self.on_button("LEFT")
+                        elif hx > 0:
+                            self.on_button("RIGHT")
+                    for e in pygame.event.get():
+                        if e.type == pygame.QUIT:
+                            self.running = False
+                    self._frame_count += 1
+                    if self._frame_count % 60 == 0:
+                        self._check_memory()
+                    self._cleanup_caches_if_needed()
+                    self.render()
+                    self.clock.tick(30)
+                except Exception as e:
+                    log("main loop error: %s" % e, "ERROR")
+                    import traceback
+                    log(traceback.format_exc(), "ERROR")
+        except Exception as e:
+            log("fatal error: %s" % e, "ERROR")
+            import traceback
+            log(traceback.format_exc(), "ERROR")
+        finally:
+            evinput.stop()
+            fbdisplay.detach()
+            log("VOID DESK exiting, exit_code=%d" % self.exit_code)
         return self.exit_code
 
 

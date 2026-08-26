@@ -15,8 +15,9 @@ def _r(s, x, y, w, h, col, wd=0, rad=0):
         pygame.draw.rect(s, col, (x, y, w, h), wd)
 
 
-def draw(surf, key, x, y, sz, col):
-    """Disegna l'icona 'key' in un riquadro sz x sz con angolo in (x, y)."""
+def draw(surf, key, x, y, sz, col, t=0.0):
+    """Disegna l'icona 'key' in un riquadro sz x sz con angolo in (x, y).
+    t (tempo in secondi) e' usato solo dalle icone animate (outer_full)."""
     u = sz / 24.0        # unita': le icone sono progettate su griglia 24x24
 
     def p(px, py):
@@ -365,6 +366,36 @@ def draw(surf, key, x, y, sz, col):
         line((3, 7), (12, 12), 1.4)
         line((21, 7), (12, 12), 1.4)
         line((12, 12), (12, 22), 1.4)
+    elif key == "outer":                       # pianeta + satellite (icona statica)
+        circ(12, 12, 4.5, 2)                   # pianeta
+        # orbita ellittica della luna
+        orb_r = 7
+        for _deg in (30, 150, 270):
+            _a = math.radians(_deg)
+            _dx = orb_r * math.cos(_a)
+            _dy = orb_r * math.sin(_a) * 0.6
+            pygame.draw.circle(surf, col, p(12 + _dx, 12 + _dy), max(1, int(1.0 * u)), 0)
+        circ(12 + orb_r * math.cos(0.7), 12 + orb_r * math.sin(0.7) * 0.6, 1.8, 0)
+    elif key == "outer_full":                  # OUTER-DESK logo animato (pianeta+sat)
+        _cx, _cy = x + 12 * u, y + 12 * u     # centro del pianeta in assoluto
+        _pr = 4.5 * u                        # raggio pianeta
+        _ar = 7.5 * u                        # raggio orbita
+        _sat_a = t * 1.4
+        _sat_x = int(_cx + _ar * math.cos(_sat_a))
+        _sat_y = int(_cy + _ar * math.sin(_sat_a) * 0.6)
+        # orbita ellittica sottile
+        ell_surf = pygame.Surface((int(_ar * 2.2), int(_ar * 1.4)), pygame.SRCALPHA)
+        ex, ey = ell_surf.get_size()
+        pygame.draw.ellipse(ell_surf, (*col, 80), (0, 0, ex, ey), max(1, int(1.2 * u)))
+        surf.blit(ell_surf, (int(_cx - ex / 2), int(_cy - ey / 2)))
+        # sat
+        pygame.draw.circle(surf, col, (_sat_x, _sat_y), max(2, int(1.6 * u)))
+        pygame.draw.circle(surf, col, (int(_cx), int(_cy)),
+                           max(4, int(_pr)), max(1, int(1.5 * u)))
+        hi = tuple(min(255, c + 40) for c in col)
+        pygame.draw.circle(surf, hi, (int(_cx - _pr * 0.3),
+                           int(_cy - _pr * 0.3)),
+                           max(2, int(_pr * 0.3)))
     elif key == "usb":                     # connettore USB (MTP)
         rect(10, 2, 4, 6, 0)
         line((12, 8), (12, 13), 2)

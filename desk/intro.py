@@ -5,10 +5,21 @@
 import math
 import os
 import random
+import sys
 import time
+import traceback
 import pygame
 
-FONT = None
+from desk.const import FONT_OXANIUM_BOLD_PATH
+from desk import fbdisplay, evinput
+
+# grubmenu è in sgrub/, deve essere importabile se sgrub/ è in sys.path
+try:
+    import grubmenu
+except ImportError:
+    grubmenu = None
+
+FONT = FONT_OXANIUM_BOLD_PATH
 _SYMBOL_CACHE = {}
 _OVERLAY_CACHE = {}
 
@@ -129,41 +140,36 @@ class UnstableTunnel(object):
         self.sides = 6
         self.z_vals = [i * (14.0 / self.num_rings) for i in range(self.num_rings)]
         self.last_active_points = []
+        self._ring_cache = {}
 
     def draw(self, surface, t, speed=0.0, accent=(255, 176, 46), spiral_progress=0.0):
-        # Velocità perfettamente costante basata sul tempo lineare t, senza sbalzi o accelerazioni improvvise
         step = speed * 0.04
-        
         if spiral_progress <= 0:
             for i in range(self.num_rings):
                 self.z_vals[i] -= step
                 if self.z_vals[i] <= 0.1:
                     self.z_vals[i] += 14.0
-                    
         sorted_z = sorted(self.z_vals, reverse=True)
-        rot = t * 0.3 
-        
+        rot = t * 0.3
         shift_x = self.cx + math.sin(t * 1.2) * 30 + math.cos(t * 0.5) * 15
         shift_y = self.cy + math.cos(t * 1.0) * 20 + math.sin(t * 0.4) * 10
-
         current_frame_points = []
-
+        cache = self._ring_cache
         for z in sorted_z:
-            if z < 0.1: continue
+            if z < 0.1:
+                continue
             scale = (self.w * 0.8) / z
-            
-            pts = []
-            deform_sides = self.sides + int(math.sin(z + t * 1.5) * 2)
-            deform_sides = max(4, min(8, deform_sides))
-            
-            for s in range(deform_sides):
-                angle = rot + (s * (2 * math.pi / deform_sides)) + (z * 0.15)
-                px = shift_x + math.cos(angle) * scale
-                py = shift_y + math.sin(angle) * scale
-                pts.append((px, py))
-            
+            key = (round(z, 2), round(rot, 3), self.sides)
+            pts = cache.get(key)
+            if pts is None:
+                pts = []
+                deform = max(4, min(8, self.sides + int(math.sin(z + t * 1.5) * 2)))
+                for s in range(deform):
+                    angle = rot + (s * (2 * math.pi / deform)) + (z * 0.15)
+                    pts.append((shift_x + math.cos(angle) * scale,
+                                shift_y + math.sin(angle) * scale))
+                cache[key] = pts
             current_frame_points.append((pts, z))
-                
             intensity = max(0.0, 1.0 - (z / 14.0))
             if intensity > 0.05:
                 mix_factor = (math.sin(t * 1.8 + z) + 1) * 0.5
@@ -173,18 +179,15 @@ class UnstableTunnel(object):
                     int(accent[2] * (1 - mix_factor) + 240 * mix_factor * intensity)
                 )
                 thickness = max(1, int(2.5 / z))
-                
                 if spiral_progress > 0:
                     uzumaki_pts = []
                     for px, py in pts:
                         dx = px - self.cx
                         dy = py - self.cy
-                        dist = math.hypot(dx, dy)
+                        dist = math.hypot(dx, dy) + 1.0
                         base_angle = math.atan2(dy, dx)
-                        
-                        twist = base_angle + (spiral_progress * (6.0 + (12.0 / (dist + 1.0))))
+                        twist = base_angle + spiral_progress * (6.0 + 12.0 / dist)
                         target_dist = dist * (1.0 - spiral_progress)
-                        
                         ux = self.cx + math.cos(twist) * target_dist
                         uy = self.cy + math.sin(twist) * target_dist
                         uzumaki_pts.append((int(ux), int(uy)))
@@ -192,10 +195,8 @@ class UnstableTunnel(object):
                 else:
                     int_pts = [(int(px), int(py)) for px, py in pts]
                     pygame.draw.lines(surface, c, True, int_pts, thickness)
-
         if spiral_progress <= 0:
             self.last_active_points = current_frame_points
-
         if random.random() < 0.3 and spiral_progress <= 0:
             sx_pt = random.randint(0, self.w)
             sy_pt = random.randint(0, self.h)
@@ -227,15 +228,131 @@ class Sparks(object):
                 alive.append(p)
         self.list = alive
 
+_LAST_BUTTONS = []
+
 def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
          skip_check=None, font_path=None, duration=1.3, menu_surf=None,
-         jingle=None):
+         jingle=None, lang="it", sfx=None):
     global FONT
     FONT = font_path
     W, H = surface.get_size()
     tunnel = UnstableTunnel(W, H)
     sparks = Sparks()
     t0 = time.time()
+
+    # --- Rintro Grub-and-Sbrobs hook (press R2 during the boot animation) ---
+    _APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _SGRUB = os.path.join(_APP_ROOT, "sgrub")
+    if _SGRUB not in sys.path:
+        sys.path.insert(0, _SGRUB)
+    _grub_shown = [False]
+
+    glitch_started = False
+    glitch_phase = 0
+    glitch_timer = 0.0
+    glitch_loop_speed = 0.1
+    glitch_last_frame = None
+    glitch_swap = False
+    glitch_slash_progress = 0.0
+    glitch_door_progress = 0.0
+
+    def _open_grub():
+        try:
+            import sys
+            import os
+            # Ensure sgrub is in sys.path
+            sgrub_dir = os.path.join(os.path.dirname(__file__), "..", "sgrub")
+            if sgrub_dir not in sys.path:
+                sys.path.insert(0, sgrub_dir)
+            
+            choice = grubmenu.run_grub_menu(lang=lang) if grubmenu else None
+            if choice and choice != "nexus":
+                try:
+                    with open("/tmp/.vd_rtcore_sel", "w") as f:
+                        f.write(choice)
+                except Exception:
+                    pass
+            try:
+                fbdisplay.attach(surface)
+            except Exception:
+                pass
+        except Exception as exc:
+            try:
+                sys.stderr.write("grub menu failed: %s\n" % exc)
+                sys.stderr.write(traceback.format_exc() + "\n")
+            except Exception:
+                pass
+
+    def _maybe_grub():
+        nonlocal glitch_started, glitch_phase, glitch_timer, glitch_last_frame
+        if _grub_shown[0] or glitch_started:
+            return
+        try:
+            if evinput.active():
+                buttons = _LAST_BUTTONS if _LAST_BUTTONS else evinput.poll()
+                for b in buttons:
+                    if b == "R2":
+                        _grub_shown[0] = True
+                        glitch_started = True
+                        glitch_phase = 1
+                        glitch_timer = 0.0
+                        glitch_last_frame = surface.copy()
+                        if sfx and sfx.get("glitch_loop"):
+                            sfx["glitch_loop"].play(-1)
+                        return
+        except Exception:
+            pass
+
+    def _tick_glitch(t):
+        nonlocal glitch_phase, glitch_timer, glitch_loop_speed, glitch_started
+        dt = 0.016
+        glitch_timer += dt
+
+        if glitch_phase == 1:
+            glitch_loop_speed = max(0.02, 0.1 - glitch_timer * 0.15)
+            if (glitch_timer % (glitch_loop_speed * 2)) < glitch_loop_speed:
+                surface.blit(glitch_last_frame, (0, 0))
+            else:
+                surface.fill((0, 0, 0))
+            if glitch_timer > 1.0:
+                glitch_phase = 2
+                glitch_timer = 0.0
+                if sfx and sfx.get("glitch_loop"):
+                    sfx["glitch_loop"].stop()
+                if sfx and sfx.get("glitch_slash"):
+                    sfx["glitch_slash"].play()
+
+        elif glitch_phase == 2:
+            surface.blit(glitch_last_frame, (0, 0))
+            progress = min(1.0, glitch_timer / 0.5)
+            x1 = int(progress * W)
+            y1 = 0
+            x2 = W
+            y2 = int(progress * H)
+            pygame.draw.line(surface, (0, 0, 0), (x1, y1), (x2, y2), 10)
+            if progress >= 1.0:
+                glitch_phase = 3
+                glitch_timer = 0.0
+                if sfx and sfx.get("glitch_door"):
+                    sfx["glitch_door"].play()
+
+        elif glitch_phase == 3:
+            progress = min(1.0, glitch_timer / 0.6)
+            left_rect = pygame.Rect(0, 0, W // 2, H)
+            right_rect = pygame.Rect(W // 2, 0, W // 2, H)
+            offset = int(progress * W // 2)
+            surface.fill((0, 0, 0))
+            left_part = glitch_last_frame.subsurface(left_rect)
+            right_part = glitch_last_frame.subsurface(right_rect)
+            surface.blit(left_part, (-offset, 0))
+            surface.blit(right_part, (W // 2 + offset, 0))
+            if progress >= 1.0:
+                glitch_phase = 4
+                glitch_timer = 0.0
+                glitch_started = False
+                _open_grub()
+                return 1
+        return 0
 
     f_pres = _f(15)
     f_fact = _f(30, True)
@@ -260,6 +377,12 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         return bool(skip_check and skip_check())
 
     def bg(t, speed=1.0, shake=0, spiral_p=0.0):
+        _maybe_grub()
+        if glitch_started:
+            _tick_glitch(t)
+            flip()
+            time.sleep(0.016)
+            return None
         surface.fill((5, 5, 9))
         tunnel.draw(surface, t, speed, accent, spiral_p)
         if shake:
@@ -275,7 +398,9 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         if skipped(): return
         k = i / float(n)
         t = time.time() - t0
-        bg(t, 1.0)
+        _r = bg(t, 1.0)
+        if _r is None:
+            continue
         a = int(255 * min(1, k * 3))
         x = W // 2 - i_fact.get_width() // 2
         y = H // 2 - 40
@@ -297,7 +422,9 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
     for _ in range(wait(28)):
         if skipped(): return
         t = time.time() - t0
-        bg(t, 1.0)
+        _r = bg(t, 1.0)
+        if _r is None:
+            continue
         x = W // 2 - i_fact.get_width() // 2
         y = H // 2 - 40
         surface.blit(i_fact, (x, y))
@@ -313,7 +440,9 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         if skipped(): return
         k = i / float(n)
         t = time.time() - t0
-        bg(t, 1.0)
+        _r = bg(t, 1.0)
+        if _r is None:
+            continue
         a = int(255 * (1 - k))
         f = i_fact.copy()
         f.set_alpha(a)
@@ -334,7 +463,10 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         k = i / float(n)
         t = time.time() - t0
         ease = 1 - (1 - min(1, k * 1.25)) ** 4
-        sx, sy = bg(t, 1.0)
+        _r = bg(t, 1.0)
+        if _r is None:
+            continue
+        sx, sy = _r
         x = W // 2 - logo_w // 2 + sx
         off = int(140 * (1 - ease))
         a = int(255 * min(1, k * 2))
@@ -368,11 +500,14 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
 
     # Atto 4 (Durata del logo ulteriormente allungata)
     n = wait(100)
+    sym = None
     for i in range(n):
         if skipped(): return
         k = i / float(n)
         t = time.time() - t0
-        bg(t, 1.0)
+        _r = bg(t, 1.0)
+        if _r is None:
+            continue
         x = W // 2 - logo_w // 2
         surface.blit(i_a, (x, ly))
         surface.blit(i_b, (x + i_a.get_width(), ly))
@@ -415,7 +550,9 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         k = i / float(crt_n)
         t = time.time() - t0
         surface.blit(base_clean_surf, (0, 0))
-        bg(t, 1.0)
+        _r = bg(t, 1.0)
+        if _r is None:
+            continue
         
         box_y1 = ly - 15
         box_y2 = ly + 110
@@ -450,6 +587,14 @@ def play(surface, flip, app_name="Void-DESK", accent=(255, 176, 46),
         if skipped(): break
         k = i / float(n)
         t = time.time() - t0
+        
+        _maybe_grub()
+        if glitch_started:
+            if _tick_glitch(t) == 1:
+                return
+            flip()
+            time.sleep(0.016)
+            continue
         
         surface.fill((5, 5, 9))
         tunnel.draw(surface, t, speed=1.0, accent=accent, spiral_progress=k)

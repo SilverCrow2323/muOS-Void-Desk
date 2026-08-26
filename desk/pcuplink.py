@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # ============================================================================
-#  VOIDDESK // pcuplink — client verso il demone SPDW sul PC.
+#  VOID-DESK v10.11 update // pcuplink — client verso il demone SPDW sul PC.
 #  Adattato da net.py (app di riferimento SPDW Uplink, PySDL2): stessa
 #  architettura, stesso protocollo. Polling in thread separato con lock:
 #  la UI non si blocca mai, nemmeno a PC spento o irraggiungibile.
@@ -26,15 +26,21 @@ def local_subnet_hosts(own_ip):
         return []
 
 
-def scan_for_servers(own_ip, port=8420, timeout=0.25, max_workers=48):
+def scan_for_servers(own_ip, port=8420, timeout=0.4, max_workers=32):
     """Scansione in parallelo della sottorete propria: prova /ping su
     ogni indirizzo candidato con molti thread contemporanei (non uno
     alla volta -- 254 tentativi in sequenza sarebbero troppo lenti).
+    Un tentativo solo con timeout cosi' stretto perde il PC vero per
+    un semplice pacchetto perso sul WiFi: chi non risponde al primo
+    giro viene riprovato una seconda volta prima di arrendersi (gli
+    indirizzi vuoti falliscono quasi subito con connection refused,
+    quindi il secondo giro costa poco).
     Ritorna la lista dei server che hanno risposto per davvero."""
     hosts = local_subnet_hosts(own_ip)
     if not hosts:
         return []
     found = []
+    found_ips = set()
     found_lock = threading.Lock()
 
     def probe(ip):
@@ -46,25 +52,36 @@ def scan_for_servers(own_ip, port=8420, timeout=0.25, max_workers=48):
                 data = json.loads(r.read().decode("utf-8",
                                                    errors="replace"))
             with found_lock:
-                found.append({"host": ip, "port": port,
-                             "name": data.get("name", ip),
-                             "version": data.get("version", "")})
+                if ip not in found_ips:
+                    found_ips.add(ip)
+                    found.append({"host": ip, "port": port,
+                                 "name": data.get("name", ip),
+                                 "version": data.get("version", "")})
+            return True
         except Exception:
-            pass
+            return False
 
-    threads = []
-    for ip in hosts:
-        t = threading.Thread(target=probe, args=(ip,), daemon=True)
-        threads.append(t)
-    # avvio a ondate per non aprire 254 socket in un colpo solo
-    i = 0
-    while i < len(threads):
-        wave = threads[i:i + max_workers]
-        for t in wave:
-            t.start()
-        for t in wave:
-            t.join(timeout=timeout + 0.3)
-        i += max_workers
+    def run_wave(ip_list):
+        ok = {}
+
+        def job(ip):
+            ok[ip] = probe(ip)
+        threads = [threading.Thread(target=job, args=(ip,), daemon=True)
+                   for ip in ip_list]
+        # avvio a ondate per non aprire 254 socket in un colpo solo
+        i = 0
+        while i < len(threads):
+            wave = threads[i:i + max_workers]
+            for t in wave:
+                t.start()
+            for t in wave:
+                t.join(timeout=timeout + 0.3)
+            i += max_workers
+        return [ip for ip in ip_list if not ok.get(ip)]
+
+    failed = run_wave(hosts)
+    if failed:
+        run_wave(failed)
     return found
 
 
@@ -136,6 +153,11 @@ class PcClient:
     def _loop(self):
         while not self._stop:
             self._cycle += 1
+            # pulito qui, non in fondo al giro: se force_refresh()
+            # arriva mentre le chiamate HTTP sotto sono ancora in
+            # corso, resta comunque "settato" e la wait() finale
+            # scatta subito invece di perdere la richiesta
+            self._force.clear()
             try:
                 data, ms = self._get("/stats")
                 with self._lock:
@@ -193,7 +215,6 @@ class PcClient:
                 with self._lock:
                     self.online = False
                     self.last_error = str(e)[:60]
-            self._force.clear()
             self._force.wait(self.poll_s)
 
     def send_notify(self, title, body=""):
