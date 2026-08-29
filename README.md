@@ -1,4 +1,7 @@
-#  ◈ Void-Desk
+
+<div align="center">
+  
+#  ◈ VOID-Desk <i>'Nexus'</i>
 
 **The definitive desktop layer for muOS.**
 *A real Linux machine lives inside your handheld. VoidDesk is how you drive it.*
@@ -10,7 +13,6 @@
   ╚══════════════════════════════════════════════════════════════════════════╝
 -->
 
-<div align="center">
 
 <img src="https://i.ibb.co/27cw4TZt/muos-20260725-175855.png" width="720" alt="Void-DESK Banner">
 
@@ -1024,10 +1026,7 @@ Third-Party Acknowledgments
 > <div style="border-left: 4px solid #00FFCC; padding: 18px 24px; background: #0a1a1a; border-radius: 0 14px 14px 0; color: #bbb;">
 > <div style="display: flex; align-items: flex-start; gap: 16px;">
 > <div style="font-family: 'Courier New', monospace; font-size: 11px; color: #00FFCC; line-height: 1.4; white-space: pre;">
->         ╔═════╗
->         ║◠   ◠║
->         ║  ‿  ║
->         ╚══╦══╝
+>         ( ----)
 > </div>
 > <div>
 > <p style="font-family: 'Impact', sans-serif; font-size: 16px; color: #00FFCC; margin: 0;"><b>[I.R.] Minoru⁷</b></p>
