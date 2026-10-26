@@ -13,13 +13,17 @@ LOG_FILE = os.path.join(APP_DIR, "data", "voiddesk_debug.log")
 
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
+_LOG_FIRST = [True]
+
+
 def log(msg):
-    """Log to both stdout and file"""
+    """Log to stdout and file (the file restarts clean on every launch: it used to grow forever)"""
     print(msg, flush=True)
     try:
-        with open(LOG_FILE, "a") as f:
+        with open(LOG_FILE, "w" if _LOG_FIRST[0] else "a") as f:
+            _LOG_FIRST[0] = False
             f.write(msg + "\n")
-    except:
+    except Exception:
         pass
 
 # Start logging
@@ -70,9 +74,11 @@ try:
     log("[DEBUG] All imports successful, launching main.py...")
     log("[DEBUG] === Launching actual VoidDesk ===\n")
     
-    # Now exec the actual main.py
-    with open(os.path.join(DESK_DIR, "main.py")) as f:
-        exec(f.read(), {"__file__": os.path.join(DESK_DIR, "main.py"), "__name__": "__main__"})
+    # Real module (not exec): so the hubs' lazy imports reuse this
+    # same module instead of re-running all of desk/main.py a second time.
+    import importlib
+    _desk_main = importlib.import_module("desk.main")
+    sys.exit(_desk_main.App().run())
     
 except Exception as e:
     log(f"\n[ERROR] {type(e).__name__}: {e}")

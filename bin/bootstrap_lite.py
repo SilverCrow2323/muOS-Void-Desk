@@ -187,13 +187,30 @@ def extract_local_archives():
                 import tarfile
                 with tempfile.TemporaryDirectory() as tmpdir:
                     with tarfile.open(zpath, 'r:gz') as t:
-                        t.extractall(tmpdir)
+                        _safe_tar_extractall(t, tmpdir)
                     _merge_into_runtime(tmpdir, APP_DIR)
             log(f"Estratto archivio runtime locale: {name}")
             return True
         except Exception as e:
             log(f"Estrazione {name} fallita: {e}", "ERROR")
     return False
+
+
+def _safe_tar_extractall(tf, dest):
+    """tar without path traversal (local copy: this script runs standalone)."""
+    import tarfile
+    base = os.path.realpath(dest)
+    ok = []
+    for m in tf.getmembers():
+        tgt = os.path.realpath(os.path.join(base, m.name))
+        if tgt != base and not tgt.startswith(base + os.sep):
+            raise ValueError('unsafe archive: %s' % m.name)
+        if not m.isdev():
+            ok.append(m)
+    if hasattr(tarfile, 'data_filter'):
+        tf.extractall(dest, members=ok, filter='data')
+    else:
+        tf.extractall(dest, members=ok)
 
 
 def _merge_into_runtime(tmpdir, app_dir):
