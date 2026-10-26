@@ -749,7 +749,7 @@ BGM_EXTS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma",
 MEDIA_EXTS = BGM_EXTS | {".mkv", ".avi", ".mov", ".m3u", ".m3u8"}
 BGM_SAMPLE_RATE = 44100
 BGM_OGG_QUALITY = "6"
-VERSION = "10.5.0"
+VERSION = "10.5.1"
 VERSION_CODENAME = "D.N"
 MENU_DEST_COLORS = [
     (60, 200, 130),   # 0 START SESSION -- verde, avvio

@@ -229,6 +229,9 @@ from desk.const import OUTERDESK_APPS, OUTERDESK_COLOR, OUTER_PANEL_BG, OUTER_PA
 from desk.ui import draw_cyber_quadrant
 from desk.utils.cache import get_texture_cache
 from desk.utils.performance import DirtyRectRenderer, get_free_memory_mb, is_low_memory, memory_guard
+from desk.utils.atomic_io import atomic_write_json, atomic_read_json
+from desk.utils.safe_extract import safe_tar_extractall
+from desk.utils.safe_calc import calc_safe_eval
 from desk.header import draw_header
 from desk.volume_overlay import VolumeOverlay
 from desk.logging_system import LoggerManager, LogRegistry, LogLevel, LogArchiver
@@ -571,7 +574,7 @@ CURSEDEV_CATEGORIES = {
         "items": [
             {"key": "termid_name", "label": {"it": "Nome operatore", "en": "Operator Name"}, "type": "text", "default": "SPDW-07"},
             {"key": "termid_id", "label": {"it": "Terminal ID", "en": "Terminal ID"}, "type": "text", "default": ""},
-             {"key": "lang", "label": {"it": "Lingua", "en": "Language"}, "type": "cycle", "values": ["it", "en"], "default": "it"},
+             {"key": "lang", "label": {"it": "Lingua", "en": "Language"}, "type": "cycle", "values": ["it", "en"], "default": "en"},
          ]
      },
      # ===== NUOVO: RADIX VERITAS ===== 
@@ -920,7 +923,7 @@ BGM_EXTS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma",
 MEDIA_EXTS = BGM_EXTS | {".mkv", ".avi", ".mov", ".m3u", ".m3u8"}
 BGM_SAMPLE_RATE = 44100
 BGM_OGG_QUALITY = "6"
-VERSION = "10.5.0"
+VERSION = "10.5.1"
 VERSION_CODENAME = "D.N"
 MENU_DEST_COLORS = [
     (60, 200, 130),   # 0 START SESSION -- verde, avvio
@@ -2633,21 +2636,15 @@ def net_test():
 
 
 def load_cfg():
-    import json
-    try:
-        with open(os.path.join(DATA, "desk_config.json")) as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    return atomic_read_json(os.path.join(DATA, "desk_config.json"), default={})
 
 
 def save_cfg(cfg):
-    import json
     try:
         os.makedirs(DATA, exist_ok=True)
-        with open(os.path.join(DATA, "desk_config.json"), "w") as f:
-            json.dump(cfg, f, indent=1)
-    except OSError:
+        atomic_write_json(os.path.join(DATA, "desk_config.json"), cfg,
+                          backup=True, indent=1)
+    except (OSError, TypeError, ValueError):
         pass
 
 
@@ -2818,8 +2815,7 @@ class VCConfig(object):
 
     def save(self):
         try:
-            with open(VC_CONFIG_PATH, "w", encoding="utf-8") as f:
-                json.dump(self.data, f, indent=2, ensure_ascii=False)
+            atomic_write_json(VC_CONFIG_PATH, self.data, indent=2, ensure_ascii=False)
         except OSError:
             pass
 
@@ -4985,7 +4981,7 @@ class App(object):
         self.cfg = load_cfg()
         if self.cfg.get("home_style") not in HOME_STYLES:
             self.cfg["home_style"] = DEFAULT_HOME_STYLE
-        self.lang = self.cfg.get("lang", "it")
+        self.lang = self.cfg.get("lang", "en")
         self.accent = ACCENTS.get(self.cfg.get("theme", "ambra"),
                                   ACCENTS["ambra"])
         self.accent2 = theme_secondary(self.accent)
@@ -5530,6 +5526,10 @@ class App(object):
         self.marked = set()     # indici selezionati per l'installazione
         self.status = {}        # nome -> True/False/None
         self.logs = self.build_logs()
+        # created BEFORE the intro: play_intro() calls render(), which uses it
+        # (it used to be created further down -> "intro non riuscita" logged on every launch)
+        self.volume_level = 50
+        self.volume_overlay = VolumeOverlay(self)
         evinput.start()
         self.rebuild_menu()
         if self.cfg.get("intro", True) and \
@@ -5615,11 +5615,9 @@ class App(object):
         self.outerdesk_hub = OuterdeskHub(self)
         self.legacy_hub = LegacyHub(self)
         self.nexus_renderer = NexusRenderer(self)
-        self.volume_overlay = VolumeOverlay(self)
-        self.volume_level = 50
         try:
             import subprocess
-            result = subprocess.run(["amixer", "sget", "Master"], capture_output=True, text=True)
+            result = subprocess.run(["amixer", "sget", "Master"], capture_output=True, text=True, timeout=2)
             for line in result.stdout.splitlines():
                 if "[" in line and "%" in line:
                     pct = line.split("[")[1].split("%")[0]
@@ -5629,7 +5627,7 @@ class App(object):
             pass
         self.logger_manager = LoggerManager.get_instance()
         self.log_registry = LogRegistry.get_instance()
-        self.logger_manager.log("voiddesk", LogLevel.INFO, "VoidDesk avviato (v10.5.0)")
+        self.logger_manager.log("voiddesk", LogLevel.INFO, "VoidDesk avviato (v%s)" % VERSION)
         self._logviewer_filter_source = None
         self._logviewer_filter_level = None
         self._logger_sel = 0
@@ -6420,92 +6418,7 @@ class App(object):
             self.clock.tick(30)
 
     # --- [E3b] Outer-Desk Boot Animation ---
-    def play_outerdesk_boot(self, on_done=None, skip_check=None):
-        col = OUTERDESK_COLOR
-        self.play("outerdesk_boot")
-        skip_font = pygame.font.Font(FONT_PATH, 14)
-        skip_txt = skip_font.render(
-            "START/A: salta" if self.lang == "it"
-            else "START/A: skip", True, (120, 120, 130))
-        skip_w = skip_txt.get_width()
-        evinput.poll()
-        f1 = 24
-        for f in range(f1):
-            if skip_check and skip_check():
-                return
-            k = (f + 1) / float(f1)
-            self.surface.fill((5, 8, 11))
-            _r = random.Random(777)
-            _t = time.time()
-            for _ in range(int(80 * k)):
-                _sx = _r.randint(0, W - 1)
-                _sy = _r.randint(0, H - 1)
-                _br = int(30 + 60 * k * abs(math.sin(_t * 0.7 + _sx * 0.03)))
-                if _br > 0:
-                    self.surface.set_at((_sx, _sy),
-                                        (max(0, col[0] - _br),
-                                         max(0, col[1] - _br),
-                                         min(255, col[2] + _br)))
-            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
-            pygame.display.flip()
-            self.clock.tick(40)
-        f2 = 20
-        tx, ty = 16, 70
-        tw = int(W * 0.32)
-        th = H - 134
-        for f in range(f2):
-            if skip_check and skip_check():
-                return
-            k = (f + 1) / float(f2)
-            ek = 1 - (1 - k) ** 3
-            self.surface.fill((5, 8, 11))
-            _r = random.Random(777)
-            for _ in range(80):
-                _sx = _r.randint(0, W - 1)
-                _sy = _r.randint(0, H - 1)
-                self.surface.set_at((_sx, _sy),
-                                    (max(0, col[0] - 30),
-                                     max(0, col[1] - 40),
-                                     min(255, col[2] + 20)))
-            self._draw_safety_tablet(tx, ty, tw, th * ek, col, k)
-            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
-            pygame.display.flip()
-            self.clock.tick(42)
-        full = "OUTER-DESK"
-        t0 = time.time()
-        ly = 70
-        lx = W - 16 - self.f_big_b.size(full)[0]
-        done = False
-        while not done:
-            if skip_check and skip_check():
-                return
-            el = time.time() - t0
-            nc = min(len(full), int(el / 0.12) + 1)
-            if nc >= len(full) and el > len(full) * 0.12 + 0.6:
-                done = True
-            self.surface.fill((5, 8, 11))
-            _r = random.Random(777)
-            for _ in range(80):
-                _sx = _r.randint(0, W - 1)
-                _sy = _r.randint(0, H - 1)
-                self.surface.set_at((_sx, _sy),
-                                    (max(0, col[0] - 30),
-                                     max(0, col[1] - 40),
-                                     min(255, col[2] + 20)))
-            self._draw_safety_tablet(tx, ty, tw, th, col, 1.0)
-            icons.draw(self.surface, "outer", lx - 40, ly - 4, 28, col)
-            part = full[:nc]
-            if part:
-                self.text(part, (lx, ly), self.f_big_b, col)
-            if nc < len(full) and int(el * 4) % 2:
-                _cx = lx + self.f_big_b.size(part)[0]
-                pygame.draw.line(self.surface, col,
-                                 (_cx, ly + 28), (_cx + 12, ly + 28), 2)
-            self.surface.blit(skip_txt, (W - skip_w - 12, H - 28))
-            pygame.display.flip()
-            self.clock.tick(20)
-        if on_done:
-            on_done()
+    # (duplicate definition removed: the active implementation is below, section [E3b])
 
     def _draw_safety_tablet(self, x, y, w, h, col, k=1.0):
         _sh = int(12 * k)
@@ -6616,7 +6529,7 @@ class App(object):
                 "guide": lambda: self.set_info_lines(self.guide_lines()) or self.push("info"),
                 "manifesto": lambda: self.push("manifesto"),
                 "voidupdate": lambda: self.push("voidupdate"),
-                "cursedev": lambda: self.cursedev_enter(),
+                "cursedev": lambda: self.info_hub.cursedev(),
             },
             "games": {
                 "portmaster": lambda: self.games_hub.portmaster(),
@@ -12871,7 +12784,7 @@ class App(object):
                 with urllib.request.urlopen(req, timeout=timeout) as r:
                     return json.loads(r.read().decode("utf-8", errors="replace"))
             except Exception as e:
-                self.log("radio_fetch attempt %d error: %s" % (attempt + 1, e), "ERROR")
+                log("radio_fetch attempt %d error: %s" % (attempt + 1, e), "ERROR")
                 if attempt == retries - 1:
                     return None
                 time.sleep(1)
@@ -13017,8 +12930,7 @@ class App(object):
                        "bitrate": 0, "favicon": "",
                        "clickcount": 0})
         try:
-            with open(self.radio_custom_path(), "w") as f:
-                json.dump(custom, f, indent=1)
+            atomic_write_json(self.radio_custom_path(), custom, indent=1)
         except OSError:
             return False
         return True
@@ -13027,8 +12939,7 @@ class App(object):
         custom = self.radio_custom_load()
         custom = [f for f in custom if f.get("name") != name]
         try:
-            with open(self.radio_custom_path(), "w") as f:
-                json.dump(custom, f, indent=1)
+            atomic_write_json(self.radio_custom_path(), custom, indent=1)
         except OSError:
             return False
         return True
@@ -13239,8 +13150,7 @@ class App(object):
                     added += 1
         if added:
             try:
-                with open(self.radio_custom_path(), "w") as f:
-                    json.dump(custom, f, indent=1)
+                atomic_write_json(self.radio_custom_path(), custom, indent=1)
                 self.notify("Void Radio",
                             ("Importati %d canali" % added)
                             if self.lang == "it" else
@@ -16469,7 +16379,7 @@ class App(object):
                             zf.extractall(self.fm_path)
                     elif low.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
                         with tarfile.open(arc_path, "r:*") as tf:
-                            tf.extractall(self.fm_path)
+                            safe_tar_extractall(tf, self.fm_path)
                     else:
                         self.notify("Formato non supportato", "", "warning")
                         return
@@ -17027,7 +16937,7 @@ class App(object):
                       "phi": (1 + 5 ** 0.5) / 2, "tau": _m.tau,
                       "ans": getattr(self, "calc_ans", 0.0)}
                 try:
-                    r = eval(e, {"__builtins__": {}}, ns)
+                    r = calc_safe_eval(e, ns)
                     self.calc_ans = r
                     self.calc_expr = ("%.10g" % r)
                 except Exception:
@@ -18625,7 +18535,7 @@ class App(object):
                                 rc = subprocess.call(
                                     chk, shell=True,
                                     stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL)
+                                    stderr=subprocess.DEVNULL, timeout=15)
                                 installed = (rc == 0)
                             except Exception:
                                 installed = False
@@ -18661,7 +18571,7 @@ class App(object):
                                     _rc = subprocess.call(
                                         _chk, shell=True,
                                         stdout=subprocess.DEVNULL,
-                                        stderr=subprocess.DEVNULL)
+                                        stderr=subprocess.DEVNULL, timeout=15)
                                     _ok = (_rc == 0)
                                 except Exception:
                                     _ok = False
@@ -19516,6 +19426,14 @@ class App(object):
             self.text(self.t(lk), (x + 14 + icon_sz, y + (h - 18) // 2),
                       self.f_tiny, FG if sel else DIM,
                       maxw=w - icon_sz - 22)
+
+    def line(self, x1, y1, x2, y2, color, width=1):
+        """Helper used by the BGM screen (was missing: AttributeError on every frame)."""
+        pygame.draw.line(self.surface, color, (x1, y1), (x2, y2), width)
+
+    def rect(self, x, y, w, h, color, fill=True, width=1):
+        """Helper used by the BGM screen (was missing)."""
+        pygame.draw.rect(self.surface, color, (x, y, w, h), 0 if fill else width)
 
     def npanel(self, x, y, w, h, border=None, fill=PANEL, cut=9, slant=0):
         """Pannello con taglio da HUD manga neon: bordo elettrico,
@@ -21125,7 +21043,8 @@ class App(object):
             self.play("click")
             try:
                 import subprocess
-                subprocess.run(["amixer", "sset", "Master", "%d%%" % self.volume_level], capture_output=True)
+                subprocess.Popen(["amixer", "sset", "Master", "%d%%" % self.volume_level],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception:
                 pass
             return
@@ -21135,7 +21054,8 @@ class App(object):
             self.play("click")
             try:
                 import subprocess
-                subprocess.run(["amixer", "sset", "Master", "%d%%" % self.volume_level], capture_output=True)
+                subprocess.Popen(["amixer", "sset", "Master", "%d%%" % self.volume_level],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception:
                 pass
             return
@@ -26435,8 +26355,8 @@ class App(object):
             NEXUS_RING_VOID,
         ]
         for rr, rnodes, rcol in zip(ring_radii, ring_nodes, ring_colors):
-            pygame.draw.circle(self.app.surface, (8, 10, 18), (cx, cy), rr + 2, 2)
-            pygame.draw.circle(self.app.surface, rcol + (60,), (cx, cy), rr, 1)
+            pygame.draw.circle(self.surface, (8, 10, 18), (cx, cy), rr + 2, 2)
+            pygame.draw.circle(self.surface, rcol + (60,), (cx, cy), rr, 1)
             ring_speed = {1: 7.0, 2: 3.0, 3: 1.3, 4: 0.5}.get(
                 ring_radii.index(rr) + 1, 3.0) * 0.3
             for i, idx in enumerate(rnodes):
@@ -30009,9 +29929,16 @@ class App(object):
             pygame.draw.rect(self.surface, (24, 26, 33),
                              (20, 54, 40, 40))
             try:
-                og = pygame.transform.scale(
-                    pygame.image.load(cur).convert_alpha(), (36, 36))
-                self.surface.blit(og, (22, 56))
+                try:
+                    _gk = (cur, os.path.getmtime(cur))
+                except OSError:
+                    _gk = (cur, None)
+                _gc = getattr(self, "_gp_cur_cache", None)
+                if not _gc or _gc[0] != _gk:
+                    _gc = (_gk, pygame.transform.scale(
+                        pygame.image.load(cur).convert_alpha(), (36, 36)))
+                    self._gp_cur_cache = _gc
+                self.surface.blit(_gc[1], (22, 56))
             except (OSError, pygame.error):
                 self.text("—", (34, 62), self.f_med, FAINT)
             self.text(app["name"], (74, 54), self.f_med, FG,
@@ -33770,8 +33697,7 @@ class App(object):
     def _vd_save_config(self):
         if hasattr(self, "_vd_state"):
             try:
-                with open(self._vd_config_path(), "w") as f:
-                    json.dump(self._vd_state["config"], f, indent=2)
+                atomic_write_json(self._vd_config_path(), self._vd_state["config"], indent=2)
             except Exception as e:
                 log("Errore salvataggio config VoidDecontext: %s" % e, "ERROR")
 
@@ -34068,6 +33994,7 @@ class App(object):
     def _vd_generate(self):
         state = self._vd_state
         cfg = state["config"]
+        it = (self.lang == "it")
         try:
             exclude_dirs = {"data", "runtime", "__pycache__", ".git", "assets", "outdesk", "sgrub", "bin"}
             included_folders = cfg.get("included_folders", [])
@@ -34398,8 +34325,7 @@ class App(object):
                 fh.write("\n".join(output_lines))
             cfg["last_run"] = timestamp
             try:
-                with open(os.path.join(DATA, "voiddecontext_config.json"), "w") as f:
-                    json.dump(cfg, f, indent=2)
+                atomic_write_json(os.path.join(DATA, "voiddecontext_config.json"), cfg, indent=2)
             except Exception:
                 pass
             log("VoidDecontext: auto-generated %s" % filename, "INFO")

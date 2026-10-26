@@ -21,7 +21,9 @@ class DirtyRectRenderer:
         self.dirty_rects.append(rect)
 
     def mark_all_dirty(self):
-        self.dirty_rects = [pygame.Rect(0, 0, W, H)]
+        surf = pygame.display.get_surface()
+        w, h = surf.get_size() if surf else (640, 480)
+        self.dirty_rects = [pygame.Rect(0, 0, w, h)]
 
     def render(self, surface, draw_func, force_full=False):
         if not self.enabled or force_full:

@@ -610,13 +610,17 @@ class NexusRenderer:
                                                 zoom, anchor_override)
         if self.app.cfg.get("void_gravity", True):
             gr = 28 + int(6 * math.sin(t_now * 1.4))
+            _gcache = self.__dict__.setdefault("_grav_cache", {})
             for gy in range(3):
-                a = int(22 * (1 - gy / 3.0))
-                s = pygame.Surface((gr * 2 + gy * 16 + 4, gr * 2 + gy * 16 + 4),
-                                   pygame.SRCALPHA)
-                pygame.draw.circle(s, (40, 30, 60, a),
-                                   (s.get_width() // 2, s.get_height() // 2),
-                                   gr + gy * 8, 2)
+                s = _gcache.get((gr, gy))
+                if s is None:
+                    a = int(22 * (1 - gy / 3.0))
+                    s = pygame.Surface((gr * 2 + gy * 16 + 4, gr * 2 + gy * 16 + 4),
+                                       pygame.SRCALPHA)
+                    pygame.draw.circle(s, (40, 30, 60, a),
+                                       (s.get_width() // 2, s.get_height() // 2),
+                                       gr + gy * 8, 2)
+                    _gcache[(gr, gy)] = s
                 self.app.surface.blit(s, (int(sun_sx) - s.get_width() // 2,
                                           int(sun_sy) - s.get_height() // 2))
         order = sorted(positions.items(), key=lambda kv: kv[1][2])
