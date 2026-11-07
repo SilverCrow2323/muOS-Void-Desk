@@ -115,6 +115,13 @@ class ToolboxHub(HubMixin):
         self.app.launch_external_tool("file_gd_x")
 
 
+        File-GD X is a standalone LÖVE app living in external/muos-prototypes.
+        It's launched engine-agnostically via external/tools.json so the
+        SAME binary is used from Pygame and LÖVE.
+        """
+        self.app.launch_external_tool("file_gd_x")
+
+
     def ftp(self):
         """FTP client."""
         app = self.app
