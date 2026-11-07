@@ -12,7 +12,6 @@
 [![GitHub Discussions](https://img.shields.io/github/discussions/SilverCrow2323/Void-Desk-Project?style=for-the-badge&color=1f883d&labelColor=0d1117)](https://github.com/SilverCrow2323/Void-Desk-Project/discussions)
 [![GitHub Issues](https://img.shields.io/github/issues/SilverCrow2323/Void-Desk-Project?style=for-the-badge&color=d9381e&labelColor=0d1117)](https://github.com/SilverCrow2323/Void-Desk-Project/issues)
 
----
 
 ![Supported Firmware](https://img.shields.io/badge/Firmware-muOS%20%7C%20ROCKNIX%20%7C%20Knulli-d4c5f9?style=flat-square)
 ![Target Architecture](https://img.shields.io/badge/SoC-Allwinner%20H700-a2eeef?style=flat-square)
