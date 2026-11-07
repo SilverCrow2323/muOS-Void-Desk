@@ -1,0 +1,4 @@
+# VOIDDESK: mirror in HTTPS (molte reti bloccano la porta 80)
+deb https://ports.ubuntu.com/ubuntu-ports noble main universe
+deb https://ports.ubuntu.com/ubuntu-ports noble-updates main universe
+deb https://ports.ubuntu.com/ubuntu-ports noble-security main universe

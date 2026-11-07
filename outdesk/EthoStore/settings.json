@@ -1,0 +1,8 @@
+{
+  "theme": "matrix",
+  "catalog_url": "https://raw.githubusercontent.com/spdw-factory/ethostore-catalog/main/db.json",
+  "download_dir": "/mnt/mmc/ARCHIVE",
+  "auto_install": true,
+  "check_updates": true,
+  "items_per_page": 8
+}

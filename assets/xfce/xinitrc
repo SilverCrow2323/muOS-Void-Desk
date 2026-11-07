@@ -1,0 +1,67 @@
+#!/bin/sh
+# VOIDDESK XFCE - sessione
+: > /tmp/.vd_x_up	# X ha preso lo schermo: vd_loader si spegne
+
+# bus di sessione: lo apriamo NOI, cosi' l'indirizzo esiste gia' qui e
+# /tmp/.vd_dbus non e' piu' vuoto (il pannello LIVE lo usa per il logout
+# pulito e le app D-Bus - terminale, Thunar - lo trovano sempre).
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && command -v dbus-launch >/dev/null 2>&1; then
+	eval "$(dbus-launch --sh-syntax --exit-with-session)"
+fi
+echo "$DBUS_SESSION_BUS_ADDRESS" > /tmp/.vd_dbus
+
+# niente ponte accessibilita': senza, le app GTK partivano con timeout
+# D-Bus da 25 secondi (sembravano "non partire")
+export NO_AT_BRIDGE=1
+export GTK_A11Y=none
+export GTK_OVERLAY_SCROLLING=0
+# gsettings su file (niente dconf-service): serve al fix dei popup blueman
+export GSETTINGS_BACKEND=keyfile
+
+# tastiera fisica e lingua desktop scelte in UPLINK
+command -v setxkbmap >/dev/null 2>&1 && setxkbmap "$VD_KBD" 2>/dev/null
+if [ -n "$VD_LANG" ] && [ "$VD_LANG" != "system" ]; then
+	export LANG="$VD_LANG.UTF-8"
+	export LC_ALL="$VD_LANG.UTF-8"
+fi
+
+xset s off -dpms 2>/dev/null
+
+# --- audio ---------------------------------------------------------------
+# PulseAudio da root serve --system=no + permesso esplicito; se non parte
+# le app usano ALSA direttamente (che sulla console funziona comunque).
+if command -v pulseaudio >/dev/null 2>&1; then
+	pulseaudio --start --exit-idle-time=-1 --allow-exit=no >/dev/null 2>&1 ||
+		pulseaudio --start --system=no --exit-idle-time=-1 >/dev/null 2>&1
+	sleep 1
+	SINK=$(pactl list short sinks 2>/dev/null | head -n1 | cut -f2)
+	[ -n "$SINK" ] && pactl set-default-sink "$SINK" >/dev/null 2>&1
+fi
+# volume di partenza udibile anche via ALSA puro
+for CTL in Master PCM Speaker Headphone; do
+	amixer -q sset "$CTL" 80% unmute >/dev/null 2>&1
+done
+
+# --- tastiera virtuale ---------------------------------------------------
+# niente pre-avvio: la tastiera parte on demand (tasto MENU o pannello
+# LIVE). Il vecchio demone+SIGUSR1 era la causa dei freeze.
+
+# --- servizi periferiche -------------------------------------------------
+# applet bluetooth e automount USB, se installati
+command -v blueman-applet >/dev/null 2>&1 && blueman-applet >/dev/null 2>&1 &
+command -v udisksd >/dev/null 2>&1 && /usr/libexec/udisks2/udisksd >/dev/null 2>&1 &
+
+# --- controller ----------------------------------------------------------
+qjoypad --notray "Default" >/dev/null 2>&1 &
+( sleep 3; command -v xdotool >/dev/null 2>&1 && \
+  xdotool search --class -- qjoypad windowunmap %@ ) >/dev/null 2>&1 &
+
+# quale ambiente? (VD_ENV arriva dal launcher; il pannello LIVE lo legge
+# da /tmp/.vd_env per sapere come chiudere la sessione)
+case "$VD_ENV" in
+	icewm)	VD_SESSION="icewm-session" ;;
+	lxde)	VD_SESSION="startlxde" ;;
+	*)	VD_ENV="xfce"; VD_SESSION="startxfce4" ;;
+esac
+echo "$VD_ENV" > /tmp/.vd_env
+exec "$VD_SESSION"

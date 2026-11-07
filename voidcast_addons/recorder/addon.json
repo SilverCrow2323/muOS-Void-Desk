@@ -1,0 +1,7 @@
+{
+  "name": "PVR Recorder",
+  "desc": "Records the current stream to SD via ffmpeg (copy, zero transcoding)",
+  "entry": "addon.py",
+  "version": "1.1.0",
+  "author": "SPDW Factory"
+}

@@ -1,0 +1,18 @@
+# QJoyPad 4.3 Layout File
+# VOIDDESK profilo CLASSICO
+Joystick 1 {
+	Axis 3: gradient, maxSpeed 3, mouse+h
+	Axis 4: gradient, maxSpeed 3, mouse+v
+	Axis 5: +key 114, -key 113
+	Axis 6: +key 116, -key 111
+	Button 4: mouse 1
+	Button 5: mouse 3
+	Button 6: mouse 2
+	Button 7: mouse 3
+	Button 8: mouse 4
+	Button 9: mouse 5
+	Button 10: key 9
+	Button 11: key 36
+	Button 13: mouse 1
+	Button 16: mouse 3
+}

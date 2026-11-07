@@ -1,0 +1,56 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# === Virtualenv ===
+venv/
+.venv/
+env/
+ENV/
+
+# === VoidDesk runtime (regenerated on first launch) ===
+runtime/
+data/.pygame_ready
+data/sdl_path.txt
+data/pygame.whl
+data/xfce_mnt/
+
+# === Logs and local state ===
+data/logs/
+*.log
+*.bak
+*.tmp
+data/desk_config.json.bak
+data/radio_cache.json
+data/logger_config.json
+
+# === Optional heavy artifacts (uncomment if not versioning) ===
+# data/xfce.img
+# assets/xfce.img.gz
+# assets/runtime_archives/*.tar.gz
+
+# === IDE / OS ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

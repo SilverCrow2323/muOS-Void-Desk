@@ -1,0 +1,100 @@
+{
+  "gabrielfvale": {
+    "login": "gabrielfvale",
+    "name": "Gabriel Freire",
+    "bio": null,
+    "location": "Brasil",
+    "company": "@hub-la",
+    "blog": "www.gabrielfvale.dev",
+    "twitter": null,
+    "avatar_url": "https://avatars.githubusercontent.com/u/16018515?v=4",
+    "public_repos": 50,
+    "followers": 45,
+    "following": 28,
+    "created_at": "2015-11-25T14:37:30Z",
+    "updated_at": "2026-08-20T13:17:37Z",
+    "apps": [
+      {
+        "id": "scrappy",
+        "name": "Scrappy",
+        "category": "applications"
+      }
+    ]
+  },
+  "milouk": {
+    "login": "milouk",
+    "name": "Michael Loukeris",
+    "bio": "DevOps Engineer",
+    "location": "Athens, Greece",
+    "company": "@grnet",
+    "blog": "milouk.me",
+    "twitter": "mi_louk",
+    "avatar_url": "https://avatars.githubusercontent.com/u/22796276?v=4",
+    "public_repos": 64,
+    "followers": 54,
+    "following": 6,
+    "created_at": "2016-10-12T15:21:05Z",
+    "updated_at": "2026-08-14T12:19:35Z",
+    "apps": [
+      {
+        "id": "artie",
+        "name": "Artie Scraper",
+        "category": "applications"
+      }
+    ]
+  },
+  "cybardev": {
+    "login": "cybardev",
+    "name": "Sheikh",
+    "bio": "Web | DevOps | Art",
+    "location": "Halifax, NS, Canada",
+    "company": "Roddis Communications",
+    "blog": "https://cybar.dev",
+    "twitter": null,
+    "avatar_url": "https://avatars.githubusercontent.com/u/50134239?v=4",
+    "public_repos": 90,
+    "followers": 66,
+    "following": 16,
+    "created_at": "2019-04-30T07:57:20Z",
+    "updated_at": "2026-08-20T09:34:15Z",
+    "apps": [
+      {
+        "id": "aesthetic",
+        "name": "Aesthetic",
+        "category": "applications"
+      }
+    ]
+  },
+  "nvcuong1312": {
+    "login": "nvcuong1312",
+    "name": "nvc",
+    "bio": null,
+    "location": null,
+    "company": null,
+    "blog": "",
+    "twitter": null,
+    "avatar_url": "https://avatars.githubusercontent.com/u/16067447?v=4",
+    "public_repos": 28,
+    "followers": 14,
+    "following": 0,
+    "created_at": "2015-11-29T10:34:51Z",
+    "updated_at": "2026-08-19T12:30:20Z",
+    "apps": [
+      {
+        "id": "bluetooth-app",
+        "name": "Bluetooth App",
+        "category": "applications"
+      },
+      {
+        "id": "ctupe",
+        "name": "CTupe",
+        "category": "applications"
+      },
+      {
+        "id": "hotspotmuos",
+        "name": "Hotspotmuos",
+        "category": "applications"
+      }
+    ]
+  }
+}
