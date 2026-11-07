@@ -38,7 +38,7 @@
       "native_engine": "love",
       "hub": "toolbox",
       "launcher_type": "love",
-      "launcher": "external/muos-prototypes/file-gd-x",
+      "launcher": "external/muos-prototypes",
       "icon": "folder",
       "color": [
         0.37,
