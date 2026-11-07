@@ -8,6 +8,16 @@ LOG_DIR="data/logs"; mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/desktop_$(date +%Y%m%d_%H%M%S).log"
 
 echo "→ Log: $LOG"
+# ── Xephyr check (PC only) ──
+if [ "$(uname -m)" != "aarch64" ] && [ "$(uname -m)" != "armv7l" ]; then
+    if command -v Xephyr >/dev/null 2>&1; then
+        echo "→ Xephyr OK: $(command -v Xephyr)"
+    else
+        echo "→ Xephyr MISSING — install: sudo apt install xserver-xephyr"
+        echo "   (XFCE launch from PC will not work until installed)"
+    fi
+fi
+
 echo "→ Windowed 640x480 (F11 = fullscreen toggle)"
 
 # Explicitly windowed on PC
