@@ -2171,7 +2171,15 @@ class App(object):
 
 # --- [E1] __init__ — Initialization, Config Loading, Boot Sequence ---
     def __init__(self):
-        pygame.display.init()
+        # Guard: device has no X11/KMS, retry with dummy + fbdisplay
+        try:
+            pygame.display.init()
+        except pygame.error:
+            import os as _os_ffb
+            _os_ffb.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+            _os_ffb.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+            _os_ffb.environ.setdefault('VOIDCAST_FB', '1')
+            pygame.display.init()
         pygame.font.init()
         self.surface = pygame.display.set_mode((W, H))
         if not fbdisplay.attach(self.surface):

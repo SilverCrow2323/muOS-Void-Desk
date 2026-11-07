@@ -115,8 +115,7 @@ def h_xfce_install(args):
     def _log(msg):
         try:
             with open(log_path, "a") as f:
-                f.write(msg + "
-")
+                f.write(msg + chr(10))
         except OSError:
             pass
 

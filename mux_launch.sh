@@ -18,6 +18,11 @@ INSTALL_GLYPH "$APP_DIR/resources/voiddesk.png" "voiddesk"
 echo "$(date) === VOIDDESK launch (dir: $APP_DIR) ===" >>"$LOG"
 
 export LD_LIBRARY_PATH="$APP_DIR/lib:${LD_LIBRARY_PATH:-}"
+# Device: SDL needs dummy driver (no X11/KMS)
+export SDL_VIDEODRIVER=dummy
+export SDL_AUDIODRIVER=dummy
+export VOIDCAST_FB=1
+
 export VOIDDESK_APP_DIR="$APP_DIR"
 export VOIDDESK_FULLSCREEN=1
 
