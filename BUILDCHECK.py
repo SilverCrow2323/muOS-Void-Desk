@@ -49,7 +49,7 @@ def warn(m):
 def py_files():
     out = []
     for dp, dn, fn in os.walk("."):
-        dn[:] = [d for d in dn if d not in (".git", "__pycache__", "runtime")]
+        dn[:] = [d for d in dn if d not in (".git", "__pycache__", "runtime", ".venv_desktop", "_backup")]
         out += [os.path.join(dp, f)[2:] for f in fn if f.endswith(".py")]
     return sorted(out)
 

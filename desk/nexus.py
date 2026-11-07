@@ -26,8 +26,8 @@ class NexusRenderer:
     app.surface and read state from the app instance."""
 
     # Limiti per dispositivi con poca RAM (RG35XX-H ha 1GB)
-    MAX_TRAIL_LENGTH = 4
-    MAX_PARTICLES_PER_FRAME = 12
+    MAX_TRAIL_LENGTH = 6
+    MAX_PARTICLES_PER_FRAME = 20
     PARTICLE_LIFETIME = 1.5
     CACHE_MAXSIZE = 12
 
@@ -307,7 +307,7 @@ class NexusRenderer:
             if phase > 2.6:
                 continue
             tw = 0.3 + 0.7 * abs(math.sin(now * 1.3 + sx * 0.1))
-            v = int(70 * tw)
+            v = int(120 * tw)
             surf.set_at((sx, sy), (v, v, v + 22, 255))
         self.app._nexus_star_cache = surf
         self.app._nexus_star_cache_t = now
@@ -326,7 +326,7 @@ class NexusRenderer:
         surf = pygame.Surface((W, H), pygame.SRCALPHA)
         cx, cy, maxr = NEXUS_SELECT_ZONE[0], NEXUS_SELECT_ZONE[1], 220
         for rr in range(maxr, 0, -6):
-            a = int(14 * (1 - rr / float(maxr)) ** 1.6)
+            a = int(35 * (1 - rr / float(maxr)) ** 1.6)
             if a > 0:
                 pygame.draw.circle(surf, col + (a,), (cx, cy), rr)
         self.app._nexus_neb_cache = surf
@@ -377,6 +377,7 @@ class NexusRenderer:
         comets_on = bg_cfg.get("comets", self.app.cfg.get("void_comets", True))
         if comets_on:
             self._draw_comets(surf)
+        self._draw_data_rain(surf)
         scanlines_on = bg_cfg.get("scanlines", False)
         if scanlines_on:
             line = pygame.Surface((W, 1), pygame.SRCALPHA)
@@ -393,38 +394,77 @@ class NexusRenderer:
                                  (i * th, i * th, W - 2 * i * th, H - 2 * i * th), th)
             surf.blit(fx, (0, 0))
 
+    _COMET_HUES = [(180, 220, 255), (255, 200, 220),
+                   (200, 240, 200), (255, 220, 180)]
+
     def _draw_comets(self, surf):
+        """Enhanced: 6 colored comets with longer, smoother tails."""
         if not hasattr(self.app, "_void_comets"):
             self.app._void_comets = []
-            for _ in range(3):
+            for _ in range(6):
                 self.app._void_comets.append({
                     "x": random.randint(0, W),
                     "y": random.randint(44, H - 20),
-                    "vx": random.uniform(1.5, 3.5),
-                    "vy": random.uniform(-0.3, 0.3),
-                    "life": random.uniform(0.3, 1.0),
-                    "size": random.randint(1, 2),
+                    "vx": random.uniform(1.8, 4.5),
+                    "vy": random.uniform(-0.4, 0.4),
+                    "life": random.uniform(0.4, 1.0),
+                    "size": random.randint(1, 3),
+                    "hue": random.choice(self._COMET_HUES),
                 })
         for c in self.app._void_comets[:]:
             c["x"] += c["vx"]
             c["y"] += c["vy"]
-            c["life"] -= 0.008
+            c["life"] -= 0.007
             if c["life"] <= 0 or c["x"] > W + 10 or c["y"] < 44 or c["y"] > H - 10:
                 c["x"] = -10
                 c["y"] = random.randint(44, H - 20)
-                c["vx"] = random.uniform(1.5, 3.5)
-                c["vy"] = random.uniform(-0.3, 0.3)
-                c["life"] = random.uniform(0.3, 1.0)
-            tail_len = 12
+                c["vx"] = random.uniform(1.8, 4.5)
+                c["vy"] = random.uniform(-0.4, 0.4)
+                c["life"] = random.uniform(0.4, 1.0)
+                c["size"] = random.randint(1, 3)
+                c["hue"] = random.choice(self._COMET_HUES)
+            tail_len = 18
             for t in range(tail_len):
-                a = int(180 * (1 - t / tail_len) * c["life"])
-                tx = int(c["x"] - t * c["vx"] * 1.8)
-                ty = int(c["y"] - t * c["vy"] * 1.8)
-                if 0 <= tx < W and 0 <= ty < H:
-                    s2 = pygame.Surface((6, 6), pygame.SRCALPHA)
-                    pygame.draw.circle(s2, (180, 220, 255, a), (3, 3),
-                                       max(1, c["size"] - t // 4))
-                    surf.blit(s2, (tx - 3, ty - 3))
+                a = int(220 * (1 - t / tail_len) * c["life"])
+                tx = int(c["x"] - t * c["vx"] * 2.2)
+                ty = int(c["y"] - t * c["vy"] * 2.2)
+                if 0 <= tx < W and 44 <= ty < H:
+                    size = max(1, c["size"] - t // 5)
+                    s2 = pygame.Surface((size * 2 + 2, size * 2 + 2),
+                                        pygame.SRCALPHA)
+                    pygame.draw.circle(s2, c["hue"] + (a,),
+                                       (size + 1, size + 1), size)
+                    surf.blit(s2, (tx - size - 1, ty - size - 1))
+
+    def _draw_data_rain(self, surf):
+        """Sparse vertical data streams on the screen edges (Blade Runner vibe)."""
+        if not hasattr(self.app, "_void_rain"):
+            self.app._void_rain = []
+            rnd = random.Random(99)
+            for _ in range(10):
+                side = rnd.choice([0, 1])
+                x = rnd.randrange(20, 100) if side == 0 else rnd.randrange(W - 100, W - 20)
+                self.app._void_rain.append({
+                    "x": x,
+                    "y": rnd.randrange(44, H),
+                    "speed": rnd.uniform(50, 140),
+                    "hue": rnd.choice([(60, 200, 220), (200, 90, 220), (100, 220, 150)]),
+                    "bright": rnd.uniform(0.35, 0.75),
+                    "tail": rnd.randrange(4, 8),
+                })
+        for drop in self.app._void_rain:
+            drop["y"] += drop["speed"] * 0.033
+            if drop["y"] > H + 10:
+                drop["y"] = 44
+                side = random.choice([0, 1])
+                drop["x"] = (random.randrange(20, 100) if side == 0
+                             else random.randrange(W - 100, W - 20))
+            for k in range(drop["tail"]):
+                yy = int(drop["y"]) - k * 3
+                if 44 <= yy < H:
+                    a = int(255 * drop["bright"] * (1 - k / drop["tail"]))
+                    pygame.draw.line(surf, drop["hue"] + (a,),
+                                     (drop["x"], yy), (drop["x"], yy + 1), 1)
 
     def _apply_glitch(self, surf):
         if random.random() < 0.3:
@@ -542,7 +582,7 @@ class NexusRenderer:
         h = max(2, int(maxy - miny) + pad * 2)
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
         local = [(px - minx + pad, py - miny + pad) for px, py in pts]
-        alpha = 110 if active else 55
+        alpha = 160 if active else 70
         col = color if color is not None else (255, 255, 255)
         lw = width if width is not None else 1
         if style == "dashed":
@@ -805,7 +845,7 @@ class NexusRenderer:
         raw_code = NEXUS_NODE_CODE.get(idx, "RAIL-?α")
         code = self._nexus_format_code(raw_code)
         bkey = NEXUS_NODE_BADGE.get(idx)
-        bimg = self.app.badge_img(bkey, 160) if bkey else None
+        bimg = getattr(self.app, "badge_img", lambda k, s: None)(bkey, 160) if bkey else None
         if bimg is not None:
             bw2, bh2 = bimg.get_size()
             maxw = bw - 20

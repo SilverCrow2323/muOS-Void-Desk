@@ -55,3 +55,5 @@ data/logger_config.json
 .DS_Store
 Thumbs.db
 .venv_desktop/
+data/.love_request.json
+data/.love_response.json

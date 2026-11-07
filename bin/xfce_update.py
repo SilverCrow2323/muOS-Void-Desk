@@ -30,7 +30,7 @@ def main():
     log.write(("\n==== %s : upgrade ====\n" % time.ctime()).encode())
     try:
         if not os.path.exists(os.path.join(DATA, ".xfce_ready")):
-            scr.msg = "FATAL: desktop XFCE non installato"
+            scr.msg = "FATAL: desktop XFCE not installed"
             scr.draw()
             time.sleep(4)
             return 1
@@ -38,7 +38,7 @@ def main():
                             "https://ports.ubuntu.com"],
                            stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL) != 0:
-            scr.msg = ("FATAL: rete assente" if lang == "it"
+            scr.msg = ("FATAL: rete missing" if lang == "it"
                        else "FATAL: no network")
             scr.draw()
             time.sleep(5)

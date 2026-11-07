@@ -146,9 +146,9 @@ class Screen(object):
         avail = fb.rows - r - 1
         for ln in self.lines[-avail:]:
             low = ln.lower()
-            if "fatal" in low or "fail" in low or "errore" in low:
+            if "fatal" in low or "fail" in low or "error" in low:
                 col = (255, 90, 90)
-            elif "ok" in low or "completato" in low or "fatto" in low:
+            elif "ok" in low or "completed" in low or "fatto" in low:
                 col = (120, 230, 120)
             else:
                 col = (225, 225, 225)

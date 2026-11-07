@@ -186,7 +186,8 @@ os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import pygame          # noqa: E402
+import pygame
+from desk import love_bridge  # LÖVE bridge (Andromeda)          # noqa: E402
 import evinput         # noqa: E402
 import fbdisplay       # noqa: E402
 import icons           # noqa: E402
@@ -449,7 +450,7 @@ NEXUS_SQUASH = 0.46
 # VOIDDESK 9.300 "Net-Sphere" -- planetario navigabile: le orbite
 # (il sole/START SESSION all'origine, non orbita) sono SEMPRE tutte
 # visibili. La zona di selezione resta fissa a sinistra dello
-# schermo: e' tutto il planetario che pan-na e si ridimensiona
+# screen: e' tutto il planetario che pan-na e si ridimensiona
 # (NEXUS_ZOOM, per nodo) per portarci dentro il pianeta scelto.
 # NEXUS_ORBIT_SPEED e' in gradi/secondo: piu' vicino al sole, piu'
 # veloce, come Keplero. Le orbite media/esterna/lontana sono
@@ -569,7 +570,7 @@ CTRL_EXCLUDE_NAMES = ["gpio", "joypad", "power button",
                       "direct-keys", "dierct-keys"]
 CTRL_PRESETS = [
     ("hdr", "NESSUNO", "NONE"),
-    ("custom:none", "Nessuno (personalizzato / disattivo)",
+    ("custom:none", "Nessuno (personalizzato / disactive)",
     "None (custom / inactive)"),
 
     ("hdr", "TASTI CONSOLE", "CONSOLE BUTTONS"),
@@ -592,34 +593,34 @@ CTRL_PRESETS = [
     ("console:btn_menu", "Console: Menu (M)", "Console: Menu (M)"),
 
     ("hdr", "AZIONI CONSOLE", "CONSOLE ACTIONS"),
-    ("console:open_files", "Console: apri File Grid-Diver",
+    ("console:open_files", "Console: open File Grid-Diver",
     "Console: open File Grid-Diver"),
-    ("console:open_shell", "Console: apri Rt:Shell",
+    ("console:open_shell", "Console: open Rt:Shell",
     "Console: open Rt:Shell"),
-    ("console:open_radio", "Console: apri Void Radio",
+    ("console:open_radio", "Console: open Void Radio",
     "Console: open Void Radio"),
-    ("console:open_clock", "Console: apri Orologio",
+    ("console:open_clock", "Console: open Orologio",
     "Console: open Clock"),
-    ("console:open_stats", "Console: apri Device Stats",
+    ("console:open_stats", "Console: open Device Stats",
     "Console: open Device Stats"),
-    ("console:open_notes", "Console: apri Note",
+    ("console:open_notes", "Console: open Note",
     "Console: open Notes"),
-    ("console:open_cal", "Console: apri Calendario",
+    ("console:open_cal", "Console: open Calendario",
     "Console: open Calendar"),
-    ("console:open_weather", "Console: apri Meteo",
+    ("console:open_weather", "Console: open Meteo",
     "Console: open Weather"),
-    ("console:open_rss", "Console: apri RSS", "Console: open RSS"),
-    ("console:open_calc", "Console: apri Calcolatrice",
+    ("console:open_rss", "Console: open RSS", "Console: open RSS"),
+    ("console:open_calc", "Console: open Calcolatrice",
     "Console: open Calculator"),
-    ("console:open_options", "Console: apri Opzioni",
+    ("console:open_options", "Console: open Opzioni",
     "Console: open Options"),
-    ("console:media_panel", "Console: apri pannello media",
+    ("console:media_panel", "Console: open pannello media",
     "Console: open media panel"),
-    ("console:shutdown_menu", "Console: apri menu spegnimento",
+    ("console:shutdown_menu", "Console: open menu spegnimento",
     "Console: open shutdown menu"),
     ("console:screenshot", "Console: scatta screenshot",
     "Console: take screenshot"),
-    ("console:wifi_toggle", "Console: attiva/disattiva WiFi",
+    ("console:wifi_toggle", "Console: active/disactive WiFi",
     "Console: toggle WiFi"),
     ("console:vol_up", "Console: volume su",
     "Console: volume up"),
@@ -654,7 +655,7 @@ BGM_EXTS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma",
 MEDIA_EXTS = BGM_EXTS | {".mkv", ".avi", ".mov", ".m3u", ".m3u8"}
 BGM_SAMPLE_RATE = 44100
 BGM_OGG_QUALITY = "6"
-VERSION = "10.2.1"
+VERSION = "10.5.1"
 VERSION_CODENAME = "Nexus"
 MENU_DEST_COLORS = [
     (60, 200, 130),   # 0 START SESSION -- verde, avvio
@@ -662,7 +663,7 @@ MENU_DEST_COLORS = [
     (100, 205, 210),  # 2 MEDIA VAULT -- ciano broadcast
     (225, 95, 40),    # 3 FORGE -- rosso-arancio, le stesse braci vere
     (150, 165, 190),  # 4 TOOLBOX -- acciaio
-    (55, 190, 220),   # 5 UPLINK -- ciano, rete
+    (55, 190, 220),   # 5 UPLINK -- ciano, network
     (165, 105, 215),  # 6 WORKSHOP -- viola, diagnostica
     (195, 180, 155),  # 7 SETTINGS -- beige caldo, neutro
     (215, 215, 225),  # 8 INFO & ABOUT -- argento
@@ -772,15 +773,15 @@ WMO_CODES = {
     71: ("w_snow", "neve debole", "light snow"),
     73: ("w_snow", "neve", "snow"),
     75: ("w_snow", "neve forte", "heavy snow"),
-    77: ("w_snow", "granelli di neve", "snow grains"),
+    77: ("w_snow", "snow grains", "snow grains"),
     80: ("w_rain", "rovesci", "showers"),
     81: ("w_rain", "rovesci", "showers"),
     82: ("w_rain", "rovesci violenti", "violent showers"),
-    85: ("w_snow", "rovesci di neve", "snow showers"),
-    86: ("w_snow", "rovesci di neve", "snow showers"),
+    85: ("w_snow", "snow showers", "snow showers"),
+    86: ("w_snow", "snow showers", "snow showers"),
     95: ("w_storm", "temporale", "thunderstorm"),
-    96: ("w_storm", "temporale con grandine", "thunderstorm w/hail"),
-    99: ("w_storm", "temporale con grandine", "thunderstorm w/hail"),
+    96: ("w_storm", "thunderstorm with hail", "thunderstorm w/hail"),
+    99: ("w_storm", "thunderstorm with hail", "thunderstorm w/hail"),
 }
 WX_SEGMENTS = ["09", "15", "21"]
 
@@ -925,7 +926,7 @@ CATEGORIES = [
    "usr/bin/xset", "gear"),
   ("D-Bus", "dbus dbus-x11", "comunicazione tra applicazioni",
    "usr/bin/dbus-daemon", "dbus"),
-  ("Font DejaVu", "fonts-dejavu-core", "font di sistema",
+  ("Font DejaVu", "fonts-dejavu-core", "font di system",
    "usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "font"),
   ("Certificati CA", "ca-certificates", "connessioni https",
    "usr/sbin/update-ca-certificates", "cert"),
@@ -939,14 +940,14 @@ CATEGORIES = [
    "panel"),
   ("Scrivania", "xfdesktop4", "sfondo e icone", "usr/bin/xfdesktop",
    "desktop"),
-  ("Impostazioni XFCE", "xfce4-settings", "aspetto, tastiera, mouse",
+  ("Impostazioni XFCE", "xfce4-settings", "aspetto, keyboard, mouse",
    "usr/bin/xfce4-settings-manager", "gear"),
   ("File manager", "thunar", "Thunar", "usr/bin/thunar", "folder"),
   ("Terminale", "xfce4-terminal", "terminale grafico",
    "usr/bin/xfce4-terminal", "terminal"),
   ("Task manager", "xfce4-taskmanager", "processi e memoria",
    "usr/bin/xfce4-taskmanager", "task"),
-  ("Screenshot", "xfce4-screenshooter", "catture schermo",
+  ("Screenshot", "xfce4-screenshooter", "catture screen",
    "usr/bin/xfce4-screenshooter", "camera"),
   ("Blocco note", "mousepad", "editor di testo", "usr/bin/mousepad", "text"),
  ]),
@@ -962,7 +963,7 @@ CATEGORIES = [
   ("QJoyPad", "qjoypad", "gamepad -> mouse e tasti", "usr/bin/qjoypad",
    "gamepad"),
   ("Tastiera matchbox", "matchbox-keyboard",
-   "tastiera virtuale (MENU la apre)", "usr/bin/matchbox-keyboard",
+   "keyboard virtuale (MENU la apre)", "usr/bin/matchbox-keyboard",
    "keyboard"),
   ("xdotool", "xdotool", "automazione finestre", "usr/bin/xdotool", "mouse"),
   ("Zenity", "zenity", "finestre di dialogo", "usr/bin/zenity", "dialog"),
@@ -982,7 +983,7 @@ CATEGORIES = [
   ("Hotspot (hostapd+dnsmasq)", "hostapd dnsmasq",
    "motore per UPLINK > Hotspot", "usr/sbin/hostapd usr/sbin/dnsmasq",
    "uplink"),
-  ("Utility rete", "iproute2 iputils-ping wireless-tools",
+  ("Utility network", "iproute2 iputils-ping wireless-tools",
    "ip, ping, iwconfig", "usr/bin/ping", "net"),
   ("NetworkManager", "network-manager network-manager-gnome",
    "gestione reti (puo' litigare con muOS)", "usr/sbin/NetworkManager",
@@ -1025,7 +1026,7 @@ CATEGORIES = [
    "usr/bin/syncthing", "download"),
   ("Tailscale", "!curl -fsSL https://tailscale.com/install.sh | sh",
    "VPN personale (script ufficiale)", "usr/bin/tailscale", "net"),
-  ("Barrier", "barrier", "mouse e tastiera dal PC via rete",
+  ("Barrier", "barrier", "mouse e keyboard dal PC via network",
    "usr/bin/barrier", "mouse"),
   ("KDE Connect", "kdeconnect", "telefono <-> desktop (PESANTE)",
    "usr/bin/kdeconnect-app", "remote"),
@@ -1043,10 +1044,10 @@ CATEGORIES = [
   ("rsync", "rsync", "sincronizza cartelle", "usr/bin/rsync", "download"),
   ("tmux", "tmux", "sessioni terminale persistenti", "usr/bin/tmux",
    "terminal"),
-  ("Samba client", "cifs-utils smbclient", "cartelle di rete Windows",
+  ("Samba client", "cifs-utils smbclient", "cartelle di network Windows",
    "usr/bin/smbclient", "folder"),
-  ("nmap", "nmap", "scansione rete e porte", "usr/bin/nmap", "net"),
-  ("traceroute", "traceroute", "traccia il percorso di rete",
+  ("nmap", "nmap", "scansione network e porte", "usr/bin/nmap", "net"),
+  ("traceroute", "traceroute", "traccia il percorso di network",
    "usr/bin/traceroute", "net"),
   ("dig / nslookup", "dnsutils", "diagnostica DNS", "usr/bin/dig",
    "globe"),
@@ -1064,20 +1065,20 @@ CATEGORIES = [
    "monitor"),
   ("Midnight Commander", "mc", "file manager da terminale", "usr/bin/mc",
    "folder"),
-  ("Git", "git", "controllo versione", "usr/bin/git", "git"),
+  ("Git", "git", "check versione", "usr/bin/git", "git"),
   ("nano", "nano", "editor da terminale", "usr/bin/nano", "edit"),
   ("wget / curl", "wget curl", "download da terminale", "usr/bin/wget",
    "download"),
-  ("Info sistema", "neofetch lshw", "neofetch, lshw", "usr/bin/neofetch",
+  ("Info system", "neofetch lshw", "neofetch, lshw", "usr/bin/neofetch",
    "info"),
-  ("ncdu", "ncdu", "spazio disco interattivo", "usr/bin/ncdu", "storage"),
+  ("ncdu", "ncdu", "spazio disco interactive", "usr/bin/ncdu", "storage"),
   ("tree", "tree", "elenco cartelle ad albero", "usr/bin/tree", "folder"),
   ("fzf", "fzf", "ricerca fuzzy da terminale", "usr/bin/fzf", "terminal"),
   ("jq", "jq", "elaborazione JSON", "usr/bin/jq", "text"),
   ("iotop", "iotop", "monitor I/O disco", "usr/sbin/iotop", "monitor"),
   ("duf", "duf", "spazio disco, colonne leggibili", "usr/bin/duf",
    "storage"),
-  ("lsof", "lsof", "quali processi tengono aperto cosa", "usr/bin/lsof",
+  ("lsof", "lsof", "quali processi tengono opened cosa", "usr/bin/lsof",
    "terminal"),
   ("psmisc", "psmisc", "killall, fuser, pstree", "usr/bin/killall",
    "task"),
@@ -1091,7 +1092,7 @@ CATEGORIES = [
   ("xterm", "xterm", "terminale X vero -- serve ai CLI tools "
    "interattivi e al Terminal", "usr/bin/xterm", "terminal"),
   ("matchbox-window-manager", "matchbox-window-manager",
-   "porta le finestre a schermo intero -- senza, xterm resta piccolo "
+   "porta le finestre a screen intero -- senza, xterm resta piccolo "
    "in un angolo", "usr/bin/matchbox-window-manager", "window"),
  ]),
  ("DIVERTIMENTO CLI", [
@@ -1236,7 +1237,7 @@ PKG_TR_EN = {
  "Dischi e USB": ("Disks and USB", "automount USB sticks in Thunar"),
  "Hotspot (hostapd+dnsmasq)": ("Hotspot (hostapd+dnsmasq)",
                                "engine for UPLINK > Hotspot"),
- "Utility rete": ("Network utilities", "ip, ping, iwconfig"),
+ "Utility network": ("Network utilities", "ip, ping, iwconfig"),
  "NetworkManager": ("NetworkManager",
                     "network management (may clash with muOS)"),
  "NetSurf": ("NetSurf", "ultra-light browser (~20MB)"),
@@ -1276,7 +1277,7 @@ PKG_TR_EN = {
  "Git": ("Git", "version control"),
  "nano": ("nano", "terminal editor"),
  "wget / curl": ("wget / curl", "terminal downloads"),
- "Info sistema": ("System info", "neofetch, lshw"),
+ "Info system": ("System info", "neofetch, lshw"),
  "ncdu": ("ncdu", "interactive disk usage"),
  "tree": ("tree", "tree-style folder listing"),
  "fzf": ("fzf", "terminal fuzzy finder"),
@@ -1332,7 +1333,7 @@ KNOWN_NAMES = {304: "A", 305: "B", 306: "Y", 307: "X", 308: "L1",
                314: "L2", 315: "R2"}
 EXTRA_NAMES = ["L3", "R3"]
 # tasti volume: sono KEY_ non BTN_, quindi QJoyPad non li vede mai.
-# Restano usabili solo dalle funzioni gestite da VoidDesk (es. tastiera).
+# Restano usabili solo dalle funzioni gestite da VoidDesk (es. keyboard).
 VOLUME_KEYS = {114: "VOL-", 115: "VOL+"}
 
 PAD_PATH, PAD_KEYS = jsmap.find_pad()
@@ -1355,7 +1356,7 @@ EV2NAME = _build_names() or dict(KNOWN_NAMES)
 NAME2EV = {v: k for k, v in EV2NAME.items()}
 
 # Nomi leggibili per i segnali grezzi di un dispositivo HID esterno
-# (tastiera USB, gamepad generico): solo per la resa a schermo nel
+# (keyboard USB, gamepad generico): solo per la resa a screen nel
 # Controller Hub -- il confronto vero, ovunque, resta sempre sul
 # codice numerico grezzo dentro la stringa "hid:N" / "midi:note:...".
 HID_KEY_NAMES = dict(KNOWN_NAMES)
@@ -1383,7 +1384,7 @@ MIDI_NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#",
 def ctrl_sig_label(sig):
     """Etichetta leggibile per un segnale raw ('hid:304' -> 'A', una
     nota MIDI -> 'C#4 ch1'): solo estetica, non tocca mai il confronto
-    vero che resta sulla stringa grezza salvata nel binding."""
+    vero che resta sulla stringa grezza saved nel binding."""
     if not sig:
         return "?"
     if sig.startswith("hid:"):
@@ -1421,7 +1422,7 @@ FUNCS_DEF = [
     ("back", "Indietro", "Back", "globe", "key 166", ["B"]),
     ("enter", "Invio", "Enter", "keyboard", "key 36", ["START"]),
     ("esc", "Esc", "Esc", "keyboard", "key 9", ["SELECT"]),
-    ("kbd", "Mostra/nascondi tastiera", "Toggle keyboard", "keyboard",
+    ("kbd", "Mostra/nascondi keyboard", "Toggle keyboard", "keyboard",
      "__kbd__", ["MENU"]),
 ]
 # risolvo i nomi in codici evdev realmente presenti sul pad
@@ -1455,7 +1456,7 @@ def write_custom_layout(cfg, path):
     learned = cfg.get("qj_map", {})
     for key, evs in m.items():
         f = FUNC_BY_KEY.get(key)
-        if not f or f[4] == "__kbd__":      # la tastiera la gestisce il watcher
+        if not f or f[4] == "__kbd__":      # la keyboard la gestisce il watcher
             continue
         for ev in evs:
             qj = learned.get(str(ev)) or EV2QJ.get(int(ev))
@@ -1486,21 +1487,21 @@ DESC_EN = {
     "avvio della sessione": "session startup",
     "xset, xrefresh, xdpyinfo": "xset, xrefresh, xdpyinfo",
     "comunicazione tra applicazioni": "inter-app communication",
-    "font di sistema": "system fonts",
+    "font di system": "system fonts",
     "connessioni https": "https connections",
     "gestore di sessione": "session manager",
     "cornici e finestre": "window frames",
     "barra applicazioni": "taskbar",
     "sfondo e icone": "wallpaper and icons",
-    "aspetto, tastiera, mouse": "appearance, keyboard, mouse",
+    "aspetto, keyboard, mouse": "appearance, keyboard, mouse",
     "Thunar": "Thunar",
     "terminale grafico": "graphical terminal",
     "processi e memoria": "processes and memory",
-    "catture schermo": "screen captures",
+    "catture screen": "screen captures",
     "editor di testo": "text editor",
     "gamepad -> mouse e tasti": "gamepad -> mouse and keys",
-    "tastiera virtuale a schermo": "on-screen keyboard",
-    "serve all'auto-comparsa tastiera": "needed for keyboard auto-show",
+    "keyboard virtuale a screen": "on-screen keyboard",
+    "serve all'auto-comparsa keyboard": "needed for keyboard auto-show",
     "automazione finestre": "window automation",
     "finestre di dialogo": "dialog windows",
     "amixer, alsamixer, aplay": "amixer, alsamixer, aplay",
@@ -1529,12 +1530,12 @@ DESC_EN = {
     "zip, 7z da terminale": "zip, 7z from the terminal",
     "monitor processi da terminale": "process monitor for the terminal",
     "file manager da terminale": "terminal file manager",
-    "controllo versione": "version control",
+    "check versione": "version control",
     "interprete e pip": "interpreter and pip",
     "editor da terminale": "terminal editor",
     "download da terminale": "downloads from the terminal",
     "neofetch, lshw": "neofetch, lshw",
-    "tastiera virtuale (MENU la apre)": "on-screen keyboard (MENU opens it)",
+    "keyboard virtuale (MENU la apre)": "on-screen keyboard (MENU opens it)",
     "gestione reti (puo' litigare con muOS)":
         "network manager (may fight with muOS)",
     "entra nel desktop dal PC (porta 22)":
@@ -1546,44 +1547,44 @@ DESC_EN = {
     "gcc, make (PESANTE)": "gcc, make (HEAVY)",
     "sincronizza cartelle": "sync folders",
     "sessioni terminale persistenti": "persistent terminal sessions",
-    "cartelle di rete Windows": "Windows network shares",
+    "cartelle di network Windows": "Windows network shares",
     "sincronizza file (muOS ne ha uno suo)":
         "file sync (muOS has its own instance)",
     "VPN personale (script ufficiale)": "personal VPN (official script)",
-    "mouse e tastiera dal PC via rete": "mouse and keyboard from your PC",
+    "mouse e keyboard dal PC via network": "mouse and keyboard from your PC",
     "telefono <-> desktop (PESANTE)": "phone <-> desktop (HEAVY)",
 }
 VAL_EN = {
     "sinistro": "left stick", "classico": "right stick", "custom": "custom",
     "destro": "right", "ambra": "amber", "cremisi": "crimson",
     "ciano": "cyan", "verde": "green", "acciaio": "steel",
-    "installato": "installed", "non installato": "not installed",
-    "assente": "missing", "attivo": "on", "spento": "off",
-    "non connesso": "not connected", "n/d": "n/a",
-    "tutte presenti": "all present", "non raggiungibile": "unreachable",
-    "curl assente": "curl missing",
+    "installed": "installed", "non installed": "not installed",
+    "missing": "missing", "on": "on", "off": "off",
+    "not connected": "not connected", "n/d": "n/a",
+    "tutte presenti": "all present", "unreachable": "unreachable",
+    "curl missing": "curl missing",
     "piccolo": "small", "normale": "normal", "grande": "large",
     "molto grande": "extra large",
 }
 STAT_EN = {
-    "SISTEMA": "SYSTEM", "MEMORIA": "MEMORY", "ARCHIVIAZIONE": "STORAGE",
-    "RETE": "NETWORK", "AUDIO": "AUDIO", "DESKTOP XFCE": "XFCE DESKTOP",
+    "SYSTEM": "SYSTEM", "MEMORY": "MEMORY", "STORAGE": "STORAGE",
+    "NETWORK": "NETWORK", "AUDIO": "AUDIO", "DESKTOP XFCE": "XFCE DESKTOP",
     "RUNTIME": "RUNTIME", "KERNEL": "KERNEL", "ACCESO DA": "UPTIME",
     "TEMPERATURA": "TEMPERATURE", "RAM": "RAM", "SD1 (MMC)": "SD1 (MMC)",
     "SD2 (SDCARD)": "SD2 (SDCARD)", "IMMAGINE XFCE": "XFCE IMAGE",
     "WIFI": "WI-FI", "SEGNALE": "SIGNAL", "INDIRIZZO IP": "IP ADDRESS",
     "BLUETOOTH": "BLUETOOTH", "INTERNET": "INTERNET", "VOLUME": "VOLUME",
-    "STATO": "STATUS", "ULTIMA SESSIONE": "LAST SESSION",
-    "CONTROLLER": "CONTROLLER", "INTERFACCIA": "INTERFACE",
+    "STATUS": "STATUS", "ULTIMA SESSIONE": "LAST SESSION",
+    "CONTROLLER": "CONTROLLER", "INTERFACE": "INTERFACE",
     "connesso": "connected", "PYTHON": "PYTHON", "PYGAME": "PYGAME",
-    "DIPENDENZE": "DEPENDENCIES", "VOID SUITE": "VOID SUITE",
-    "PIATTAFORMA": "PLATFORM", "COME FUNZIONA": "HOW IT WORKS",
-    "CREDITI": "CREDITS", "TARGET": "TARGET", "OS": "OS",
+    "DEPENDENCIES": "DEPENDENCIES", "VOID SUITE": "VOID SUITE",
+    "PLATFORM": "PLATFORM", "HOW IT WORKS": "HOW IT WORKS",
+    "CREDITS": "CREDITS", "TARGET": "TARGET", "OS": "OS",
     "DESKTOP": "DESKTOP", "UI": "UI",
 }
 
 COMP_MENU = [
-    ("install", "pkg", "Installa / Reinstalla software",
+    ("install", "pkg", "Install / Reinstalla software",
      "Install / reinstall software",
      "catalogo con stato di ogni componente",
      "catalogue with per-component status"),
@@ -1593,42 +1594,42 @@ COMP_MENU = [
     ("autostart", "start", "Avvio al boot", "Startup apps",
      "quali programmi partono con XFCE",
      "which programs start with XFCE"),
-    ("update", "download", "Aggiorna sistema", "Update system",
+    ("update", "download", "Update system", "Update system",
      "apt update + upgrade nel chroot",
      "apt update + upgrade in the chroot"),
     ("clean", "task", "Pulisci cache apt", "Clean apt cache",
      "recupera spazio nell'immagine", "reclaim space in the image"),
     ("shell", "terminal", "Terminal shell", "Terminal shell",
-     "terminale con tastiera a schermo",
+     "terminale con keyboard a screen",
      "terminal with on-screen keyboard"),
 ]
 
 TR = {
  "it": {
   "xfce_run": "▶  DESKTOP XFCE", "xfce_inst": "▶  INSTALLA DESKTOP XFCE",
-  "xfce_run_s": "avvia il desktop a schermo intero",
+  "xfce_run_s": "start il desktop a screen intero",
   "xfce_inst_s": "~400MB via WiFi, 10-20 minuti",
   "comp": "◈  VOID INSTALLER",
   "comp_s": "driver, desktop, browser, tool: stato e installazione",
   "info": "▤  VOID STATS",
-  "info_s": "sistema, memoria, rete, audio, desktop",
+  "info_s": "system, memoria, network, audio, desktop",
   "opts": "⚒  OPZIONI", "opts_s": "tema, lingua, controller, avvio",
   "logs": "≡  LOGS & ABOUT", "logs_s": "diari di bordo e info sul progetto",
   "quit": "◉  ESCI", "quit_s": "torna a muOS",
-  "open": "apri", "back": "indietro", "exit": "esci", "install": "installa",
-  "change": "cambia", "row": "riga", "page": "pagina", "sel": "seleziona",
-  "select": "seleziona", "details": "dettagli", "confirm": "conferma",
+  "open": "open", "back": "indietro", "exit": "esci", "install": "install",
+  "change": "cambia", "row": "riga", "page": "pagina", "sel": "select",
+  "select": "select", "details": "dettagli", "confirm": "confirm",
   "view": "stile",
-  "all": "tutti/nessuno", "inst_sel": "installa selezione",
+  "all": "tutti/nessuno", "inst_sel": "install selezione",
   "title_comp": "VOID INSTALLER", "title_info": "INFO",
   "title_logs": "LOGS & ABOUT", "title_opts": "OPZIONI",
-  "checking": "controllo in corso...",
-  "need_xfce": "Prima installa il desktop XFCE (voce in alto nel menu).",
+  "checking": "checking...",
+  "need_xfce": "Prima install il desktop XFCE (voce in alto nel menu).",
   "opt_theme": "Tema colore", "opt_home_style": "Stile menu principale",
   "opt_font_scale": "Dimensione testo",
   "opt_vfx_bg": "Sfondo animato", "opt_vfx_trans": "Transizioni",
-  "opt_vfx_fx": "Effetti schermo",
-  "opt_lang": "Lingua",
+  "opt_vfx_fx": "Effetti screen",
+  "opt_lang": "Language",
   "opt_ctrl": "Profilo controller", "opt_batt": "Batteria nell'header",
   "opt_st_clock": "Orologio nell'header",
   "opt_st_batt": "Icona batteria", "opt_st_vol": "Icona volume",
@@ -1637,27 +1638,27 @@ TR = {
   "opt_st_hotspot": "Icona hotspot",
   "opt_intro": "Sigla d'avvio",
   "sess": "START SESSION",
-  "sess_s": "scegli e avvia l'ambiente desktop",
+  "sess_s": "scegli e start l'ambiente desktop",
   "e_active": "ATTIVO", "e_inst": "Installato",
-  "e_missing": "Non installato",
+  "e_missing": "Non installed",
   "e_base": "richiede la base (~400MB)",
-  "e_launch": "A: avvia", "sess_a": "avvia / installa",
+  "e_launch": "A: start", "sess_a": "start / install",
   "ed_boot": "Sigla d'avvio (bootanim)",
   "ed_repair": "Ripara / reinstalla pacchetti",
   "ed_log": "Vedi log di sessione",
   "ed_remove": "Rimuovi ambiente",
-  "ed_update": "Controlla e aggiorna sistema",
-  "ed_removed": "ambiente rimosso", "ed_confirm_rm": "Rimuovere questo ambiente?",
+  "ed_update": "Controlla e update system",
+  "ed_removed": "ambiente removed", "ed_confirm_rm": "Rimuovere questo ambiente?",
   "img_never": "mai controllato", "img_updated": "controllato il",
-  "img_stale": "da un po': valuta un controllo",
-  "mapps": "MUOS APPS", "mapps_s": "gestore completo: avvia, governor, glyph, rimuovi",
+  "img_stale": "da un po': valuta un check",
+  "mapps": "MUOS APPS", "mapps_s": "gestore completo: start, governor, glyph, rimuovi",
   "media": "MEDIA VAULT", "media_s": "radio, IPTV, libreria e normalizzazione BGM",
   "mapps_t": "MUOS APPS", "mapps_none": "nessuna app in MUOS/application",
   "mapps_scan": "scansione e sistemazione glyph...",
-  "mapps_go": "avvia", "mapps_r1": "glyph+scan",
+  "mapps_go": "start", "mapps_r1": "glyph+scan",
   "h_forge": "THE FORGE", "h_forge_s": "installer, avvio al boot, update",
   "h_work": "WORKSHOP", "h_work_s": "stats, diagnosi, log, memorie, boost",
-  "h_up": "UPLINK", "h_up_s": "rete, PC link, Tailnet e controller esterni",
+  "h_up": "UPLINK", "h_up_s": "network, PC link, Tailnet e controller esterni",
   "h_media": "MEDIA VAULT",
   "m_radio": "Void Radio", "m_radio_s": "stazioni live e preferiti",
   "m_iptv": "VoidCast IPTV", "m_iptv_s": "M3U, EPG, guida TV e PVR",
@@ -1667,17 +1668,17 @@ TR = {
   "h_info": "INFO & ABOUT", "h_info_s": "progetto, manuale, guida rapida",
   "h_set": "SETTINGS", "h_set_s": "aspetto, audio, lingua dell'app",
   "h_exit": "END NODE", "h_exit_s": "torna a muOS",
-  "f_inst": "Void Installer", "f_inst_s": "installa e rimuovi (L1: tab)",
+  "f_inst": "Void Installer", "f_inst_s": "install e rimuovi (L1: tab)",
   "f_auto": "Avvio al boot", "f_auto_s": "app che partono col desktop",
   "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
-  "f_vdupd": "Void-Desk Update", "f_vdupd_s": "aggiorna l'app da GitHub",
+  "f_vdupd": "Void-Desk Update", "f_vdupd_s": "update l'app da GitHub",
   "f_cli": "CLI Shooter", "f_cli_s": "roba simpatica da terminale",
-  "w_stats": "Device Stats", "w_stats_s": "il quadro completo del sistema",
+  "w_stats": "Device Stats", "w_stats_s": "il quadro completo del system",
   "w_diag": "Void Diag", "w_diag_s": "salute di immagine e sessioni",
   "w_sto": "Memorie", "w_sto_s": "partizioni, spazio, cosa occupa",
   "w_boost": "Chou Henka", "w_boost_s": "swap e governor, separati",
   "w_chd": "Disc Crusher", "w_chd_s": "converti immagini disco in CHD",
-  "w_dop": "Doppel-Defender", "w_dop_s": "trova ed elimina ROM doppie",
+  "w_dop": "Doppel-Defender", "w_dop_s": "trova ed delete ROM doppie",
   "w_clean": "Pulisci cache apt", "w_clean_s": "recupera spazio",
   "w_logs": "Registro log", "w_logs_s": "tutti i diari, per area",
   "t_clock": "Clock", "t_clock_s": "digitale o analogico, con sveglie",
@@ -1685,8 +1686,8 @@ TR = {
   "u_cthub": "Controller Hub", "u_cthub_s": "dispositivi USB/MIDI, profili e mappature",
   "h_cthub": "CONTROLLER HUB",
   "u_devs": "Controller esterni", "u_devs_s": "Korg, tastiere USB, comandi personalizzati",
-  "u_kmb": "Layout tastiera schermo", "u_kmb_s": "matchbox-keyboard",
-  "u_kx": "Layout tastiera fisica", "u_kx_s": "se ne colleghi una USB",
+  "u_kmb": "Layout keyboard screen", "u_kmb_s": "matchbox-keyboard",
+  "u_kx": "Layout keyboard fisica", "u_kx_s": "se ne colleghi una USB",
   "u_ctrl": "Profilo controller", "u_ctrl_s": "stick e mappatura mouse",
   "u_map": "Mappatura tasti", "u_map_s": "ridefinisci i pulsanti",
   "u_wifi": "WiFi", "u_wifi_s": "gestore completo: scan e connetti",
@@ -1694,14 +1695,14 @@ TR = {
   "u_pcup": "PC Uplink", "u_pcup_s": "stats e notifiche col tuo PC",
   "u_base": "BaseStation Web", "u_base_s": "server web, trasferimento file e companion PC",
   "u_netdiag": "Network Probe", "u_netdiag_s": "internet, indirizzo e diagnostica collegamento",
-  "u_ts": "Tailnet Console", "u_ts_s": "rete privata, peer, file e QR login",
+  "u_ts": "Tailnet Console", "u_ts_s": "network privata, peer, file e QR login",
   "u_hot": "Hotspot", "u_hot_s": "rileva e usa lo script muOS",
   "t_sh": "Rt:Shell", "t_sh_s": "terminale veloce, host diretto",
   "t_calc": "Calcolatrice", "t_calc_s": "scientifica, nativa Void",
   "t_fm": "File Grid-Diver", "t_fm_s": "esplora, tuffati nella griglia",
   "t_mc": "Midnight Commander", "t_mc_s": "file manager da terminale",
   "t_ftp": "FTP", "t_ftp_s": "client FTP nativo, con profili",
-  "t_ed": "Editor di testo", "t_ed_s": "VOID EDIT: apri e modifica qui",
+  "t_ed": "Editor di testo", "t_ed_s": "VOID EDIT: open e modifica qui",
   "t_sync": "Syncthing", "t_sync_s": "pannello nativo via REST",
   "t_cal": "Calendario", "t_cal_s": "eventi: data, ora, priorita'",
   "t_note": "Note", "t_note_s": "appunti rapidi: scrivi e via",
@@ -1711,23 +1712,23 @@ TR = {
   "t_bgm": "BGM Normalizer", "t_bgm_s": "normalizza il volume delle musiche",
   "wx_add": "+ aggiungi città", "wx_none": "nessuna città monitorata",
   "wx_searching": "cerco la città...", "wx_updating": "aggiorno il meteo...",
-  "wx_notfound": "nessuna città trovata", "wx_pick": "quale intendi?",
-  "wx_err": "meteo non disponibile",
+  "wx_notfound": "nessuna città found", "wx_pick": "quale intendi?",
+  "wx_err": "meteo not available",
   "deps_title": "DIPENDENZE MANCANTI",
   "deps_body": "non puo' essere avviata su questo dispositivo: mancano le seguenti dipendenze",
   "deps_ask": "Scaricare e installare gli elementi mancanti?",
   "feat_hotspot": "Hotspot",
-  "rss_upd": "aggiorno i feed...", "rss_empty": "nessun feed attivo",
+  "rss_upd": "aggiorno i feed...", "rss_empty": "nessun feed on",
   "rss_none": "nessuna notizia: R1 per aggiornare",
-  "rss_sel_hint": "X: attiva/disattiva  ·  aggiungi i tuoi in",
-  "rss_err": "errore", "rss_eng": "INGLESE", "rss_ita": "ITALIANO",
+  "rss_sel_hint": "X: active/disactive  ·  aggiungi i tuoi in",
+  "rss_err": "error", "rss_eng": "INGLESE", "rss_ita": "ITALIANO",
   "rss_gen": "GENERALE (personalizzati)",
   "cat_news": "news", "cat_tech": "tech", "cat_linux": "linux",
   "cat_gaming": "gaming", "cat_retro": "retrogaming",
   "cat_anime": "anime", "cat_general": "generale",
-  "t_mon": "Void Monitor", "t_mon_s": "cpu, ram, temp, rete: live",
-  "t_py": "Python", "t_py_s": "console interattiva (host muOS)",
-  "w_bak": "Backup immagine", "w_bak_s": "salva e ripristina xfce.img",
+  "t_mon": "Void Monitor", "t_mon_s": "cpu, ram, temp, network: live",
+  "t_py": "Python", "t_py_s": "console interactive (host muOS)",
+  "w_bak": "Backup immagine", "w_bak_s": "save e ripristina xfce.img",
   "wm_scan": "cerco le reti..." , "wm_pass": "PASSWORD WIFI",
   "bt_scan": "cerco dispositivi (8s)...",
   "t_tsg": "Tailscale", "t_tsg_s": "pannello nativo // cuore Rt",
@@ -1737,19 +1738,19 @@ TR = {
   "i_guide": "Guida rapida", "i_guide_s": "i comandi essenziali",
   "i_manifesto": "Manifesto", "i_manifesto_s": "un segnale dal VOID",
   "i_update": "Void Desk Update", "i_update_s": "versione, novità, release",
-  "installed": "installato", "notinst": "non installato - A: installa",
+  "installed": "installed", "notinst": "non installed - A: install",
   "opens_desk": "si apre nel desktop: la trovi nel menu applicazioni",
   "tab_inst": "TAB: INSTALLA", "tab_rm": "TAB: RIMUOVI",
   "gov": "Governor", "glyphp": "Change Glyph", "arch": "Archivia (.muxapp)",
   "removeapp": "Rimuovi app", "sysapp": "APP DI SISTEMA",
   "k_ab_yn": "A: si'   B: no",
   "confirm_rm": "Confermi la rimozione? A: si'   B: no",
-  "arch_ok": "archivio creato in", "size": "dimensione",
+  "arch_ok": "archivio created in", "size": "dimensione",
   "clock_set": "A: applica ora e fuso", "applied": "applicato",
   "bs_swap": "Boost SWAP (zram/file)", "bs_cpu": "Boost CPU (governor)",
   "opt_fx": "Interferenze video",
   "opt_sfx": "Suoni interfaccia",
-  "opt_anim": "Transizioni a finestra",
+  "opt_anim": "Transizioni a window",
   "opt_bgm": "Musica delle sigle",
   "opt_boost": "Void Boost (swap, cpu)",
   "yes": "si'", "no": "no",
@@ -1766,18 +1767,18 @@ TR = {
   "free": "liberi: %s",
   "n_sel": "%d selezionati", "mounting": "leggo lo stato dei componenti...",
   "about": "INFO SUL PROGETTO", "about_s": "suite Void, piattaforma, crediti",
-  "title_compmenu": "VOID INSTALLER", "refresh": "aggiorna",
+  "title_compmenu": "VOID INSTALLER", "refresh": "update",
   "title_remove": "DISINSTALLA SOFTWARE", "title_auto": "AVVIO AL BOOT",
   "remove_btn": "disinstalla", "auto_on": "all'avvio", "auto_off": "no",
-  "not_inst": "non installato", "sel_none": "nessuna voce selezionata",
+  "not_inst": "non installed", "sel_none": "nessuna voce selezionata",
   "no_base": "I componenti base del desktop non si possono rimuovere:",
   "confirm_rm": "Disinstallo %d componenti?", "yes_a": "A = si'",
-  "no_b": "B = annulla", "shell_hint": "SELECT esce",
+  "no_b": "B = cancel", "shell_hint": "SELECT esce",
   "opt_map": "Mappatura tasti", "title_map": "MAPPATURA TASTI",
   "map_stick": "Mouse sullo stick", "press": "PREMI IL TASTO DA ASSEGNARE A:",
   "press_s": "attendi 5 secondi per annullare",
   "used_by": "Il tasto %s e' gia' usato da: %s",
-  "swap_q": "A = scambia le due funzioni     B = annulla",
+  "swap_q": "A = scambia le due funzioni     B = cancel",
   "assign": "assegna", "reset": "ripristina", "reset_all": "tutti default",
   "none": "(nessuno)",
  },
@@ -2001,7 +2002,7 @@ def chroot_path_exists(root, relpath, depth=0):
     /usr/bin/<nome> e' solo un link assoluto -- senza questa
     risoluzione, dall'host quel link punterebbe a un percorso che su
     muOS stesso non esiste mai, e il pacchetto sembrerebbe sempre
-    mancante anche quando e' installato per davvero."""
+    mancante anche quando e' installed per davvero."""
     if depth > 8:
         return False
     relpath = relpath.lstrip("/")
@@ -2057,9 +2058,9 @@ def net_test():
                               "https://ports.ubuntu.com"],
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL)
-        return "OK" if rc == 0 else "non raggiungibile"
+        return "OK" if rc == 0 else "unreachable"
     except OSError:
-        return "curl assente"
+        return "curl missing"
 
 
 def load_cfg():
@@ -2172,9 +2173,9 @@ class App(object):
         pygame.font.init()
         self.surface = pygame.display.set_mode((W, H))
         if not fbdisplay.attach(self.surface):
-            print("fbdisplay non disponibile")
+            print("fbdisplay not available")
         self.cfg = load_cfg()
-        self.lang = self.cfg.get("lang", "it")
+        self.lang = self.cfg.get("lang", "en")
         self.accent = ACCENTS.get(self.cfg.get("theme", "ambra"),
                                   ACCENTS["ambra"])
         self.accent2 = theme_secondary(self.accent)
@@ -2350,7 +2351,7 @@ class App(object):
         self.capture_t = 0.0
         self.pending = None
         self.rows = []          # righe del gestore componenti
-        self.pc_client = None   # PcClient, creato al primo ingresso
+        self.pc_client = None   # PcClient, created al primo ingresso
         self.pcup_notify_buf = ""
         self.pc_servers = self.cfg.get("pc_servers_manual", [])
         for s in self.pc_servers:
@@ -2519,18 +2520,18 @@ class App(object):
                 self.play_boot_sequence()
             except Exception as e:
                 sys.stderr.write(
-                    "sequenza boot update non riuscita: %s\n" % e)
+                    "boot update sequence failed: %s\n" % e)
             try:
                 self.play_intro()
             except Exception as e:
                 import traceback
-                sys.stderr.write("intro non riuscita: %s\n" % e)
+                sys.stderr.write("intro failed: %s\n" % e)
                 traceback.print_exc(file=sys.stderr)
         # migrazione v6: boost separato in swap+cpu, animazioni/bgm on
         if self.cfg.get("boost") is False:
             self.cfg.setdefault("boost_swap", False)
             self.cfg.setdefault("boost_cpu", False)
-        # avviso il loader di consegna (vd_loader) che il menu e' a schermo
+        # avviso il loader di consegna (vd_loader) che il menu e' a screen
         try:
             open("/tmp/.vd_menu_up", "w").close()
         except OSError:
@@ -2920,7 +2921,7 @@ class App(object):
 
 # --- [H4] Home Scroll & Selection Visibility // HUB: NEXUS ---
     def push(self, state, color=None, shape="rect"):
-        """Apre uno stato come una finestra di un OS cyberpunk: blip,
+        """Apre uno stato come una window di un OS cyberpunk: blip,
         cattura del frame corrente, esplosione dal rettangolo (o cerchio,
         per i nodi orbitali) selezionato."""
         self.play("open")
@@ -3151,7 +3152,7 @@ class App(object):
                     self.diag_scan_results = [("sec", "gear",
                                               "VOID DIAG")]
                     self.push("diagscan")
-                self.confirm = (("Device pronto al setaccio.\n"
+                self.confirm = (("Device ready al setaccio.\n"
                                 "Procedere?" if self.lang == "it"
                                 else "Device ready for the sieve.\n"
                                 "Proceed?"), go, "VOID DIAG", "gear",
@@ -3177,7 +3178,7 @@ class App(object):
                 if not self.status.get("mame-tools (chdman)"):
                     self.info_lines = [
                         ("sec", "disk", "DISC CRUSHER"),
-                        ("kv", "", "chdman non è installato" if
+                        ("kv", "", "chdman non è installed" if
                          self.lang == "it" else
                          "chdman is not installed", NO_R),
                         ("kv", "", "Void Installer > STRUMENTI/CLI > "
@@ -3229,20 +3230,20 @@ class App(object):
                 try:
                     self.play_ts_intro()
                 except Exception as e:
-                    sys.stderr.write("bootanim tailnet non riuscita: %s\n" % e)
+                    sys.stderr.write("bootanim tailnet failed: %s\n" % e)
                 self.ts_open()
             elif key == "netdiag":
                 st = self.status_snapshot()
-                ip = self.own_ip() or "non disponibile"
+                ip = self.own_ip() or "not available"
                 internet = self.run_busy(self.t("checking"), net_test)
-                base = "attivo" if self.bstation_srv is not None else "fermo"
+                base = "on" if self.bstation_srv is not None else "fermo"
                 self.info_title = "NETWORK PROBE"
                 self.info_lines = self.stub_lines("NETWORK PROBE", [
-                    "Wi-Fi: " + ("connesso" if st.get("conn") else "non connesso"),
+                    "Wi-Fi: " + ("connesso" if st.get("conn") else "not connected"),
                     "IP locale: " + ip,
                     "Internet: " + internet,
                     "BaseStation: " + base,
-                    "Tailnet: apri Tailnet Console per peer e netcheck."])
+                    "Tailnet: open Tailnet Console per peer e netcheck."])
                 self.scroll = 0
                 self.push("info")
         elif hub == "mediahub":
@@ -3261,8 +3262,8 @@ class App(object):
                 self.info_title = "VOIDCAST IPTV"
                 self.info_lines = self.stub_lines(
                     "VOIDCAST IPTV", [
-                        "Installa VoidCast.zip con Archive Manager, poi "
-                        "torna qui: Media Vault lo avviera' direttamente.",
+                        "Install VoidCast.zip with Archive Manager, then "
+                        "come back: Media Vault will launch it directly.",
                         "M3U · EPG · guida TV · PVR recorder."])
                 self.scroll = 0
                 self.push("info")
@@ -3297,7 +3298,7 @@ class App(object):
                     self.play_clock_gaze(entering=True)
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim clock non riuscita: %s\n" % e)
+                        "bootanim clock failed: %s\n" % e)
                 self.push("clock")
             elif key == "calc":
                 self.calc_expr = ""
@@ -3306,7 +3307,7 @@ class App(object):
                     self.play_calc_lid(opening=True)
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim calc non riuscita: %s\n" % e)
+                        "bootanim calc failed: %s\n" % e)
                 self.push("calc")
             elif key == "cal":
                 self.evs = self.cal_load()
@@ -3324,7 +3325,7 @@ class App(object):
                     self.play_rss_intro()
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim rss non riuscita: %s\n" % e)
+                        "bootanim rss failed: %s\n" % e)
                 self.rss_sel = 0
                 self.push("rss")
                 if not self.rss_items and self.rss_enabled_feeds():
@@ -3334,7 +3335,7 @@ class App(object):
                     self.play_weather_intro()
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim meteo non riuscita: %s\n" % e)
+                        "bootanim meteo failed: %s\n" % e)
                 self.wx_sel = 0
                 self.push("weather")
                 cities = self.cfg.get("weather_cities") or []
@@ -3350,7 +3351,7 @@ class App(object):
                     self.play_python_intro()
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim python non riuscita: %s\n" % e)
+                        "bootanim python failed: %s\n" % e)
 
                 def run_and_open(p):
                     self.py_runfile(p)
@@ -3362,14 +3363,14 @@ class App(object):
                     self.play_files_intro()
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim files non riuscita: %s\n" % e)
+                        "bootanim files failed: %s\n" % e)
                 self.fm_open()
             elif key == "ftp":
                 try:
                     self.play_ftp_intro()
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim ftp non riuscita: %s\n" % e)
+                        "bootanim ftp failed: %s\n" % e)
                 self.ftp_prof_sel = 0
                 self.push("ftpprof")
             elif key == "editor":
@@ -3377,7 +3378,7 @@ class App(object):
                     self.play_editor_intro()
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim editor non riuscita: %s\n" % e)
+                        "bootanim editor failed: %s\n" % e)
                 self.fm_open(start_path=TEXTS_DIR,
                             ext_filter=TEXT_EXTS)
             elif key == "sync":
@@ -3385,7 +3386,7 @@ class App(object):
                     self.play_sync_intro()
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim sync non riuscita: %s\n" % e)
+                        "bootanim sync failed: %s\n" % e)
                 self.sync_open()
             elif key in TOOL_PKGS:
                 self.tool_open(key)
@@ -3394,7 +3395,7 @@ class App(object):
                     self.play_ts_intro()
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim tailscale non riuscita: %s\n" % e)
+                        "bootanim tailscale failed: %s\n" % e)
                 self.ts_open()
         elif hub == "infohub":
             if key == "about":
@@ -3490,7 +3491,7 @@ class App(object):
             self.ftpc = None
         if not self.ftpc:
             self.info_lines = self.stub_lines(
-                "VOID FTP", [("connessione fallita a %s" if it else
+                "VOID FTP", [("connessione failed a %s" if it else
                               "connection failed to %s") % prof["host"]])
             self.scroll = 0
             self.info_title = "VOID FTP"
@@ -3565,7 +3566,7 @@ class App(object):
         self.info_lines = self.stub_lines(
             "VOID FTP",
             [((("%d file in " % len(names)) + d) if d else
-              ("scaricamento fallito" if it else "download failed"))])
+              ("scaricamento failed" if it else "download failed"))])
         self.scroll = 0
         self.info_title = "VOID FTP"
         self.push("info")
@@ -3705,7 +3706,7 @@ class App(object):
             fm_blue = (70, 140, 220)
             cx, cy = W // 2, H // 2 - 30
             t0 = time.time()
-            # ATTO 1: la cartella si apre (il lembo superiore ruota
+            # ATTO 1: la folder si apre (il lembo superiore ruota
             # verso l'alto)
             for i in range(16):
                 k = i / 15.0
@@ -3787,7 +3788,7 @@ class App(object):
         try:
             self.play_chd_intro()
         except Exception as e:
-            sys.stderr.write("bootanim chd non riuscita: %s\n" % e)
+            sys.stderr.write("bootanim chd failed: %s\n" % e)
         self.chd_sd_list = self.doppel_sd_list()
         self.chd_sd_idx = 0
         self.chd_expanded = set()
@@ -3854,7 +3855,7 @@ class App(object):
                              stderr=subprocess.DEVNULL)
         except OSError as e:
             with self.chd_lock:
-                self.chd_state["log"].append("errore avvio: %s" % e)
+                self.chd_state["log"].append("error avvio: %s" % e)
                 self.chd_state["done"] = True
                 self.chd_state["rc"] = -1
             return -1
@@ -3894,7 +3895,7 @@ class App(object):
         return rc
 
     def chd_start(self, src, out, verify=True):
-        """Avvia la conversione CHD in un thread separato: legge il
+        """Start la conversione CHD in un thread separato: legge il
         diario dello script mano a mano che cresce, applicando la
         stessa regex del tool PC originale per estrarre la percentuale.
         Non blocca mai la UI."""
@@ -4270,7 +4271,7 @@ class App(object):
         elif divanim == "slow":
             sep = sepchar if int(t_now) % 2 == 0 else " "
         elif divanim == "rintromped":
-            # lampeggio irregolare a tema VOID, non un acceso/spento
+            # lampeggio irregolare a tema VOID, non un acceso/off
             # regolare -- due lampi brevi poi una pausa più lunga
             phase = (t_now * 2.6) % 1.0
             sep = sepchar if (phase < 0.10 or 0.22 < phase < 0.30) \
@@ -4690,7 +4691,7 @@ class App(object):
                 cwd=os.path.expanduser("~"))
         except OSError as e:
             self.info_lines = self.stub_lines(
-                "RT:SHELL", ["avvio fallito: %s" % e])
+                "RT:SHELL", ["avvio failed: %s" % e])
             self.scroll = 0
             self.info_title = "RT:SHELL"
             self.push("info")
@@ -4699,7 +4700,7 @@ class App(object):
         try:
             self.play_rtsh_intro()
         except Exception as e:
-            sys.stderr.write("bootanim rtsh non riuscita: %s\n" % e)
+            sys.stderr.write("bootanim rtsh failed: %s\n" % e)
         self.rtsh_line = ""
         self.rtsh_cursor = 0
         self.rtsh_hist_idx = None
@@ -4937,7 +4938,7 @@ class App(object):
             pygame.display.flip = real_flip
 
     def play_ts_intro(self):
-        """Piu' nodi connessi tra loro in rete mesh (motivo generico
+        """Piu' nodi connessi tra loro in network mesh (motivo generico
         del concetto di 'mesh network', non il logo vero). Rosso
         caldo, confermato da due fonti indipendenti come tinta
         associata a Tailscale."""
@@ -5068,7 +5069,7 @@ class App(object):
 
         def parse_multipart(body, boundary):
             """Analisi minima e vera di multipart/form-data per un
-            singolo file -- niente modulo cgi (deprecato/rimosso
+            singolo file -- niente modulo cgi (deprecato/removed
             nelle versioni Python più recenti, non affidabile a
             lungo termine)."""
             marker = b"--" + boundary
@@ -5170,7 +5171,7 @@ class App(object):
                                               g1("path"))
                     if sub is None or not os.path.isfile(sub):
                         self._json({"error": "file non "
-                                   "trovato"}, 404)
+                                   "found"}, 404)
                         return
                     if os.path.getsize(sub) > 2 * 1024 * 1024:
                         self._json({"error": "file troppo grande "
@@ -5189,7 +5190,7 @@ class App(object):
                                               g1("path"))
                     if sub is None or not os.path.isfile(sub):
                         self._send(404, "text/plain",
-                                  b"non trovato")
+                                  b"not found")
                         return
                     ctype = mimetypes.guess_type(sub)[0] or \
                         "application/octet-stream"
@@ -5198,14 +5199,14 @@ class App(object):
                             data = f.read()
                     except OSError:
                         self._send(500, "text/plain",
-                                  b"errore di lettura")
+                                  b"error di lettura")
                         return
                     self._send(200, ctype, data, {
                         "Content-Disposition":
                             "attachment; filename=\"%s\"" %
                             os.path.basename(sub)})
                 else:
-                    self._send(404, "text/plain", b"non trovato")
+                    self._send(404, "text/plain", b"not found")
 
             def do_POST(self):
                 path, _ = self._qs()
@@ -5286,7 +5287,7 @@ class App(object):
                     content = data.get("content", "")
                     if sub is None or not os.path.isfile(sub):
                         self._json({"error": "file non "
-                                   "trovato"}, 404)
+                                   "found"}, 404)
                         return
                     try:
                         with open(sub, "w", encoding="utf-8") as f:
@@ -5298,12 +5299,12 @@ class App(object):
                 elif path == "/api/delete":
                     if sub is None or not os.path.exists(sub) or \
                             sub == os.path.normpath(root):
-                        self._json({"error": "non trovato"}, 404)
+                        self._json({"error": "not found"}, 404)
                         return
                     try:
                         if os.path.isdir(sub):
                             if os.listdir(sub):
-                                self._json({"error": "cartella "
+                                self._json({"error": "folder "
                                            "non vuota"}, 400)
                                 return
                             os.rmdir(sub)
@@ -5314,7 +5315,7 @@ class App(object):
                         return
                     self._json({"ok": True})
                 else:
-                    self._send(404, "text/plain", b"non trovato")
+                    self._send(404, "text/plain", b"not found")
 
             def log_message(self, fmt, *args):
                 pass
@@ -5367,7 +5368,7 @@ class App(object):
             pass
         try:
             s_ = int(float(open("/proc/uptime").read().split()[0]))
-            L.append(("Uptime" if not it else "Acceso da",
+            L.append(("Uptime" if not it else "Uptime",
                       "%dh %02dm" % (s_ // 3600, (s_ % 3600) // 60)))
         except (OSError, ValueError):
             pass
@@ -5427,7 +5428,7 @@ class App(object):
     def rtsh_pump(self):
         """Legge tutto quello che c'e' dal PTY senza bloccare, lo
         digerisce nel buffer. Va chiamato a ogni fotogramma mentre la
-        schermata e' aperta."""
+        schermata e' opened."""
         if not self.rtsh_sess or not self.rtsh_sess.alive:
             return
         data = self.rtsh_sess.read_nonblock(timeout=0)
@@ -5441,7 +5442,7 @@ class App(object):
         try:
             self.play_doppel_intro()
         except Exception as e:
-            sys.stderr.write("bootanim doppel non riuscita: %s\n" % e)
+            sys.stderr.write("bootanim doppel failed: %s\n" % e)
         self.push("doppelcon")
 
     CHD_TARGET_SYSTEMS = [
@@ -5484,7 +5485,7 @@ class App(object):
         return refs
 
     def chd_scan_system_files(self, folder):
-        """File .cue/.gdi processabili in una cartella, con i loro
+        """File .cue/.gdi processabili in una folder, con i loro
         file collegati veri (parsing del contenuto, non supposizioni)
         e dimensioni reali."""
         out = []
@@ -5524,9 +5525,9 @@ class App(object):
         return out
 
     def chd_discover(self, roms_root):
-        """Per ogni sistema target, dice se la cartella esiste e se
+        """Per ogni system target, dice se la folder esiste e se
         ha almeno un file processabile davvero (non solo se la
-        cartella c'e')."""
+        folder c'e')."""
         out = []
         for key, label, kws in self.CHD_TARGET_SYSTEMS:
             found_dir = None
@@ -5610,8 +5611,8 @@ class App(object):
 # --- [P7] Boot Animation Toggle // HUB: SETTINGS ---
     def pcup_setup(self):
         """Aggiunge un server PC manualmente -- ripiego per quando la
-        scansione automatica non trova qualcosa (rete diversa, PC
-        spento durante la scansione, eccetera)."""
+        scansione automatica non trova qualcosa (network diversa, PC
+        off durante la scansione, eccetera)."""
         it = (self.lang == "it")
         cur = {}
         steps = [("HOST PC", "pcup_host", "192.168.1."),
@@ -5693,11 +5694,11 @@ class App(object):
                               max(0, len(self.pc_servers) - 1))
 
     def pc_link_ensure_client(self, s):
-        """Crea e avvia il client per il server s se non esiste
+        """Crea e start il client per il server s se non esiste
         ancora -- stessa identica logica gia' usata quando si apre
         un server dalla lista, estratta qui cosi' la puo' richiamare
         anche la riconnessione automatica di 'PC Link sempre
-        attivo' senza duplicare nulla."""
+        on' senza duplicare nulla."""
         if s.get("client") is not None:
             return s["client"]
         dev_id = self.cfg.get("termid_id") or "voiddesk-unknown"
@@ -5712,11 +5713,11 @@ class App(object):
         return s["client"]
 
     def pc_link_connect_default(self):
-        """Per 'PC Link sempre attivo': si ricollega da solo al
+        """Per 'PC Link sempre on': si ricollega da solo al
         server giusto senza che l'utente debba rientrare nella
         schermata e riselezionarlo a mano. Preferisce l'ultimo
-        server usato (salvato in pc_last_server); se non c'e' ancora
-        una preferenza salvata ma c'e' un solo server in lista, usa
+        server usato (saved in pc_last_server); se non c'e' ancora
+        una preferenza saved ma c'e' un solo server in lista, usa
         quello -- con piu' di un server e nessuna preferenza aspetta
         una scelta esplicita invece di indovinare."""
         last = self.cfg.get("pc_last_server")
@@ -5734,8 +5735,8 @@ class App(object):
 
     def pc_link_disconnect_all(self):
         """Spegne davvero tutte le connessioni attive -- prima
-        disattivare 'sempre attivo' salvava solo la preferenza senza
-        fermare nulla che fosse gia' in corso."""
+        disattivare 'sempre on' salvava solo la preferenza senza
+        fermare nulla che fosse gia' working."""
         for s in self.pc_servers:
             if s.get("client"):
                 try:
@@ -5749,26 +5750,26 @@ class App(object):
         rows = [
             ("refresh", "act",
              "CONTROLLA ORA" if it else "CHECK NOW",
-             "aggiornamenti + integrità del link sorgente" if it else
+             "updates + source link integrity"if it else
              "updates + source link integrity"),
             ("autocheck", "bool",
-             "CONTROLLO AUTOMATICO" if it else "AUTO-CHECK",
-             "verifica all'avvio di Void Desk" if it else
+             "AUTOMATIC CHECK" if it else "AUTO-CHECK",
+             "verify all'avvio di Void Desk" if it else
              "check on Void Desk startup"),
             ("autoinstall", "bool",
              "INSTALLAZIONE AUTOMATICA" if it else "AUTO-INSTALL",
-             "installa da sola se trova un aggiornamento" if it else
+             "install da sola se trova un aggiornamento" if it else
              "installs on its own if an update is found"),
             ("interval", "cycle",
-             "INTERVALLO CONTROLLO" if it else "CHECK INTERVAL",
-             "ogni quanto ripetere il controllo automatico" if it
+             "CHECK INTERVAL" if it else "CHECK INTERVAL",
+             "how often to repeat the automatic check" if it
              else "how often to repeat the automatic check"),
             ("div1", "div", "", ""),
         ]
         e1 = self.updset_ethos1
         e2 = self.updset_ethos2
         rows.append(("ethos1", "ethos",
-                    "CONFERMA ETHOS · LIVELLO 1" if it else
+                    "ETHOS CONFIRMATION · LEVEL 1"if it else
                     "ETHOS CONFIRMATION · LEVEL 1",
                     ("confermi di non essere debole di ethos e di "
                      "poter domare un software noto per la sua "
@@ -5779,7 +5780,7 @@ class App(object):
                      "ethos not yet conceived by the human mind?")))
         if e1 is True:
             rows.append(("ethos2", "ethos",
-                        "CONFERMA ETHOS · LIVELLO 2" if it else
+                        "ETHOS CONFIRMATION · LEVEL 2"if it else
                         "ETHOS CONFIRMATION · LEVEL 2",
                         "ne sei veramethos sicuro?" if it else
                         "are you really-ethos sure?"))
@@ -5890,7 +5891,7 @@ class App(object):
         (nuovo tasto premuto durante la cattura), mantenendo nome e
         comando gia' assegnati. Se new_sig e' gia' occupato da un
         ALTRO binding, non tocca nulla e restituisce quel segnale --
-        chi chiama puo' chiedere conferma prima di sovrascriverlo."""
+        chi chiama puo' chiedere confirm prima di sovrascriverlo."""
         b = self.ctrl_bindings(dev_name)
         if new_sig == old_sig:
             return None
@@ -5904,7 +5905,7 @@ class App(object):
         return None
 
     def ctrl_force_rebind(self, dev_name, old_sig, new_sig):
-        """Come ctrl_rebind_signal, ma dopo conferma esplicita
+        """Come ctrl_rebind_signal, ma dopo confirm esplicita
         dell'utente: sovrascrive quello che occupava new_sig."""
         b = self.ctrl_bindings(dev_name)
         cur = b.pop(old_sig, None)
@@ -5927,7 +5928,7 @@ class App(object):
         """Raccoglie cosa il dispositivo vede DAVVERO quando un
         controller e' collegato -- lsusb, /dev/snd, schede ALSA,
         log kernel filtrato. Ogni comando e' opzionale: se manca
-        (sistema molto ridotto, comune su dispositivi pensati per
+        (system molto ridotto, comune su dispositivi pensati per
         l'emulazione) lo dichiara invece di fallire in silenzio."""
         it = (self.lang == "it")
         L = []
@@ -5941,7 +5942,7 @@ class App(object):
             for t_, cmd, ok, msg in reversed(self.ctrl_exec_log[-10:]):
                 ago = ("%ds fa" if it else "%ds ago") % int(now - t_)
                 lbl = cmd if ok else "%s -- %s" % (
-                    cmd, msg or ("errore" if it else "error"))
+                    cmd, msg or ("error" if it else "error"))
                 L.append(("kv", ago, lbl, OK_G if ok else NO_R))
         if self.ctrl_pump_errors:
             L.append(("sec", "gear", "errori di lettura recenti" if it
@@ -5959,9 +5960,9 @@ class App(object):
                  self.lang == "it" else "USB-MIDI module attempt"))
         for mod, rc, err in self.ctrl_try_load_midi_module():
             status_s = ("ok" if rc == 0 else
-                       ("assente" if rc is None and err ==
-                        "modprobe non presente" else
-                        "errore: %s" % err))
+                       ("missing" if rc is None and err ==
+                        "modprobe not present" else
+                        "error: %s" % err))
             L.append(("kv", mod, status_s,
                      OK_G if rc == 0 else NO_R))
         L.append(("sec", "gear", "ripopolamento /dev tentato" if
@@ -5969,12 +5970,12 @@ class App(object):
                  "attempted"))
         for cmd_name, rc, err in getattr(
                 self, "ctrl_devnode_scan_result", []):
-            status_s = ("assente" if rc is None and err ==
-                       "non presente" else
-                       ("ok" if rc == 0 else "errore: %s" % err))
+            status_s = ("missing" if rc is None and err ==
+                       "not present" else
+                       ("ok" if rc == 0 else "error: %s" % err))
             L.append(("kv", cmd_name, status_s,
                      OK_G if rc == 0 else (DIM if err ==
-                     "non presente" else NO_R)))
+                     "not present" else NO_R)))
 
         def add(title_, fn):
             L.append(("sec", "gear", title_))
@@ -5987,8 +5988,8 @@ class App(object):
                     if ln.strip():
                         L.append(("kv", "", ln[:70], FG))
             except FileNotFoundError:
-                L.append(("kv", "", "comando non presente su "
-                          "questo sistema" if self.lang == "it" else
+                L.append(("kv", "", "comando not present su "
+                          "questo system" if self.lang == "it" else
                           "command not available on this system",
                           NO_R))
             except Exception as e:
@@ -6032,7 +6033,7 @@ class App(object):
                                   timeout=5)
                 results.append((mod, r.returncode, r.stderr[:100]))
             except FileNotFoundError:
-                results.append((mod, None, "modprobe non presente"))
+                results.append((mod, None, "modprobe not present"))
             except Exception as e:
                 results.append((mod, None, str(e)[:100]))
         return results
@@ -6041,8 +6042,8 @@ class App(object):
         """Prova a far ripopolare i nodi /dev veri prima di cercare
         controller -- ipotesi: muOS usa un gestore dispositivi
         minimale (mdev, tipico su base BusyBox) che potrebbe non
-        aver mai creato il nodo per una periferica mai vista prima
-        (tastiera esterna, MIDI), a differenza del chroot desktop
+        aver mai created il nodo per una periferica mai vista prima
+        (keyboard esterna, MIDI), a differenza del chroot desktop
         che probabilmente ne ha uno più completo. Prova più
         approcci comuni, in ordine, senza mai bloccare se falliscono
         (serve quasi certamente root, che l'app potrebbe non avere)."""
@@ -6055,7 +6056,7 @@ class App(object):
                                   text=True, timeout=3)
                 results.append((cmd[0], r.returncode, r.stderr[:80]))
             except FileNotFoundError:
-                results.append((cmd[0], None, "non presente"))
+                results.append((cmd[0], None, "not present"))
             except Exception as e:
                 results.append((cmd[0], None, str(e)[:80]))
         return results
@@ -6069,9 +6070,9 @@ class App(object):
     def ctrl_listen_pump(self):
         """Motore di ascolto vero, gira a ogni fotogramma: per ogni
         dispositivo con almeno un tasto mappato, apre il lettore se
-        non e' gia' aperto, controlla nuovi segnali, e se
+        non e' gia' opened, controlla nuovi segnali, e se
         corrispondono a un tasto con un comando assegnato lo esegue
-        davvero. Prima la mappatura veniva salvata ma nessuno la
+        davvero. Prima la mappatura veniva saved ma nessuno la
         controllava mai fuori dalla schermata di configurazione --
         e' questo il pezzo che mancava. Gli errori non spariscono
         piu' in silenzio: finiscono in ctrl_pump_errors, visibile
@@ -6202,7 +6203,7 @@ class App(object):
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, "wb") as f:
                     f.write(base64.b64decode(png_b64))
-                self.notify("Screenshot salvata" if self.lang ==
+                self.notify("Screenshot saved" if self.lang ==
                            "it" else "Screenshot saved",
                            os.path.basename(path), "success")
             elif command == "console:wifi_toggle":
@@ -6275,7 +6276,7 @@ class App(object):
     def notify(self, title, body="", kind="standard"):
         """Mette in coda una notifica cyberpunk. Richiamabile da
         qualunque punto dell'app: messaggi dal Basestation, eventi
-        interni (screenshot inviata, aggiornamento completato...)."""
+        interni (screenshot inviata, aggiornamento completed...)."""
         if kind not in NOTIF_KINDS:
             kind = "standard"
         note = {"title": str(title)[:60], "body": str(body)[:90],
@@ -6306,12 +6307,12 @@ class App(object):
             self.notify("Void Radio", "stream fermato", "system")
             return
         if not self.radio_mpv or not self.radio_mpv.is_running():
-            self.notify("Controller media", "nessun flusso audio attivo",
+            self.notify("Controller media", "nessun flusso audio on",
                         "standard")
             return
         if btn == "A":
             paused = self.radio_mpv.toggle_pause()
-            self.notify("Void Radio", "in pausa" if paused else "ripresa",
+            self.notify("Void Radio", "paused" if paused else "ripresa",
                         "message")
         elif btn in ("LEFT", "RIGHT"):
             vol = self.radio_mpv.get_property("volume")
@@ -6348,9 +6349,9 @@ class App(object):
                  "NESSUN FLUSSO ATTIVO")
         self.text(title[:48], (px + 16, y + 42), self.f_med_b,
                   FG if active else DIM, maxw=pw - 32)
-        state = "PAUSA" if info.get("pause") else "IN RIPRODUZIONE"
+        state = "PAUSA" if info.get("pause") else "PLAYING"
         if not active:
-            state = "apri Void Radio per iniziare"
+            state = "open Void Radio per iniziare"
         self.text(state, (px + 16, y + 72), self.f_tiny,
                   (230, 190, 60) if info.get("pause") else col)
         vol = info.get("volume", 0) if active else 0
@@ -6358,7 +6359,7 @@ class App(object):
         pygame.draw.rect(self.surface, col,
                          (px + 16, y + 98, int((pw - 32) * vol / 100), 6))
         self.text("%3d%%" % vol, (px + pw - 60, y + 110), self.f_tiny, FG)
-        self.text("A pausa/riprendi   SX/DX volume   X ferma   B chiudi",
+        self.text("A pausa/riprendi   SX/DX volume   X ferma   B close",
                   (px + 16, y + 132), self.f_tiny, FAINT, maxw=pw - 32)
 
     def _radio_health_update(self):
@@ -6818,7 +6819,7 @@ class App(object):
         return [("dl", ("Scarica (%d)" if it else "Download (%d)")
                  % max(1, n)),
                 ("ul", "Carica un file..." if it else "Upload a file..."),
-                ("refresh", "Aggiorna" if it else "Refresh"),
+                ("refresh", "Update" if it else "Refresh"),
                 ("close", "Disconnetti" if it else "Disconnect")]
 
     def sync_open_refresh(self):
@@ -7167,7 +7168,7 @@ class App(object):
     def rss_enabled_feeds(self):
         en = self.cfg.get("rss_enabled")
         allf = self.rss_all_feeds()
-        if en is None:                     # primo avvio: tutto attivo
+        if en is None:                     # primo avvio: tutto on
             return allf
         enset = set(en)
         return [f for f in allf if f[0] in enset]
@@ -7286,7 +7287,7 @@ class App(object):
 # --- [V7] Auto-connect Background Threads (PC Link, BaseStation) // HUB: UPLINK ---
     def update_latest(self):
         """La release piu' recente vera, o None se non ce ne sono
-        ancora pubblicate -- stato onesto, non un errore."""
+        ancora pubblicate -- stato onesto, non un error."""
         if not self.update_data or not self.update_data.get("ok"):
             return None
         rel = self.update_data.get("releases") or []
@@ -7306,9 +7307,9 @@ class App(object):
 
     def gh_fetch_releases(self):
         """Scarica le release vere dal repository GitHub. Nessuna
-        release pubblicata non e' un errore di connessione -- e' lo
+        release pubblicata non e' un error di connessione -- e' lo
         stato reale del progetto, e va mostrato come tale, non
-        inventato ne' confuso con un problema di rete."""
+        inventato ne' confuso con un problema di network."""
         import urllib.request
         import json as jsonmod
         url = ("https://api.github.com/repos/SilverCrow2323/"
@@ -7402,7 +7403,7 @@ class App(object):
         base = os.environ.get("VD_NET_SYS", "/sys/class/net")
         st = self.wm_status()
         L = [("sec", "wifi", "WIFI // INFO")]
-        L.append(("kv", "INTERFACCIA" if it else "INTERFACE",
+        L.append(("kv", "INTERFACE" if it else "INTERFACE",
                   "wlan0", DIM))
         try:
             L.append(("kv", "MAC", open(os.path.join(
@@ -7448,13 +7449,13 @@ class App(object):
         return L
 
     def wm_iw_link(self):
-        """SSID/BSSID/segnale dalla connessione attiva via iw: e' la
+        """SSID/BSSID/segnale dalla connessione active via iw: e' la
         via seguita dal WiFi Manager di amosjerbi ('iw funziona meglio
         di iwconfig su questo hardware') e funziona anche quando
         wpa_cli non riesce ad agganciare il control socket di
         wpa_supplicant (il sintomo esatto: menu che dice 'nessuna
-        connessione' mentre l'indicatore di sistema mostra il WiFi
-        attivo)."""
+        connessione' mentre l'indicatore di system mostra il WiFi
+        on)."""
         try:
             out = subprocess.run(["iw", "dev", WM_IFACE, "link"],
                                  capture_output=True, text=True,
@@ -7577,7 +7578,7 @@ class App(object):
                     "cur": k == cur}
                    for k, v in nets.items()]
             for k, nid in saved.items():
-                if k not in nets:      # salvata ma fuori portata
+                if k not in nets:      # saved ma fuori portata
                     out.append({"ssid": k, "sig": -95, "sec": True,
                                 "saved": True, "id": nid,
                                 "cur": False})
@@ -7591,10 +7592,10 @@ class App(object):
     def wm_bounce_connect(self, ssid, psk):
         """Fallback quando wpa_cli non parla col demone: la ricetta del
         WiFi Manager di amosjerbi per questo hardware. Riscrive
-        wpa_supplicant.conf dando priorita' massima alla rete voluta,
+        wpa_supplicant.conf dando priorita' massima alla network voluta,
         killa e rilancia wpa_supplicant in foreground-background (-B),
-        poi verifica via iw. La configurazione originale viene sempre
-        ripristinata, connessione riuscita o no."""
+        poi verify via iw. La configurazione originale viene sempre
+        ripristinata, connessione succeeded o no."""
         path = SYS_WPA_CONF
         try:
             orig = open(path).read() if os.path.exists(path) else ""
@@ -7660,7 +7661,7 @@ class App(object):
             st = self.wm_status()
             if wpa_ok and st.get("ssid") == net["ssid"]:
                 return st
-            # wpa_cli non ha funzionato o non ha portato alla rete
+            # wpa_cli non ha funzionato o non ha portato alla network
             # giusta: ripiego sulla ricetta amosjerbi (bounce diretto)
             if self.wm_bounce_connect(net["ssid"], psk):
                 return self.wm_status()
@@ -7670,7 +7671,7 @@ class App(object):
         ok = (st or {}).get("ssid") == net["ssid"]
         self.info_lines = self.stub_lines(
             net["ssid"], ["%s  ·  %s" %
-                          (("connessa" if ok else "non riuscita")
+                          (("connessa" if ok else "non succeeded")
                            if self.lang == "it" else
                            ("connected" if ok else "failed"),
                            (st or {}).get("ip_address", ""))])
@@ -7798,7 +7799,7 @@ class App(object):
                 ["pgrep", "-f", "bluetoothd"],
                 capture_output=True, timeout=4).returncode == 0
         except Exception:
-            running = True    # non blocco l'accensione per un pgrep fallito
+            running = True    # non blocco l'accensione per un pgrep failed
         if not running and os.path.exists(BTD_BIN):
             try:
                 subprocess.Popen([BTD_BIN, "-n", "-d"],
@@ -7905,7 +7906,7 @@ class App(object):
     def hot_toggle(self):
         """Interruttore diretto: A sullo switch. Spegne con lo script
         Stop se acceso, accende col 2.4GHz (piu' compatibile) se
-        spento -- gli script nativi ci sono sempre, non serve piu'
+        off -- gli script nativi ci sono sempre, non serve piu'
         cercarli."""
         sc = self.hot_scripts if isinstance(
             getattr(self, "hot_scripts", None), dict) else \
@@ -7986,7 +7987,7 @@ class App(object):
         elif not imgmount.is_mounted_rw(root):
             # gia' montato, ma in sola lettura (es. residuo di uno scan
             # precedente): senza questo, la scrittura fallirebbe muta
-            log("montato ma in SOLA LETTURA: rimonto in scrittura")
+            log("mounted read-only: remounting rw")
             rc = subprocess.run(["mount", "-o", "remount,rw", root],
                                 capture_output=True, text=True, timeout=8)
             we_remounted = (rc.returncode == 0)
@@ -7994,7 +7995,7 @@ class App(object):
                 (rc.returncode, rc.stderr.strip()))
             if not we_remounted:
                 return False, ("chroot in sola lettura, remount "
-                               "fallito: chiudi eventuali sessioni "
+                               "failed: close eventuali sessioni "
                                "attive e riprova")
         try:
             import urllib.request
@@ -8003,35 +8004,35 @@ class App(object):
             os.makedirs(dest_dir, exist_ok=True)
             dest = os.path.join(dest_dir, "ani-cli")
             url = os.environ.get("VD_ANI_CLI_URL", ANI_CLI_URL)
-            log("scarico da %s" % url)
+            log("downloading from %s" % url)
             req = urllib.request.Request(
                 url, headers={"User-Agent": "VoidDesk"})
             with urllib.request.urlopen(req, timeout=25) as r:
                 data = r.read()
             log("scaricati %d byte" % len(data))
             if not data or b"#!/" not in data[:20]:
-                log("risposta non sembra uno script, primi byte: %r"
+                log("response doesn't look like a script, first bytes: %r"
                     % data[:60])
-                return False, "risposta inattesa: non sembra uno script"
+                return False, "unexpected response: not a script"
             with open(dest, "wb") as f:
                 f.write(data)
             os.chmod(dest, 0o755)
             log("scritto e reso eseguibile: %s" % dest)
-            return True, "ani-cli installato"
+            return True, "ani-cli installed"
         except urllib.error.URLError as e:
             reason = str(getattr(e, "reason", e))
             log("URLError: %s" % reason)
             if "CERTIFICATE" in reason.upper():
                 return False, ("certificati SSL non validi sul "
                                "dispositivo: %s" % reason[:80])
-            return False, ("rete non raggiungibile: %s" % reason[:90])
+            return False, ("network unreachable: %s" % reason[:90])
         except Exception as e:
             log("eccezione: %r" % e)
             return False, str(e)[:120]
         finally:
             if not was_mounted:
                 imgmount.umount_tree(root)
-                log("smontato (era stato montato fresco da qui)")
+                log("unmounted (it was fresh-mounted from here)")
 
     def hotcfg_load(self):
         ssid, pw = "VoidDesk-AP", "voiddesk99"
@@ -8089,9 +8090,9 @@ class App(object):
         on = self.hot_active()
         iface = cf.get("interface", "wlan1")
         L = [("sec", "uplink", "HOTSPOT // INFO")]
-        L.append(("kv", "STATO" if it else "STATE",
-                  ("attivo" if it else "active") if on else
-                  ("spento" if it else "off"), OK_G if on else FAINT))
+        L.append(("kv", "STATUS" if it else "STATE",
+                  ("on" if it else "active") if on else
+                  ("off" if it else "off"), OK_G if on else FAINT))
         if cf:
             L.append(("kv", "SSID", cf.get("ssid", "?"), FG))
             L.append(("kv", "PASSWORD",
@@ -8099,7 +8100,7 @@ class App(object):
             L.append(("kv", "CANALE" if it else "CHANNEL",
                       cf.get("channel", "?") +
                       ("  ·  " + cf.get("hw_mode", "")), DIM))
-        L.append(("kv", "INTERFACCIA" if it else "INTERFACE",
+        L.append(("kv", "INTERFACE" if it else "INTERFACE",
                   iface, DIM))
         try:
             out = subprocess.run(["ip", "-4", "addr", "show", iface],
@@ -8445,7 +8446,7 @@ class App(object):
         loudness reale + correzione precisa), se fallisce prova
         1-passaggio (stima diretta), se fallisce ancora fa solo la
         conversione senza normalizzare -- non lascia mai l'utente
-        senza risultato per un singolo errore ffmpeg."""
+        senza risultato per un singolo error ffmpeg."""
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         if progress_cb:
             progress_cb(5)
@@ -8543,8 +8544,8 @@ class App(object):
         if not os.path.exists(TS_BIN):
             self.info_lines = self.stub_lines(
                 "TAILSCALE",
-                ["tailscale non trovato in /opt/muos/bin: aggiorna muOS "
-                 "o installa Rt-Tailscale." if it else
+                ["tailscale not found in /opt/muos/bin: update muOS "
+                 "o install Rt-Tailscale." if it else
                  "tailscale not found in /opt/muos/bin: update muOS or "
                  "install Rt-Tailscale."])
             self.scroll = 0
@@ -8558,7 +8559,7 @@ class App(object):
         if not self.ts:
             self.info_lines = self.stub_lines(
                 "TAILSCALE",
-                ["demone non raggiungibile (socket %s)" % TS_SOCK])
+                ["demone unreachable (socket %s)" % TS_SOCK])
             self.scroll = 0
             self.info_title = "TAILSCALE"
             self.push("info")
@@ -8601,13 +8602,13 @@ class App(object):
                   ("Disconnect" if run else "Connect")))
         A.append(("exitoff", "Exit node: nessuno" if it
                   else "Exit node: none"))
-        A.append(("netcheck", "Diagnostica rete" if it
+        A.append(("netcheck", "Diagnostica network" if it
                   else "Network diagnostics"))
-        A.append(("recv", "Ricevi file (Taildrop)" if it
+        A.append(("recv", "Receive files (Taildrop)" if it
                   else "Receive files (Taildrop)"))
         A.append(("tstheme", "Tema Tailscale: %s" %
                   self.cfg.get("ts_theme", "ciano").upper()))
-        A.append(("rtapp", "Apri Rt-Tailscale" if it
+        A.append(("rtapp", "Open Rt-Tailscale" if it
                   else "Open Rt-Tailscale"))
         A.append(("logout", "Logout"))
         return A
@@ -8685,7 +8686,7 @@ class App(object):
                     if time.time() - t0 > 12:
                         break
                 return url
-            url = self.run_busy("genero il link..." if it
+            url = self.run_busy("generating link..." if it
                                 else "getting the link...", job)
             if url:
                 self.ts_login_url = url
@@ -8797,8 +8798,8 @@ class App(object):
         if not (url and key):
             self.info_lines = self.stub_lines(
                 "SYNCTHING",
-                ["Syncthing non configurato nell'immagine: installalo "
-                 "dal FORGE e avvialo una volta nel desktop." if it else
+                ["Syncthing not configured in image: install it "
+                 "from FORGE and run it once on the desktop." if it else
                  "Syncthing not configured in the image: install it "
                  "from FORGE and run it once in the desktop."])
             self.scroll = 0
@@ -8870,7 +8871,7 @@ class App(object):
         if not self.sync:
             self.info_lines = self.stub_lines(
                 "SYNCTHING",
-                ["demone non raggiungibile: avvialo nel desktop o "
+                ["demone unreachable: avvialo nel desktop o "
                  "riprova" if it else
                  "daemon unreachable: start it in the desktop and retry"])
             self.scroll = 0
@@ -8886,7 +8887,7 @@ class App(object):
             if os.path.getsize(path) > 512 * 1024:
                 self.info_lines = self.stub_lines(
                     os.path.basename(path),
-                    ["file troppo grande per l'editor (max 512KB)" if it
+                    ["file too big for the editor (512KB max)" if it
                      else "file too big for the editor (512KB max)"])
                 self.scroll = 0
                 self.push("info")
@@ -8909,7 +8910,7 @@ class App(object):
                 f.write("\n".join(self.ed_lines))
             self.ed_path = p
             self.ed_dirty = False
-            self.ed_msg = ("salvato " if it else "saved ") + \
+            self.ed_msg = ("saved " if it else "saved ") + \
                 time.strftime("%H:%M:%S")
         except OSError as e:
             self.ed_msg = "ERR: %s" % e
@@ -9013,12 +9014,12 @@ class App(object):
                   "Dati Void" if it else "Void Data", "sub": DATA,
                   "icon": "folder"})
         E.append({"kind": "bookmarks", "path": None, "label":
-                  "Preferiti" if it else "Bookmarks", "sub":
+                  "Favourites" if it else "Bookmarks", "sub":
                   ("%d salvati" if it else "%d saved") %
                   len(self.cfg.get("fm_bookmarks", [])), "icon": "book"})
         E.append({"kind": "search", "path": None, "label":
                   "Cerca..." if it else "Search...", "sub":
-                  "nome file, in questo storage" if it else
+                  "by filename, in this storage" if it else
                   "by filename, in this storage", "icon": "search"})
         E.append({"kind": "goto", "path": None, "label":
                   "Vai a..." if it else "Go to...", "sub":
@@ -9246,7 +9247,7 @@ class App(object):
                 "ARCHIVE SMUGGLER",
                 [("estratto in: %s" % dest if it else
                  "extracted to: %s" % dest) if ok else
-                 (("errore: %s" % msg) if it else
+                 (("error: %s" % msg) if it else
                   ("error: %s" % msg))])
             self.scroll = 0
             self.pop_state()
@@ -9297,7 +9298,7 @@ class App(object):
             self.fm_path = None
         else:
             parent = os.path.dirname(self.fm_path)
-            # rete di sicurezza: se dirname non cambia nulla (nessun
+            # network di sicurezza: se dirname non cambia nulla (nessun
             # genitore vero, come alla radice /), torno comunque alla
             # prima schermata invece di restare bloccato lì per sempre
             self.fm_path = None if parent == self.fm_path else parent
@@ -9305,7 +9306,7 @@ class App(object):
         self.fm_refresh()
 
     def fm_do(self, op):
-        """Esegue copia/sposta/elimina con progresso vivo nel busy."""
+        """Esegue copia/sposta/delete con progresso vivo nel busy."""
         import shutil as _sh
         it = (self.lang == "it")
         if op in ("copy", "cut"):
@@ -9380,10 +9381,10 @@ class App(object):
                   % max(1, n)))
         if n <= 1 and cur != "..":
             A.append(("rename", "Rinomina" if it else "Rename"))
-        A.append(("newdir", "Nuova cartella" if it else "New folder"))
-        A.append(("newfile", "Nuovo file di testo" if it else
+        A.append(("newdir", "Nuova folder" if it else "New folder"))
+        A.append(("newfile", "New file di testo" if it else
                   "New text file"))
-        A.append(("delete", ("Elimina (%d)" if it else "Delete (%d)")
+        A.append(("delete", ("Delete (%d)" if it else "Delete (%d)")
                   % max(1, n)))
         if n <= 1 and cur.rsplit(".", 1)[-1].lower() in ("sh", "py"):
             A.append(("frun", "Esegui" if it else "Run"))
@@ -9415,7 +9416,7 @@ class App(object):
                     except OSError:
                         pass
                     self.fm_refresh()
-            self.osk_open("NUOVA CARTELLA" if it else "NEW FOLDER",
+            self.osk_open("NEW FOLDER" if it else "NEW FOLDER",
                           "", nd)
         elif key == "newfile":
             def nf(nm):
@@ -9427,7 +9428,7 @@ class App(object):
                         return
                     self.fm_refresh()
                     self.ed_load(p)
-            self.osk_open("NUOVO FILE" if it else "NEW FILE",
+            self.osk_open("NEW FILE" if it else "NEW FILE",
                           "nuovo.txt" if it else "new.txt", nf)
         elif key == "frun":
             self.run_script(os.path.join(self.fm_path, cur))
@@ -9517,7 +9518,7 @@ class App(object):
         dest = self.mapp_other_root(self.mapp_cur)
         if not dest:
             return "SD" if it else "SD"
-        return (("Sposta su %s" if it else "Move to %s") % dest[1])
+        return (("Move to %s" if it else "Move to %s") % dest[1])
 
     def mapp_move(self, app):
         dest = self.mapp_other_root(app)
@@ -9545,7 +9546,7 @@ class App(object):
         L.append(("kv", self.t("size"), human(self.mapp_size or 0), FG))
         try:
             ctime = os.path.getctime(app["dir"])
-            L.append(("kv", "installata il" if it else "installed on",
+            L.append(("kv", "installed il" if it else "installed on",
                       time.strftime("%d/%m/%Y %H:%M",
                                     time.localtime(ctime)), DIM))
         except OSError:
@@ -9567,7 +9568,7 @@ class App(object):
             L.append(("kv", k2, v[:44], DIM))
         gov = (self.cfg.get("mapp_gov") or {}).get(app["name"], "default")
         L.append(("kv", self.t("gov"), gov, self.accent))
-        prot = ("sistema" if self.is_sys_protected(app["name"]) else
+        prot = ("system" if self.is_sys_protected(app["name"]) else
                 "utente" if self.is_user_protected(app["name"]) else
                 "no") if it else \
             ("system" if self.is_sys_protected(app["name"]) else
@@ -9630,7 +9631,7 @@ class App(object):
                 msg = {"ok": "spostata" if it else "moved",
                        "exists": "esiste gia' a destinazione" if it
                        else "already exists at destination",
-                       "err": "errore durante lo spostamento" if it
+                       "err": "error durante lo spostamento" if it
                        else "error while moving",
                        "no-dest": "nessun'altra SD disponibile" if it
                        else "no other SD available"}.get(r, r)
@@ -9649,7 +9650,7 @@ class App(object):
             self.info_lines = self.stub_lines(
                 self.t("arch"),
                 [(self.t("arch_ok") + " " + path) if path else
-                 ("scrittura fallita: vedi log" if it
+                 ("scrittura failed: vedi log" if it
                   else "write failed: see log")])
             self.scroll = 0
             self.push("info")
@@ -10027,14 +10028,14 @@ class App(object):
             ok = os.path.exists(img)
             return [("kv", "IMMAGINE" if it else "IMAGE",
                     human(os.path.getsize(img)) if ok else
-                    ("assente" if it else "missing"),
+                    ("missing" if it else "missing"),
                     FG if ok else NO_R)]
 
         def step_envs():
             base, extra = self.read_envs()
             return [("kv", "AMBIENTI" if it else "ENVS",
                     ("xfce " + " ".join(sorted(extra - {"xfce"}))).strip()
-                    if base else ("base non installata" if it
+                    if base else ("base not installed" if it
                                   else "base not installed"),
                     FG if base else DIM)]
 
@@ -10086,12 +10087,12 @@ class App(object):
         img = os.path.join(DATA, "xfce.img")
         L.append(("kv", "IMMAGINE" if it else "IMAGE",
                   human(os.path.getsize(img)) if os.path.exists(img)
-                  else ("assente" if it else "missing"),
+                  else ("missing" if it else "missing"),
                   FG if os.path.exists(img) else NO_R))
         base, extra = self.read_envs()
         L.append(("kv", "AMBIENTI" if it else "ENVS",
                   ("xfce " + " ".join(sorted(extra - {"xfce"}))).strip()
-                  if base else ("base non installata" if it
+                  if base else ("base not installed" if it
                                 else "base not installed"),
                   FG if base else DIM))
         try:
@@ -10119,7 +10120,7 @@ class App(object):
             except OSError:
                 pass
         if len(L) < 6:
-            L.append(("kv", "", "tutto in ordine" if it else "all clear",
+            L.append(("kv", "", "all good" if it else "all clear",
                       OK_G))
         return L
 
@@ -10186,7 +10187,7 @@ class App(object):
                 ip = m.group(1) if m else ""
             except Exception:
                 pass
-            L.append(("kv", "STATO" if it else "STATE", up,
+            L.append(("kv", "STATUS" if it else "STATE", up,
                       OK_G if up == "up" else NO_R))
             if ip:
                 L.append(("kv", "IP", ip, FG))
@@ -10202,7 +10203,7 @@ class App(object):
                 pass
             L.append(("kv", "ADATTATORE" if it else "ADAPTER",
                       ", ".join(devs) if devs else
-                      ("assente" if it else "missing"),
+                      ("missing" if it else "missing"),
                       OK_G if devs else NO_R))
             L.append(("kv", "", "pairing: blueman nel desktop, o muOS" if it
                       else "pairing: blueman in the desktop, or muOS",
@@ -10234,15 +10235,15 @@ class App(object):
              "all three desktop environments.", DIM),
             ("Quando avvii un ambiente o un'app muOS, VoidDesk cede il "
              "posto e chiude (mai un doppio processo che si contende "
-             "schermo e input): e' per questo che il menu e' cosi' "
+             "screen e input): e' per questo che il menu e' cosi' "
              "leggero." if it else "Launching an environment or a muOS "
              "app makes VoidDesk hand off and exit (never a double "
              "process fighting over screen and input): that's why the "
              "menu is this light.", DIM),
             ("__sec__", "PRIMO AVVIO" if it else "FIRST LAUNCH", "start"),
-            ("START SESSION la prima volta installa la base (~400MB, "
-             "serve il WiFi): dopo quello, ogni ambiente si avvia o "
-             "installa in pochi secondi." if it else "START SESSION the "
+            ("START SESSION la prima volta install la base (~400MB, "
+             "serve il WiFi): dopo quello, ogni ambiente si start o "
+             "install in pochi secondi." if it else "START SESSION the "
              "first time installs the base (~400MB, needs WiFi): after "
              "that, each environment launches or installs in seconds.",
              DIM)]),
@@ -10251,7 +10252,7 @@ class App(object):
              "start"),
             ("XFCE // CORE (completo, la megastruttura), IceWM // "
              "TURBO (10MB, velocissimo), LXDE // LIGHT (leggero). A "
-             "avvia; se manca, A lo installa." if it else
+             "start; se manca, A lo install." if it else
              "XFCE // CORE (full, the megastructure), IceWM // TURBO "
              "(10MB, blazing fast), LXDE // LIGHT (light). A launches; "
              "if missing, A installs it.", DIM),
@@ -10278,7 +10279,7 @@ class App(object):
             ("Sigla d'avvio on/off solo per questo ambiente, ripara/"
              "reinstalla pacchetti (apt e' idempotente, sicuro anche "
              "se gia' installati), log di sessione diretto, controlla "
-             "e aggiorna il sistema." if it else "Boot animation on/off "
+             "e update il system." if it else "Boot animation on/off "
              "just for this environment, repair/reinstall packages "
              "(apt is idempotent, safe even if already installed), "
              "direct session log, check and update the system.", DIM),
@@ -10320,7 +10321,7 @@ class App(object):
              "writes a timestamp marker: that's what the START SESSION "
              "box shows as 'last checked'.", DIM),
             ("__sec__", "VOID-DESK UPDATE", "forge"),
-            ("Diverso dal precedente: qui si aggiorna VoidDesk stesso, "
+            ("Diverso dal precedente: qui si update VoidDesk stesso, "
              "non il desktop. Controlla l'ultima release su GitHub, "
              "confronta la versione, scarica e sostituisce solo se il "
              "pacchetto e' valido -- data/ (le tue configurazioni) non "
@@ -10337,12 +10338,12 @@ class App(object):
           "mapps": ("MUOS APPS", [
             ("__sec__", "IL GESTORE" if it else "THE MANAGER", "window"),
             ("Un gestore multifunzione per le app di muOS, non solo un "
-             "lanciatore: le trovi tutte (SD1+SD2), le avvii a schermo "
+             "lanciatore: le trovi tutte (SD1+SD2), le avvii a screen "
              "pieno, poi torni qui." if it else
              "A full multi-function manager for muOS apps, not just a "
              "launcher: every app (SD1+SD2), launched full-screen, then "
              "back here.", DIM),
-            ("R1 sistema le glyph secondo lo standard # ICON: di muOS "
+            ("R1 system le glyph secondo lo standard # ICON: di muOS "
              "su tutte le app in un colpo solo." if it else "R1 fixes "
              "glyphs per muOS # ICON: standard on every app in one "
              "pass.", DIM),
@@ -10357,12 +10358,12 @@ class App(object):
              "ARCHIVE, extended info (path, install date, HELP/ICON/"
              "GRID tags).", DIM),
             ("Proteggi da rimozione: lista tua, in aggiunta a quella "
-             "di sistema. Un'app protetta nasconde 'rimuovi' dalla "
+             "di system. Un'app protetta nasconde 'rimuovi' dalla "
              "lista." if it else "Protect from removal: your own list, "
              "on top of the system one. A protected app hides 'remove' "
              "from the list.", DIM),
             ("Rimuovere un'app da qui non e' possibile dal menu muOS "
-             "originale: le app di sistema (PortMaster, RetroArch, "
+             "originale: le app di system (PortMaster, RetroArch, "
              "PPSSPP...) restano comunque protette per sempre." if it
              else "Removing an app here isn't possible from the native "
              "muOS menu: system apps (PortMaster, RetroArch, PPSSPP...) "
@@ -10380,7 +10381,7 @@ class App(object):
              "backup of the original: X restores it any time.", DIM),
             ("Aggiungi le tue: butta i PNG in assets/glyphs, compaiono "
              "nella griglia. Se non sono a norma, viene chiesta "
-             "conferma prima di convertirli in 22x22 bianco." if it
+             "confirm prima di convertirli in 22x22 bianco." if it
              else "Add your own: drop PNGs in assets/glyphs, they show "
              "up in the grid. If they don't conform, you're asked to "
              "confirm before converting to 22x22 white.", DIM)]),
@@ -10421,7 +10422,7 @@ class App(object):
              "media." if it else "Every diary, grouped by area: "
              "VoidDesk, per-environment sessions (xfce/icewm/lxde "
              "separate), installer, media.", DIM),
-            ("R1 nel visualizzatore attiva la modalita' LIVE: il file "
+            ("R1 nel visualizzatore active la modalita' LIVE: il file "
              "si ricarica da solo, perfetto per guardare una sessione "
              "mentre succede. UP la mette in pausa." if it else "R1 in "
              "the viewer turns on LIVE mode: the file reloads itself, "
@@ -10430,12 +10431,12 @@ class App(object):
             ("__sec__", "BACKUP IMMAGINE" if it else "IMAGE BACKUP",
              "archive"),
             ("Backup compresso di xfce.img in ARCHIVE con percentuale "
-             "live, ripristino con conferma (scrive su file temporaneo, "
+             "live, ripristino con confirm (scrive su file temporaneo, "
              "sostituisce solo a successo)." if it else "Compressed "
              "backup of xfce.img into ARCHIVE with a live percentage, "
              "restore with confirmation (writes to a temp file, swaps "
              "in only on success).", DIM),
-            ("Serve l'immagine smontata: se un desktop e' aperto da "
+            ("Serve l'immagine smontata: se un desktop e' opened da "
              "qualche parte, VoidDesk te lo dice invece di rischiare."
              if it else "Needs the image unmounted: if a desktop is "
              "open somewhere, VoidDesk tells you instead of risking "
@@ -10444,14 +10445,14 @@ class App(object):
             ("__sec__", "LINGUA E TASTIERE" if it else
              "LANGUAGE & KEYBOARDS", "lang"),
             ("Lingua desktop (vale solo per gli ambienti, non per "
-             "l'app) e layout tastiera, sia a schermo (matchbox) sia "
+             "l'app) e layout keyboard, sia a screen (matchbox) sia "
              "fisica (se colleghi una USB)." if it else "Desktop "
              "language (only for the environments, not the app) and "
              "keyboard layout, both on-screen (matchbox) and physical "
              "(if you plug in a USB one).", DIM),
             ("__sec__", "WIFI", "wifi"),
-            ("Interruttore acceso/spento della radio, scansione, "
-             "connetti con tastiera per la password. LED verde+IP "
+            ("Interruttore acceso/off della radio, scansione, "
+             "connetti con keyboard per la password. LED verde+IP "
              "quando online, rosso+OFFLINE quando no." if it else "Radio "
              "on/off switch, scan, join with on-screen keyboard for "
              "the password. Green LED+IP when online, red+OFFLINE when "
@@ -10469,7 +10470,7 @@ class App(object):
              "off), scan, pair+trust+connect in one tap, device info "
              "panel.", DIM),
             ("__sec__", "HOTSPOT", "uplink"),
-            ("Nativo, scritto da zero (hostapd+dnsmasq): sempre pronto, "
+            ("Nativo, scritto da zero (hostapd+dnsmasq): sempre ready, "
              "nessuna app esterna richiesta. 2.4 o 5GHz, interruttore "
              "diretto con Y." if it else "Native, built from scratch "
              "(hostapd+dnsmasq): always ready, no external app "
@@ -10503,7 +10504,7 @@ class App(object):
             ("__sec__", "RETE E FILE" if it else "NETWORK & FILES",
              "folder"),
             ("VOID FILES: file manager completo, clipboard, "
-             "rinomina, elimina con conferma, visualizzatore immagini, "
+             "rinomina, delete con confirm, visualizzatore immagini, "
              "esegue script .sh/.py." if it else "VOID FILES: full "
              "file manager, clipboard, rename, delete with "
              "confirmation, image viewer, runs .sh/.py scripts.", DIM),
@@ -10518,8 +10519,8 @@ class App(object):
              "Tailscale (same socket as the muOS service: peers, ping, "
              "Taildrop, exit node).", DIM),
             ("__sec__", "SVILUPPO" if it else "DEVELOPMENT", "terminal"),
-            ("Terminale con tastiera a schermo. Console Python "
-             "interattiva: namespace persistente, comandi shell col "
+            ("Terminale con keyboard a screen. Console Python "
+             "interactive: namespace persistente, comandi shell col "
              "prefisso !, Y apre ed esegue un file .py dallo storage."
              if it else "Terminal with on-screen keys. Interactive "
              "Python console: persistent namespace, shell commands "
@@ -10527,7 +10528,7 @@ class App(object):
              "storage.", DIM),
             ("__sec__", "INFORMAZIONE" if it else "INFORMATION",
              "globe"),
-            ("RSS Reader: libreria pronta ENG+ITA per categoria (news, "
+            ("RSS Reader: libreria ready ENG+ITA per categoria (news, "
              "tech, linux, gaming, retrogaming, anime), colorata per "
              "categoria; Y sceglie i feed attivi, aggiungi i tuoi in "
              "rss_custom.json." if it else "RSS Reader: ready-made "
@@ -10552,16 +10553,16 @@ class App(object):
              "on top, the session stays exactly as it was underneath.",
              DIM),
             ("__sec__", "LE VOCI" if it else "THE ITEMS", "task"),
-            ("Torna al desktop, diagnosi sistema, risoluzione problemi "
-             "rapida, volume, luminosita', tastiera virtuale, task "
-             "manager, riavvia o chiudi la sessione." if it else "Back "
+            ("Torna al desktop, diagnosi system, risoluzione problemi "
+             "rapida, volume, luminosita', keyboard virtuale, task "
+             "manager, restart o close la sessione." if it else "Back "
              "to the desktop, system check, quick troubleshooting, "
              "volume, brightness, virtual keyboard, task manager, "
              "restart or close the session.", DIM),
             ("__sec__", "ADATTIVO PER AMBIENTE" if it else
              "ADAPTIVE PER ENVIRONMENT", "uplink"),
             ("Colore, nome ('Torna a IceWM', non solo XFCE) e comandi "
-             "di riparazione seguono davvero l'ambiente attivo: ognuno "
+             "di riparazione seguono davvero l'ambiente on: ognuno "
              "usa i propri strumenti (xfwm4/icewm/openbox)." if it else
              "Colour, name ('Back to IceWM', not just XFCE) and repair "
              "commands genuinely follow the active environment: each "
@@ -10720,7 +10721,7 @@ class App(object):
     def normalize_glyphs(self):
         """Convenzione muOS completa: glyph/<nome>.png dove <nome> e' il
         tag '# ICON:' nello script. Se il tag manca, lo aggiungiamo (una
-        riga di commento dopo lo shebang); l'icona trovata viene copiata
+        riga di commento dopo lo shebang); l'icona found viene copiata
         col nome giusto, e a chi non ha nulla generiamo la glyph SPDW."""
         import re as _re
         import shutil
@@ -10959,11 +10960,11 @@ class App(object):
 
     def _backdrop_corners(self, t):
         """I quattro accenti animati agli angoli, fissi rispetto allo
-        schermo (non scorrono col fondo): ingranaggio in basso a sx,
+        screen (non scorrono col fondo): ingranaggio in basso a sx,
         rombo in basso a dx, griglia in alto a dx, linea curva in alto
         a sx. Sobri apposta -- decorano, non distraggono. Il livello
         0-5 dalle opzioni aggiunge un elemento in piu' a ogni soglia,
-        non e' un semplice acceso/spento."""
+        non e' un semplice acceso/off."""
         lvl = self.cfg.get("vfx_bg", 3)
         if lvl <= 0:
             return
@@ -11404,7 +11405,7 @@ class App(object):
     def _nexus_sync_sel(self):
         """Il resto dell'app (activate(), ecc.) ragiona ancora su un
         indice piatto self.sel: lo tengo allineato al nodo che si
-        trova davvero al punto di aggancio dell'anello attivo."""
+        trova davvero al punto di aggancio dell'anello on."""
         ring_list = self._nexus_ring_list(self.nexus_ring)
         rot = self._nexus_ring_rot(self.nexus_ring)
         self.sel = ring_list[rot % len(ring_list)]
@@ -11428,7 +11429,7 @@ class App(object):
         return x, y
 
     def _nexus_to_screen(self, wx, wy, sel_wx, sel_wy, zoom):
-        """Da coordinate di mondo a schermo: la zona di selezione
+        """Da coordinate di mondo a screen: la zona di selezione
         resta fissa a sinistra, e' il mondo che pan-na e si
         ridimensiona per portarci dentro il nodo scelto -- il
         pianeta selezionato finisce sempre esattamente li', qualunque
@@ -11545,8 +11546,8 @@ class App(object):
             shade = 0.60 + 0.40 * depth
             col = tuple(min(255, int(c * shade)) for c in raw_col)
             if sel:
-                halo_a = int(55 * (0.5 + 0.5 * math.sin(t_now * 3.0)))
-                for gr in (r + 12, r + 5):
+                halo_a = int(75 * (0.5 + 0.5 * math.sin(t_now * 3.0)))
+                for gr in (r + 16, r + 7):
                     s = pygame.Surface((gr * 2 + 4, gr * 2 + 4),
                                        pygame.SRCALPHA)
                     pygame.draw.circle(s, col + (halo_a,),
@@ -11566,7 +11567,7 @@ class App(object):
         """START SESSION come una piccola stella, non un pianeta: la
         piu' grande di tutte, aura calda pulsante, corona di piccoli
         brillamenti -- il centro attorno a cui gli altri girano
-        davvero (anche se sullo schermo si sposta pure lei, quando
+        davvero (anche se sullo screen si sposta pure lei, quando
         il focus e' altrove, esattamente come il resto del
         planetario)."""
         col = NEXUS_NODE_COLOR.get(0, (255, 205, 120))
@@ -11671,7 +11672,7 @@ class App(object):
         di selezione resta fissa a sinistra: e' il planetario che si
         sposta e si ridimensiona in base al nodo scelto. Sinistra/
         Destra sposta il focus su un'altra orbita, Su/Giu' al
-        pianeta successivo/precedente su quella attiva."""
+        pianeta successivo/precedente su quella active."""
         self.header("__brand__")
         self._nexus_bg()
         self._nexus_draw_scene()
@@ -11685,7 +11686,7 @@ class App(object):
                      ("R2", "USER ID")])
 
     def nexus_ring_rotate(self, direction):
-        """Sposta il focus di uno scatto sull'orbita attiva (Su/
+        """Sposta il focus di uno scatto sull'orbita active (Su/
         Giu'): il planetario pan-na e si ridimensiona con continuita'
         dalla posizione del pianeta attuale a quella del successivo/
         precedente -- niente scatti, e la deriva orbitale continua a
@@ -11719,7 +11720,7 @@ class App(object):
     def nexus_ring_switch(self, direction):
         """Sposta il focus sull'orbita interna/esterna successiva
         (Sinistra/Destra): il planetario pan-na dalla posizione del
-        pianeta attivo dell'orbita attuale a quello dell'orbita
+        pianeta on dell'orbita attuale a quello dell'orbita
         nuova -- tutte le orbite restano visibili per tutto il
         tempo, e' solo l'inquadratura (e lo zoom) che cambia. v10.6:
         il limite arriva a 3, la nuova orbita lontana di END NODE."""
@@ -12005,7 +12006,7 @@ class App(object):
 
     def handoff(self, label):
         """Ultimo frame prima di passare la mano a uno script esterno:
-        lo schermo cambia SUBITO, poi vd_loader continua l'animazione."""
+        lo screen cambia SUBITO, poi vd_loader continua l'animazione."""
         self.backdrop()
         pw, ph = 420, 120
         px, py = (W - pw) // 2, (H - ph) // 2
@@ -12190,9 +12191,9 @@ class App(object):
         self.surface.blit(img, (ix, iy))
 
     def triage_backdrop(self):
-        """Sfondo pronto soccorso: tinta pallida clinica, griglia
-        sottile stile cartella medica, una linea ECG che pulsa
-        attraversando lo schermo."""
+        """Sfondo ready soccorso: tinta pallida clinica, griglia
+        sottile stile folder medica, una linea ECG che pulsa
+        attraversando lo screen."""
         self.surface.set_clip(pygame.Rect(0, 44, W, H - 44))
         self.surface.fill((246, 244, 240), (0, 44, W, H - 44))
         for gx in range(0, W, 24):
@@ -12350,7 +12351,7 @@ class App(object):
         if not needed:
             return []
         if not os.path.exists(os.path.join(DATA, ".xfce_ready")):
-            log("base XFCE non pronta (.xfce_ready assente)")
+            log("base XFCE non ready (.xfce_ready missing)")
             return None
         root = os.path.join(DATA, "xfce_mnt")
         was_mounted = imgmount.is_mounted(root)
@@ -12360,7 +12361,7 @@ class App(object):
                 os.path.join(DATA, "xfce.img"), root, ro=True)
             log("mount fresco (ro): ok=%r err=%r" % (ok, _e))
             if not ok:
-                log("mount fallito: assumo tutto mancante")
+                log("mount failed: assumo tutto mancante")
                 return list(needed)
         missing = []
         try:
@@ -12386,7 +12387,7 @@ class App(object):
         finally:
             if not was_mounted:
                 imgmount.umount_tree(root)
-                log("smontato (era stato montato fresco da qui)")
+                log("unmounted (it was fresh-mounted from here)")
         return missing
 
     def deps_dialog_open(self, feature_key, icon, title):
@@ -12405,7 +12406,7 @@ class App(object):
         return False
 
     def scan_status(self):
-        """Monta l'immagine in sola lettura, verifica i file, poi smonta
+        """Monta l'immagine in sola lettura, verify i file, poi smonta
         e LIBERA il loop (altrimenti dopo qualche giro i loop finiscono
         e l'installazione non riesce piu' a montare)."""
         img = os.path.join(DATA, "xfce.img")
@@ -12572,7 +12573,7 @@ class App(object):
         L = []
         st = self.status_snapshot()
 
-        L.append(("sec", "xorg", "SISTEMA"))
+        L.append(("sec", "xorg", "SYSTEM"))
         try:
             un = os.uname()
             L.append(("kv", "KERNEL", "%s %s" % (un.sysname, un.release), FG))
@@ -12607,7 +12608,7 @@ class App(object):
         if t:
             L.append(("kv", "TEMPERATURA", t, FG))
 
-        L.append(("sec", "task", "MEMORIA"))
+        L.append(("sec", "task", "MEMORY"))
         tot = avail = 0
         try:
             for ln in open("/proc/meminfo"):
@@ -12623,7 +12624,7 @@ class App(object):
                       (used // 1024, tot // 1024),
                       NO_R if used * 100 // tot > 85 else FG))
 
-        L.append(("sec", "disk", "ARCHIVIAZIONE"))
+        L.append(("sec", "disk", "STORAGE"))
         for lbl, p in (("SD1 (mmc)", "/mnt/mmc"), ("SD2 (sdcard)",
                                                    "/mnt/sdcard")):
             free, tt = disk_free(p)
@@ -12636,19 +12637,19 @@ class App(object):
         if os.path.exists(img):
             L.append(("kv", "IMMAGINE XFCE", human(os.path.getsize(img)), FG))
 
-        L.append(("sec", "wifi", "RETE"))
+        L.append(("sec", "wifi", "NETWORK"))
         wtxt = st["ssid"] or ("connesso" if st.get("conn") else
-                              "non connesso")
+                              "not connected")
         L.append(("kv", "WIFI", wtxt, OK_G if st.get("conn") else DIM))
         if st.get("iface"):
-            L.append(("kv", "INTERFACCIA", st["iface"], FG))
+            L.append(("kv", "INTERFACE", st["iface"], FG))
         if st["wifi"] is not None:
             L.append(("kv", "SEGNALE", "%d/3 tacche" % st["wifi"], FG))
         addr = st.get("ip")
         L.append(("kv", "INDIRIZZO IP", addr or "n/d", FG if addr else DIM))
         L.append(("kv", "BLUETOOTH",
                   "n/d" if st["bt"] is None else
-                  ("attivo" if st["bt"] else "spento"),
+                  ("on" if st["bt"] else "off"),
                   OK_G if st["bt"] else DIM))
         L.append(("kv", "INTERNET", net_test(), FG))
 
@@ -12658,7 +12659,7 @@ class App(object):
 
         L.append(("sec", "desktop", "DESKTOP XFCE"))
         ready = os.path.exists(os.path.join(DATA, ".xfce_ready"))
-        L.append(("kv", "STATO", "installato" if ready else "non installato",
+        L.append(("kv", "STATUS", "installed" if ready else "non installed",
                   OK_G if ready else NO_R))
         last = ""
         try:
@@ -12677,7 +12678,7 @@ class App(object):
 
         L.append(("sec", "gear", "CHOU HENKA"))
         bon = self.cfg.get("boost", True)
-        L.append(("kv", "STATO", "attivo" if bon else "spento",
+        L.append(("kv", "STATUS", "on" if bon else "off",
                   OK_G if bon else DIM))
         binfo = []
         try:
@@ -12700,7 +12701,7 @@ class App(object):
         miss = [c for c in ("curl", "gzip", "tar", "chroot", "mount")
                 if not any(os.access(os.path.join(d, c), os.X_OK)
                            for d in os.environ.get("PATH", "").split(":"))]
-        L.append(("kv", "DIPENDENZE",
+        L.append(("kv", "DEPENDENCIES",
                   ("tutte presenti" if self.lang == "it" else "all present")
                   if not miss else
                   (("mancanti: %s" if self.lang == "it" else "missing: %s")
@@ -12711,19 +12712,19 @@ class App(object):
         it = (self.lang == "it")
         L = [("sec", "info", "VOID SUITE")]
         L.append(("kv", "VOIDDESK", "v%s  -  %s" % (VERSION,
-                  ("pannello di controllo + desktop XFCE" if it
+                  ("pannello di check + desktop XFCE" if it
                    else "control panel + XFCE desktop")), FG))
         L.append(("kv", "VOIDCAST", "v2.2  -  %s" %
                   ("IPTV, EPG, registrazione" if it
                    else "IPTV, EPG, recording"), FG))
         L.append(("kv", "VOIDDIAG", "v1.5  -  %s" %
                   ("report diagnostico" if it else "diagnostic report"), FG))
-        L.append(("sec", "xorg", "PIATTAFORMA" if it else "PLATFORM"))
+        L.append(("sec", "xorg", "PLATFORM" if it else "PLATFORM"))
         L.append(("kv", "TARGET", "Anbernic RG35XX-H", FG))
         L.append(("kv", "OS", "muOS 2601 Jacaranda", FG))
         L.append(("kv", "DESKTOP", "Ubuntu 24.04 + XFCE (chroot ext4)", FG))
         L.append(("kv", "UI", "pygame su /dev/fb0, input evdev", FG))
-        L.append(("sec", "gear", "COME FUNZIONA" if it else "HOW IT WORKS"))
+        L.append(("sec", "gear", "HOW IT WORKS" if it else "HOW IT WORKS"))
         for t in (("immagine ext4 in loopback: aggira i limiti di exFAT"
                    if it else
                    "loopback ext4 image: works around exFAT limits"),
@@ -12734,7 +12735,7 @@ class App(object):
                   ("START+SELECT: pannello LIVE sopra XFCE"
                    if it else "START+SELECT: LIVE panel over XFCE")):
             L.append(("kv", "", t, DIM))
-        L.append(("sec", "git", "CREDITI" if it else "CREDITS"))
+        L.append(("sec", "git", "CREDITS" if it else "CREDITS"))
         L.append(("kv", "SPDW FACTORY", "Void suite - universo ß", FG))
         L.append(("kv", "MustardOS", "muOS - mustard.foo", DIM))
         L.append(("kv", "MrJackSpade", "RG35XXP-XFCE (ispirazione)"
@@ -12792,7 +12793,7 @@ class App(object):
                   "source.", DIM))
         L.append(("kv", "ETHOS STORE" if it else "ETHOS STORE",
                   "in arrivo" if it else "coming", self.accent))
-        L.append(("kv", "", "una casa aperta a chi costruisce, senza "
+        L.append(("kv", "", "una casa opened a chi costruisce, senza "
                   "il rischio di essere sfrattati." if it else
                   "an open home for builders, without the risk of "
                   "getting evicted.", DIM))
@@ -12842,7 +12843,7 @@ class App(object):
 
     def logs_archive(self, dest_root):
         """Zip di tutti i log del registro (build_logs()), in una
-        cartella dedicata sulla destinazione scelta. Ritorna
+        folder dedicata sulla destinazione scelta. Ritorna
         (ok, messaggio/percorso)."""
         import zipfile
         dbg = os.path.join(LOGS_DIR, "log_archive.log")
@@ -12859,7 +12860,7 @@ class App(object):
             out_dir = os.path.join(dest_root, "MUOS", "application",
                                    "VoidDesk", "data", "LogArchive")
             os.makedirs(out_dir, exist_ok=True)
-            log("cartella pronta: %s" % out_dir)
+            log("folder ready: %s" % out_dir)
             stamp = time.strftime("%Y%m%d_%H%M%S")
             out_path = os.path.join(out_dir,
                                     "VoidLogsArchive_%s.zip" % stamp)
@@ -12878,9 +12879,9 @@ class App(object):
                             z.write(path, arcname)
                             n += 1
                         except OSError as e:
-                            log("  errore scrivendo %s nello zip: %r" %
+                            log("  error scrivendo %s nello zip: %r" %
                                 (path, e))
-            log("completato: %s, %d file inclusi" % (out_path, n))
+            log("completed: %s, %d file inclusi" % (out_path, n))
             try:
                 fd = os.open(out_path, os.O_RDONLY)
                 os.fsync(fd)
@@ -12889,7 +12890,7 @@ class App(object):
                 os.fsync(dfd)
                 os.close(dfd)
             except OSError as e:
-                log("fsync non riuscito (non fatale): %r" % e)
+                log("fsync failed (non fatale): %r" % e)
             return True, (out_path, n)
         except Exception as e:
             log("ECCEZIONE: %r" % e)
@@ -12934,7 +12935,7 @@ class App(object):
               os.path.join(LOGS_DIR, "bootstrap.log")),
             E("post_install_check.log",
               os.path.join(LOGS_DIR, "post_install_check.log")),
-            H("RETE" if it else "NETWORK"),
+            H("NETWORK" if it else "NETWORK"),
             E("hotspot.log", os.path.join(LOGS_DIR, "hotspot.log")),
             E("syncthing.log", os.path.join(LOGS_DIR, "syncthing.log")),
             H("MEDIA"),
@@ -13017,13 +13018,13 @@ class App(object):
             return ("kv", k, v, c)
 
         L = [("sec", "gamepad", "NEL MENU" if it else "IN THE MENU")]
-        L.append(kv("A / B", "conferma / indietro" if it
+        L.append(kv("A / B", "confirm / indietro" if it
                     else "confirm / back"))
         L.append(kv("SX / DX", "salta di categoria (componenti)" if it
                     else "jump by category (components)"))
-        L.append(kv("X / Y", "seleziona / tutti-nessuno" if it
+        L.append(kv("X / Y", "select / tutti-nessuno" if it
                     else "mark / all-none"))
-        L.append(kv("R1", "aggiorna lo stato dei componenti" if it
+        L.append(kv("R1", "update lo stato dei componenti" if it
                     else "refresh component status"))
         L.append(("sec", "desktop", "DENTRO XFCE" if it else "INSIDE XFCE"))
         L.append(kv("STICK", "muove il mouse" if it else "moves the mouse"))
@@ -13031,7 +13032,7 @@ class App(object):
                     else "left / right click"))
         L.append(kv("L1 / R1", "rotella giu' / su" if it
                     else "wheel down / up"))
-        L.append(kv("MENU", "tastiera a schermo" if it
+        L.append(kv("MENU", "keyboard a screen" if it
                     else "on-screen keyboard"))
         L.append(kv("START+SELECT", "pannello LIVE (volume, esci...)" if it
                     else "LIVE panel (volume, quit...)", self.accent))
@@ -13059,7 +13060,7 @@ class App(object):
                 txt = f.read()[-40000:].decode("utf-8", "replace")
             self.log_lines = txt.splitlines()[-400:] or ["(vuoto)"]
         except OSError:
-            self.log_lines = ["file non trovato:", path]
+            self.log_lines = ["file not found:", path]
         self.scroll = max(0, len(self.log_lines) - 23)
 
     # ------------------------------------------------------------- opzioni
@@ -13114,7 +13115,7 @@ class App(object):
         return None
 
     def apply_map(self):
-        """Scrive il layout personalizzato e attiva il profilo custom."""
+        """Scrive il layout personalizzato e active il profilo custom."""
         self.cfg["controller"] = "custom"
         write_custom_layout(self.cfg, os.path.join(DATA,
                                                    "qjoypad_custom.lyt"))
@@ -13648,7 +13649,7 @@ class App(object):
                     self.info_lines = [
                         ("sec", "shield", "DOPPEL-DEFENDER"),
                         ("kv", "", name, DIM),
-                        ("kv", "", "nessun doppione trovato" if
+                        ("kv", "", "nessun doppione found" if
                          self.lang == "it" else "no duplicates found",
                          OK_G)]
                     self.scroll = 0
@@ -13715,7 +13716,7 @@ class App(object):
                       if self.lang == "it" else
                       "%d files, cannot be undone" % n_mark)
                 self.confirm = (
-                    ("elimina %d file selezionati?" % n_mark if
+                    ("delete %d file selezionati?" % n_mark if
                      self.lang == "it" else
                      "delete %d selected files?" % n_mark),
                     go, "DOPPEL-DEFENDER", "shield", sub)
@@ -13953,7 +13954,7 @@ class App(object):
                             dest))
                     if ok:
                         path, cnt = res
-                        msg = (("archivio creato: %s (%d file)" %
+                        msg = (("archivio created: %s (%d file)" %
                                (path, cnt)) if self.lang == "it" else
                                ("archive created: %s (%d files)" %
                                (path, cnt)))
@@ -14065,7 +14066,7 @@ class App(object):
                     self.play_clock_gaze(entering=False)
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim clock uscita non riuscita: %s\n"
+                        "bootanim clock uscita failed: %s\n"
                         % e)
                 self.pop_state()
         elif top == "stopwatch":
@@ -14137,7 +14138,7 @@ class App(object):
                 ok, err = self.run_busy(self.t("checking"),
                                         lambda: self.radio_play(st))
                 if not ok:
-                    self.notify(("Riproduzione fallita" if
+                    self.notify(("Riproduzione failed" if
                                 self.lang == "it" else
                                 "Playback failed"), err, "warning")
                 else:
@@ -14157,7 +14158,7 @@ class App(object):
                             lambda: self.radio_search(q)) or []
                     except Exception as e:
                         self.radio_search_results = []
-                        self.notify(("Ricerca fallita" if
+                        self.notify(("Ricerca failed" if
                                     self.lang == "it" else
                                     "Search failed"), str(e)[:60],
                                    "warning")
@@ -14189,7 +14190,7 @@ class App(object):
                 if ok:
                     self.pop_state()
                 else:
-                    self.notify(("Riproduzione fallita" if
+                    self.notify(("Riproduzione failed" if
                                 self.lang == "it" else
                                 "Playback failed"), err, "warning")
             elif btn == "Y" and n:
@@ -14504,7 +14505,7 @@ class App(object):
                         self.play_calc_lid(opening=False)
                     except Exception as e:
                         sys.stderr.write(
-                            "bootanim calc chiusura non riuscita: "
+                            "bootanim calc chiusura failed: "
                             "%s\n" % e)
                     self.pop_state()
                 return
@@ -14540,7 +14541,7 @@ class App(object):
                     self.play_calc_lid(opening=False)
                 except Exception as e:
                     sys.stderr.write(
-                        "bootanim calc chiusura non riuscita: %s\n"
+                        "bootanim calc chiusura failed: %s\n"
                         % e)
                 self.pop_state()
             self.calc_sel = r * C + c
@@ -15165,7 +15166,7 @@ class App(object):
             elif btn == "Y":
                 self.hotcfg_save(self.hotcfg_ssid, self.hotcfg_pass)
                 self.info_lines = self.stub_lines(
-                    "HOTSPOT", [("salvato: %s" % self.hotcfg_ssid)
+                    "HOTSPOT", [("saved: %s" % self.hotcfg_ssid)
                                if self.lang == "it" else
                                ("saved: %s" % self.hotcfg_ssid)])
                 self.scroll = 0
@@ -15246,7 +15247,7 @@ class App(object):
                             lambda: self.update_download_install(
                                 asset_url))
                         L = [("sec", "gear", "OK" if ok else
-                             ("errore" if it else "error"))]
+                             ("error" if it else "error"))]
                         L.append(("kv", "", msg,
                                  OK_G if ok else NO_R))
                         self.info_lines = L
@@ -15267,7 +15268,7 @@ class App(object):
                     L.append(("kv", "", latest.get("html_url", ""),
                              DIM))
                     L.append(("kv", "", ("nessun file scaricabile "
-                              "allegato -- apri la pagina e scarica "
+                              "allegato -- open la pagina e scarica "
                               "a mano" if it else
                               "no downloadable file attached -- "
                               "open the page and download "
@@ -15285,13 +15286,13 @@ class App(object):
                         self.t("checking"),
                         lambda: self.update_install_from_zip(path))
                     L = [("sec", "gear", "OK" if ok else
-                         ("errore" if it else "error"))]
+                         ("error" if it else "error"))]
                     L.append(("kv", "", msg, OK_G if ok else NO_R))
                     self.info_lines = L
                     self.scroll = 0
                     self.push("info")
                 self.confirm = ((
-                    "Installare v%s trovato su SD? VoidDesk andrà "
+                    "Installare v%s found su SD? VoidDesk andrà "
                     "riavviato a mano dopo." % ver if it else
                     "Install v%s found on SD? You'll need to "
                     "restart VoidDesk afterwards." % ver),
@@ -15412,7 +15413,7 @@ class App(object):
                 def go():
                     self.ctrl_delete_profile(profile_name)
                     self.ctrl_profile_sel = 0
-                self.confirm = (("Elimina profilo %s?" % profile_name if
+                self.confirm = (("Delete profilo %s?" % profile_name if
                                  self.lang == "it" else
                                  "Delete profile %s?" % profile_name),
                                 go)
@@ -15430,7 +15431,7 @@ class App(object):
                 self.ctrl_map_sel = (self.ctrl_map_sel + 1) % n
             elif btn == "X" and dev:
                 # cattura un tasto fisico per una riga NUOVA -- stessa
-                # finestra usata per riassegnarne una esistente
+                # window usata per riassegnarne una esistente
                 self.ctrl_capture_target = "__new__"
                 self.ctrl_capturing = True
                 self.ctrl_capture_t0 = time.time()
@@ -15438,7 +15439,7 @@ class App(object):
                 self.push("ctrlcapture")
             elif btn == "A" and n and dev:
                 # cattura un tasto fisico per RIASSEGNARE la riga
-                # selezionata: stessa modalita' (finestra grande,
+                # selezionata: stessa modalita' (window grande,
                 # attesa del tasto, countdown) della sezione
                 # "Mappatura tasti", qui applicata alla sorgente
                 # giusta (il dispositivo esterno, non il pad interno)
@@ -15585,12 +15586,12 @@ class App(object):
                 it = (self.lang == "it")
                 if self.bak_sel == 0:
                     r = self.run_busy("...", self.bak_create)
-                    msg = {"no-img": "immagine assente" if it
+                    msg = {"no-img": "immagine missing" if it
                            else "no image",
-                           "mounted": "smonta prima l'immagine (chiudi "
+                           "mounted": "smonta prima l'immagine (close "
                            "il desktop)" if it else
                            "unmount the image first",
-                           "err": "backup fallito: spazio?" if it
+                           "err": "backup failed: spazio?" if it
                            else "backup failed: space?"}.get(
                                r, (r or ""))
                     self.info_lines = self.stub_lines(
@@ -15706,7 +15707,7 @@ class App(object):
                     self.push("bgmproc")
                 self.confirm = ((
                     "Normalizzare %d file? Verranno convertiti in "
-                    "OGG in una cartella BGM_normalized." %
+                    "OGG in una folder BGM_normalized." %
                     len(self.bgm_marked) if it else
                     "Normalize %d files? They'll be converted to "
                     "OGG in a BGM_normalized folder." %
@@ -16069,9 +16070,9 @@ class App(object):
                 it = (self.lang == "it")
                 self.info_lines = self.stub_lines(
                     "VOID DIAG",
-                    [("referto salvato: %s" % res if it else
+                    [("referto saved: %s" % res if it else
                      "report saved: %s" % res) if ok else
-                     (("errore: %s" % res) if it else
+                     (("error: %s" % res) if it else
                       ("error: %s" % res))])
                 self.scroll = 0
                 self.info_title = "VOID DIAG"
@@ -16106,7 +16107,7 @@ class App(object):
                 self.viewer_live = False
                 self.pop_state()
         else:
-            # rete di sicurezza: uno stato senza gestore non deve MAI piu'
+            # network di sicurezza: uno stato senza gestore non deve MAI piu'
             # murare la console. B torna sempre indietro.
             if btn == "B" and len(self.stack) > 1:
                 self.pop_state()
@@ -16182,8 +16183,8 @@ class App(object):
         """Cerca un pacchetto .muxapp con versione più recente nelle
         cartelle ARCHIVE di SD1 e SD2 (stessi punti di mount usati
         altrove nel progetto). Ritorna (percorso, 'X.Y') del
-        migliore trovato, o (None, None) se nessuno supera la
-        versione installata."""
+        migliore found, o (None, None) se nessuno supera la
+        versione installed."""
         cur = tuple(int(p) for p in VERSION.split("."))
         best_path, best_ver = None, cur
         for mount, _label in (("/mnt/mmc", "SD1"),
@@ -16213,10 +16214,10 @@ class App(object):
         return None, None
 
     def update_install_from_zip(self, zip_path):
-        """Verifica, estrae in una cartella temporanea e SOLO se
+        """Verify, estrae in una folder temporanea e SOLO se
         tutto e' andato bene sovrascrive l'app dal vivo -- data/ non
         viene mai toccata. Condivisa dal percorso online (scaricato
-        da GitHub) e da quello locale (trovato su SD). Ritorna
+        da GitHub) e da quello locale (found su SD). Ritorna
         (ok, messaggio)."""
         import zipfile
         import shutil
@@ -16238,7 +16239,7 @@ class App(object):
                 break
         if not root:
             shutil.rmtree(stage, ignore_errors=True)
-            return False, ("pacchetto trovato ma senza desk/main.py: "
+            return False, ("pacchetto found ma senza desk/main.py: "
                           "aggiornamento annullato per sicurezza")
 
         try:
@@ -16254,12 +16255,12 @@ class App(object):
                     shutil.copy2(src, dst)
         except Exception as e:
             shutil.rmtree(stage, ignore_errors=True)
-            return False, "copia fallita: %s" % str(e)[:100]
+            return False, "copia failed: %s" % str(e)[:100]
         shutil.rmtree(stage, ignore_errors=True)
-        return True, "aggiornato: riavvia VoidDesk per applicarlo"
+        return True, "aggiornato: restart VoidDesk per applicarlo"
 
     def update_download_install(self, url, progress_cb=None):
-        """Scarica da un URL, poi affida verifica+installazione vera
+        """Scarica da un URL, poi affida verify+installazione vera
         a update_install_from_zip (condivisa col percorso locale).
         Ritorna (ok, messaggio)."""
         import urllib.request
@@ -16282,7 +16283,7 @@ class App(object):
                         if progress_cb and total:
                             progress_cb(min(99, done * 100 // total))
         except Exception as e:
-            return False, "download fallito: %s" % str(e)[:100]
+            return False, "download failed: %s" % str(e)[:100]
         try:
             return self.update_install_from_zip(tmp_zip)
         finally:
@@ -16330,11 +16331,11 @@ class App(object):
                   "(xterm on X, not the fake pygame shell).", FG))
         L.append(("sec", "terminal", "CLI ARSENAL"))
         L.append(("kv", "", "L'elenco dei tool pronti da lanciare "
-                  "subito. Seleziona, premi A." if it else
+                  "subito. Seleziona, press A." if it else
                   "The list of tools ready to launch right away. "
                   "Select, press A.", DIM))
         L.append(("sec", "pkg", "CLI INSTALLER"))
-        L.append(("kv", "", "Installa e rimuove i CLI tool. X segna "
+        L.append(("kv", "", "Install e rimuove i CLI tool. X segna "
                   "una voce, Y segna/toglie tutte, L1/R1 passano tra "
                   "Installer e Uninstaller, START esegue quanto "
                   "selezionato. A apre la scheda dettaglio di un "
@@ -16352,8 +16353,8 @@ class App(object):
                   "curl and fzf.", DIM))
         L.append(("sec", "keyboard", "TASTIERA NEL TERMINALE" if it
                   else "KEYBOARD IN THE TERMINAL"))
-        L.append(("kv", "", "Nessuna tastiera fisica? Il tasto "
-                  "dedicato (MENU) apre/chiude la tastiera a schermo, "
+        L.append(("kv", "", "Nessuna keyboard fisica? Il tasto "
+                  "dedicato (MENU) apre/chiude la keyboard a screen, "
                   "esattamente come nei desktop XFCE/IceWM/LXDE. "
                   "START+SELECT apre il pannello LIVE." if it else
                   "No physical keyboard? The dedicated key (MENU) "
@@ -16363,11 +16364,11 @@ class App(object):
         return L
 
     def cliinst_execute(self, force=False):
-        """Installa o rimuove i CLI tool selezionati. ani-cli (script
+        """Install o rimuove i CLI tool selezionati. ani-cli (script
         GitHub, non apt) viene gestito subito e a parte; i pacchetti
         apt veri passano per il meccanismo standard di FORGE (stesso
         percorso collaudato del Void Installer). force=True salta il
-        filtro "gia' installato": serve per Reinstall, dove il tool
+        filtro "gia' installed": serve per Reinstall, dove il tool
         e' li' apposta."""
         idxs = sorted(self.cliinst_marked) or [self.cliinst_sel]
         apt_names, apt_pkgs = [], []
@@ -16446,7 +16447,7 @@ class App(object):
         self.running = False
 
     def open_shell(self, auto_cmd=None):
-        """Terminale con tastiera a schermo (dentro il chroot se montato).
+        """Terminale con keyboard a screen (dentro il chroot se montato).
         Se auto_cmd e' dato, lo esegue subito -- e' cosi' che i CLI
         tools si aprono direttamente nel loro programma."""
         img = os.path.join(DATA, "xfce.img")
@@ -16657,7 +16658,7 @@ class App(object):
                 os.execv(sys.executable,
                         [sys.executable] + sys.argv)
             except Exception as e:
-                sys.stderr.write("riavvio app fallito: %s\n" % e)
+                sys.stderr.write("riavvio app failed: %s\n" % e)
                 sys.exit(0)
             return
         if key == "reboot":
@@ -16688,7 +16689,7 @@ class App(object):
                 self.play_menu_transition(i)
             except Exception as e:
                 sys.stderr.write(
-                    "transizione menu non riuscita: %s\n" % e)
+                    "transizione menu failed: %s\n" % e)
         # nelle viste orbitali (orbit/nexus) i nodi sono sfere: la
         # transizione di apertura deve "esplodere" da un cerchio, non
         # da un rettangolo, per restare coerente con la loro forma.
@@ -16723,7 +16724,7 @@ class App(object):
     # -------------------------------------------------------------- render
     def render_home_hud(self):
         """HUD futuristico: pannelli angolari con taglio doppio, bagliori,
-        parentesi da mirino sulla voce attiva, scanline che scorre."""
+        parentesi da mirino sulla voce active, scanline che scorre."""
         self.surface.fill(BG)
         pygame.draw.rect(self.surface, INK, (0, 0, W, 40))
         pygame.draw.line(self.surface, self.accent, (0, 40), (W, 40), 2)
@@ -16821,7 +16822,7 @@ class App(object):
 
     def render_home_orbit(self):
         """Menu radiale: gli hub orbitano attorno al marchio centrale,
-        la voce attiva si illumina e mostra i dettagli in alto."""
+        la voce active si illumina e mostra i dettagli in alto."""
         self.surface.fill(BG)
         cx, cy, r = W // 2, H // 2 + 6, 128
         for ring in (r, r - 30):
@@ -17158,7 +17159,7 @@ class App(object):
                               self.f_tiny, FAINT, maxw=dw + 4)
                 y += 44
             foot = [("A", (("rimuovi" if it else "remove") if rm else
-                           ("installa" if it else "install"))
+                           ("install" if it else "install"))
                      + ((" (%d)" % n) if n else "")),
                     ("X", "sel"), ("Y", "tutti" if it else "all"),
                     ("START", "+/-" ), ("SEL", "scan")]
@@ -17293,7 +17294,7 @@ class App(object):
                     self.text(app["sd"], (84, y + 34), self.f_tiny,
                               FAINT)
                     if qi["date"]:
-                        self.text(("installata " if it else "installed ")
+                        self.text(("installed " if it else "installed ")
                                   + qi["date"], (84, y + 52),
                                   self.f_tiny, FAINT)
                     if qi["help"]:
@@ -17409,8 +17410,8 @@ class App(object):
             trigreen = (30, 140, 60)
             self.npanel(16, 50, W - 32, 34, border=trired, fill=
                        (238, 235, 230), cut=8)
-            status_txt = (("scansione in corso..." if idx < n else
-                          "scansione completata") if it else
+            status_txt = (("scansione working..." if idx < n else
+                          "scansione completed") if it else
                           ("scanning..." if idx < n else "scan complete"))
             self.text(status_txt, (28, 58), self.f_med,
                       trired if idx < n else trigreen)
@@ -17433,12 +17434,12 @@ class App(object):
             if idx >= n:
                 if len(self.diag_scan_results) < 3:
                     self.diag_scan_results.append(
-                        ("kv", "", "tutto in ordine" if it else
+                        ("kv", "", "all good" if it else
                          "all clear", OK_G))
                 self.info_lines = self.diag_scan_results
                 self.scroll = 0
                 self.stack[-1] = "diagresult"
-            self.footer([("B", ("annulla" if it else "cancel")
+            self.footer([("B", ("cancel" if it else "cancel")
                          if idx < n else self.t("back"))])
         elif top == "diagresult":
             it = (self.lang == "it")
@@ -17478,17 +17479,17 @@ class App(object):
             self.content_panel(46, H - 40)
             done, rc = snap["done"], snap["rc"]
             if not done:
-                phase_txt = ("verifica in corso..." if snap["phase"] ==
-                             "verify" else "conversione in corso...") \
+                phase_txt = ("verify working..." if snap["phase"] ==
+                             "verify" else "conversione working...") \
                     if it else (("verifying..." if snap["phase"] ==
                                 "verify" else "converting..."))
                 col = self.accent
             elif rc == 0:
-                phase_txt = "completato con successo" if it else \
+                phase_txt = "completed con successo" if it else \
                     "completed successfully"
                 col = OK_G
             else:
-                phase_txt = "operazione fallita (rc=%s)" % rc
+                phase_txt = "operazione failed (rc=%s)" % rc
                 col = NO_R
             self.text(phase_txt, (20, 56), self.f_med, col)
             pw = W - 40
@@ -17630,7 +17631,7 @@ class App(object):
                            border=NO_R, fill=INK, cut=4)
                 self.text(ctxt, (W - ctw - 14, input_y + 6),
                           self.f_tiny, NO_R)
-            # tastiera a schermo, se visibile
+            # keyboard a screen, se visibile
             if kbdv:
                 ky = input_y + input_h + 4
                 r0 = 0
@@ -17677,7 +17678,7 @@ class App(object):
             items = [
                 ("riga numeri sempre visibile" if it else
                  "always show number row", self.rtsh_show_numrow),
-                ("riga sistema/hotkey sempre visibile" if it else
+                ("riga system/hotkey sempre visibile" if it else
                  "always show system/hotkey row",
                  self.rtsh_show_sysrow),
                 ("modifica simboli riga numeri" if it else
@@ -17801,7 +17802,7 @@ class App(object):
             sd2w = self.f_small.size("SD2")[0]
             self.text("SD2", (W - 40 - sd2w, 52), self.f_small, c1)
             if not self.chd_sd_list:
-                self.text("nessuna cartella ROMS trovata" if it else
+                self.text("nessuna folder ROMS found" if it else
                           "no ROMS folder found", (16, 90),
                           self.f_small, DIM)
             y = 86
@@ -17829,7 +17830,7 @@ class App(object):
                     cnt = len(data["files"])
                     ctxt = ("%d gioco/hi" % cnt if it else
                            "%d game(s)" % cnt) if active else (
-                           "non trovato" if it else "not found")
+                           "not found" if it else "not found")
                     cw2 = self.f_tiny.size(ctxt)[0]
                     self.text(ctxt, (W - 28 - cw2, y + 12),
                               self.f_tiny,
@@ -17930,7 +17931,7 @@ class App(object):
                 self.npanel(16, dy, W - 32, 32,
                            border=(sd_col if dsel else LINE), fill=INK,
                            cut=6)
-                dtxt = "elimina file sorgente dopo la conversione" if \
+                dtxt = "delete file sorgente dopo la conversione" if \
                     it else "delete source files after converting"
                 self.text(dtxt, (26, dy + 7), self.f_tiny,
                           FG if dsel else DIM, maxw=W - 110)
@@ -17971,7 +17972,7 @@ class App(object):
                     kx += kw2 + 4
                 self.footer([("Y", "layout"),
                             ("X", "spazio" if it else "space"),
-                            ("START", "salva" if it else "save")])
+                            ("START", "save" if it else "save")])
         elif top == "chdconvprep":
             it = (self.lang == "it")
             chd_gold = (210, 165, 70)
@@ -18006,7 +18007,7 @@ class App(object):
             dsel = True
             self.npanel(16, y, W - 32, 34, border=chd_gold, fill=INK,
                        cut=6)
-            dtxt = "elimina file sorgente dopo la conversione" if it \
+            dtxt = "delete file sorgente dopo la conversione" if it \
                 else "delete source files after converting"
             self.text(dtxt, (26, y + 9), self.f_tiny, FG,
                       maxw=W - 110)
@@ -18014,9 +18015,9 @@ class App(object):
             vw = self.f_small.size(vt)[0]
             self.text(vt, (W - 26 - vw, y + 7), self.f_small,
                       NO_R if self.chd_delete_source else OK_G)
-            self.footer([("A", "elimina sorgente" if it else
+            self.footer([("A", "delete sorgente" if it else
                         "delete source"),
-                        ("START", "avvia" if it else "start"),
+                        ("START", "start" if it else "start"),
                         ("B", self.t("back"))])
         elif top == "chdconv":
             it = (self.lang == "it")
@@ -18057,9 +18058,9 @@ class App(object):
                           maxw=W - 48)
                 ty += 17
             if all_done:
-                msg = ("tutto completato" if it else
+                msg = ("tutto completed" if it else
                       "all done") if snap["rc"] == 0 else (
-                      "errore sull'ultimo file" if it else
+                      "error sull'ultimo file" if it else
                       "error on last file")
                 self.text(msg, (16, H - 46), self.f_small,
                           OK_G if snap["rc"] == 0 else NO_R)
@@ -18071,7 +18072,7 @@ class App(object):
             sds = self.doppel_sds
             if not sds:
                 self.content_panel(46, H - 40)
-                self.text("nessuna cartella ROMS trovata su nessuna SD"
+                self.text("nessuna folder ROMS found su nessuna SD"
                           if it else
                           "no ROMS folder found on any SD card",
                           (20, 60), self.f_med, DIM, maxw=W - 40)
@@ -18100,7 +18101,7 @@ class App(object):
                 cons = self.doppel_consoles(root)
                 self.content_panel(80, H - 40)
                 if not cons:
-                    self.text("nessuna console trovata" if it else
+                    self.text("nessuna console found" if it else
                               "no console folders found", (20, 92),
                               self.f_small, DIM)
                 per = max(1, (H - 28 - 88) // 42)
@@ -18176,8 +18177,8 @@ class App(object):
                 shown += 1
             nmark = len(self.doppel_marked)
             self.footer([("X", "marca" if it else "mark"),
-                        ("Y", ("elimina (%d)" % nmark) if nmark else
-                         ("elimina" if it else "delete")),
+                        ("Y", ("delete (%d)" % nmark) if nmark else
+                         ("delete" if it else "delete")),
                         ("B", self.t("back"))])
         elif top == "envdetail":
             it = (self.lang == "it")
@@ -18206,7 +18207,7 @@ class App(object):
             if not base:
                 stxt, scol = self.t("e_base"), DIM
             elif inst:
-                stxt = ("attivo" if env == self.cfg.get("desk_env")
+                stxt = ("on" if env == self.cfg.get("desk_env")
                         and it else "active" if env ==
                         self.cfg.get("desk_env") else self.t("e_inst"))
                 scol = OK_G
@@ -18811,7 +18812,7 @@ class App(object):
                               UPLINK_ACCENT)
                 y += 44
             self.footer([("A", self.t("open")),
-                        ("SX/DX", "rete" if it else "network"),
+                        ("SX/DX", "network" if it else "network"),
                         ("B", self.t("back"))])
         elif top.startswith("hub:"):
             hub = top[4:]
@@ -18949,7 +18950,7 @@ class App(object):
             tw = self.f_big.size(tstr)[0]
             self.text(tstr, ((W - tw) // 2, 76), self.f_big,
                      OK_G if self.sw_running else FG)
-            stxt = ("in corso" if it else "running") if \
+            stxt = ("working" if it else "running") if \
                 self.sw_running else ("fermo" if it else "stopped")
             stw = self.f_small.size(stxt)[0]
             self.text(stxt, ((W - stw) // 2, 116), self.f_small,
@@ -19001,9 +19002,9 @@ class App(object):
                          else FAINT))
                 y += 60
             self.footer([("A", "nuovo" if it else "new"),
-                        ("X", "avvia/pausa" if it else
+                        ("X", "start/pausa" if it else
                         "start/pause"),
-                        ("Y", "elimina" if it else "delete"),
+                        ("Y", "delete" if it else "delete"),
                         ("B", self.t("back"))])
         elif top == "radio":
             it = (self.lang == "it")
@@ -19093,7 +19094,7 @@ class App(object):
                 buffering = st_info.get("paused_for_cache")
                 status_s = (("bufferizzo..." if it else
                            "buffering...") if buffering else
-                          ("in riproduzione" if it else "playing"))
+                          ("playing" if it else "playing"))
                 self.text(status_s, (18, py + 26), self.f_tiny,
                          radio_col)
                 if self.radio_sleep_min:
@@ -19252,7 +19253,7 @@ class App(object):
                           DIM)
             self.footer([("A", self.t("open")),
                          ("Y", "on/off"),
-                         ("X", "elimina" if it else "delete"),
+                         ("X", "delete" if it else "delete"),
                          ("B", self.t("back"))])
         elif top == "alarmwhen":
             it = (self.lang == "it")
@@ -19277,7 +19278,7 @@ class App(object):
                           self.accent if j == self.aw_f else FAINT)
             self.footer([("SX/DX", self.t("change")),
                          ("Y", "etichetta" if it else "label"),
-                         ("A", "salva" if it else "save"),
+                         ("A", "save" if it else "save"),
                          ("B", self.t("back"))])
         elif top == "alarmring":
             it = (self.lang == "it")
@@ -19351,7 +19352,7 @@ class App(object):
                           self.f_small, DIM)
             self.footer([("A", self.t("open")),
                          ("X", "rimuovi" if it else "remove"),
-                         ("R1", "aggiorna" if it else "refresh"),
+                         ("R1", "update" if it else "refresh"),
                          ("B", self.t("back"))])
         elif top == "weatherpick":
             it = (self.lang == "it")
@@ -19377,7 +19378,7 @@ class App(object):
             if not data:
                 self.text(self.t("wx_err"), (30, 140), self.f_med,
                           NO_R)
-                self.footer([("R1", "aggiorna" if it else "refresh"),
+                self.footer([("R1", "update" if it else "refresh"),
                             ("B", self.t("back"))])
             else:
                 cur = data.get("current") or {}
@@ -19412,7 +19413,7 @@ class App(object):
                             tstr = "%.0f°" % seg[0]
                             self.text(tstr, (x, yy + 20), self.f_tiny,
                                       FAINT)
-                self.footer([("R1", "aggiorna" if it else "refresh"),
+                self.footer([("R1", "update" if it else "refresh"),
                             ("B", self.t("back"))])
         elif top == "depsmissing":
             it = (self.lang == "it")
@@ -19600,8 +19601,8 @@ class App(object):
                        ("rintro",
                         "In RintroCalc, L1/R1 ruotano il cartellino "
                         "della materia specialistica a destra. "
-                        "DESTRA dall'ultima colonna della tastiera "
-                        "numerica passa alla tastiera "
+                        "DESTRA dall'ultima colonna della keyboard "
+                        "numerica passa alla keyboard "
                         "specialistica, e viceversa con SINISTRA." if
                         it else
                         "In RintroCalc, L1/R1 rotate the specialist "
@@ -19879,7 +19880,7 @@ class App(object):
                 self.text("▸", (W - 30, y + 12), self.f_med,
                           self.accent if j == self.cw_f else FAINT)
             self.footer([("SX/DX", self.t("change")),
-                         ("A", "salva" if it else "save"),
+                         ("A", "save" if it else "save"),
                          ("B", self.t("back"))])
         elif top == "notes":
             it = (self.lang == "it")
@@ -19941,9 +19942,9 @@ class App(object):
                 self.text("bacheca vuota: scrivi la prima." if it
                           else "empty board: jot the first.",
                           (24, 140), self.f_small, DIM)
-            self.footer([("A", "nuova/apri" if it else "new/open"),
+            self.footer([("A", "nuova/open" if it else "new/open"),
                          ("Y", "pin"),
-                         ("X", "elimina" if it else "delete"),
+                         ("X", "delete" if it else "delete"),
                          ("B", self.t("back"))])
         elif top == "rss":
             it = (self.lang == "it")
@@ -19992,13 +19993,13 @@ class App(object):
                           maxw=W - 80)
                 y += 66
             if self.rss_errors:
-                ex = "%d feed in errore" % len(self.rss_errors) if it \
+                ex = "%d feed in error" % len(self.rss_errors) if it \
                     else "%d feeds errored" % len(self.rss_errors)
                 self.text(ex, (14, H - 48), self.f_tiny, NO_R)
             self.footer([("A", self.t("open")),
                         ("L1", "categoria" if it else "category"),
                         ("Y", "feed"),
-                        ("R1", "aggiorna" if it else "refresh"),
+                        ("R1", "update" if it else "refresh"),
                         ("B", self.t("back"))])
         elif top == "rsssel":
             it = (self.lang == "it")
@@ -20038,7 +20039,7 @@ class App(object):
                           maxw=W - 190)
                 if broken:
                     err = self.rss_errors.get(name, "")[:40]
-                    self.text(("errore: " if it else "error: ") + err,
+                    self.text(("error: " if it else "error: ") + err,
                               (84, y + 26), self.f_tiny, NO_R,
                               maxw=W - 190)
                 else:
@@ -20068,7 +20069,7 @@ class App(object):
                 self.text("—", (34, 62), self.f_med, FAINT)
             self.text(app["name"], (74, 54), self.f_med, FG,
                       maxw=W - 260)
-            self.text(("originale salvato" if it else "original saved")
+            self.text(("originale saved" if it else "original saved")
                       if os.path.exists(bak) else
                       ("X: ripristina" if it else "X: restore")
                       if False else "", (74, 78), self.f_tiny, OK_G)
@@ -20172,7 +20173,7 @@ class App(object):
             ron = self.wm_radio_on()
             self.npanel(8, 44, W - 16, 46, border=LINE, fill=INK)
             self.switch(22, 52, ron)
-            cur = st.get("ssid") or ("non connesso" if it
+            cur = st.get("ssid") or ("not connected" if it
                                      else "not connected")
             self.text(cur, (100, 48), self.f_med,
                       OK_G if st.get("ssid") else
@@ -20191,7 +20192,7 @@ class App(object):
             first = max(0, min(self.wm_sel - per // 2,
                                len(self.wm_nets) - per))
             if not self.wm_nets:
-                self.text("nessuna rete: R1 per cercare" if it
+                self.text("nessuna network: R1 per cercare" if it
                           else "no networks: R1 to scan",
                           (40, 150), self.f_med, DIM)
             for j in range(first, min(first + per,
@@ -20213,11 +20214,11 @@ class App(object):
                 if nt["cur"]:
                     sub.append("connessa" if it else "connected")
                 if nt["saved"]:
-                    sub.append(("salvata" if it else "saved")
+                    sub.append(("saved" if it else "saved")
                                + ("" if nt["sig"] > -95 else
                                   (" · fuori portata" if it
                                    else " · out of range")))
-                sub.append("WPA" if nt["sec"] else "aperta"
+                sub.append("WPA" if nt["sec"] else "opened"
                            if it else "open")
                 self.text("  ·  ".join(sub), (56, y + 27),
                           self.f_tiny, FAINT)
@@ -20295,9 +20296,9 @@ class App(object):
             self.text(sub, (104, 80), self.f_tiny, DIM, maxw=W - 140)
             acts = [k for k in ("start", "start5", "stop")
                     if sc.get(k)]
-            labs = {"start": "Avvia hotspot (2.4GHz)" if it
+            labs = {"start": "Start hotspot (2.4GHz)" if it
                     else "Start hotspot (2.4GHz)",
-                    "start5": "Avvia hotspot (5GHz)" if it
+                    "start5": "Start hotspot (5GHz)" if it
                     else "Start hotspot (5GHz)",
                     "stop": "Ferma hotspot" if it else "Stop hotspot"}
             y = 126
@@ -20317,7 +20318,7 @@ class App(object):
             if not acts:
                 self.npanel(30, 140, W - 60, 110, border=LINE,
                             fill=INK)
-                self.text("errore inatteso: script nativi assenti dal "
+                self.text("error inatteso: script nativi missing dal "
                           "pacchetto." if it else
                           "unexpected: native scripts missing from "
                           "the package.", (54, 168), self.f_small,
@@ -20357,7 +20358,7 @@ class App(object):
                     known = self.ani_cli_installed()
                 else:
                     known = bool(self.status.get(cat_name))
-                tag = ("pronto" if it else "ready") if known else \
+                tag = ("ready" if it else "ready") if known else \
                     ("da scaricare" if it else "needs install")
                 tw = self.f_small.size(tag)[0]
                 self.text(tag, (W - 18 - tw, y + 18), self.f_small,
@@ -20383,10 +20384,10 @@ class App(object):
             items = [
                 ("CLI ARSENAL", "elenco tool pronti da lanciare"
                  if it else "list of tools ready to launch", "terminal"),
-                ("CLI INSTALLER", "installa, rimuovi, gestisci CLI tools"
+                ("CLI INSTALLER", "install, rimuovi, gestisci CLI tools"
                  if it else "install, remove, manage CLI tools", "pkg"),
                 (("TERMINALE COMPLETO" if it else "FULL TERMINAL"),
-                 "shell nel chroot, X e tastiera completa -- "
+                 "shell nel chroot, X e keyboard completa -- "
                  "piu' lento, piu' potente" if it else
                  "chroot shell, X and full keyboard -- "
                  "slower, more capable", "keyboard"),
@@ -20544,7 +20545,7 @@ class App(object):
             self.text(di if it else de, (20, y), self.f_small, FG,
                       maxw=W - 40)
             y += 44
-            self.text("DIPENDENZE" if it else "DEPENDENCIES",
+            self.text("DEPENDENCIES" if it else "DEPENDENCIES",
                       (20, y), self.f_small, self.cli_accent)
             y += 22
             self.text(", ".join(dp) if dp else
@@ -20608,7 +20609,7 @@ class App(object):
                       "changes apply from the next hotspot start",
                       (24, H - 70), self.f_tiny, FAINT, maxw=W - 48)
             self.footer([("A", "modifica" if it else "edit"),
-                         ("Y", "salva" if it else "save"),
+                         ("Y", "save" if it else "save"),
                          ("B", self.t("back"))])
         elif top == "updsettings":
             import colorsys
@@ -20725,9 +20726,9 @@ class App(object):
                              (170, 130, 190) if is_ethos else FAINT,
                              maxw=pw - 44)
                 ry += rh - (15 if not is_ethos else 0)
-            self.footer([("A", "attiva/conferma" if it else
+            self.footer([("A", "active/confirm" if it else
                         "toggle/confirm"),
-                        ("X", "chiudi" if it else "close")])
+                        ("X", "close" if it else "close")])
         elif top == "voidupdate":
             it = (self.lang == "it")
             up_cyan = (60, 210, 220)
@@ -20750,7 +20751,7 @@ class App(object):
             self.text(vtxt, (bx, sy + 32), self.f_small, up_cyan)
             avail = self.update_available()
             if self.update_checking:
-                stxt = "verifica in corso..." if it else "checking..."
+                stxt = "verify working..." if it else "checking..."
                 scol = FAINT
             elif avail:
                 stxt = "aggiornamento disponibile" if it else \
@@ -20765,7 +20766,7 @@ class App(object):
                 stxt = "sei aggiornato" if it else "up to date"
                 scol = OK_G
             else:
-                stxt = "verifica non riuscita" if it else \
+                stxt = "verify failed" if it else \
                     "check failed"
                 scol = NO_R
             self.text(stxt, (bx, sy + 50), self.f_small, scol,
@@ -20880,7 +20881,7 @@ class App(object):
                            fill=(10, 16, 12), cut=8)
                 icons.draw(self.surface, "storage", 16, sy + 7, 20,
                           OK_G)
-                loc_txt = (("v%s trovato su SD -- SELECT per "
+                loc_txt = (("v%s found su SD -- SELECT per "
                           "installare" % self.update_local_ver) if
                           it else ("v%s found on SD -- SELECT to "
                           "install" % self.update_local_ver))
@@ -20888,12 +20889,12 @@ class App(object):
                          maxw=W - 60)
                 sy += 38
             self._voidupdate_content_h = sy + self.scroll - 50
-            self.footer([("A", "aggiorna" if avail else
+            self.footer([("A", "update" if avail else
                         ("nessun aggiornamento" if it else
                          "no update")),
                         ("X", "impostazioni" if it else "settings"),
                         ("Y", "riscansiona" if it else "rescan")] +
-                       ([("SELECT", "installa locale" if it else
+                       ([("SELECT", "install locale" if it else
                          "install local")] if self.update_local_path
                         else []) +
                        [("B", self.t("back"))])
@@ -20904,17 +20905,17 @@ class App(object):
             self.npanel(8, 46, W - 16, 30, border=LINE, fill=INK,
                        cut=6)
             self.switch(16, 52, always_on, w=36, h=18)
-            atxt = ("PC Link sempre attivo" if it else
+            atxt = ("PC Link sempre on" if it else
                    "PC Link always on")
             self.text(atxt, (60, 53), self.f_tiny,
                      self.accent if always_on else FAINT)
             self.content_panel(80, H - 40)
             if self.pc_scanning:
-                self.text("scansione della rete in corso..." if it
+                self.text("scansione della network working..." if it
                           else "scanning the network...", (20, 90),
                           self.f_med, self.accent)
             elif not self.pc_servers:
-                self.text("nessun server trovato" if it else
+                self.text("nessun server found" if it else
                           "no servers found", (20, 90), self.f_med,
                           DIM)
                 self.text("X: aggiungi manualmente" if it else
@@ -20957,7 +20958,7 @@ class App(object):
             self.npanel(8, 46, W - 16, 30, border=LINE, fill=INK,
                        cut=6)
             self.switch(16, 52, always_on, w=36, h=18)
-            atxt = ("Basestation sempre attiva" if it else
+            atxt = ("Basestation sempre active" if it else
                    "Basestation always on")
             self.text(atxt, (60, 53), self.f_tiny,
                      self.accent if always_on else FAINT)
@@ -20967,7 +20968,7 @@ class App(object):
                        fill=(8, 14, 16), cut=12)
             icons.draw(self.surface, "monitor", 46, 108, 26,
                       OK_G if running else DIM)
-            status_s = (("server attivo" if it else "server "
+            status_s = (("server on" if it else "server "
                        "running") if running else
                        ("server fermo" if it else "server "
                         "stopped"))
@@ -20976,7 +20977,7 @@ class App(object):
             if running:
                 ip = self.own_ip() or "?"
                 url = "http://%s:8765/" % ip
-                self.text(("apri questo indirizzo su un browser "
+                self.text(("open questo indirizzo su un browser "
                           "del PC:" if it else "open this address "
                           "on a PC browser:"), (46, 144),
                          self.f_tiny, DIM)
@@ -21007,7 +21008,7 @@ class App(object):
                          (46, 248), self.f_small, FG)
             else:
                 for wl in self.note_wrap(
-                        "avvia il server per scaricare il "
+                        "start il server per scaricare il "
                         "companion PC (basestation.py) da questo "
                         "dispositivo, senza bisogno di internet" if
                         it else "start the server to download the "
@@ -21016,7 +21017,7 @@ class App(object):
                         self.f_small, 4):
                     self.text(wl, (46, 144), self.f_small, DIM,
                              maxw=W - 92)
-            a_label = ("ferma" if running else "avvia") if it else \
+            a_label = ("ferma" if running else "start") if it else \
                 ("stop" if running else "start")
             self.footer([("A", a_label),
                         ("SELECT", "auto" if it else "auto"),
@@ -21030,8 +21031,8 @@ class App(object):
             if not self.ctrl_devices:
                 yy = 60
                 for wl in self.note_wrap(
-                        "nessun controller esterno rilevato -- "
-                        "collega una tastiera USB o un dispositivo "
+                        "nessun controller esterno detected -- "
+                        "collega una keyboard USB o un dispositivo "
                         "MIDI e premi Y" if it else
                         "no external controller detected -- plug "
                         "in a USB keyboard or MIDI device and "
@@ -21077,10 +21078,10 @@ class App(object):
                            "select a controller to manage profiles"),
                           (20, 60), self.f_small, DIM, maxw=W - 40)
             elif not profile_names:
-                self.text(("nessun profilo salvato per questo dispositivo" if it else
+                self.text(("nessun profilo saved per questo dispositivo" if it else
                            "no saved profiles for this device"),
                           (20, 60), self.f_small, DIM, maxw=W - 40)
-                self.text(("premi Y per salvare le impostazioni correnti" if it else
+                self.text(("press Y per salvare le impostazioni correnti" if it else
                            "press Y to save current bindings"),
                           (20, 90), self.f_small, FAINT, maxw=W - 40)
             y = 50
@@ -21092,8 +21093,8 @@ class App(object):
                          FG if sel else DIM, maxw=W - 40)
                 y += 36
             self.footer([("A", "carica" if it else "load"),
-                        ("Y", "salva" if it else "save"),
-                        ("X", "elimina" if it else "delete"),
+                        ("Y", "save" if it else "save"),
+                        ("X", "delete" if it else "delete"),
                         ("B", self.t("back"))])
         elif top == "ctrlmap":
             it = (self.lang == "it")
@@ -21188,7 +21189,7 @@ class App(object):
                                 left)
             self.text(t2, (W // 2 - self.f_tiny.size(t2)[0] // 2,
                      288), self.f_tiny, FAINT)
-            self.footer([("B", "annulla" if it else "cancel")])
+            self.footer([("B", "cancel" if it else "cancel")])
         elif top == "ctrlswap":
             it = (self.lang == "it")
             ctrl_col = (175, 115, 225)
@@ -21210,7 +21211,7 @@ class App(object):
                  ("%s  →  here" % ctrl_sig_label(new_sig)))
             self.text(m2, (W // 2 - self.f_med.size(m2)[0] // 2, 222),
                      self.f_med, ctrl_col)
-            m3 = ("A: sposta qui   B: annulla" if it else
+            m3 = ("A: sposta qui   B: cancel" if it else
                  "A: move here   B: cancel")
             self.text(m3, (W // 2 - self.f_small.size(m3)[0] // 2,
                      270), self.f_small, DIM)
@@ -21263,15 +21264,15 @@ class App(object):
             veil.fill((0, 0, 0, 190))
             self.surface.blit(veil, (0, 0))
             labels = {
-                "close": ("Chiudi (torna a muOS)" if it else
+                "close": ("Close (torna a muOS)" if it else
                          "Close (return to muOS)"),
-                "restart_app": ("Riavvia VoidDesk" if it else
+                "restart_app": ("Restart VoidDesk" if it else
                                "Restart VoidDesk"),
-                "reboot": ("Riavvia console" if it else
+                "reboot": ("Restart console" if it else
                           "Reboot console"),
                 "poweroff": ("Spegni console" if it else
                             "Power off console"),
-                "cancel": ("Annulla" if it else "Cancel"),
+                "cancel": ("Cancel" if it else "Cancel"),
             }
             n = len(SHUTDOWN_OPTS)
             row_h = 56
@@ -21302,8 +21303,8 @@ class App(object):
                 self.text(labels[key_], (108, bcy - 8), self.f_small,
                          FG if sel else DIM)
                 ry += row_h
-            self.footer([("A", "conferma" if it else "confirm"),
-                        ("B", "annulla" if it else "cancel")])
+            self.footer([("A", "confirm" if it else "confirm"),
+                        ("B", "cancel" if it else "cancel")])
         elif top == "pcuplink":
             it = (self.lang == "it")
             self.header("PC UPLINK", icon="monitor")
@@ -21360,7 +21361,7 @@ class App(object):
                 y += 22
             else:
                 msg = snap.get("last_error") or (
-                    "PC non raggiungibile" if it else
+                    "PC unreachable" if it else
                     "PC unreachable")
                 self.text(msg[:60], (20, y), self.f_small, NO_R,
                           maxw=W - 40)
@@ -21385,7 +21386,7 @@ class App(object):
                     self.text(m["body"], (28, y), self.f_tiny, FAINT,
                               maxw=W - 48)
                     y += 18
-            self.footer([("X", "aggiorna" if it else "refresh"),
+            self.footer([("X", "update" if it else "refresh"),
                         ("Y", "notifica" if it else "notify"),
                         ("B", self.t("back"))])
         elif top == "monitor":
@@ -21505,7 +21506,7 @@ class App(object):
                 y += 21
             self.footer([("A", "scrivi" if self.lang == "it"
                           else "type"),
-                         ("Y", "apri .py" if self.lang == "it"
+                         ("Y", "open .py" if self.lang == "it"
                           else "open .py"), ("X", "clear"),
                          ("!cmd", "shell"),
                          ("B", self.t("back"))])
@@ -21538,7 +21539,7 @@ class App(object):
                           (54, y + 10), self.f_small, DIM)
             self.footer([("A", "crea/ripristina" if it
                           else "create/restore"),
-                         ("X", "elimina" if it else "delete"),
+                         ("X", "delete" if it else "delete"),
                          ("B", self.t("back"))])
         elif top == "tsnetcheck":
             it = (self.lang == "it")
@@ -21589,7 +21590,7 @@ class App(object):
                          (20, 50 + total + 34), self.f_tiny, DIM,
                          maxw=W - 40)
             else:
-                self.text("QR non disponibile" if it else
+                self.text("QR not available" if it else
                           "QR not available", (40, 120),
                          self.f_med, DIM)
             self.footer([("B", self.t("back"))])
@@ -21600,7 +21601,7 @@ class App(object):
             self.content_panel(46, H - 40)
             if not self.bgm_files:
                 for wl in self.note_wrap(
-                        "nessun file audio trovato nelle cartelle "
+                        "nessun file audio found nelle cartelle "
                         "musica comuni di SD1/SD2" if it else
                         "no audio files found in SD1/SD2 common "
                         "music folders", W - 40, self.f_small, 3):
@@ -21619,7 +21620,7 @@ class App(object):
                 self.text(f["rel_path"], (56, y + 6), self.f_small,
                          FG if sel else DIM, maxw=W - 80)
                 y += 36
-            self.footer([("A", "seleziona" if it else "select"),
+            self.footer([("A", "select" if it else "select"),
                         ("X", "tutti/nessuno" if it else
                         "all/none"),
                         ("Y", "normalizza (%d)" %
@@ -21653,7 +21654,7 @@ class App(object):
                 self.bgm_proc_idx += 1
             else:
                 self.content_panel(46, H - 40)
-                self.text(("completato: %d file" % total_n) if it
+                self.text(("completed: %d file" % total_n) if it
                           else ("done: %d files" % total_n),
                          (20, 56), self.f_med, OK_G)
                 ly = 90
@@ -21718,7 +21719,7 @@ class App(object):
                 y += 50
             self.footer([("A", "peer"), ("Y", "azioni" if it
                                          else "actions"),
-                         ("R1", "aggiorna" if it else "refresh"),
+                         ("R1", "update" if it else "refresh"),
                          ("B", self.t("back"))])
         elif top in ("tsmenu", "tsact"):
             self.render_prev_dim()
@@ -21769,7 +21770,7 @@ class App(object):
                               (54, y + 26), self.f_tiny, FAINT)
                 y += 50
             self.footer([("A", "connetti" if it else "connect"),
-                         ("X", "elimina" if it else "delete"),
+                         ("X", "delete" if it else "delete"),
                          ("B", self.t("back"))])
         elif top == "ftpls":
             it = (self.lang == "it")
@@ -21827,12 +21828,12 @@ class App(object):
             sy = self.sync or {"id": "?", "folders": []}
             self.npanel(8, 48, W - 16, 30, border=LINE, fill=INK, cut=8)
             self.text("ID: " + sy["id"], (20, 54), self.f_small, DIM)
-            ok = "demone attivo" if it else "daemon up"
+            ok = "demone on" if it else "daemon up"
             self.text(ok, (W - 24 - self.f_small.size(ok)[0], 54),
                       self.f_small, OK_G)
             y = 92
             if not sy["folders"]:
-                self.text("nessuna cartella condivisa" if it
+                self.text("nessuna folder condivisa" if it
                           else "no shared folders", (40, 140),
                           self.f_med, DIM)
             for lbl, path, pct in sy["folders"][:6]:
@@ -21853,7 +21854,7 @@ class App(object):
                                      OK_G if pct >= 100 else self.accent,
                                      (22, y + 44, bw * pct // 100, 5))
                 y += 58
-            self.footer([("A", "aggiorna" if it else "refresh"),
+            self.footer([("A", "update" if it else "refresh"),
                          ("B", self.t("back"))])
         elif top == "osk":
             self.header(self.osk_title[:26], icon="keyboard")
@@ -22021,7 +22022,7 @@ class App(object):
             self.content_panel(46, H - 40)
             bm = self.cfg.get("fm_bookmarks", [])
             if not bm:
-                self.text("nessun preferito salvato" if it else
+                self.text("nessun preferito saved" if it else
                           "no bookmarks saved", (20, 60), self.f_med,
                           FAINT)
             per = 7
@@ -22096,7 +22097,7 @@ class App(object):
                 y += 21
             self.footer([("A", "modifica" if it else "edit"),
                          ("Y", "+riga" if it else "+line"), ("X", "-"),
-                         ("START", "salva" if it else "save"),
+                         ("START", "save" if it else "save"),
                          ("B", self.t("back"))])
         else:
             # stato senza schermata: meglio dirlo che congelarsi
@@ -22373,10 +22374,10 @@ class App(object):
                         "initializing..."))
             autocheck = self.cfg.get("upd_autocheck", False)
             if not autocheck:
-                push_status(("controllo automatico disattivato" if it
+                push_status(("check automatico disattivato" if it
                             else "auto-check disabled"))
             else:
-                push_status(("verifica repository..." if it else
+                push_status(("verify repository..." if it else
                             "checking repository..."))
                 try:
                     self.update_data = self.gh_fetch_releases()
@@ -22384,7 +22385,7 @@ class App(object):
                     self.update_data = {"ok": False,
                                         "error": str(e)[:60]}
                 if not self.update_data.get("ok"):
-                    push_status(("linea assente -- salto" if it else
+                    push_status(("linea missing -- salto" if it else
                                 "no connection -- skipping"))
                 elif self.update_available():
                     latest = self.update_latest()
@@ -22401,7 +22402,7 @@ class App(object):
                                 break
                         if asset_url:
                             push_status(("installazione automatica "
-                                        "in corso..." if it else
+                                        "working..." if it else
                                         "auto-installing..."))
                             try:
                                 ok, msg = \
@@ -22421,7 +22422,7 @@ class App(object):
                 else:
                     push_status(("VOID Desk aggiornato" if it else
                                 "VOID Desk up to date"))
-            push_status(("sequenza completata" if it else
+            push_status(("sequenza completed" if it else
                         "sequence complete"))
             for i in range(10):
                 blame_frame(log, glitch=(i % 3 == 0))
@@ -22439,6 +22440,14 @@ class App(object):
             pygame.display.flip = real_flip
 
     def play_intro(self):
+        # Andromeda: prefer LÖVE for the intro (shaders, bloom)
+        try:
+            resp = love_bridge.run_scene("intro", {"duration": 2.5})
+            if not resp.get("fallback"):
+                return
+        except Exception as e:
+            sys.stderr.write(f"[love] intro fallback: {e}\n")
+        # fallback: existing Pygame intro
         """Sigla d'avvio; l'ultimo atto atterra dentro il menu vero."""
         real_flip = pygame.display.flip
         pygame.display.flip = lambda *a, **k: None
@@ -22478,7 +22487,7 @@ class App(object):
         if raw:
             ev = raw[0]
             key0 = self.map_rows()[self.map_sel]
-            # QJoyPad non vede i tasti volume: ammessi solo per la tastiera
+            # QJoyPad non vede i tasti volume: ammessi solo per la keyboard
             if ev in VOLUME_KEYS and key0 != "kbd":
                 return
             key = self.map_rows()[self.map_sel]
@@ -22491,7 +22500,7 @@ class App(object):
                 self.cur_map()[key] = [ev]
                 self.apply_map()
             return
-        if time.time() - self.capture_t > 5:      # annulla per timeout
+        if time.time() - self.capture_t > 5:      # cancel per timeout
             self.pop_state()
 
     def handle_ctrl_capture(self):
@@ -22559,7 +22568,7 @@ class App(object):
                     if sig in keys:
                         self.ctrl_map_sel = keys.index(sig)
             return
-        if time.time() - self.ctrl_capture_t0 > 5:   # annulla per timeout
+        if time.time() - self.ctrl_capture_t0 > 5:   # cancel per timeout
             self.ctrl_capturing = False
             self.pop_state()
 

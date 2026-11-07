@@ -437,7 +437,37 @@ def draw(surf, key, x, y, sz, col):
         pygame.draw.polygon(surf, col, pts)
         circ(20, 6, 1.4, 0)
         circ(20.5, 13, 1.1, 0)
-    else:                                  # ripiego: quadratino
+    elif key == "games":                   # gamepad
+        rect(2, 9, 20, 8, 2, 4)
+        line((6, 13), (9, 13), 1.6)
+        line((7.5, 11.5), (7.5, 14.5), 1.6)
+        circ(16, 12, 1.0, 0)
+        circ(18.5, 14, 1.0, 0)
+    elif key == "develop":                 # code brackets
+        line((9, 6), (5, 12), 1.8)
+        line((5, 12), (9, 18), 1.8)
+        line((15, 6), (19, 12), 1.8)
+        line((19, 12), (15, 18), 1.8)
+        line((13, 7), (11, 17), 1.5)
+    elif key == "community":               # 3 heads
+        circ(12, 7, 3, 2)
+        circ(6, 16, 3, 2)
+        circ(18, 16, 3, 2)
+        line((12, 10), (6, 14), 1.2)
+        line((12, 10), (18, 14), 1.2)
+    elif key == "outerdesk":               # rocket
+        pygame.draw.polygon(surf, col, [p(12, 3), p(17, 11), p(17, 17),
+                                        p(7, 17), p(7, 11)])
+        circ(12, 9, 2, 1)
+        line((7, 17), (5, 22), 1.6)
+        line((17, 17), (19, 22), 1.6)
+        line((12, 17), (12, 22), 1.6)
+    elif key == "legacy":                  # hourglass
+        pygame.draw.polygon(surf, col, [p(5, 4), p(19, 4), p(12, 12)])
+        pygame.draw.polygon(surf, col, [p(5, 20), p(19, 20), p(12, 12)])
+        line((4, 3), (20, 3), 1.8)
+        line((4, 21), (20, 21), 1.8)
+    else:                                  # fallback square
         rect(4, 4, 16, 16, 2, 2)
 
 

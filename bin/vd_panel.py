@@ -63,22 +63,22 @@ WIN = pygame.Rect(28, 26, W - 56, H - 52)
 
 TR = {
  "it": {"back": "Torna a XFCE", "back_s": "riprende la sessione",
-        "diag": "Diagnosi sistema", "diag_s": "periferiche, rete, audio, XFCE",
+        "diag": "System check", "diag_s": "periferiche, rete, audio, XFCE",
         "fix": "Risoluzione problemi", "fix_s": "riparazioni rapide",
         "vol": "Volume", "vol_s": "SX/DX regola",
         "bri": "Luminosita'", "bri_s": "SX/DX regola",
-        "kbd": "Tastiera virtuale", "kbd_s": "mostra/nascondi la tastiera",
+        "kbd": "On-screen keyboard", "kbd_s": "mostra/nascondi la tastiera",
         "task": "Task manager", "task_s": "processi, A termina",
-        "restart": "Riavvia XFCE", "restart_s": "chiude e riapre la sessione",
-        "close": "Chiudi XFCE", "close_s": "torna a muOS",
-        "sel": "scegli", "adj": "regola", "ok": "conferma", "back_b": "torna",
+        "restart": "Restart XFCE", "restart_s": "chiude e riapre la sessione",
+        "close": "Close XFCE", "close_s": "torna a muOS",
+        "sel": "scegli", "adj": "regola", "ok": "confirm", "back_b": "torna",
         "kill": "termina", "run": "esegui",
         "t_diag": "DIAGNOSI SISTEMA", "t_fix": "RISOLUZIONE PROBLEMI",
         "t_task": "TASK MANAGER", "killed": "terminato: %s",
-        "checking": "controllo in corso...", "working": "eseguo...",
-        "all_ok": "tutto in ordine", "probs": "%d problemi rilevati",
+        "checking": "checking...", "working": "eseguo...",
+        "all_ok": "all good", "probs": "%d problemi rilevati",
         "conn_lbl": "connesso", "d_wifi": "WiFi", "d_ip": "Indirizzo IP",
-        "d_noconn": "non connesso", "d_missing": "assente"},
+        "d_noconn": "not connected", "d_missing": "missing"},
  "en": {"back": "Back to XFCE", "back_s": "resume the session where it was",
         "diag": "System check", "diag_s": "devices, network, audio, XFCE",
         "fix": "Troubleshooting", "fix_s": "one-tap repairs",
@@ -223,7 +223,7 @@ class Panel(object):
             cfg = json.load(open(os.path.join(DATA, "desk_config.json")))
         except Exception:
             pass
-        self.lang = cfg.get("lang", "it")
+        self.lang = cfg.get("lang", "en")
         theme = cfg.get("theme", "ambra")
         self.accent = ACCENTS.get(theme, ACCENTS["ambra"])
         self.env = "xfce"
@@ -377,7 +377,7 @@ class Panel(object):
                  "terminal"),
                 ("launch_clitools", "terminal",
                  "Lancia CLI Tools" if it_ else "Launch CLI Tools",
-                 "chiudi e avvia un altro tool" if it_ else "close "
+                 "close e start un altro tool" if it_ else "close "
                  "and launch another tool"),
                 ("core_tasks", "task", "Core Tasks",
                  "processi necessari, tutti attivi?" if it_ else
@@ -391,7 +391,7 @@ class Panel(object):
                  "dimensione, layout" if it_ else "size, layout"),
                 ("restart", "start",
                  "Restart CLI Tool" if it_ else "Restart CLI Tool",
-                 "riavvia il tool corrente" if it_ else "restart the "
+                 "restart il tool corrente" if it_ else "restart the "
                  "current tool"),
                 ("close", "info",
                  "Termina CLI Terminal" if it_ else "Close CLI "
@@ -449,10 +449,10 @@ class Panel(object):
         d.append(("QJoyPad", bool(self.chroot_pids("qjoypad")),
                   L("controller -> mouse", "controller -> mouse"),
                   "gamepad"))
-        d.append((L("Tastiera (matchbox)", "Keyboard (matchbox)"),
+        d.append((L("Keyboard (matchbox)", "Keyboard (matchbox)"),
                   bool(self.chroot_pids("matchbox-keybo",
                                         "matchbox-keyboard")),
-                  L("tastiera virtuale", "on-screen keyboard"), "keyboard"))
+                  L("on-screen keyboard", "on-screen keyboard"), "keyboard"))
         for lbl_i, lbl_e, sub, ic in (
                 ("Audio (/dev/snd)", "Audio (/dev/snd)", "/dev/snd",
                  "speaker"),
@@ -460,7 +460,7 @@ class Panel(object):
                  "gamepad"),
                 ("Memoria cond. (/dev/shm)", "Shared mem (/dev/shm)",
                  "/dev/shm", "task"),
-                ("D-Bus di sistema", "System D-Bus", "/run/dbus", "dbus")):
+                ("System D-Bus", "System D-Bus", "/run/dbus", "dbus")):
             ok = (mounted(os.path.join(self.mnt, sub.lstrip("/")))
                   if self.mnt else False)
             d.append((L(lbl_i, lbl_e), ok,
@@ -486,24 +486,24 @@ class Panel(object):
         d.append(("Internet", inet, "ports.ubuntu.com", "globe"))
         d.append(("Bluetooth", bool(st["bt"]),
                   L("n/d", "n/a") if st["bt"] is None else
-                  (L("adattatore attivo", "adapter on")
-                   if st["bt"] else L("spento", "off")), "bt"))
+                  (L("adattatore active", "adapter on")
+                   if st["bt"] else L("off", "off")), "bt"))
         mf = mem_free_mb()
         sw = swap_mb()
         d.append((L("Memoria libera", "Free memory"), (mf or 0) > 120,
                   "%s MB" % (mf if mf is not None else "?"), "task"))
         d.append(("Swap", sw > 0, "%d MB" % sw if sw else
-                  L("assente: consigliato (RAM 1GB)",
+                  L("missing: consigliato (RAM 1GB)",
                     "missing: recommended (1GB RAM)"), "disk"))
         img = os.path.join(DATA, "xfce.img")
         dev = imgmount.loop_of(img)
         d.append((L("Immagine XFCE", "XFCE image"), True,
-                  (L("montata su %s", "mounted on %s") % dev) if dev
-                  else L("non montata", "not mounted"), "disk"))
+                  (L("mounted on %s", "mounted on %s") % dev) if dev
+                  else L("not mounted", "not mounted"), "disk"))
         try:
             s_ = os.statvfs(DATA)
             free_gb = s_.f_bavail * s_.f_frsize / 1e9
-            d.append((L("Spazio su SD1", "SD1 free space"), free_gb > 0.3,
+            d.append((L("SD1 free space", "SD1 free space"), free_gb > 0.3,
                       L("%.1f GB liberi", "%.1f GB free") % free_gb, "disk"))
         except OSError:
             pass
@@ -531,9 +531,9 @@ class Panel(object):
         it = (self.lang == "it")
         return [
             ("ctrlc", "terminal", "Ctrl+C",
-             "interrompi il comando in corso" if it else
+             "interrupt the running command" if it else
              "interrupt the running command"),
-            ("refresh", "monitor", "Refresh schermo" if it else
+            ("refresh", "monitor", "Refresh screen" if it else
              "Refresh screen", "se rimangono artefatti visivi" if it
              else "if visual artifacts remain"),
         ]
@@ -542,28 +542,28 @@ class Panel(object):
         it = (self.lang == "it")
         if it:
             return [
-                ("panel", "panel", "Riavvia pannello XFCE",
-                 "se la barra e' sparita"),
-                ("wm", "window", "Riavvia window manager",
-                 "se le finestre non hanno cornice"),
-                ("qjp", "gamepad", "Riavvia controller",
-                 "se stick e tasti non rispondono"),
+                ("panel", "panel", "Restart XFCE panel",
+                 "if the taskbar is gone"),
+                ("wm", "window", "Restart window manager",
+                 "if windows lost their borders"),
+                ("qjp", "gamepad", "Restart controller",
+                 "if sticks and buttons stop working"),
                 ("audio", "speaker", "Ripara audio",
-                 "riattiva mixer e PulseAudio all'80%"),
-                ("kbd", "keyboard", "Riavvia tastiera virtuale",
-                 "se matchbox non compare"),
+                 "riactive mixer e PulseAudio all'80%"),
+                ("kbd", "keyboard", "Restart on-screen keyboard",
+                 "if matchbox will not show"),
                 ("mounts", "disk", "Rimonta periferiche",
                  "audio, input, dbus nel chroot"),
                 ("swap", "disk", "Attiva swap 512MB",
-                 "piu' respiro con 1GB di RAM"),
+                 "more headroom with 1GB RAM"),
                 ("mem", "task", "Libera memoria",
-                 "svuota le cache del kernel"),
+                 "drop kernel caches"),
                 ("loop", "disk", "Libera immagine XFCE",
-                 "se l'installazione dice 'mount fallito'"),
-                ("fitwin", "window", "Adatta finestra allo schermo",
-                 "riporta dentro le finestre giganti"),
-                ("killwin", "window", "Chiudi finestra attiva",
-                 "se un programma e' bloccato"),
+                 "se l'installazione dice 'mount failed'"),
+                ("fitwin", "window", "Fit window to screen",
+                 "pull oversized windows back in"),
+                ("killwin", "window", "Kill active window",
+                 "if an app is frozen"),
             ]
         return [
             ("panel", "panel", "Restart XFCE panel",
@@ -663,7 +663,7 @@ class Panel(object):
                      else "remounted %d devices") % n)
         if key == "swap":
             if swap_mb() > 0:
-                return (("swap gia' attivo (%d MB)" if it
+                return (("swap gia' active (%d MB)" if it
                          else "swap already on (%d MB)") % swap_mb())
             sf = os.path.join(self.mnt, "swapfile") if self.mnt else \
                 os.path.join(DATA, "swapfile")
@@ -680,11 +680,11 @@ class Panel(object):
                                      stdout=subprocess.DEVNULL,
                                      stderr=subprocess.DEVNULL)
                 if rc == 0:
-                    return ("swap 512MB attivo" if it else "512MB swap on")
-                return ("swapon fallito (kernel senza swap?)" if it
+                    return ("swap 512MB active" if it else "512MB swap on")
+                return ("swapon failed (kernel senza swap?)" if it
                         else "swapon failed (no swap support?)")
             except Exception as e:
-                return ("errore swap: %s" if it else "swap error: %s") % e
+                return ("swap error: %s" if it else "swap error: %s") % e
         if key == "mem":
             before = mem_free_mb() or 0
             subprocess.call(["sync"])
@@ -719,7 +719,7 @@ class Panel(object):
         if key == "killwin":
             self.session_cmd(["sh", "-c",
                               "xdotool windowkill $(xdotool getactivewindow)"])
-            return ("finestra chiusa" if it else "window closed")
+            return ("finestra closed" if it else "window closed")
         return ""
 
     # ------------------------------------------------------------- input
@@ -867,7 +867,7 @@ class Panel(object):
                 name, comms, launch = CORE_TASKS[self.sub_sel]
                 running = bool(pids_of(*comms))
                 if running:
-                    self.note = (("gia' attivo" if self.lang == "it"
+                    self.note = (("gia' active" if self.lang == "it"
                                  else "already running"))
                 elif name == "matchbox-keyboard":
                     self.result = "kbd"
@@ -915,7 +915,7 @@ class Panel(object):
                     json.dump(cfgd, open(cfgp, "w"))
                 except Exception:
                     pass
-                self.note = (("dimensione: %dpx (attiva alla "
+                self.note = (("dimensione: %dpx (active alla "
                              "prossima apertura)" % nxt) if
                              self.lang == "it" else
                              ("size: %dpx (applies next time it "
@@ -1003,7 +1003,7 @@ class Panel(object):
                         pygame.draw.line(self.surface, NO_R, (cx + 11, y + 2),
                                          (cx, y + 13), 3)
                     y += 22
-            self.wfooter([("A", "aggiorna"), ("SU/GIU", "scorri"),
+            self.wfooter([("A", "update"), ("SU/GIU", "scorri"),
                           ("B", self.t("back_b"))])
         elif top == "fix":
             self.window(self.t("t_fix"))
@@ -1069,7 +1069,7 @@ class Panel(object):
                 pass
             y = WIN.y + 70
             if active:
-                self.text(("in esecuzione ora:" if it else
+                self.text(("currently running:" if it else
                           "currently running:"), (WIN.x + 24, y),
                           self.f_small, FAINT)
                 y += 24
@@ -1081,7 +1081,7 @@ class Panel(object):
                       "Close it and go to CLI Arsenal to pick "
                       "another?"), (WIN.x + 24, y), self.f_small, FG,
                       maxw=WIN.w - 48)
-            self.wfooter([("A", "conferma" if it else "confirm"),
+            self.wfooter([("A", "confirm" if it else "confirm"),
                          ("B", self.t("back_b"))])
         elif top == "core_tasks":
             it = (self.lang == "it")
@@ -1101,22 +1101,22 @@ class Panel(object):
                 self.text(name, (WIN.x + 46, y + 5), self.f_med,
                           FG if i == self.sub_sel else DIM)
                 if running:
-                    stxt = "attivo" if it else "running"
+                    stxt = "active" if it else "running"
                     scol = OK_G
                 else:
                     can_start = launch or name == "matchbox-keyboard"
                     if can_start:
-                        stxt = ("spento -- premi A per avviarlo" if it
+                        stxt = ("off -- press A to start it" if it
                                 else "off -- press A to start it")
                     else:
-                        stxt = "spento" if it else "off"
+                        stxt = "off" if it else "off"
                     scol = FAINT
                 self.text(stxt, (WIN.x + 46, y + 22), self.f_tiny, scol)
                 y += 42
             if self.note:
                 self.text(self.note, (WIN.x + 16, WIN.bottom - 50),
                           self.f_tiny, OK_G)
-            self.wfooter([("A", "avvia" if it else "start"),
+            self.wfooter([("A", "start" if it else "start"),
                          ("B", self.t("back_b"))])
         elif top == "cli_troubleshoot":
             self.window("CLI Troubleshooting")

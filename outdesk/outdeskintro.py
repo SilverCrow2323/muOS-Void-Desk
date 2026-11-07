@@ -58,7 +58,7 @@ if os.path.isdir(RUNTIME_DIR):
 try:
     import pygame
 except ImportError:
-    log("ERRORE: pygame non trovato. Runtime mancante?")
+    log("ERRORE: pygame not found. Runtime mancante?")
     sys.exit(1)
 
 try:
@@ -126,17 +126,17 @@ def release_display():
             fbdisplay.detach()
             log("fbdisplay.detach() chiamato")
     except Exception as e:
-        log(f"fbdisplay.detach() fallito: {e}")
+        log(f"fbdisplay.detach() failed: {e}")
     try:
         pygame.display.quit()
         log("pygame.display.quit() chiamato")
     except Exception as e:
-        log(f"pygame.display.quit() fallito: {e}")
+        log(f"pygame.display.quit() failed: {e}")
     try:
         pygame.quit()
         log("pygame.quit() chiamato")
     except Exception as e:
-        log(f"pygame.quit() fallito: {e}")
+        log(f"pygame.quit() failed: {e}")
 
 # ---- MAIN ----
 def main():
@@ -177,7 +177,7 @@ def main():
             fbdisplay.attach(screen)
             log("fbdisplay attach OK")
         except Exception as e:
-            log(f"fbdisplay attach fallito: {e}")
+            log(f"fbdisplay attach failed: {e}")
 
     # ---- SCHERMATA VUOTA (senza animazione che blocca) ----
     # Mostriamo subito uno schermo nero (con eventuale logo) e lanciamo

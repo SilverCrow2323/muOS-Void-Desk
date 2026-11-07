@@ -27,7 +27,7 @@ class ToolboxHub(HubMixin):
             app.play_clock_gaze(entering=True)
         except Exception as e:
             sys.stderr.write(
-                "bootanim clock non riuscita: %s\n" % e)
+                "bootanim clock failed: %s\n" % e)
         app.push("clock")
 
     def calc(self):
@@ -39,7 +39,7 @@ class ToolboxHub(HubMixin):
             app.play_calc_lid(opening=True)
         except Exception as e:
             sys.stderr.write(
-                "bootanim calc non riuscita: %s\n" % e)
+                "bootanim calc failed: %s\n" % e)
         app.push("calc")
 
     def cal(self):
@@ -66,7 +66,7 @@ class ToolboxHub(HubMixin):
             app.play_rss_intro()
         except Exception as e:
             sys.stderr.write(
-                "bootanim rss non riuscita: %s\n" % e)
+                "bootanim rss failed: %s\n" % e)
         app.rss_sel = 0
         app.push("rss")
         if not app.rss_items and app.rss_enabled_feeds():
@@ -79,7 +79,7 @@ class ToolboxHub(HubMixin):
             app.play_weather_intro()
         except Exception as e:
             sys.stderr.write(
-                "bootanim meteo non riuscita: %s\n" % e)
+                "bootanim meteo failed: %s\n" % e)
         app.wx_sel = 0
         app.push("weather")
         cities = app.cfg.get("weather_cities") or []
@@ -97,7 +97,7 @@ class ToolboxHub(HubMixin):
             app.play_python_intro()
         except Exception as e:
             sys.stderr.write(
-                "bootanim python non riuscita: %s\n" % e)
+                "bootanim python failed: %s\n" % e)
 
         def run_and_open(p):
             app.py_runfile(p)
@@ -112,7 +112,7 @@ class ToolboxHub(HubMixin):
             app.play_files_intro()
         except Exception as e:
             sys.stderr.write(
-                "bootanim files non riuscita: %s\n" % e)
+                "bootanim files failed: %s\n" % e)
         app.fm_open()
 
     def ftp(self):
@@ -122,7 +122,7 @@ class ToolboxHub(HubMixin):
             app.play_ftp_intro()
         except Exception as e:
             sys.stderr.write(
-                "bootanim ftp non riuscita: %s\n" % e)
+                "bootanim ftp failed: %s\n" % e)
         app.ftp_prof_sel = 0
         app.push("ftpprof")
 
@@ -134,7 +134,7 @@ class ToolboxHub(HubMixin):
             app.play_editor_intro()
         except Exception as e:
             sys.stderr.write(
-                "bootanim editor non riuscita: %s\n" % e)
+                "bootanim editor failed: %s\n" % e)
         app.fm_open(start_path=TEXTS_DIR, ext_filter=TEXT_EXTS)
 
     def sync(self):
@@ -144,7 +144,7 @@ class ToolboxHub(HubMixin):
             app.play_sync_intro()
         except Exception as e:
             sys.stderr.write(
-                "bootanim sync non riuscita: %s\n" % e)
+                "bootanim sync failed: %s\n" % e)
         app.sync_open()
 
     def tsgui(self):
@@ -154,7 +154,7 @@ class ToolboxHub(HubMixin):
             app.play_ts_intro()
         except Exception as e:
             sys.stderr.write(
-                "bootanim tailscale non riuscita: %s\n" % e)
+                "bootanim tailscale failed: %s\n" % e)
         app.ts_open()
 
     def tool_open(self, key):

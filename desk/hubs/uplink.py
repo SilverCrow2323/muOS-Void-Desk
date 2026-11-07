@@ -64,7 +64,7 @@ class UplinkHub(HubMixin):
         try:
             app.play_sync_intro()
         except Exception as e:
-            sys.stderr.write("bootanim sync non riuscita: %s\n" % e)
+            sys.stderr.write("bootanim sync failed: %s\n" % e)
         app.sync_open()
 
     def tsgui(self):
@@ -73,7 +73,7 @@ class UplinkHub(HubMixin):
         try:
             app.play_ts_intro()
         except Exception as e:
-            sys.stderr.write("bootanim tailnet non riuscita: %s\n" % e)
+            sys.stderr.write("bootanim tailnet failed: %s\n" % e)
         app.ts_open()
 
     def ftp(self):
@@ -82,7 +82,7 @@ class UplinkHub(HubMixin):
         try:
             app.play_ftp_intro()
         except Exception as e:
-            sys.stderr.write("bootanim ftp non riuscita: %s\n" % e)
+            sys.stderr.write("bootanim ftp failed: %s\n" % e)
         app.ftp_prof_sel = 0
         app.push("ftpprof")
 
@@ -91,11 +91,11 @@ class UplinkHub(HubMixin):
         from desk.main import net_test
         app = self.app
         st = app.status_snapshot()
-        ip = app.own_ip() or "non disponibile"
+        ip = app.own_ip() or "not available"
         internet = app.run_busy(app.t("checking"), net_test,
                                 accent=(74, 206, 224),
                                 icon="globe")
-        base = "attivo" if app.bstation_srv is not None else "fermo"
+        base = "active" if app.bstation_srv is not None else "fermo"
         app.netprobe_data = {
             "ip": ip,
             "internet": internet,
@@ -108,8 +108,12 @@ class UplinkHub(HubMixin):
 
     def deviceremapper(self):
         """Device key mapping."""
-        self.app.controller_hub.map()
+        _hub = getattr(self.app, "controller_hub", None)
+        if _hub is not None:
+            _hub.map()
 
     def wiredcontroller(self):
         """External controller management."""
-        self.app.controller_hub.devices()
+        _hub = getattr(self.app, "controller_hub", None)
+        if _hub is not None:
+            _hub.devices()

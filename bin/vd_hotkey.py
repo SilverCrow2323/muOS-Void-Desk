@@ -107,7 +107,7 @@ def onboard_toggle():
             time.sleep(0.6)
             if kbd_pids():
                 return
-            log("layout %s assente: fallback default" % lay)
+            log("layout %s missing: fallback default" % lay)
         session_cmd(["matchbox-keyboard"] + extra)
 
 
@@ -246,10 +246,10 @@ def main():
     # i figli (matchbox, xrefresh...) si auto-raccolgono: mai piu' zombie
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     if not evinput.start():
-        log("evdev non disponibile")
+        log("evdev not available")
         return 1
     kbd_keys = kbd_buttons()
-    log("attivo (START+SELECT = pannello, %s = tastiera)"
+    log("active (START+SELECT = pannello, %s = tastiera)"
         % kbd_keys)
     both_since = 0.0
     fired = 0.0
@@ -281,7 +281,7 @@ def main():
                     import vd_panel
                     act = vd_panel.Panel(MNT).run_panel()
                 except Exception as e:
-                    log("errore pannello: %s" % e)
+                    log("error pannello: %s" % e)
                 finally:
                     sig_all(xp + qp, signal.SIGCONT)
                 log("azione: %s" % act)

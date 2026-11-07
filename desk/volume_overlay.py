@@ -47,7 +47,7 @@ class VolumeOverlay:
         alpha = self.alpha
         vol = self.last_volume
 
-        panel_w, panel_h = 220, 90
+        panel_w, panel_h = 260, 110
         panel_x = (W - panel_w) // 2
         panel_y = (H - panel_h) // 2 - 30
 
@@ -64,7 +64,7 @@ class VolumeOverlay:
         icons.volume_icon(s, 20, 25, 40, vol, (255, 255, 255), (100, 100, 100))
 
         bar_x, bar_y = 80, 35
-        bar_w, bar_h = 110, 14
+        bar_w, bar_h = 140, 18
         pygame.draw.rect(s, (30, 35, 40), (bar_x, bar_y, bar_w, bar_h), border_radius=3)
         fill_w = int(bar_w * vol / 100)
         if fill_w > 0:

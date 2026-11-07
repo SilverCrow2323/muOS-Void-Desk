@@ -1,0 +1,53 @@
+{
+ "controller_bindings": {},
+ "notification_history": [
+  {
+   "title": "gia' mappato",
+   "body": "A",
+   "kind": "message",
+   "ts": 1785815582.1145923
+  },
+  {
+   "title": "Desktop Mode",
+   "body": "XFCE installation requires the RG35XX-H handheld (arm64 Ubuntu chroot).",
+   "kind": "warning",
+   "ts": 1794011785.5502481
+  }
+ ],
+ "home_style": "nexus",
+ "theme": "ciano",
+ "lang": "en",
+ "sfx": true,
+ "battery": true,
+ "termid_name": "qq",
+ "termid_id": "20260733110111",
+ "desk_env": "xfce",
+ "font_scale": "normale",
+ "bgm": true,
+ "vfx_bg": 4,
+ "vfx_trans": 3,
+ "vfx_fx": 3,
+ "void_stars": true,
+ "void_nebula": true,
+ "void_comets": true,
+ "void_glitch": false,
+ "void_gravity": true,
+ "void_trails": true,
+ "clock_badge": true,
+ "nexus_bg": {
+  "enabled": false,
+  "stars": true,
+  "comets": true,
+  "nebula": true,
+  "orbit_color": [
+   74,
+   206,
+   224
+  ],
+  "orbit_width": 2,
+  "orbit_style": "glow",
+  "glitch": false,
+  "scanlines": true,
+  "vignette": true
+ }
+}

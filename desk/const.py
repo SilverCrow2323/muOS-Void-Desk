@@ -233,12 +233,12 @@ NEXUS_RING_OUT = [4, 1, 7, 8, 12, 13]                     # TOOLBOX, MUOS APPS, 
 NEXUS_RING_FAR = [9]                                      # END NODE (solo lui)
 NEXUS_RING_VOID = [14]                                    # QUARTA ORBITA — LEGACY (chiusura)
 NEXUS_NODE_COLOR = {
-    0: (255, 205, 120),    # START SESSION -- bianco/ambra
-    3: (240, 90, 60),      # FORGE -- rosso/ambra
-    5: (80, 205, 255),     # UPLINK -- ciano
-    2: (230, 80, 190),     # MEDIA VAULT -- magenta/teal
-    6: (175, 110, 240),    # WORKSHOP -- viola/giallo
-    4: (95, 210, 140),     # TOOLBOX -- verde/acciaio
+    0: (255, 215, 140),    # START SESSION -- bianco/ambra
+    3: (255, 100, 70),      # FORGE -- rosso/ambra
+    5: (90, 220, 255),     # UPLINK -- ciano
+    2: (245, 90, 210),     # MEDIA VAULT -- magenta/teal
+    6: (185, 120, 255),    # WORKSHOP -- viola/giallo
+    4: (105, 225, 155),     # TOOLBOX -- verde/acciaio
     1: (225, 225, 235),    # MUOS APPS -- bianco/argento
     7: (100, 130, 210),    # SETTINGS ("SYSTEM") -- blu scuro/grigio
     8: (150, 160, 180),    # INFO & ABOUT
@@ -378,7 +378,7 @@ NEXUS_SAT_ZOOM_MULT = 2.6
 # v10.6: orbite ridistanziate ulteriormente (era 145/235) e nuova
 # terza orbita, la piu' lontana di tutte, riservata a END NODE.
 # v10.14: aggiunta quarta orbita VOID per LEGACY.
-NEXUS_RING_RADIUS = {1: 155, 2: 270, 3: 350, 4: 420}
+NEXUS_RING_RADIUS = {1: 140, 2: 250, 3: 340, 4: 420}
 NEXUS_OUTER_TILT = 18
 NEXUS_FAR_TILT = -32     # v10.6: END NODE inclinato in senso opposto
                           # all'esterna -- un piano tutto suo, non solo
@@ -456,14 +456,14 @@ NEXUS_SATELLITES = {
 }
 NOTIF_KINDS = {
     # tipo: (colore, icona, etichetta_it, etichetta_en)
-    "standard": ((140, 150, 165), "info", "NOTIFICA", "NOTICE"),
-    "message": ((60, 200, 210), "monitor", "MESSAGGIO", "MESSAGE"),
-    "success": ((90, 205, 130), "info", "COMPLETATO", "DONE"),
-    "warning": ((230, 180, 60), "shield", "AVVISO", "WARNING"),
-    "urgent": ((230, 110, 50), "shield", "URGENTE", "URGENT"),
-    "critical": ((220, 60, 55), "shield", "ALLARME CRITICO",
+    "standard": ((160, 175, 195), "info", "NOTIFICA", "NOTICE"),
+    "message": ((80, 220, 230), "monitor", "MESSAGGIO", "MESSAGE"),
+    "success": ((110, 225, 150), "info", "COMPLETATO", "DONE"),
+    "warning": ((255, 200, 80), "shield", "AVVISO", "WARNING"),
+    "urgent": ((255, 130, 60), "shield", "URGENTE", "URGENT"),
+    "critical": ((240, 75, 70), "shield", "ALLARME CRITICO",
                 "CRITICAL ALARM"),
-    "system": ((170, 110, 220), "gear", "SISTEMA VOID", "VOID SYSTEM"),
+    "system": ((190, 130, 245), "gear", "SISTEMA VOID", "VOID SYSTEM"),
 }
 
 # --- [C6.5] Outer-Desk App Registry // HUB: TOOLBOX Satellite (R1) ---

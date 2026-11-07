@@ -295,14 +295,14 @@ def alsa_volume_hint():
                 ln.strip() for ln in out.splitlines()
                 if "%" in ln or "[on]" in ln or "[off]" in ln))
     except Exception as e:
-        bgm_log("amixer non disponibile per la diagnostica: %s" % e)
+        bgm_log("amixer not available per la diagnostica: %s" % e)
 
 
 def load_bgm(env):
     """Preferisce il file WAV vero in assets/bgm/<env>.wav — cosi'
     l'utente puo' sostituirlo col proprio (stesso nome) senza toccare
     codice. Se manca o e' illeggibile, ripiega sulla sintesi al volo
-    (nessuna sigla resta mai muta per un file assente)."""
+    (nessuna sigla resta mai muta per un file missing)."""
     if os.environ.get("VD_BGM_OFF"):
         bgm_log("disattivato da VD_BGM_OFF")
         return None
@@ -331,7 +331,7 @@ def load_bgm(env):
                      os.environ.get("SDL_AUDIODRIVER", "(default)")))
             break
         except Exception as e:
-            bgm_log("mixer.init%r fallito: %s" % ((freq, size, ch), e))
+            bgm_log("mixer.init%r failed: %s" % ((freq, size, ch), e))
     else:
         bgm_log("nessun formato audio disponibile: silenzio")
         return None
@@ -339,17 +339,17 @@ def load_bgm(env):
         try:
             return pygame.mixer.Sound(wav)
         except Exception as e:
-            bgm_log("caricamento %s fallito: %s -- ripiego su sintesi"
+            bgm_log("loading %s failed: %s -- ripiego su sintesi"
                     % (wav, e))
     else:
-        bgm_log("%s assente -- ripiego su sintesi" % wav)
+        bgm_log("%s missing -- ripiego su sintesi" % wav)
     return synth_bgm_pcm(env)
 
 
 def synth_bgm_pcm(env):
     """Sintesi di riserva (usata solo se il WAV su disco manca o e'
     corrotto): stesso spartito di sempre, generato al volo sul mixer
-    che load_bgm() ha gia' aperto."""
+    che load_bgm() ha gia' opened."""
     import math as m
     import random as r
     import pygame
@@ -418,7 +418,7 @@ def synth_bgm_pcm(env):
     try:
         return pygame.mixer.Sound(buffer=bytes(raw))
     except Exception as e:
-        bgm_log("Sound(buffer=...) fallito: %s" % e)
+        bgm_log("Sound(buffer=...) failed: %s" % e)
         return None
 
 
@@ -439,7 +439,7 @@ def main():
             busy = pygame.mixer.get_busy()
             bgm_log("play() chiamato, get_busy()=%r" % busy)
         except Exception as e:
-            bgm_log("play() fallito: %s" % e)
+            bgm_log("play() failed: %s" % e)
         alsa_volume_hint()
     ANIMS.get(env, anim_xfce)(pt, fb)
     time.sleep(HOLD)

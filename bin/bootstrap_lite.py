@@ -122,7 +122,7 @@ def main():
     for pkg in ("pygame", "pygame-ce"):
         url, name, ver = pick_wheel(op, pkg, tag, mach)
         if url:
-            log("   trovato: %s (v%s)" % (name, ver))
+            log("   found: %s (v%s)" % (name, ver))
             break
     if not url:
         log("FATAL: nessun wheel pygame per %s/%s" % (tag, mach))
@@ -132,7 +132,7 @@ def main():
     try:
         download(op, url, WHL)
     except Exception as e:
-        log("FATAL: download fallito: %s" % e)
+        log("FATAL: download failed: %s" % e)
         return 1
 
     log("3/4 scompatto in %s ..." % RUNTIME)
@@ -142,7 +142,7 @@ def main():
         with zipfile.ZipFile(WHL) as z:
             z.extractall(RUNTIME)
     except Exception as e:
-        log("FATAL: estrazione wheel fallita: %s" % e)
+        log("FATAL: estrazione wheel failed: %s" % e)
         return 1
     for base, _d, files in os.walk(RUNTIME):
         for fn in files:
@@ -152,7 +152,7 @@ def main():
                 except OSError:
                     pass
 
-    log("4/4 verifica import pygame...")
+    log("4/4 verify import pygame...")
     env = dict(os.environ)
     env["PYTHONPATH"] = RUNTIME
     env["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
@@ -163,10 +163,10 @@ def main():
              "import pygame,sys;sys.stdout.write(pygame.version.ver)"],
             env=env, capture_output=True, text=True, timeout=60)
     except Exception as e:
-        log("FATAL: verifica non eseguibile: %s" % e)
+        log("FATAL: verify non eseguibile: %s" % e)
         return 1
     if out.returncode != 0:
-        log("FATAL: import pygame fallito:")
+        log("FATAL: import pygame failed:")
         log(out.stderr.strip()[-800:])
         return 1
     log("   pygame %s OK" % out.stdout.strip())
@@ -177,7 +177,7 @@ def main():
         with open(SDL_TXT, "w") as f:
             f.write(sdl[0] + "\n")
     else:
-        log("libSDL2 di sistema: non trovata (si usera' quella del wheel)")
+        log("libSDL2 di sistema: not found (si usera' quella del wheel)")
         try:
             os.remove(SDL_TXT)
         except OSError:
@@ -189,7 +189,7 @@ def main():
         os.remove(WHL)
     except OSError:
         pass
-    log("==== VOIDDESK BOOTSTRAP-LITE completato ====")
+    log("==== VOIDDESK BOOTSTRAP-LITE completed ====")
     return 0
 
 

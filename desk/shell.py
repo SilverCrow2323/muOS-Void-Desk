@@ -48,7 +48,7 @@ class Shell(object):
             self.out.append(self._t("comandi eseguiti nel chroot XFCE",
                                     "commands run inside the XFCE chroot"))
         else:
-            self.out.append(self._t("chroot non montato: comandi su muOS",
+            self.out.append(self._t("chroot not mounted: comandi su muOS",
                                     "chroot not mounted: running on muOS"))
         self.kx, self.ky = 0, 1
         self.shift = False
@@ -193,7 +193,7 @@ class Shell(object):
                                         ("chroot XFCE" if self.mnt
                                          else "muOS host"), True,
                                         self.accent), (10, 5))
-        st = self._t("occupato..." if self.busy else "pronto",
+        st = self._t("occupato..." if self.busy else "ready",
                      "busy..." if self.busy else "ready")
         self.s.blit(self.f_small.render(st, True,
                                         NO_R if self.busy else OK_G),

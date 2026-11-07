@@ -110,7 +110,7 @@ def mount_img(img, mnt, ro=False):
     if is_mounted(mnt):
         return True, ""
     if not os.path.exists(img):
-        return False, "immagine assente: %s" % img
+        return False, "immagine missing: %s" % img
 
     if ro:
         attempts = [["-o", "ro"], ["-o", "ro,noload"], []]

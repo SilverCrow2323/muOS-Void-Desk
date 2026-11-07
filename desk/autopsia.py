@@ -28,7 +28,7 @@ class Autopsia:
         return self.results
 
     def _check_system(self):
-        self.results.append(("sec", "info", "SISTEMA"))
+        self.results.append(("sec", "info", "SYSTEM"))
         try:
             un = os.uname()
             self.results.append(("kv", "KERNEL", "%s %s" % (un.sysname, un.release), (96, 225, 120)))
@@ -49,7 +49,7 @@ class Autopsia:
             pass
 
     def _check_memory(self):
-        self.results.append(("sec", "task", "MEMORIA"))
+        self.results.append(("sec", "task", "MEMORY"))
         try:
             with open("/proc/meminfo") as f:
                 lines = f.readlines()
@@ -68,7 +68,7 @@ class Autopsia:
             self.results.append(("kv", "RAM", "N/D", (238, 62, 58)))
 
     def _check_storage(self):
-        self.results.append(("sec", "disk", "ARCHIVIAZIONE"))
+        self.results.append(("sec", "disk", "STORAGE"))
         for lbl, p in (("SD1 (mmc)", "/mnt/mmc"), ("SD2 (sdcard)", "/mnt/sdcard")):
             try:
                 st = os.statvfs(p)
@@ -84,7 +84,7 @@ class Autopsia:
             self.results.append(("kv", "IMMAGINE XFCE", self._human(os.path.getsize(img)), (96, 225, 120)))
 
     def _check_network(self):
-        self.results.append(("sec", "wifi", "RETE"))
+        self.results.append(("sec", "wifi", "NETWORK"))
         try:
             ssid = ""
             try:
@@ -93,7 +93,7 @@ class Autopsia:
             except Exception:
                 pass
             conn = bool(ssid)
-            self.results.append(("kv", "WIFI", ssid or "non connesso", (96, 225, 120) if conn else (148, 150, 152)))
+            self.results.append(("kv", "WIFI", ssid or "not connected", (96, 225, 120) if conn else (148, 150, 152)))
         except Exception:
             self.results.append(("kv", "WIFI", "N/D", (238, 62, 58)))
 
@@ -111,16 +111,16 @@ class Autopsia:
                 col = (96, 225, 120) if exists else (238, 62, 58)
                 self.results.append(("kv", "  %s" % app["key"], "OK" if exists else "MANCANTE", col))
         except Exception as e:
-            self.results.append(("kv", "OUTER-DESK", "errore: %s" % str(e), (238, 62, 58)))
+            self.results.append(("kv", "OUTER-DESK", "error: %s" % str(e), (238, 62, 58)))
 
     def _check_audio(self):
         self.results.append(("sec", "speaker", "AUDIO"))
         try:
             import pygame
             pygame.mixer.init()
-            self.results.append(("kv", "MIXER", "attivo", (96, 225, 120)))
+            self.results.append(("kv", "MIXER", "active", (96, 225, 120)))
         except Exception:
-            self.results.append(("kv", "MIXER", "non disponibile", (238, 62, 58)))
+            self.results.append(("kv", "MIXER", "not available", (238, 62, 58)))
 
     def _check_display(self):
         self.results.append(("sec", "monitor", "DISPLAY"))

@@ -20,7 +20,7 @@ class MediaHub(HubMixin):
         app = self.app
         mpv, ffplay, _ = app.check_media_deps()
         if not mpv and not ffplay:
-            app.notify("Void Radio", "mpv/ffplay non trovati: installa i player multimediali", "warning")
+            app.notify("Void Radio", "mpv/ffplay non trovati: install i player multimediali", "warning")
             return
         app.play_media_boot("radio")
         app.radio_tab = "all"
@@ -71,7 +71,7 @@ class MediaHub(HubMixin):
         app.push("bgmmain")
 
     def media_vault_enter(self):
-        """Avvia la transizione di Media Vault."""
+        """Start la transizione di Media Vault."""
         app = self.app
         app.media_vault_phase = "intro"
         app.media_vault_anim_t0 = time.time()

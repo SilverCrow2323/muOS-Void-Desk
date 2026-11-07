@@ -15,7 +15,7 @@ class GamesHub(HubMixin):
         self.app = app
 
     def portmaster(self):
-        """Avvia PortMaster (già presente in muOS)."""
+        """Start PortMaster (già presente in muOS)."""
         app = self.app
         pm_paths = [
             "/mnt/mmc/MUOS/PortMaster/PortMaster.sh",
@@ -28,7 +28,7 @@ class GamesHub(HubMixin):
                 pm = p
                 break
         if not pm:
-            app.notify("PortMaster", "non trovato nel sistema", "warning")
+            app.notify("PortMaster", "not found nel sistema", "warning")
             return
         app.handoff("AVVIO PORTMASTER..." if app.lang == "it" else "STARTING PORTMASTER...")
         app.exit_code = 0

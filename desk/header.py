@@ -120,7 +120,7 @@ def _draw_indicators(surface, app, acc, acc2, right=""):
         icons.bt_icon(surface, x, 10, 16, st["bt"], acc, FAINT)
         col = OK_G if st["bt"] else (60, 60, 60)
         pulse = 0.5 + 0.5 * math.sin(now * 3) if st["bt"] else 1
-        pygame.draw.circle(surface, (col[0], col[1], col[2], int(150 * pulse)), (x + 8, 30), 2)
+        pygame.draw.circle(surface, (col[0], col[1], col[2], int(180 * pulse)), (x + 8, 30), 3)
 
     if app.cfg.get("st_wifi", True):
         x -= 22
@@ -144,7 +144,7 @@ def _draw_indicators(surface, app, acc, acc2, right=""):
         pygame.draw.rect(surface, acc, (bx, by, tw + 8, 26), 1, border_radius=4)
         surface.blit(app.f_med_b.render(hm, True, (120, 240, 170)), (bx + 4, by + 2))
         pulse = 0.5 + 0.5 * math.sin(now * 3)
-        pygame.draw.circle(surface, (60, 255, 110, int(150 * pulse)), (bx - 6, by + 12), 3)
+        pygame.draw.circle(surface, (80, 255, 130, int(200 * pulse)), (bx - 6, by + 12), 4)
 
     if right:
         x -= app.f_small.size(right)[0] + 6

@@ -26,8 +26,8 @@ class MpvController:
         return self.proc is not None and self.proc.poll() is None
 
     def start(self, url, extra_args=None):
-        """Avvia mpv su un URL/percorso, in pausa iniziale disattivata.
-        Ritorna (ok, errore)."""
+        """Start mpv su un URL/percorso, in pausa iniziale disattivata.
+        Ritorna (ok, error)."""
         self.stop()
         try:
             if os.path.exists(self.sock_path):
@@ -70,7 +70,7 @@ class MpvController:
                 return True, ""
             except (OSError, ConnectionError):
                 time.sleep(0.1)
-        self.last_error = "connessione al socket fallita"
+        self.last_error = "connessione al socket failed"
         return False, self.last_error
 
     def _read_last_error(self):
@@ -86,7 +86,7 @@ class MpvController:
                     return line.strip()[-110:]
         except OSError:
             pass
-        return "mpv ha chiuso lo stream"
+        return "mpv ha closed lo stream"
 
     def _connect(self):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -96,7 +96,7 @@ class MpvController:
 
     def _send(self, command):
         """Manda un comando IPC vero, ritorna la risposta parsata o
-        None se qualcosa va storto (mpv chiuso, socket morto...)."""
+        None se qualcosa va storto (mpv closed, socket morto...)."""
         if self._sock is None:
             return None
         with self._lock:

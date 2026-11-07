@@ -194,7 +194,7 @@ class Screen(object):
                 pygame.draw.circle(self.surf, FAINT, (cx + 7, y + 7), 3, 1)
             self.text(p, (cx + 24, y - 1), self.f_med, col, maxw=W - 120)
             if st == "work":
-                self.text(self.t("in corso", "working"), (W - 90, y + 1),
+                self.text(self.t("in progress", "working"), (W - 90, y + 1),
                           self.f_tiny, self.acc)
             y += 22
 
@@ -321,7 +321,7 @@ def parse_status(line, scr):
         for p in scr.pkgs:
             if p != who and scr.state[p] == "work":
                 scr.state[p] = "done"
-        if "Installed" in desc or "installato" in desc:
+        if "Installed" in desc or "installed" in desc:
             if who in scr.state:
                 scr.state[who] = "done"
     elif kind == "pmerror":
@@ -373,7 +373,7 @@ def main():
         logf.write((m + "\n").encode())
 
     if not os.path.exists(os.path.join(DATA, ".xfce_ready")):
-        note("FATAL: desktop XFCE non installato")
+        note("FATAL: desktop XFCE not installed")
         time.sleep(4)
         scr.close()
         return 1
@@ -381,7 +381,7 @@ def main():
                         "https://ports.ubuntu.com"],
                        stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL) != 0:
-        note("FATAL: rete assente (attiva il WiFi)" if lang == "it"
+        note("FATAL: rete missing (active il WiFi)" if lang == "it"
              else "FATAL: no network (turn on Wi-Fi)")
         time.sleep(5)
         scr.close()
@@ -392,8 +392,8 @@ def main():
     imgmount.cleanup_stale(IMG)        # libera loop rimasti appesi
     ok, err = imgmount.mount_img(IMG, MNT)
     if not ok:
-        note("FATAL: mount immagine fallito - %s" % (err or "?"))
-        note("Suggerimento: chiudi il desktop XFCE e riprova, oppure usa"
+        note("FATAL: mount immagine failed - %s" % (err or "?"))
+        note("Suggerimento: close il desktop XFCE e riprova, oppure usa"
              " il pannello (START+SELECT) -> Risoluzione problemi.")
         time.sleep(7)
         scr.close()
@@ -464,7 +464,7 @@ def main():
             rc = apt_with_progress(pkgs, scr, logf,
                                    remove=(mode == "remove"))
         if rc != 0:
-            note("FATAL: installazione fallita (rc=%d)" % rc if lang == "it"
+            note("FATAL: installazione failed (rc=%d)" % rc if lang == "it"
                  else "FATAL: install failed (rc=%d)" % rc)
             time.sleep(6)
             return 1

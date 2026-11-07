@@ -15,7 +15,7 @@ class DevelopHub(HubMixin):
         self.app = app
 
     def repl(self):
-        """Python REPL interattivo."""
+        """Python REPL interactive."""
         app = self.app
         app.py_ns = {}
         app.py_out = ["Python %s // host muOS" % __import__("sys").version.split()[0], ">>> "]
@@ -28,7 +28,7 @@ class DevelopHub(HubMixin):
         try:
             app.play_editor_intro()
         except Exception as e:
-            __import__("sys").stderr.write("bootanim editor non riuscita: %s\n" % e)
+            __import__("sys").stderr.write("bootanim editor failed: %s\n" % e)
         app.fm_open(start_path=TEXTS_DIR, ext_filter=TEXT_EXTS)
 
     def builder(self):

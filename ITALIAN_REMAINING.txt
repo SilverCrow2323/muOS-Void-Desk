@@ -1,0 +1,833 @@
+Remaining Italian-looking strings: 831
+========================================================================
+BUILDCHECK.py:13: intro non riuscita
+BUILDCHECK.py:306: intro non riuscita
+bin/vd_panel.py:65: riprende la sessione
+bin/vd_panel.py:66: periferiche, rete, audio, XFCE
+bin/vd_panel.py:70: mostra/nascondi la tastiera
+bin/vd_panel.py:72: chiude e riapre la sessione
+bin/vd_panel.py:76: DIAGNOSI SISTEMA
+bin/vd_panel.py:380: close e start un altro tool
+bin/vd_panel.py:387: diagnosi per questo ambiente
+bin/vd_panel.py:394: restart il tool corrente
+bin/vd_panel.py:468: NON montato: usa Risoluzione problemi
+bin/vd_panel.py:646: tastiera riavviata
+bin/vd_panel.py:695: impossibile svuotare le cache
+bin/vd_panel.py:709: ancora occupato
+bin/vd_panel.py:717: finestra adattata a 640x480
+bin/vd_panel.py:722: finestra closed
+bin/vd_panel.py:777: tastiera: %dpx (si applica alla 
+bin/vd_panel.py:879: non riavviabile da qui
+bin/vd_panel.py:973: SU/GIU
+bin/vd_panel.py:1006: SU/GIU
+bin/vd_panel.py:1079: Chiudere e passare a CLI Arsenal per 
+bin/vd_panel.py:1080: sceglierne un altro?
+bin/vd_hotkey.py:117: non ricompare
+bin/vd_hotkey.py:252: active (START+SELECT = pannello, %s = tastiera)
+bin/vd_hotkey.py:265: toggle tastiera
+bin/xfce_install.py:384: FATAL: rete missing (active il WiFi)
+bin/xfce_install.py:396: Suggerimento: close il desktop XFCE e riprova, oppure usa
+bin/xfce_install.py:397:  il pannello (START+SELECT) -> Risoluzione problemi.
+bin/xfce_install.py:452: riparo le dipendenze e riprovo...
+bin/xfce_install.py:502: Fatto: lo trovi nel menu Applicazioni di XFCE.
+bin/xfce_bootstrap.py:114: FATAL: rete missing (active il WiFi e riprova)
+bin/xfce_bootstrap.py:170: 3/5 configuro il sistema...
+bin/xfce_bootstrap.py:202:     NON SPEGNERE LA CONSOLE
+bin/xfce_bootstrap.py:232: Avvialo da VOIDDESK -> DESKTOP XFCE
+bin/bootstrap_lite.py:120: 1/4 cerco il wheel pygame per %s/%s su PyPI...
+bin/bootstrap_lite.py:128: FATAL: nessun wheel pygame per %s/%s
+bin/bootstrap_lite.py:166: FATAL: verify non eseguibile: %s
+bin/bootstrap_lite.py:176: libSDL2 di sistema: %s
+bin/bootstrap_lite.py:180: libSDL2 di sistema: not found (si usera' quella del wheel)
+bin/vd_bootanim.py:285:  a 0 o mutato, tutto il resto di questo file puo
+bin/vd_bootanim.py:298: amixer not available per la diagnostica: %s
+bin/vd_bootanim.py:307: disattivato da VD_BGM_OFF
+bin/vd_bootanim.py:312: pygame non importabile: %s
+bin/vd_bootanim.py:329: mixer OK per file: %r driver=%s
+bin/vd_bootanim.py:342: caricamento %s failed: %s -- ripiego su sintesi
+bin/vd_bootanim.py:345: %s missing -- ripiego su sintesi
+bin/xfce_update.py:41: FATAL: rete missing
+bin/xfce_update.py:88: Sistema aggiornato.
+outdesk/outdeskintro.py:68: fbdisplay o evinput non trovati, continuo senza.
+outdesk/outdeskintro.py:146: Comando da eseguire dopo l'intro
+outdesk/outdeskintro.py:149: Lancio per: {args.name}
+outdesk/outdeskintro.py:200: Logo non caricato: {e}
+outdesk/outdeskintro.py:248: Comando terminato con rc={rc}
+lib/fbshow.py:13: report non trovato
+lib/fbshow.py:25: Collega la SD al PC e invialo per la diagnosi.
+desk/rtshell.py:42:  un emulatore completo -- e
+desk/qrgen.py:117: testo troppo lungo per le versioni supportate 
+desk/mpvctl.py:59: socket IPC non comparso
+desk/mpvctl.py:89: mpv ha closed lo stream
+desk/radixeditor.py:400: Modalità: {mode_str}
+desk/radixeditor.py:406: Seleziona nodo
+desk/const.py:341: Esplora la tua collezione multimediale.
+desk/const.py:342: Normalizza il volume delle tracce BGM.
+desk/const.py:466: SISTEMA VOID
+desk/const.py:486: Gestore dipendenze standalone per app muOS
+desk/const.py:510: Store di app e giochi per muOS
+desk/const.py:522: Player audio/video standalone per Media Vault
+desk/const.py:534: Visualizzatore immagini standalone per Media Vault
+desk/const.py:546: Gestore animazioni di avvio per muOS
+desk/const.py:558: Suite di penetrazione WiFi per muOS
+desk/const.py:645: Console: D-pad Su
+desk/const.py:646: Console: D-pad Giù
+desk/const.py:664: Console: apri File Grid-Diver
+desk/const.py:666: Console: apri Rt:Shell
+desk/const.py:668: Console: apri Void Radio
+desk/const.py:670: Console: apri Orologio
+desk/const.py:672: Console: apri Device Stats
+desk/const.py:674: Console: apri Note
+desk/const.py:676: Console: apri Calendario
+desk/const.py:678: Console: apri Meteo
+desk/const.py:680: Console: apri RSS
+desk/const.py:681: Console: apri Calcolatrice
+desk/const.py:683: Console: apri Opzioni
+desk/const.py:685: Console: apri pannello media
+desk/const.py:687: Console: apri menu spegnimento
+desk/const.py:693: Console: volume su
+desk/const.py:695: Console: volume giù
+desk/const.py:735: Termina sessione corrente di Void-Desk.
+desk/const.py:738: Riavvia l'applicazione Void-Desk.
+desk/const.py:741: Spegne completamente il dispositivo.
+desk/const.py:744: Riavvia il sistema del dispositivo.
+desk/const.py:794: Il cuore pulsante dell'universo Void-Desk: ambienti KLinux Desktop serviti con Mostarda e 
+desk/const.py:798: L'officina in cui forgerete il VOSTRO Void-Desk: installer, updater e script runner.
+desk/const.py:802: Il ponte di comando per tutte le connessioni: rete wireless, hotspot, Bluetooth, PC link e
+desk/const.py:806: Il salotto multimediale: radio in streaming, IPTV, libreria di file e normalizzatore audio
+desk/const.py:810: Il laboratorio di manutenzione: statistiche, diagnostica, monitoraggio, analisi storage, b
+desk/const.py:814: La cassetta degli attrezzi: calcolatrice, orologio, agenda, note, file manager, FTP, sincr
+desk/const.py:818: Il portale verso le app muOS: scopri, avvia e organizza le tue applicazioni.
+desk/const.py:822: Il centro di controllo: tema, font, effetti, lingua, mappatura controller e avvio.
+desk/const.py:834: Il catalogo dei giochi nativi e porting per muOS.
+desk/const.py:842: La piazza della community: forum, wiki, condivisione.
+desk/const.py:846: Il modulo Outer-Desk: app standalone e strumenti portatili.
+desk/const.py:850: L'ultima orbita. La fine di un ciclo.
+desk/const.py:860: RETE E FILE
+desk/const.py:961: granelli di neve
+desk/const.py:965: rovesci di neve
+desk/const.py:966: rovesci di neve
+desk/const.py:968: temporale con grandine
+desk/const.py:969: temporale con grandine
+desk/const.py:1033: Il Post
+desk/const.py:1114: il server grafico
+desk/const.py:1116: uscita su framebuffer
+desk/const.py:1124: comunicazione tra applicazioni
+desk/const.py:1126: font di sistema
+desk/const.py:1132: gestore di sessione
+desk/const.py:1140: aspetto, tastiera, mouse
+desk/const.py:1147: catture schermo
+desk/const.py:1149: editor di testo
+desk/const.py:1153: window manager turbo: ~10MB di RAM
+desk/const.py:1159: INPUT / TASTIERA
+desk/const.py:1162: Tastiera matchbox
+desk/const.py:1163: tastiera virtuale (MENU la apre)
+desk/const.py:1166: finestre di dialogo
+desk/const.py:1181: motore per UPLINK > Hotspot
+desk/const.py:1183: Utility rete
+desk/const.py:1186: gestione reti (puo' litigare con muOS)
+desk/const.py:1189: BROWSER / RETE
+desk/const.py:1217: fogli di calcolo
+desk/const.py:1221: RETE / SVILUPPO
+desk/const.py:1222: sincronizza file (muOS ne ha uno suo)
+desk/const.py:1226: mouse e tastiera dal PC via rete
+desk/const.py:1234: vedi il desktop dal PC
+desk/const.py:1244: cartelle di rete Windows
+desk/const.py:1246: scansione rete e porte
+desk/const.py:1247: traccia il percorso di rete
+desk/const.py:1251: misura la banda tra due host
+desk/const.py:1257: zip, 7z da terminale
+desk/const.py:1261: monitor processi da terminale
+desk/const.py:1263: file manager da terminale
+desk/const.py:1265: controllo versione
+desk/const.py:1266: editor da terminale
+desk/const.py:1267: download da terminale
+desk/const.py:1269: Info sistema
+desk/const.py:1273: ricerca fuzzy da terminale
+desk/const.py:1282: database leggero da riga di comando
+desk/const.py:1284: calcolatrice da script/terminale
+desk/const.py:1285: converti/ritaglia immagini da CLI
+desk/const.py:1287: scarica video/audio da riga di comando
+desk/const.py:1292: porta le finestre a schermo intero -- senza, xterm resta piccolo 
+desk/const.py:1293: in un angolo
+desk/const.py:1296: la pioggia di Matrix nel terminale
+desk/const.py:1298: il gatto arcobaleno, in ASCII
+desk/const.py:1300: un treno a vapore attraversa il terminale
+desk/const.py:1302: una mucca (o altro) che dice quello che vuoi
+desk/const.py:1304: colora l'output di qualsiasi comando
+desk/const.py:1310: il serpente del Nokia, in terminale
+desk/const.py:1314: Tetris, ma ti da sempre il pezzo peggiore
+desk/const.py:1318: Space Invaders da terminale
+desk/const.py:1334: Tastiera matchbox
+desk/const.py:1340: la pioggia di Matrix nel terminale
+desk/const.py:1343: il gatto arcobaleno, in ASCII
+desk/const.py:1345: un treno a vapore attraversa il terminale
+desk/const.py:1348: una mucca che dice quello che vuoi
+desk/const.py:1356: anime in streaming da terminale (script GitHub, non apt)
+desk/const.py:1359: il serpente del Nokia, in terminale
+desk/const.py:1365: Tetris, ma ti da sempre il pezzo peggiore
+desk/const.py:1370: Space Invaders da terminale
+desk/const.py:1373: file manager da terminale, due pannelli
+desk/const.py:1375: editor di testo da terminale
+desk/const.py:1386: INPUT / TASTIERA
+desk/const.py:1387: BROWSER / RETE
+desk/const.py:1389: RETE / SVILUPPO
+desk/const.py:1395: INPUT / TASTIERA
+desk/const.py:1396: BROWSER / RETE
+desk/const.py:1398: RETE / SVILUPPO
+desk/const.py:1425: Tastiera matchbox
+desk/const.py:1437: Utility rete
+desk/const.py:1477: Info sistema
+desk/const.py:1624: Rotella su
+desk/const.py:1629: Mostra/nascondi tastiera
+desk/const.py:1682: INPUT / TASTIERA
+desk/const.py:1683: BROWSER / RETE
+desk/const.py:1685: RETE / SVILUPPO
+desk/const.py:1688: il server grafico
+desk/const.py:1689: uscita su framebuffer
+desk/const.py:1693: comunicazione tra applicazioni
+desk/const.py:1694: font di sistema
+desk/const.py:1696: gestore di sessione
+desk/const.py:1700: aspetto, tastiera, mouse
+desk/const.py:1704: catture schermo
+desk/const.py:1705: editor di testo
+desk/const.py:1707: tastiera virtuale a schermo
+desk/const.py:1708: serve all'auto-comparsa tastiera
+desk/const.py:1710: finestre di dialogo
+desk/const.py:1730: fogli di calcolo
+desk/const.py:1734: zip, 7z da terminale
+desk/const.py:1735: monitor processi da terminale
+desk/const.py:1736: file manager da terminale
+desk/const.py:1737: controllo versione
+desk/const.py:1739: editor da terminale
+desk/const.py:1740: download da terminale
+desk/const.py:1742: tastiera virtuale (MENU la apre)
+desk/const.py:1743: gestione reti (puo' litigare con muOS)
+desk/const.py:1748: vedi il desktop dal PC
+desk/const.py:1754: cartelle di rete Windows
+desk/const.py:1755: sincronizza file (muOS ne ha uno suo)
+desk/const.py:1758: mouse e tastiera dal PC via rete
+desk/const.py:1765: non installato
+desk/const.py:1767: non connesso
+desk/const.py:1768: non raggiungibile
+desk/const.py:1774: SISTEMA
+desk/const.py:1776: ACCESO DA
+desk/const.py:1793: catalogo con stato di ogni componente
+desk/const.py:1794: catalogue with per-component status
+desk/const.py:1799: quali programmi partono con XFCE
+desk/const.py:1801: Aggiorna sistema
+desk/const.py:1807: terminale con tastiera a schermo
+desk/const.py:1814: avvia il desktop a schermo intero
+desk/const.py:1819: sistema, memoria, rete, audio, desktop
+desk/const.py:1821: diari di bordo e info sul progetto
+desk/const.py:1824: seleziona
+desk/const.py:1825: seleziona
+desk/const.py:1825: conferma
+desk/const.py:1830: controllo in corso...
+desk/const.py:1831: Prima installa il desktop XFCE (voce in alto nel menu).
+desk/const.py:1835: Effetti schermo
+desk/const.py:1837: solo gli ambienti, non l'app
+desk/const.py:1846: personalizza lo sfondo del planetario
+desk/const.py:1850: Non installato
+desk/const.py:1851: richiede la base (~400MB)
+desk/const.py:1855: Vedi log di sessione
+desk/const.py:1857: Controlla e aggiorna sistema
+desk/const.py:1858: Rimuovere questo ambiente?
+desk/const.py:1859: mai controllato
+desk/const.py:1859: controllato il
+desk/const.py:1860: da un po': valuta un controllo
+desk/const.py:1868: rete, sincronizzazione, FTP, Tailnet e controller
+desk/const.py:1879: app che partono col desktop
+desk/const.py:1881: aggiorna l'app da GitHub
+desk/const.py:1882: roba simpatica da terminale
+desk/const.py:1883: il quadro completo del sistema
+desk/const.py:1884: salute di immagine e sessioni
+desk/const.py:1888: trova ed elimina ROM doppie
+desk/const.py:1890: tutti i diari, per area
+desk/const.py:1891: digitale o analogico, con sveglie
+desk/const.py:1892: solo gli ambienti, non l'app
+desk/const.py:1896: Layout tastiera schermo
+desk/const.py:1897: Layout tastiera fisica
+desk/const.py:1897: se ne colleghi una USB
+desk/const.py:1905: rete privata, peer, file e QR login
+desk/const.py:1907: client FTP con profili
+desk/const.py:1910: rileva e usa lo script muOS
+desk/const.py:1914: file manager da terminale
+desk/const.py:1915: client FTP nativo, con profili
+desk/const.py:1916: Editor di testo
+desk/const.py:1916: VOID EDIT: apri e modifica qui
+desk/const.py:1921: città monitorate, previsioni settimanali
+desk/const.py:1923: normalizza il volume delle musiche
+desk/const.py:1924: + aggiungi città
+desk/const.py:1924: nessuna città monitorata
+desk/const.py:1925: cerco la città...
+desk/const.py:1925: aggiorno il meteo...
+desk/const.py:1926: nessuna città trovata
+desk/const.py:1927: meteo non disponibile
+desk/const.py:1929: non puo' essere avviata su questo dispositivo: mancano le seguenti dipendenze
+desk/const.py:1930: Scaricare e installare gli elementi mancanti?
+desk/const.py:1933: nessuna notizia: R1 per aggiornare
+desk/const.py:1940: cpu, ram, temp, rete: live
+desk/const.py:1942: salva e ripristina xfce.img
+desk/const.py:1943: cerco le reti...
+desk/const.py:1947: Il progetto
+desk/const.py:1950: un segnale dal VOID
+desk/const.py:1951: versione, novità, release
+desk/const.py:1952: non installato - A: installa
+desk/const.py:1953: si apre nel desktop: la trovi nel menu applicazioni
+desk/const.py:1956: APP DI SISTEMA
+desk/const.py:1958: Confermi la rimozione? A: si'   B: no
+desk/const.py:1964: Transizioni a finestra
+desk/const.py:1972: AGGIORNAMENTO SISTEMA...
+desk/const.py:1977: SU/GIU
+desk/const.py:1979: leggo lo stato dei componenti...
+desk/const.py:1984: non installato
+desk/const.py:1985: I componenti base del desktop non si possono rimuovere:
+desk/const.py:1986: B = annulla
+desk/const.py:1988: PREMI IL TASTO DA ASSEGNARE A:
+desk/const.py:1989: attendi 5 secondi per annullare
+desk/const.py:1990: Il tasto %s e' gia' usato da: %s
+desk/const.py:1991: A = scambia le due funzioni     B = annulla
+desk/const.py:1999: Caricamento stazioni...
+desk/const.py:2003: Importa da M3U
+desk/const.py:2004: seleziona playlist
+desk/controllers.py:129: errore vero, utile per capire se e
+desk/controllers.py:138: cartella usata: %s
+desk/controllers.py:143: impossibile leggere la cartella: %s
+desk/imgmount.py:24: comando non eseguibile
+desk/imgmount.py:104: installazione il journal ext4 puo
+desk/fbdisplay.py:27:  quello che scriviamo all
+desk/fbdisplay.py:169: fb: non attivo
+desk/pcuplink.py:17: indirizzo di rete, broadcast, e se
+desk/autopsia.py:31: SISTEMA
+desk/main.py:505: SISTEMA VOID
+desk/main.py:576: Console: D-pad Su
+desk/main.py:577: Console: D-pad Giù
+desk/main.py:624: Console: volume su
+desk/main.py:626: Console: volume giù
+desk/main.py:681: RETE E FILE
+desk/main.py:847: Il Post
+desk/main.py:916: il server grafico
+desk/main.py:918: uscita su framebuffer
+desk/main.py:926: comunicazione tra applicazioni
+desk/main.py:928: font di system
+desk/main.py:934: gestore di sessione
+desk/main.py:951: editor di testo
+desk/main.py:955: window manager turbo: ~10MB di RAM
+desk/main.py:961: INPUT / TASTIERA
+desk/main.py:964: Tastiera matchbox
+desk/main.py:965: keyboard virtuale (MENU la apre)
+desk/main.py:968: finestre di dialogo
+desk/main.py:983: motore per UPLINK > Hotspot
+desk/main.py:988: gestione reti (puo' litigare con muOS)
+desk/main.py:991: BROWSER / RETE
+desk/main.py:1019: fogli di calcolo
+desk/main.py:1023: RETE / SVILUPPO
+desk/main.py:1024: sincronizza file (muOS ne ha uno suo)
+desk/main.py:1036: vedi il desktop dal PC
+desk/main.py:1046: cartelle di network Windows
+desk/main.py:1049: traccia il percorso di network
+desk/main.py:1053: misura la banda tra due host
+desk/main.py:1059: zip, 7z da terminale
+desk/main.py:1063: monitor processi da terminale
+desk/main.py:1065: file manager da terminale
+desk/main.py:1067: controllo versione
+desk/main.py:1068: editor da terminale
+desk/main.py:1069: download da terminale
+desk/main.py:1075: ricerca fuzzy da terminale
+desk/main.py:1084: database leggero da riga di comando
+desk/main.py:1086: calcolatrice da script/terminale
+desk/main.py:1087: converti/ritaglia immagini da CLI
+desk/main.py:1089: scarica video/audio da riga di comando
+desk/main.py:1094: porta le finestre a screen intero -- senza, xterm resta piccolo 
+desk/main.py:1095: in un angolo
+desk/main.py:1098: la pioggia di Matrix nel terminale
+desk/main.py:1100: il gatto arcobaleno, in ASCII
+desk/main.py:1102: un treno a vapore attraversa il terminale
+desk/main.py:1104: una mucca (o altro) che dice quello che vuoi
+desk/main.py:1106: colora l'output di qualsiasi comando
+desk/main.py:1112: il serpente del Nokia, in terminale
+desk/main.py:1116: Tetris, ma ti da sempre il pezzo peggiore
+desk/main.py:1120: Space Invaders da terminale
+desk/main.py:1136: Tastiera matchbox
+desk/main.py:1142: la pioggia di Matrix nel terminale
+desk/main.py:1145: il gatto arcobaleno, in ASCII
+desk/main.py:1147: un treno a vapore attraversa il terminale
+desk/main.py:1150: una mucca che dice quello che vuoi
+desk/main.py:1158: anime in streaming da terminale (script GitHub, non apt)
+desk/main.py:1161: il serpente del Nokia, in terminale
+desk/main.py:1167: Tetris, ma ti da sempre il pezzo peggiore
+desk/main.py:1172: Space Invaders da terminale
+desk/main.py:1175: file manager da terminale, due pannelli
+desk/main.py:1177: editor di testo da terminale
+desk/main.py:1188: INPUT / TASTIERA
+desk/main.py:1189: BROWSER / RETE
+desk/main.py:1191: RETE / SVILUPPO
+desk/main.py:1197: INPUT / TASTIERA
+desk/main.py:1198: BROWSER / RETE
+desk/main.py:1200: RETE / SVILUPPO
+desk/main.py:1227: Tastiera matchbox
+desk/main.py:1419: Rotella su
+desk/main.py:1477: INPUT / TASTIERA
+desk/main.py:1478: BROWSER / RETE
+desk/main.py:1480: RETE / SVILUPPO
+desk/main.py:1483: il server grafico
+desk/main.py:1484: uscita su framebuffer
+desk/main.py:1488: comunicazione tra applicazioni
+desk/main.py:1489: font di system
+desk/main.py:1491: gestore di sessione
+desk/main.py:1500: editor di testo
+desk/main.py:1505: finestre di dialogo
+desk/main.py:1525: fogli di calcolo
+desk/main.py:1529: zip, 7z da terminale
+desk/main.py:1530: monitor processi da terminale
+desk/main.py:1531: file manager da terminale
+desk/main.py:1532: controllo versione
+desk/main.py:1534: editor da terminale
+desk/main.py:1535: download da terminale
+desk/main.py:1537: keyboard virtuale (MENU la apre)
+desk/main.py:1538: gestione reti (puo' litigare con muOS)
+desk/main.py:1543: vedi il desktop dal PC
+desk/main.py:1549: cartelle di network Windows
+desk/main.py:1550: sincronizza file (muOS ne ha uno suo)
+desk/main.py:1560: non installed
+desk/main.py:1569: SISTEMA
+desk/main.py:1571: ACCESO DA
+desk/main.py:1588: catalogo con stato di ogni componente
+desk/main.py:1589: catalogue with per-component status
+desk/main.py:1594: quali programmi partono con XFCE
+desk/main.py:1602: terminale con keyboard a screen
+desk/main.py:1609: start il desktop a screen intero
+desk/main.py:1616: diari di bordo e info sul progetto
+desk/main.py:1619: seleziona
+desk/main.py:1620: seleziona
+desk/main.py:1626: Prima install il desktop XFCE (voce in alto nel menu).
+desk/main.py:1642: Non installed
+desk/main.py:1643: richiede la base (~400MB)
+desk/main.py:1647: Vedi log di sessione
+desk/main.py:1650: Rimuovere questo ambiente?
+desk/main.py:1651: mai controllato
+desk/main.py:1651: controllato il
+desk/main.py:1652: da un po': valuta un controllo
+desk/main.py:1671: app che partono col desktop
+desk/main.py:1673: update l'app da GitHub
+desk/main.py:1674: roba simpatica da terminale
+desk/main.py:1675: il quadro completo del system
+desk/main.py:1676: salute di immagine e sessioni
+desk/main.py:1682: tutti i diari, per area
+desk/main.py:1683: digitale o analogico, con sveglie
+desk/main.py:1684: solo gli ambienti, non l'app
+desk/main.py:1689: se ne colleghi una USB
+desk/main.py:1698: rileva e usa lo script muOS
+desk/main.py:1702: file manager da terminale
+desk/main.py:1703: client FTP nativo, con profili
+desk/main.py:1704: Editor di testo
+desk/main.py:1709: città monitorate, previsioni settimanali
+desk/main.py:1711: normalizza il volume delle musiche
+desk/main.py:1712: + aggiungi città
+desk/main.py:1712: nessuna città monitorata
+desk/main.py:1713: cerco la città...
+desk/main.py:1713: aggiorno il meteo...
+desk/main.py:1714: nessuna città found
+desk/main.py:1717: non puo' essere avviata su questo dispositivo: mancano le seguenti dipendenze
+desk/main.py:1718: Scaricare e installare gli elementi mancanti?
+desk/main.py:1721: nessuna notizia: R1 per aggiornare
+desk/main.py:1731: cerco le reti...
+desk/main.py:1735: Il progetto
+desk/main.py:1738: un segnale dal VOID
+desk/main.py:1739: versione, novità, release
+desk/main.py:1740: non installed - A: install
+desk/main.py:1741: si apre nel desktop: la trovi nel menu applicazioni
+desk/main.py:1744: APP DI SISTEMA
+desk/main.py:1746: Confermi la rimozione? A: si'   B: no
+desk/main.py:1760: AGGIORNAMENTO SISTEMA...
+desk/main.py:1765: SU/GIU
+desk/main.py:1767: leggo lo stato dei componenti...
+desk/main.py:1772: non installed
+desk/main.py:1773: I componenti base del desktop non si possono rimuovere:
+desk/main.py:1777: PREMI IL TASTO DA ASSEGNARE A:
+desk/main.py:1778: attendi 5 secondi per annullare
+desk/main.py:1779: Il tasto %s e' gia' usato da: %s
+desk/main.py:1780: A = scambia le due funzioni     B = cancel
+desk/main.py:3245: Tailnet: open Tailnet Console per peer e netcheck.
+desk/main.py:3839: verrà sovrascritto: 
+desk/main.py:4872: idea di 
+desk/main.py:5141: percorso non 
+desk/main.py:5172: file non 
+desk/main.py:5177: per l'editor (oltre 2MB)
+desk/main.py:5201: error di lettura
+desk/main.py:5218: percorso non 
+desk/main.py:5223: richiesta non 
+desk/main.py:5252: dati non validi
+desk/main.py:5270: dati non validi
+desk/main.py:5288: file non 
+desk/main.py:5307: non vuota
+desk/main.py:5698:  la puo
+desk/main.py:5737: sempre on
+desk/main.py:5752: aggiornamenti + integrità del link sorgente
+desk/main.py:5755: CONTROLLO AUTOMATICO
+desk/main.py:5756: verify all'avvio di Void Desk
+desk/main.py:5760: install da sola se trova un aggiornamento
+desk/main.py:5763: INTERVALLO CONTROLLO
+desk/main.py:5764: ogni quanto ripetere il controllo automatico
+desk/main.py:5771: CONFERMA ETHOS · LIVELLO 1
+desk/main.py:5773: confermi di non essere debole di ethos e di 
+desk/main.py:5774: poter domare un software noto per la sua 
+desk/main.py:5775: capacità di violare ethos non ancora 
+desk/main.py:5782: CONFERMA ETHOS · LIVELLO 2
+desk/main.py:5790: un piccolo avviso ogni tanto, 
+desk/main.py:5791: paraculando ethos (non fa nulla di 
+desk/main.py:5947: errori di lettura recenti
+desk/main.py:5991: questo system
+desk/main.py:6015: /dev/input/ (per confronto)
+desk/main.py:6079: il binding non funziona
+desk/main.py:6353: open Void Radio per iniziare
+desk/main.py:6820: Carica un file...
+desk/main.py:6872: Lunedì
+desk/main.py:6872: Martedì
+desk/main.py:6872: Mercoledì
+desk/main.py:6872: Giovedì
+desk/main.py:6873: Venerdì
+desk/main.py:7031: ULTIME NOTIZIE DA TUTTI I FEED  \u2022  
+desk/main.py:7309:  un error di connessione -- e
+desk/main.py:7673: non succeeded
+desk/main.py:7965:  un pacchetto apt: e
+desk/main.py:8006: scarico da %s
+desk/main.py:8013: risposta non sembra uno script, primi byte: %r
+desk/main.py:8015: risposta inattesa: non sembra uno script
+desk/main.py:8025: certificati SSL non validi sul 
+desk/main.py:8034: smontato (era stato montato fresco da qui)
+desk/main.py:8688: genero il link...
+desk/main.py:9275: impossibile leggere il membro
+desk/main.py:9384: New file di testo
+desk/main.py:9418: NUOVA CARTELLA
+desk/main.py:9520: Sposta su %s
+desk/main.py:9548: installed il
+desk/main.py:9596: Proteggi da rimozione
+desk/main.py:9633: error durante lo spostamento
+desk/main.py:10079: diario alla ricerca di errori
+desk/main.py:10218: Un ambiente Linux completo (Ubuntu, chroot) dentro la tua 
+desk/main.py:10219: console, con menu, installer e pannello di casa SPDW.
+desk/main.py:10222: Non solo un lanciatore: file manager, FTP, editor, 
+desk/main.py:10223: orologio con sveglie, RSS, meteo, hotspot -- tutto nativo, 
+desk/main.py:10224: nessuna app di terzi richiesta per le funzioni di base.
+desk/main.py:10230: Tutto vive in un'immagine ext4 da 4GB: xfce.img. Un'unica 
+desk/main.py:10231: immagine condivisa, un solo apt, per tutti e tre gli 
+desk/main.py:10235: Quando avvii un ambiente o un'app muOS, VoidDesk cede il 
+desk/main.py:10236: posto e chiude (mai un doppio processo che si contende 
+desk/main.py:10237: screen e input): e' per questo che il menu e' cosi' 
+desk/main.py:10243: START SESSION la prima volta install la base (~400MB, 
+desk/main.py:10244: serve il WiFi): dopo quello, ogni ambiente si start o 
+desk/main.py:10252: XFCE // CORE (completo, la megastruttura), IceWM // 
+desk/main.py:10254: start; se manca, A lo install.
+desk/main.py:10258: Le dipendenze sono condivise: un'immagine, un apt. 
+desk/main.py:10259: Installare un secondo ambiente costa solo i suoi 
+desk/main.py:10263: IL RIQUADRO
+desk/main.py:10265: per CORE, strisce hazard per TURBO, fori perforati per 
+desk/main.py:10269: Il bollino a destra dice tutto a colpo d'occhio: ▶ 
+desk/main.py:10271: (rosso). In fondo, l'ultimo controllo aggiornamenti 
+desk/main.py:10278: Sigla d'avvio on/off solo per questo ambiente, ripara/
+desk/main.py:10279: reinstalla pacchetti (apt e' idempotente, sicuro anche 
+desk/main.py:10280: se gia' installati), log di sessione diretto, controlla 
+desk/main.py:10281: e update il system.
+desk/main.py:10285: Rimuovi ambiente: solo IceWM/LXDE, mai XFCE che e' la 
+desk/main.py:10286: base condivisa. Libera spazio senza toccare gli altri.
+desk/main.py:10292: L1 e' la tab installer, R1 la tab uninstaller: colori 
+desk/main.py:10299: In modalita' rimozione i pacchetti non installati sono 
+desk/main.py:10300: grigi e non selezionabili: non si puo' disinstallare cio' 
+desk/main.py:10301: che non c'e'.
+desk/main.py:10304: Reinstallare un pacchetto gia' presente e' sicuro: apt 
+desk/main.py:10309: Solo vere applicazioni compaiono in elenco: mai pezzi 
+desk/main.py:10313: AGGIORNA SISTEMA
+desk/main.py:10315: apt update + upgrade nel chroot, con barra di progresso 
+desk/main.py:10316: reale. A fine corsa scrive un marcatore con data e ora: 
+desk/main.py:10317: e' quello che il riquadro di START SESSION mostra come 
+desk/main.py:10318: 'ultimo controllo'.
+desk/main.py:10324: non il desktop. Controlla l'ultima release su GitHub, 
+desk/main.py:10325: confronta la versione, scarica e sostituisce solo se il 
+desk/main.py:10326: pacchetto e' valido -- data/ (le tue configurazioni) non 
+desk/main.py:10327: viene mai toccata, nemmeno se il pacchetto scaricato ne 
+desk/main.py:10328: contenesse una.
+desk/main.py:10334: Serve riavviare l'app perche' la nuova versione prenda 
+desk/main.py:10338: IL GESTORE
+desk/main.py:10339: Un gestore multifunzione per le app di muOS, non solo un 
+desk/main.py:10340: lanciatore: le trovi tutte (SD1+SD2), le avvii a screen 
+desk/main.py:10345: R1 system le glyph secondo lo standard # ICON: di muOS 
+desk/main.py:10346: su tutte le app in un colpo solo.
+desk/main.py:10347: glyphs per muOS # ICON: standard on every app in one 
+desk/main.py:10351: Governor per-app (impostato prima del lancio, ripristinato 
+desk/main.py:10352: dopo), sposta tra SD1/SD2, ricrea il pacchetto .muxapp in 
+desk/main.py:10355: Per-app governor (set before launch, restored after), 
+desk/main.py:10359: Proteggi da rimozione: lista tua, in aggiunta a quella 
+desk/main.py:10360: di system. Un'app protetta nasconde 'rimuovi' dalla 
+desk/main.py:10364: Rimuovere un'app da qui non e' possibile dal menu muOS 
+desk/main.py:10365: originale: le app di system (PortMaster, RetroArch, 
+desk/main.py:10366: PPSSPP...) restano comunque protette per sempre.
+desk/main.py:10370: IL SISTEMA GLYPH
+desk/main.py:10372: Cambia glyph apre una griglia stile character-select con 
+desk/main.py:10373: 26 preset SPDW, tutti 22x22 bianco puro (lo standard che 
+desk/main.py:10377: Il primo cambio fa sempre un backup automatico 
+desk/main.py:10378: dell'originale: X lo ripristina in qualsiasi momento.
+desk/main.py:10381: Aggiungi le tue: butta i PNG in assets/glyphs, compaiono 
+desk/main.py:10382: nella griglia. Se non sono a norma, viene chiesta 
+desk/main.py:10383: confirm prima di convertirli in 22x22 bianco.
+desk/main.py:10391: sempre aggiornati -- un colpo d'occhio prima ancora di 
+desk/main.py:10392: aprire una voce.
+desk/main.py:10395: Void Stats e Void Diag: il quadro completo e la salute 
+desk/main.py:10396: di immagine e sessioni (swap, governor, ultimi errori 
+desk/main.py:10405: Void Monitor: cinque schede (L1/R1) -- Dashboard con 
+desk/main.py:10407: NET in dettaglio con minimo, media, massimo.
+desk/main.py:10413: separati: puoi tenere il boost CPU e spegnere solo lo 
+desk/main.py:10419: Ogni diario, raggruppato per area: VoidDesk, sessioni 
+desk/main.py:10420: per ambiente (xfce/icewm/lxde separati), installer, 
+desk/main.py:10422: VoidDesk, per-environment sessions (xfce/icewm/lxde 
+desk/main.py:10424: R1 nel visualizzatore active la modalita' LIVE: il file 
+desk/main.py:10425: si ricarica da solo, perfetto per guardare una sessione 
+desk/main.py:10426: mentre succede. UP la mette in pausa.
+desk/main.py:10432: Backup compresso di xfce.img in ARCHIVE con percentuale 
+desk/main.py:10433: live, ripristino con confirm (scrive su file temporaneo, 
+desk/main.py:10438: Serve l'immagine smontata: se un desktop e' opened da 
+desk/main.py:10439: qualche parte, VoidDesk te lo dice invece di rischiare.
+desk/main.py:10446: Lingua desktop (vale solo per gli ambienti, non per 
+desk/main.py:10448: fisica (se colleghi una USB).
+desk/main.py:10454: connetti con keyboard per la password. LED verde+IP 
+desk/main.py:10459: Rilevamento e riconnessione doppi: se wpa_cli non 
+desk/main.py:10460: risponde, si ripiega su iw e su una riscrittura diretta 
+desk/main.py:10465: Stesso schema: interruttore vero (accende/spegne la 
+desk/main.py:10466: radio fisica), scansione, pair+trust+connect in un tocco, 
+desk/main.py:10467: pannello con le info del dispositivo.
+desk/main.py:10472: Nativo, scritto da zero (hostapd+dnsmasq): sempre ready, 
+desk/main.py:10474: diretto con Y.
+desk/main.py:10477: Sceglie da solo l'interfaccia giusta: una seconda radio 
+desk/main.py:10478: se il device ce l'ha, altrimenti riusa la principale.
+desk/main.py:10488: Clock: digitale in 3 stili o analogico con lancette vere, 
+desk/main.py:10489: X apre data/ora/fuso, A le sveglie con suono a scelta -- 
+desk/main.py:10490: suonano finche' resti nei menu di VoidDesk, non oltre 
+desk/main.py:10491: (lanciare un gioco cede il posto e chiude l'app).
+desk/main.py:10498: colorate) e Note a bacheca stile post-it, con puntine 
+desk/main.py:10499: per fissare le preferite in cima.
+desk/main.py:10503: RETE E FILE
+desk/main.py:10506: rinomina, delete con confirm, visualizzatore immagini, 
+desk/main.py:10510: VOID FTP: profili salvati, scarica con percentuale 
+desk/main.py:10511: live, carica scegliendo il file dal file manager.
+desk/main.py:10521: Terminale con keyboard a screen. Console Python 
+desk/main.py:10523: prefisso !, Y apre ed esegue un file .py dallo storage.
+desk/main.py:10530: RSS Reader: libreria ready ENG+ITA per categoria (news, 
+desk/main.py:10531: tech, linux, gaming, retrogaming, anime), colorata per 
+desk/main.py:10537: Meteo: cerca la citta' (con disambiguazione se il nome 
+desk/main.py:10548: START+SELECT insieme, in qualsiasi momento dentro un 
+desk/main.py:10549: desktop: il pannello compare sopra, la sessione resta 
+desk/main.py:10554: LE VOCI
+desk/main.py:10557: manager, restart o close la sessione.
+desk/main.py:10561: ADATTIVO PER AMBIENTE
+desk/main.py:10562: ADAPTIVE PER ENVIRONMENT
+desk/main.py:10563: Colore, nome ('Torna a IceWM', non solo XFCE) e comandi 
+desk/main.py:10564: di riparazione seguono davvero l'ambiente on: ognuno 
+desk/main.py:10571: I LOG DICONO LA VERITA'
+desk/main.py:10573: WORKSHOP > Registro log: ogni area ha il suo diario. La 
+desk/main.py:10574: modalita' LIVE (R1) mostra un problema mentre succede.
+desk/main.py:10581: software da FORGE che non usi.
+desk/main.py:10584: Un ambiente non parte? Il launcher ripiega su XFCE e lo 
+desk/main.py:10585: scrive nel log; da START SESSION prova 'ripara pacchetti' 
+desk/main.py:10586: su quell'ambiente.
+desk/main.py:10590: WiFi/Bluetooth che non si aggiornano? Esci e rientra nel 
+desk/main.py:10591: pannello: se il problema persiste, controlla il log 
+desk/main.py:10597: Le sveglie di Clock suonano solo mentre stai nei menu di 
+desk/main.py:10598: VoidDesk: lanciare un gioco o un desktop chiude l'app 
+desk/main.py:10599: (e' il patto di consegna pulito che tiene tutto 
+desk/main.py:10805: icon-frame, per continuita
+desk/main.py:11081: unica fonte di verita
+desk/main.py:11487:  essere frazionario durante un
+desk/main.py:11673: altra orbita, Su/Giu
+desk/main.py:11679: SU/GIÙ
+desk/main.py:11684: SU/GIÙ
+desk/main.py:11689: ): il planetario pan-na e si ridimensiona con continuita
+desk/main.py:11714: SU/GIÙ
+desk/main.py:11722: orbita attuale a quello dell
+desk/main.py:12353: base XFCE non ready (.xfce_ready missing)
+desk/main.py:12389: smontato (era stato montato fresco da qui)
+desk/main.py:12410: installazione non riesce piu
+desk/main.py:12466: indietro fino al più vicino header 
+desk/main.py:12575: SISTEMA
+desk/main.py:12596: ACCESO DA
+desk/main.py:12661: non installed
+desk/main.py:12714: pannello di controllo + desktop XFCE
+desk/main.py:12725: pygame su /dev/fb0, input evdev
+desk/main.py:12727: immagine ext4 in loopback: aggira i limiti di exFAT
+desk/main.py:12730: Xorg su framebuffer, senza GPU
+desk/main.py:12732: QJoyPad traduce il gamepad in mouse e tasti
+desk/main.py:12753: rilevamento via iw + riconnessione di riserva
+desk/main.py:12760: IL MANIFESTO
+desk/main.py:12763: universo \u03b2: questa ha smesso di essere 
+desk/main.py:12764: una semplice app desktop da un pezzo.
+desk/main.py:12766: forza dentro una console da 200 grammi che non 
+desk/main.py:12772: di quello che c'e' qui dentro. Non importa: 
+desk/main.py:12796: il rischio di essere sfrattati.
+desk/main.py:12892: fsync failed (non fatale): %r
+desk/main.py:12951: anonimo@ß-relay ha stabilito una connessione.
+desk/main.py:12952: [in attesa di risposta dall'altro capo...]
+desk/main.py:12954: non sappiamo chi legge questo. non sappiamo 
+desk/main.py:12955: nemmeno se qualcuno lo far\u00e0 mai. ma se sei 
+desk/main.py:12956: arrivato fin qui, dentro un menu nascosto di un 
+desk/main.py:12957: firmware nascosto su una consolina che nessuno 
+desk/main.py:12958: guardava pi\u00f9 -- allora forse sei uno di noi.
+desk/main.py:12960: VoidDesk non \u00e8 nato per essere perfetto. 
+desk/main.py:12961: \u00e8 nato perch\u00e9 il firmware di fabbrica non 
+desk/main.py:12963: \u00e8 mai stata una risposta che ci ha convinto.
+desk/main.py:12965: IR Minoru\u2076 osserva da qualche parte 
+desk/main.py:12966: nell'universo \u03b2. non sappiamo cosa veda. 
+desk/main.py:12967: sappiamo solo che ogni volta che qualcuno smonta, 
+desk/main.py:12968: ricompila, rompe e ripara qualcosa che non gli 
+desk/main.py:12969: apparteneva davvero -- il VOID si allarga un poco.
+desk/main.py:12971: continua a smontare le cose.
+desk/main.py:12973: non fatto per stare dove ci hanno detto di 
+desk/main.py:12974: stare. THE ETHOS BREAKER -- non adatto ai deboli 
+desk/main.py:12975: di ethos.
+desk/main.py:12977: -- SPDW Factory, da qualche parte nel VOID
+desk/main.py:12978: trasmesso da %s // %s
+desk/main.py:13022: salta di categoria (componenti)
+desk/main.py:13024: seleziona / tutti-nessuno
+desk/main.py:13026: update lo stato dei componenti
+desk/main.py:13029: muove il mouse
+desk/main.py:13032: rotella giu' / su
+desk/main.py:13523: ANNULLA
+desk/main.py:13571: ANNULLA
+desk/main.py:15256: Scaricare e installare %s? VoidDesk andrà 
+desk/main.py:15270: allegato -- open la pagina e scarica 
+desk/main.py:15294: Installare v%s found su SD? VoidDesk andrà 
+desk/main.py:15591: il desktop)
+desk/main.py:15709: OGG in una folder BGM_normalized.
+desk/main.py:15896: percorso non valido
+desk/main.py:16025: SALVA COME
+desk/main.py:16230: archivio non valido: %s
+desk/main.py:16242: aggiornamento annullato per sicurezza
+desk/main.py:16259: aggiornato: restart VoidDesk per applicarlo
+desk/main.py:16326: un terminale VERO (xterm su X, non la shell finta 
+desk/main.py:16333: subito. Seleziona, press A.
+desk/main.py:16338: una voce, Y segna/toglie tutte, L1/R1 passano tra 
+desk/main.py:16340: selezionato. A apre la scheda dettaglio di un 
+desk/main.py:16347:  un pacchetto apt: e
+desk/main.py:16348: scaricato dal repository ufficiale su GitHub. 
+desk/main.py:16349: Dipende da mpv, curl e fzf.
+desk/main.py:16353: TASTIERA NEL TERMINALE
+desk/main.py:16356: dedicato (MENU) apre/chiude la keyboard a screen, 
+desk/main.py:16358: START+SELECT apre il pannello LIVE.
+desk/main.py:16450:  dato, lo esegue subito -- e
+desk/main.py:17194: nessuna app in questa scheda
+desk/main.py:17196: Y per cambiare scheda
+desk/main.py:17487: completed con successo
+desk/main.py:17516: Inserisci il tuo Terminal I.D. username
+desk/main.py:17546: premi un tasto per continuare
+desk/main.py:17580: premi un tasto per iniziare
+desk/main.py:17678: riga numeri sempre visibile
+desk/main.py:17680: riga system/hotkey sempre visibile
+desk/main.py:17687: svuota lo storico comandi
+desk/main.py:17689: esci da Rt:Shell
+desk/main.py:17736: SX/DX: scegli la cifra   SU/GIU: cambia simbolo
+desk/main.py:17749: SU/GIU
+desk/main.py:17933: delete file sorgente dopo la conversione
+desk/main.py:17947: ANNULLA
+desk/main.py:17982: %d file da convertire
+desk/main.py:18009: delete file sorgente dopo la conversione
+desk/main.py:18033: file %d di %d
+desk/main.py:18074: nessuna folder ROMS found su nessuna SD
+desk/main.py:18435: archivio di TUTTI i log in un file .zip -- 
+desk/main.py:18451: azzera il contenuto, i file restano
+desk/main.py:18458: crea archivio su 
+desk/main.py:18981: nessun timer -- A per aggiungerne uno
+desk/main.py:19589: SU/GIU/SX/DX naviga; A preme il tasto; 
+desk/main.py:19590: X cancella un carattere; START calcola.
+desk/main.py:19601: In RintroCalc, L1/R1 ruotano il cartellino 
+desk/main.py:19605: specialistica, e viceversa con SINISTRA.
+desk/main.py:19612: Le pagine seguenti spiegano ogni materia. 
+desk/main.py:19941: bacheca vuota: scrivi la prima.
+desk/main.py:20116: CONFERMA
+desk/main.py:20194: nessuna network: R1 per cercare
+desk/main.py:20246: nessun dispositivo: R1 per cercare (8s)
+desk/main.py:20361: da scaricare
+desk/main.py:20366: ani-cli e' uno script scaricato da GitHub, non 
+desk/main.py:20367: un pacchetto apt -- gli altri si installano da 
+desk/main.py:20384: elenco tool pronti da lanciare
+desk/main.py:20397: a cosa serve questa sezione
+desk/main.py:20450: in arrivo con Update Desktop Systems: qui 
+desk/main.py:20451: sceglierai la combinazione shell preferita, 
+desk/main.py:20452: anche per singolo tool.
+desk/main.py:20455: per tool.
+desk/main.py:20457: la dimensione del testo si regola da 
+desk/main.py:20560: script GitHub, non un pacchetto apt
+desk/main.py:20584: SU/GIU
+desk/main.py:20606: le modifiche valgono dal prossimo avvio 
+desk/main.py:20660: MAI VERIFICATO
+desk/main.py:20777: Terminal I.D. non impostato
+desk/main.py:20803: problema di connessione: %s
+desk/main.py:20816: Latest Release: nessuna ancora
+desk/main.py:20838: il changelog comparira' qui alla prima 
+desk/main.py:20883: v%s found su SD -- SELECT per 
+desk/main.py:20907: PC Link sempre on
+desk/main.py:20960: Basestation sempre active
+desk/main.py:20979: open questo indirizzo su un browser 
+desk/main.py:21000: ricevuti da PC: %d elementi
+desk/main.py:21004: condivisi da console: %d elementi
+desk/main.py:21010: start il server per scaricare il 
+desk/main.py:21011: companion PC (basestation.py) da questo 
+desk/main.py:21012: dispositivo, senza bisogno di internet
+desk/main.py:21034: collega una keyboard USB o un dispositivo 
+desk/main.py:21075: seleziona un controller per gestire i 
+desk/main.py:21080: nessun profilo saved per questo dispositivo
+desk/main.py:21083: premi Y per salvare le impostazioni correnti
+desk/main.py:21112: nessun tasto mappato -- premi X, poi il 
+desk/main.py:21113: tasto del dispositivo esterno da 
+desk/main.py:21179: premi il tasto per:
+desk/main.py:21203: %s e' gia' usato da \
+desk/main.py:21496: Y  ·  APRI UN FILE .PY DALLO STORAGE
+desk/main.py:21536: nessun backup: creane uno.
+desk/main.py:21581: inquadra col telefono per accedere
+desk/main.py:21584: inquadra col telefono per accedere
+desk/main.py:21604: musica comuni di SD1/SD2
+desk/main.py:21622: seleziona
+desk/main.py:21945: scegli una memoria
+desk/main.py:22376: controllo automatico disattivato
+desk/shell.py:43: VoidDesk shell — A preme il tasto, 
+desk/shell.py:51: chroot not mounted: comandi su muOS
+desk/utils/__init__.py:108: non raggiungibile
+desk/hubs/media.py:23: mpv/ffplay non trovati: install i player multimediali
+desk/hubs/games.py:31: not found nel sistema
+desk/hubs/develop.py:37: STRUMENTI DI BUILD
+outdesk/Little_Mischief/wps_attack.py:23: BSSID non valido.
+outdesk/Little_Mischief/wps_attack.py:27: reaver non trovato. Installa reaver.
+outdesk/Little_Mischief/wps_attack.py:55: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/capture_pmkid.py:82: Verifica che il router supporti PMKID e che la rete sia attiva.
+outdesk/Little_Mischief/deauth_attack.py:21: \n⚠️  ATTENZIONE: Usa solo su reti di proprietà.\n
+outdesk/Little_Mischief/deauth_attack.py:24: BSSID non valido.
+outdesk/Little_Mischief/deauth_attack.py:29: aireplay-ng non trovato. Installa aircrack-ng.
+outdesk/Little_Mischief/deauth_attack.py:34: Attivazione modalità monitor su wlan0...
+outdesk/Little_Mischief/deauth_attack.py:47: \nAttacco eseguito. Controlla il log.
+outdesk/Little_Mischief/deauth_attack.py:55: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/crack_pmkid.py:31: ❌ File hashline.txt non trovato. Esegui prima Capture PMKID.
+outdesk/Little_Mischief/crack_pmkid.py:32: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/crack_pmkid.py:38: ❌ Formato hashline non valido.
+outdesk/Little_Mischief/crack_pmkid.py:39: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/crack_pmkid.py:50: ❌ File passlist.txt non trovato. Usa quello fornito.
+outdesk/Little_Mischief/crack_pmkid.py:51: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/crack_pmkid.py:58: \n🔍 Cracking PMKID per SSID: {essid.decode()}
+outdesk/Little_Mischief/crack_pmkid.py:81: \n❌ Password non trovata nella wordlist.
+outdesk/Little_Mischief/crack_pmkid.py:82:    Prova con una lista più grande.
+outdesk/Little_Mischief/crack_pmkid.py:85: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/scan_networks.py:27: \nErrore scansione. Verifica che wlan0 sia attivo.
+outdesk/Little_Mischief/scan_networks.py:31: \nScansione completata. Vedi log per i dettagli.
+outdesk/Little_Mischief/scan_networks.py:36: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/handshake_capture.py:21: \n⚠️  Richiede modalità monitor e target.\n
+outdesk/Little_Mischief/handshake_capture.py:30: airodump-ng o aireplay-ng non trovati. Installa aircrack-ng.
+outdesk/Little_Mischief/handshake_capture.py:46: Invio pacchetti deauth per forzare handshake...
+outdesk/Little_Mischief/handshake_capture.py:50: Attesa 10 secondi per catturare handshake...
+outdesk/Little_Mischief/handshake_capture.py:59: \nHandshake catturato? Verifica il file {cap_path}
+outdesk/Little_Mischief/handshake_capture.py:66: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/port_scan.py:22: Subnet non valida.
+outdesk/Little_Mischief/port_scan.py:31: Nessuno strumento di scansione trovato (nmap o fping).
+outdesk/Little_Mischief/port_scan.py:47: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/clear_log.py:16: ℹ️  Nessun log da cancellare.
+outdesk/Little_Mischief/clear_log.py:17: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/view_log.py:16: ⚠️  File di log '{LOG_FILE}' non trovato.
+outdesk/Little_Mischief/view_log.py:17: Nessuna attività registrata finora.
+outdesk/Little_Mischief/view_log.py:18: \nPremi ENTER per tornare al menu.
+outdesk/Little_Mischief/view_log.py:30: Premi ENTER per tornare al menu.

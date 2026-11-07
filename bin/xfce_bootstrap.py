@@ -111,7 +111,7 @@ def main():
                          stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
     if rc != 0:
-        log("FATAL: rete assente (attiva il WiFi e riprova)")
+        log("FATAL: rete missing (active il WiFi e riprova)")
         return 1
 
     # ---- 1. immagine ext4 ---------------------------------------------
@@ -134,7 +134,7 @@ def main():
                         log("   %dMB / 4096MB" % (done >> 20))
                         nxt += 512 << 20
         except Exception as e:
-            log("FATAL: creazione immagine fallita: %s" % e)
+            log("FATAL: creazione immagine failed: %s" % e)
             return 1
         open(MARKER + ".img", "w").close()
 
@@ -145,7 +145,7 @@ def main():
     sh("modprobe loop 2>/dev/null || true")
     ok, err = imgmount.mount_img(IMG, MNT)
     if not ok:
-        log("FATAL: mount loop fallito - %s" % (err or "?"))
+        log("FATAL: mount loop failed - %s" % (err or "?"))
         return 1
     log("   montata: %.1fGB liberi dentro l'immagine" % free_gb(MNT))
 
@@ -158,11 +158,11 @@ def main():
             if not (os.path.exists(TGZ) and
                     sh(["gzip", "-t", TGZ]) == 0):
                 if sh(["curl", "-fL", "--retry", "2", "-o", TGZ, UB_URL]) != 0:
-                    log("FATAL: download fallito")
+                    log("FATAL: download failed")
                     return 1
             log("   estraggo nel filesystem ext4...")
             if sh("gzip -dc '%s' | tar -xf - -C '%s'" % (TGZ, MNT)) != 0:
-                log("FATAL: estrazione fallita")
+                log("FATAL: estrazione failed")
                 return 1
             os.remove(TGZ)
 
@@ -211,16 +211,16 @@ def main():
                  "-o Acquire::Retries=2")
         if sh("chroot '%s' /bin/bash -c '%s apt-get %s update'"
               % (MNT, env, aptop)) != 0:
-            log("FATAL: apt-get update fallito")
+            log("FATAL: apt-get update failed")
             return 1
         if sh("chroot '%s' /bin/bash -c \"%s apt-get %s install -y "
               "--no-install-recommends %s && apt-get clean\""
               % (MNT, env, aptop, PKGS)) != 0:
-            log("FATAL: installazione pacchetti fallita")
+            log("FATAL: installazione pacchetti failed")
             return 1
 
         # ---- 5. verifica ----------------------------------------------
-        log("5/5 verifica...")
+        log("5/5 verify...")
         for p in ("/usr/bin/startx", "/usr/bin/startxfce4",
                   "/usr/bin/qjoypad"):
             if not os.path.exists(MNT + p):
