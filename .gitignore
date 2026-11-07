@@ -54,3 +54,4 @@ data/logger_config.json
 *~
 .DS_Store
 Thumbs.db
+.venv_desktop/
