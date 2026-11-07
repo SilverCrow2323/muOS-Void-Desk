@@ -28,10 +28,12 @@ class MediaHub(HubMixin):
         app.push("radio")
 
     def voidcast(self):
-        """Voidcast IPTV suite."""
-        app = self.app
-        app.play_media_boot("iptv")
-        app.voidcast_enter()
+        """Launch VoidCast IPTV (external tool)."""
+        self.app.launch_external_tool("voidcast")
+    def bgm_normalizer(self):
+        """Launch BGM Normalizer (external tool)."""
+        self.app.launch_external_tool("bgm_normalizer")
+
 
     def library(self):
         """Media library browser."""

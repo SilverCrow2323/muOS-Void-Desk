@@ -67,7 +67,11 @@ class UplinkHub(HubMixin):
             sys.stderr.write("bootanim sync failed: %s\n" % e)
         app.sync_open()
 
-    def tsgui(self):
+        def rt_tailscale(self):
+        """Launch Rt:Tailscale-M (external LÖVE tool)."""
+        self.app.launch_external_tool("rt_tailscale_m")
+
+def tsgui(self):
         """Tailnet GUI management."""
         app = self.app
         try:

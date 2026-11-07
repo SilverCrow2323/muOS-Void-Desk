@@ -1,4 +1,4 @@
--- External tools registry + launcher bridge
+-- External tools registry (engine-agnostic)
 local bridge = require("core.bridge")
 
 local ext = {}
@@ -23,16 +23,12 @@ function ext.load(on_done)
     end)
 end
 
-function ext.launch(tool_id, on_done)
-    bridge.call("launch_external", { id = tool_id }, function(resp)
-        if on_done then on_done(resp) end
-    end)
-end
-
-function ext.by_category(cat)
+function ext.by_hub(hub)
     local out = {}
     for _, t in ipairs(ext.state.tools) do
-        if t.category == cat then table.insert(out, t) end
+        if not hub or t.hub == hub then
+            table.insert(out, t)
+        end
     end
     return out
 end
@@ -42,6 +38,12 @@ function ext.get(tool_id)
         if t.id == tool_id then return t end
     end
     return nil
+end
+
+function ext.launch(tool_id, on_done)
+    bridge.call("launch_external", { id = tool_id }, function(resp)
+        if on_done then on_done(resp) end
+    end)
 end
 
 return ext

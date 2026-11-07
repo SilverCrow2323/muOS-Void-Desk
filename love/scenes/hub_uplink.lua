@@ -4,6 +4,7 @@ local sm        = require("core.scene_manager")
 local widgets   = require("core.widgets")
 local nodes     = require("core.nodes")
 local font      = require("core.font")
+local ext = require("core.external")
 
 local state = {
     wifi    = { connected = false, ssid = "—", signal = 0, ip = "—" },

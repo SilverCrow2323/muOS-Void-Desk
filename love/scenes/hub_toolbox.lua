@@ -3,6 +3,7 @@ local bridge    = require("core.bridge")
 local sm        = require("core.scene_manager")
 local nodes     = require("core.nodes")
 local widgets   = require("core.widgets")
+local ext = require("core.external")
 
 local state = {
     uptime_s = 0, ram_pct = 0, disk_free_gb = 0,

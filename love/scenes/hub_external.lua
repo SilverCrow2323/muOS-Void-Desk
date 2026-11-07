@@ -5,8 +5,8 @@ local widgets   = require("core.widgets")
 local ext       = require("core.external")
 
 local category = "all"
-local scene_ref = nil
 local status_msg = "Loading external tools..."
+local categories_list = {"all", "media", "toolbox", "uplink", "workshop"}
 
 local function refresh(scene, silent)
     if not silent then scene.set_status("Loading external tools...") end
@@ -21,32 +21,42 @@ end
 
 local function items_for(cat)
     local list = {}
-    local all = ext.state.tools
-    for _, t in ipairs(all) do
-        if cat == "all" or t.category == cat then
-            table.insert(list, {
-                badge = (t.icon or "?"):sub(1,1):upper(),
-                label = t.name or t.id,
-                desc = (t.desc or "") .. (t.exists and "" or " [NOT INSTALLED]"),
-                action = function(scene)
-                    if not t.exists then
-                        scene.set_status("Not installed: " .. t.name)
-                        return "Not installed"
+    local tools = ext.by_hub(cat == "all" and nil or cat)
+    for _, t in ipairs(tools) do
+        local badge_letter = (t.icon or "?"):sub(1,1):upper()
+        local native_badge = (t.native_engine == "love") and "LOVE" or "PY"
+        table.insert(list, {
+            badge = badge_letter,
+            label = t.name .. "  [" .. native_badge .. "]",
+            desc = (t.desc or "") .. (t.exists and "" or "  [NOT INSTALLED]"),
+            action = function(scene)
+                if not t.exists then
+                    scene.set_status("Not installed: " .. t.name)
+                    return "Not installed"
+                end
+                scene.set_status("Launching " .. t.name .. "...")
+                ext.launch(t.id, function(resp)
+                    if resp.ok then
+                        scene.set_status("Launched: " .. t.name)
+                    else
+                        scene.set_status("Failed: " .. (resp.error or "unknown"))
                     end
-                    scene.set_status("Launching " .. t.name .. "...")
-                    ext.launch(t.id, function(resp)
-                        if resp.ok then
-                            scene.set_status("Launched: " .. t.name)
-                        else
-                            scene.set_status("Failed: " .. (resp.error or "unknown"))
-                        end
-                    end)
-                    return "Launching..."
-                end,
-            })
-        end
+                end)
+                return "Launching..."
+            end,
+        })
     end
-    -- Back entry
+    table.insert(list, {
+        badge = "C", label = "Cycle category  [" .. category:upper() .. "]",
+        desc = "all / media / toolbox / uplink / workshop",
+        action = function(scene)
+            local idx = 1
+            for i, c in ipairs(categories_list) do if c == category then idx = i end end
+            category = categories_list[(idx % #categories_list) + 1]
+            scene.set_status("Category: " .. category)
+            return "Category: " .. category
+        end,
+    })
     table.insert(list, {
         badge = "<", label = "Back",
         desc = "Return to Nexus",
@@ -57,18 +67,15 @@ end
 
 local config = {
     title = "EXTERNAL TOOLS",
-    node_idx = 4,   -- toolbox color
+    node_idx = 4,
     widget_height = 130,
-    status = "External apps & tools",
+    status = "VoidDesk ecosystem apps",
 
-    on_enter = function(scene)
-        scene_ref = scene
-        refresh(scene, false)
-    end,
+    on_enter = function(scene) refresh(scene, false) end,
 
     on_update = function(scene, dt)
         scene._t = (scene._t or 0) + dt
-        if scene._t > 6 then scene._t = 0; refresh(scene, true) end
+        if scene._t > 8 then scene._t = 0; refresh(scene, true) end
     end,
 
     widgets_draw = function(scene, alpha)
@@ -80,8 +87,8 @@ local config = {
             if t.exists then installed = installed + 1 end
         end
         widgets.status_card(12, 62, (W-40)/2, 56, "gear",
-            "Tools", string.format("%d total", total),
-            nc, "EXT", alpha)
+            "Tools", string.format("%d registered", total),
+            nc, "REG", alpha)
         widgets.status_card(12 + (W-40)/2 + 8, 62, (W-40)/2, 56, "folder",
             "Installed", string.format("%d ready", installed),
             (installed > 0 and {0.4,0.9,0.5} or {0.55,0.58,0.62}),
@@ -90,25 +97,17 @@ local config = {
         widgets.info_row(20, 148, W-40, "Status", status_msg, nc, alpha)
     end,
 
-    -- Items are rebuilt on the fly by menu_screen if we use a function;
-    -- but dashboard uses static list. Use on_enter to mutate scene._items.
     items = {},
 }
 local scene = dashboard.new(config)
 
--- Override enter to rebuild items based on loaded tools
+-- Override to use dynamic items
 local base_enter = scene.enter
 function scene.enter(args)
     base_enter(args)
-    -- Build initial items (they will update when load completes)
     scene._items = items_for(category)
-    -- Patch input handler to use dynamic items
-    -- (dashboard's static items list is captured at construction; we hook
-    --  the refresh callback to update the internal list by reconstructing)
-    if scene._replace_items then scene._replace_items(scene._items) end
 end
 
--- Provide accessor for dashboard to grab current items
 scene._get_items = function() return items_for(category) end
 
 return scene
