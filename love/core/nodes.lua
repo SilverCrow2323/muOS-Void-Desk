@@ -57,8 +57,8 @@ nodes.LIST = {
       type="planet", size=12, surface="icy",
       rot_speed=0.4, scene=nil },
     { idx=9, name="END NODE", icon="power", ring=3,
-      type="planet", size=7, surface="volcanic",
-      rot_speed=0.3, orbit_mult=0.7, scene="quit" },
+      type="comet", size=7, rot_speed=0.3, orbit_mult=0.7,
+      scene="quit" },
 
     { idx=10, name="GAMES", icon="games", ring=2, hidden=true,
       type="planet", size=16, surface="gas_bands", rot_speed=0.7 },

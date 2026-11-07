@@ -10,26 +10,109 @@ local anim    = require("core.anim")
 
 local nexus = {}
 local bodies, stars = {}, {}
+local orbit_offset = { [1]=0, [2]=0, [3]=0, [4]=0 }
 local time = 0
 local selected = 1
 
--- Selection animation: reticle flies from OLD to NEW position
+-- Selection flight along the arc
 local sel = {
-    from_idx = 1, to_idx = 1, t = 1.0,   -- 1.0 = settled
-    from_x = 0, from_y = 0, from_r = 0,
-    to_x = 0,   to_y = 0,   to_r = 0,
+    t = 1.0,
+    from_ring = 2, to_ring = 2,
+    from_local = 0, to_local = 0,
+    from_r = 15, to_r = 15,
 }
+
 local warp = { active=false, t=0, target_idx=nil,
                target_scene=nil, use_stub=false, quit=false }
 
 local RING_RADII = { [1]=0, [2]=240, [3]=340, [4]=420 }
+local SQUASH = 0.42
 
--- ============ CYBERPUNK RETICLE (draws at any position) ============
+local function lerp(a, b, t) return a + (b - a) * t end
+
+local function world_angle_of(b)
+    return (b.base_angle or 0) + (orbit_offset[b.node.ring] or 0)
+end
+
+local function orbit_pos(ring, world_angle)
+    local rr = RING_RADII[ring] or 240
+    return 320 + math.cos(world_angle) * rr,
+           240 + math.sin(world_angle) * rr * SQUASH
+end
+
+local function body_pos(b)
+    return orbit_pos(b.node.ring, world_angle_of(b))
+end
+
+-- ============ SELECTION MOVEMENT ============
+local function set_selection(new_idx)
+    if new_idx == selected or not bodies[new_idx] then return end
+    local ob = bodies[selected]
+    local nb = bodies[new_idx]
+    sel.from_ring = ob.node.ring
+    sel.to_ring = nb.node.ring
+    sel.from_local = ob.base_angle or 0
+    sel.to_local = nb.base_angle or 0
+    sel.from_r = ob.r
+    sel.to_r = nb.r
+    sel.t = 0
+    selected = new_idx
+end
+
+-- LEFT/RIGHT: move along current orbit
+local function move_along_orbit(dir)
+    local cur = bodies[selected]
+    local ring = cur.node.ring
+    local same = {}
+    for i, b in ipairs(bodies) do
+        if b.node.ring == ring then
+            table.insert(same, { idx = i, base_angle = b.base_angle or 0 })
+        end
+    end
+    if #same < 2 then return end
+    table.sort(same, function(a, b) return a.base_angle < b.base_angle end)
+    local cur_pos = 1
+    for k, e in ipairs(same) do
+        if e.idx == selected then cur_pos = k; break end
+    end
+    local new_pos = cur_pos + dir
+    if new_pos < 1 then new_pos = #same
+    elseif new_pos > #same then new_pos = 1 end
+    set_selection(same[new_pos].idx)
+end
+
+-- UP/DOWN: change ring, pick nearest-angle body
+local function change_ring(dir)
+    local cur_ring = bodies[selected].node.ring
+    local target_ring = cur_ring + dir
+    -- skip empty rings
+    while target_ring >= 1 and target_ring <= 4 do
+        local has = false
+        for _, b in ipairs(bodies) do
+            if b.node.ring == target_ring then has = true; break end
+        end
+        if has then break end
+        target_ring = target_ring + dir
+    end
+    if target_ring < 1 or target_ring > 4 then return end
+
+    local cur_local = bodies[selected].base_angle or 0
+    local best, best_d = nil, math.huge
+    for i, b in ipairs(bodies) do
+        if b.node.ring == target_ring then
+            local d = math.abs((b.base_angle or 0) - cur_local)
+            if d > math.pi then d = math.pi * 2 - d end
+            if d < best_d then best = i; best_d = d end
+        end
+    end
+    if best then set_selection(best) end
+end
+
+-- ============ CYBER RETICLE ============
 local function draw_cyber_reticle(x, y, r, c, t_now, enter_t, alpha)
     alpha = alpha or 1
     enter_t = anim.clamp(enter_t, 0, 1)
 
-    -- RGB split on entry
     if enter_t < 0.6 then
         local off = 5 * (1 - enter_t / 0.6)
         love.graphics.setColor(1, 0.15, 0.25, 0.35 * alpha)
@@ -39,7 +122,6 @@ local function draw_cyber_reticle(x, y, r, c, t_now, enter_t, alpha)
         love.graphics.circle("line", x - off, y, r + 3)
     end
 
-    -- Rotating reticle (4 arcs, CCW)
     local rot = t_now * 1.4
     local reticle_r = r + 9 + 2.5 * math.sin(t_now * 3.2)
     love.graphics.setColor(c[1], c[2], c[3], 0.90 * alpha)
@@ -50,7 +132,6 @@ local function draw_cyber_reticle(x, y, r, c, t_now, enter_t, alpha)
         love.graphics.arc("line", "open", x, y, reticle_r, a0, a1)
     end
 
-    -- CW dashed inner ring
     local rot2 = -t_now * 0.9
     love.graphics.setColor(c[1]*0.85, c[2]*0.85, c[3]*0.85, 0.55 * alpha)
     love.graphics.setLineWidth(1)
@@ -60,7 +141,6 @@ local function draw_cyber_reticle(x, y, r, c, t_now, enter_t, alpha)
         love.graphics.arc("line", "open", x, y, r + 4, a0, a1)
     end
 
-    -- Corner brackets
     if enter_t > 0.3 then
         local bt = (enter_t - 0.3) / 0.7
         local arm = 10 * bt
@@ -77,7 +157,6 @@ local function draw_cyber_reticle(x, y, r, c, t_now, enter_t, alpha)
         end
     end
 
-    -- Scanlines
     love.graphics.setLineWidth(1)
     for yy = -r, r, 3 do
         local b = 0.4 + 0.6 * math.abs(math.sin(yy*0.5 + t_now*7))
@@ -85,7 +164,6 @@ local function draw_cyber_reticle(x, y, r, c, t_now, enter_t, alpha)
         love.graphics.line(x - r - 3, y + yy, x + r + 3, y + yy)
     end
 
-    -- Glitch bar
     local gs = math.floor(t_now * 12) % 9
     if gs < 2 then
         local gy = y + math.sin(t_now * 47) * r * 0.7
@@ -94,31 +172,10 @@ local function draw_cyber_reticle(x, y, r, c, t_now, enter_t, alpha)
         love.graphics.rectangle("fill", x - gw/2, gy, gw, 2)
     end
 
-    -- Data readout
     if enter_t > 0.5 then
         local readout = string.format("TGT %03d  LOCK", math.floor(t_now * 7) % 999)
         love.graphics.setColor(c[1], c[2], c[3], 0.65 * alpha)
         love.graphics.print(readout, x + r + 12, y - r - 4)
-    end
-end
-
--- ============ TRAIL of dots from old to new position ============
-local function draw_selection_trail(sel, c, t_frac)
-    if t_frac >= 1.0 or t_frac <= 0.01 then return end
-    local steps = 6
-    for i = 0, steps do
-        local f = i / steps
-        local trail_frac = math.max(0, t_frac - f * 0.12)
-        if trail_frac > 0 then
-            local tt = anim.ease_out_cubic(trail_frac)
-            local x = sel.from_x + (sel.to_x - sel.from_x) * tt
-            local y = sel.from_y + (sel.to_y - sel.from_y) * tt
-            local r = sel.from_r + (sel.to_r - sel.from_r) * tt
-            local a = (1 - f / steps) * 0.65
-            love.graphics.setColor(c[1], c[2], c[3], a)
-            love.graphics.setLineWidth(2)
-            love.graphics.circle("line", x, y, r + 6)
-        end
     end
 end
 
@@ -131,16 +188,18 @@ local function build_bodies()
     end
     local out = {}
     for _, n in ipairs(list) do
-        local angle = 0
+        local base_angle = 0
         if n.type ~= "sun" then
             counters[n.ring] = (counters[n.ring] or 0) + 1
             local i_in = counters[n.ring] - 1
             local cnt = per_ring[n.ring] or 1
-            angle = (i_in / cnt) * math.pi * 2 + (n.ring - 1) * 0.42
+            base_angle = (i_in / cnt) * math.pi * 2 + (n.ring - 1) * 0.42
         end
         table.insert(out, {
-            node = n, color = nodes.color_for(n.idx),
-            angle = angle, r = n.size or 14,
+            node = n,
+            color = nodes.color_for(n.idx),
+            base_angle = base_angle,
+            r = n.size or 14,
             icon = nodes.image_for(n.icon),
             x = 320, y = 240,
         })
@@ -152,10 +211,11 @@ local function compute_positions()
     for _, b in ipairs(bodies) do
         if b.node.type == "sun" then
             b.x, b.y = 320, 240
+            b.angle = 0
         else
-            local rr = RING_RADII[b.node.ring] or 240
-            b.x = 320 + math.cos(b.angle) * rr
-            b.y = 240 + math.sin(b.angle) * rr * 0.42
+            local wa = world_angle_of(b)
+            b.angle = wa   -- used by comet tail direction
+            b.x, b.y = orbit_pos(b.node.ring, wa)
         end
     end
 end
@@ -176,9 +236,9 @@ function nexus.enter(args)
         }
     end
     bodies = build_bodies()
+    orbit_offset = { [1]=0, [2]=0, [3]=0, [4]=0 }
     compute_positions()
     sel.t = 1.0
-    sel.from_idx = selected; sel.to_idx = selected
     warp.active, warp.t = false, 0
 
     input.clear()
@@ -188,23 +248,10 @@ function nexus.enter(args)
             return
         end
 
-        local function move_selection(new_idx)
-            if new_idx == selected then return end
-            -- capture OLD position and radius
-            local ob = bodies[selected]
-            local nb = bodies[new_idx]
-            sel.from_idx = selected
-            sel.to_idx = new_idx
-            sel.from_x = ob.x; sel.from_y = ob.y; sel.from_r = ob.r
-            sel.to_x = nb.x;   sel.to_y = nb.y;   sel.to_r = nb.r
-            sel.t = 0
-            selected = new_idx
-        end
-
-        if action == "up" or action == "left" then
-            move_selection(math.max(1, selected - 1))
-        elseif action == "down" or action == "right" then
-            move_selection(math.min(#bodies, selected + 1))
+        if action == "left"  then move_along_orbit(-1)
+        elseif action == "right" then move_along_orbit(1)
+        elseif action == "up"   then change_ring(-1)   -- toward center
+        elseif action == "down" then change_ring(1)    -- toward outer
         elseif action == "a" then
             local b = bodies[selected]
             warp.active = true; warp.t = 0
@@ -225,19 +272,14 @@ end
 
 function nexus.update(dt)
     time = time + dt
-    for _, b in ipairs(bodies) do
-        if b.node.type ~= "sun" then
-            local step = dt * (0.06 + 0.02 * (4 - b.node.ring)) * (b.node.orbit_mult or 1)
-            b.angle = b.angle + step
-        end
+    -- Advance orbit offsets (planets drift)
+    for ring = 2, 4 do
+        orbit_offset[ring] = (orbit_offset[ring] or 0) + dt * (0.06 + 0.02 * (4 - ring))
     end
     compute_positions()
 
-    -- selection flight: update positions live so reticle follows the moving body
     if sel.t < 1.0 then
-        sel.t = math.min(1.0, sel.t + dt / 0.32)
-        local tb = bodies[sel.to_idx]
-        sel.to_x = tb.x; sel.to_y = tb.y; sel.to_r = tb.r
+        sel.t = math.min(1.0, sel.t + dt / 0.35)
     end
 
     if warp.active then
@@ -252,6 +294,57 @@ function nexus.update(dt)
                 end
             end
             warp.active = false; warp.t = 0
+        end
+    end
+end
+
+-- Compute current reticle position (arc-following during flight)
+local function reticle_position()
+    if sel.t >= 1.0 then
+        local b = bodies[selected]
+        return b.x, b.y, b.r
+    end
+    local e = anim.ease_out_cubic(sel.t)
+    local ring = sel.from_ring + (sel.to_ring - sel.from_ring) * e
+    local rr = lerp(RING_RADII[sel.from_ring] or 240,
+                    RING_RADII[sel.to_ring] or 240, e)
+    -- interpolate the WORLD angle with shortest path
+    local from_world = sel.from_local + (orbit_offset[sel.from_ring] or 0)
+    local to_world   = sel.to_local   + (orbit_offset[sel.to_ring] or 0)
+    local d = to_world - from_world
+    while d >  math.pi do d = d - math.pi * 2 end
+    while d < -math.pi do d = d + math.pi * 2 end
+    local world = from_world + d * e
+    local x = 320 + math.cos(world) * rr
+    local y = 240 + math.sin(world) * rr * SQUASH
+    local r = lerp(sel.from_r, sel.to_r, e)
+    return x, y, r
+end
+
+-- Trail of dots following the arc
+local function draw_arc_trail(c, t_frac)
+    if t_frac >= 1.0 or t_frac <= 0.02 then return end
+    local steps = 8
+    for i = 1, steps do
+        local back = i / steps
+        local tt = math.max(0, t_frac - back * 0.20)
+        if tt > 0.01 then
+            -- recompute the reticle at tt
+            local e = anim.ease_out_cubic(tt)
+            local rr = lerp(RING_RADII[sel.from_ring] or 240,
+                            RING_RADII[sel.to_ring] or 240, e)
+            local from_world = sel.from_local + (orbit_offset[sel.from_ring] or 0)
+            local to_world   = sel.to_local   + (orbit_offset[sel.to_ring] or 0)
+            local d = to_world - from_world
+            while d >  math.pi do d = d - math.pi * 2 end
+            while d < -math.pi do d = d + math.pi * 2 end
+            local world = from_world + d * e
+            local x = 320 + math.cos(world) * rr
+            local y = 240 + math.sin(world) * rr * SQUASH
+            local a = (1 - back) * 0.55
+            love.graphics.setColor(c[1], c[2], c[3], a)
+            love.graphics.setLineWidth(2)
+            love.graphics.circle("line", x, y, 8)
         end
     end
 end
@@ -276,10 +369,10 @@ function nexus.draw()
         local rr = RING_RADII[ring]
         love.graphics.setColor(th.orbit_color[1], th.orbit_color[2],
                                th.orbit_color[3], 0.35 * warp_dim)
-        love.graphics.ellipse("line", 320, 240, rr, rr * 0.42)
+        love.graphics.ellipse("line", 320, 240, rr, rr * SQUASH)
     end
 
-    -- Sort bodies (outer first for depth)
+    -- Sort for depth
     local sorted = {}
     for _, b in ipairs(bodies) do table.insert(sorted, b) end
     table.sort(sorted, function(a, b)
@@ -305,6 +398,8 @@ function nexus.draw()
             planet.draw_sun(b.x, b.y, rr, c, time)
         elseif b.node.type == "satellite" then
             planet.draw_satellite(b.x, b.y, rr, c, time)
+        elseif b.node.type == "comet" then
+            planet.draw_comet(b.x, b.y, rr, c, time, b)
         else
             planet.draw_planet(b.x, b.y, rr, c, time, {
                 ring = b.node.ring_kind,
@@ -326,27 +421,16 @@ function nexus.draw()
         ::continue::
     end
 
-    -- Selection trail + reticle
+    -- Selection reticle
     if not warp.active then
         local selb = bodies[selected]
         local cur_c = selb.color
 
-        -- Flying trail from old position
         if sel.t < 1.0 then
-            draw_selection_trail(sel, cur_c, sel.t)
+            draw_arc_trail(cur_c, sel.t)
         end
 
-        -- Reticle: interpolate position during flight, snap when settled
-        local rx, ry, rr2
-        if sel.t < 1.0 then
-            local e = anim.ease_out_cubic(sel.t)
-            rx = sel.from_x + (sel.to_x - sel.from_x) * e
-            ry = sel.from_y + (sel.to_y - sel.from_y) * e
-            rr2 = sel.from_r + (sel.to_r - sel.from_r) * e
-        else
-            rx, ry, rr2 = selb.x, selb.y, selb.r
-        end
-
+        local rx, ry, rr2 = reticle_position()
         local enter_t = (sel.t < 1.0) and sel.t or 1.0
         local fade_in = math.min(1.0, sel.t * 2.0)
         draw_cyber_reticle(rx, ry, rr2, cur_c, time, enter_t, fade_in)
@@ -375,7 +459,7 @@ function nexus.draw()
     chrome.draw_footer({
         theme = th,
         hints = {
-            { icon = "dpad",  label = "Navigate" },
+            { icon = "dpad",  label = "Orbit / Node" },
             { icon = "btn_a", label = "Open" },
             { icon = "btn_b", label = "Quit" },
         },

@@ -115,48 +115,123 @@ def _kill_xfce_procs():
                 except Exception: pass
 atexit.register(_kill_xfce_procs)
 
+def _tail_log(path, n=12):
+    try:
+        with open(path, "rb") as f:
+            data = f.read()[-4000:].decode("utf-8", "replace")
+        lines = [ln for ln in data.splitlines() if ln.strip()]
+        return " | ".join(lines[-n:])
+    except Exception:
+        return ""
+
 def h_xfce_launch(args):
-    """Launch XFCE:
-       - on device: deferred (real chroot)
-       - on PC: run XFCE inside Xephyr (nested X server in a window)."""
+    """Launch XFCE on PC inside Xephyr. Returns detailed error on failure."""
     if IS_DEVICE:
         return {"ok": True, "note": "device: launch via VoidDesk chroot (Sprint 2)"}
-    import shutil, subprocess, time
+
+    import shutil, subprocess, time, os
     if not shutil.which("startxfce4"):
-        return {"ok": False, "error": "XFCE not installed — run Install XFCE Desktop first"}
+        return {"ok": False, "error": "XFCE not installed — use Install XFCE Desktop first"}
     if not shutil.which("Xephyr"):
         return {"ok": False, "error": "Xephyr missing — install: sudo apt install xserver-xephyr"}
-    try:
-        # Kill any stale Xephyr :99 from a previous run
-        subprocess.run(["pkill", "-f", "Xephyr :99"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       check=False)
-        time.sleep(0.4)
-        xephyr = subprocess.Popen(
-            ["Xephyr", ":99", "-screen", "800x600",
-             "-title", "VoidDesk XFCE (PC)"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            preexec_fn=os.setsid)
-        _XFCE_PROCS.append(("xephyr", xephyr))
-        time.sleep(1.6)  # give Xephyr time to initialize
-        env = os.environ.copy()
-        env["DISPLAY"] = ":99"
-        xfce = subprocess.Popen(
-            ["startxfce4"], env=env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            preexec_fn=os.setsid)
-        _XFCE_PROCS.append(("xfce", xfce))
-        return {"ok": True,
-                "note": "XFCE running in the 'VoidDesk XFCE (PC)' window",
-                "xfce_pid": xfce.pid,
-                "xephyr_pid": xephyr.pid}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    if not shutil.which("dbus-run-session") and not shutil.which("dbus-launch"):
+        return {"ok": False, "error": "dbus-run-session missing — install: sudo apt install dbus"}
 
-def h_apt_update(args):
-    r = device_only("apt_update")
-    if r: return r
-    return {"ok": True, "note": "implementation deferred to Sprint 2"}
+    # Kill stale Xephyr on :99
+    subprocess.run(["pkill", "-f", "Xephyr :99"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    time.sleep(0.5)
+
+    log_path = APP_DIR / "data" / "xfce_pc.log"
+    try:
+        log_file = open(log_path, "wb")
+    except OSError as e:
+        return {"ok": False, "error": f"cannot write log: {e}"}
+
+    # ── 1) Launch Xephyr ──
+    try:
+        xephyr = subprocess.Popen(
+            ["Xephyr", ":99",
+             "-screen", "1280x720",
+             "-ac", "-br", "-noreset",
+             "-title", "VoidDesk XFCE (PC)"],
+            stdout=log_file, stderr=log_file,
+            preexec_fn=os.setsid)
+    except Exception as e:
+        log_file.close()
+        return {"ok": False, "error": f"Xephyr failed to start: {e}"}
+    _XFCE_PROCS.append(("xephyr", xephyr))
+
+    # ── 2) Wait for X11 socket ──
+    sock = "/tmp/.X11-unix/X99"
+    ready = False
+    for _ in range(60):  # 6s max
+        if os.path.exists(sock):
+            ready = True
+            break
+        if xephyr.poll() is not None:
+            log_file.close()
+            return {"ok": False,
+                    "error": "Xephyr exited: " + _tail_log(log_path, 8)}
+        time.sleep(0.1)
+    if not ready:
+        try: xephyr.terminate()
+        except Exception: pass
+        log_file.close()
+        return {"ok": False,
+                "error": "Xephyr socket /tmp/.X11-unix/X99 never appeared (maybe :99 busy)"}
+
+    time.sleep(0.4)  # let X settle
+
+    # ── 3) Launch XFCE with dbus session ──
+    env = os.environ.copy()
+    env["DISPLAY"] = ":99"
+    # Remove our pygame-specific vars that might confuse GTK
+    for k in ("SDL_VIDEODRIVER", "VOIDDESK_PC", "VOIDDESK_APP_DIR"):
+        env.pop(k, None)
+
+    cmd = ["dbus-run-session", "--", "startxfce4"]
+    if not shutil.which("dbus-run-session"):
+        # fallback to dbus-launch shim
+        cmd = ["dbus-launch", "startxfce4"]
+
+    try:
+        xfce = subprocess.Popen(
+            cmd, env=env,
+            stdout=log_file, stderr=log_file,
+            preexec_fn=os.setsid)
+    except Exception as e:
+        log_file.close()
+        try: xephyr.terminate()
+        except Exception: pass
+        return {"ok": False, "error": f"startxfce4 failed: {e}"}
+    _XFCE_PROCS.append(("xfce", xfce))
+
+    # ── 4) Wait for xfce4-panel to appear (or fail) ──
+    for _ in range(100):  # 10s
+        if xfce.poll() is not None:
+            log_file.close()
+            return {"ok": False,
+                    "error": "XFCE exited immediately — log: " + _tail_log(log_path, 12)}
+        r = subprocess.run(["pgrep", "-f", "xfce4-panel"],
+                           stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, check=False)
+        if r.returncode == 0:
+            log_file.close()
+            return {"ok": True,
+                    "note": "XFCE running in the 'VoidDesk XFCE (PC)' window",
+                    "xfce_pid": xfce.pid,
+                    "xephyr_pid": xephyr.pid,
+                    "log": str(log_path)}
+        time.sleep(0.1)
+
+    log_file.close()
+    return {"ok": True,
+            "note": "XFCE running (panel not detected yet — may be slow to start)",
+            "xfce_pid": xfce.pid,
+            "xephyr_pid": xephyr.pid,
+            "log": str(log_path)}
+
 
 HANDLERS = {
     "ping": h_ping,

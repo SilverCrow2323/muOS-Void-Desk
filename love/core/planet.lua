@@ -460,4 +460,117 @@ function planet._ring_arc(x, y, r, kind, tilt, color, back)
     if kind == "double" then ring_pass(inner * 0.65, back and 1 or 2, 0.55) end
 end
 
+-- ============ COMET (END NODE) ============
+-- Dark electric-purple core with golden cracks,
+-- tail of purplish-red energy with thin electric sparks.
+function planet.draw_comet(x, y, r, base, t, body)
+    local orbit_angle = body and (body.angle or 0) or 0
+    -- tangent direction (movement direction on orbit)
+    -- for ellipse: dy = dθ * cos(θ) * a_squash
+    local tx = -math.sin(orbit_angle)
+    local ty =  math.cos(orbit_angle) * 0.42
+    local tlen = math.sqrt(tx*tx + ty*ty)
+    if tlen > 0.001 then tx, ty = tx/tlen, ty/tlen end
+
+    -- Tail direction = opposite of movement
+    local dx, dy = -tx, -ty
+
+    -- ── 1) Tail: purple → red gradient ──
+    local tail_len = r * 14
+    for i = 1, 56 do
+        local frac = i / 56
+        local dist = frac * tail_len
+        local px = x + dx * dist
+        local py = y + dy * dist
+        local width = r * (1.4 * (1 - frac) + 0.15)
+        -- color gradient: purple core → reddish fade
+        local cc = mix({0.55, 0.15, 0.72}, {0.85, 0.20, 0.30}, frac)
+        local alpha = (1 - frac) * 0.55
+        love.graphics.setColor(cc[1], cc[2], cc[3], alpha)
+        love.graphics.circle("fill", px, py, width)
+    end
+
+    -- ── 2) Inner brighter stream (hot purplish-red near core) ──
+    for i = 1, 30 do
+        local frac = i / 30
+        local dist = frac * tail_len * 0.65
+        local px = x + dx * dist
+        local py = y + dy * dist
+        local width = r * (0.9 * (1 - frac) + 0.08)
+        love.graphics.setColor(0.90, 0.30, 0.45, (1 - frac) * 0.55)
+        love.graphics.circle("fill", px, py, width)
+    end
+
+    -- ── 3) Electric sparks along the tail (jagged thin lines) ──
+    for i = 1, 14 do
+        local frac = (i / 14) ^ 1.3
+        local dist = frac * tail_len * 0.9
+        local bx = x + dx * dist
+        local by = y + dy * dist
+        -- perpendicular offset (with time-jitter)
+        local perp_x, perp_y = -dy, dx
+        local off = math.sin(t * 8 + i * 1.7) * r * 1.2 * (1 - frac)
+        local jx = bx + perp_x * off + math.sin(t * 22 + i * 2.3) * 3.5
+        local jy = by + perp_y * off + math.cos(t * 19 + i * 1.9) * 3.5
+        love.graphics.setColor(0.85, 0.65, 1.0, (1 - frac) * 0.85)
+        love.graphics.setLineWidth(1.2)
+        love.graphics.line(bx, by, jx, jy)
+        -- tiny branch
+        if i % 3 == 0 then
+            local jx2 = jx + perp_x * off * 0.4 + math.sin(t * 30 + i) * 2
+            local jy2 = jy + perp_y * off * 0.4 + math.cos(t * 27 + i) * 2
+            love.graphics.line(jx, jy, jx2, jy2)
+        end
+    end
+
+    -- ── 4) Comet body: dark purple-black with golden cracks ──
+    -- outer electric glow
+    for k = 4, 1, -1 do
+        love.graphics.setColor(0.55, 0.25, 0.90, 0.16 / k)
+        love.graphics.circle("fill", x, y, r + k * 3)
+    end
+    -- dark core
+    love.graphics.setColor(0.10, 0.04, 0.16, 1)
+    love.graphics.circle("fill", x, y, r)
+    -- purple electric rim
+    love.graphics.setColor(0.65, 0.35, 1.0, 0.75)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.circle("line", x, y, r)
+
+    -- ── 5) Golden cracks (rotating) ──
+    for i = 1, 6 do
+        local a0 = i * math.pi / 3 + t * 1.2
+        local a1 = a0 + math.pi / 5
+        local x1 = x + math.cos(a0) * r * 0.88
+        local y1 = y + math.sin(a0) * r * 0.88
+        local x2 = x + math.cos(a1) * r * 0.55
+        local y2 = y + math.sin(a1) * r * 0.55
+        -- golden crack glow
+        love.graphics.setColor(1, 0.85, 0.30, 0.55)
+        love.graphics.setLineWidth(3)
+        love.graphics.line(x1, y1, x2, y2)
+        -- bright core
+        love.graphics.setColor(1, 1, 0.70, 0.95)
+        love.graphics.setLineWidth(1.2)
+        love.graphics.line(x1, y1, x2, y2)
+    end
+
+    -- ── 6) Small electric arcs around the body ──
+    for i = 1, 4 do
+        local a = t * 2.5 + i * 1.4
+        local ax = x + math.cos(a) * (r + 3)
+        local ay = y + math.sin(a) * (r + 3)
+        local a2 = a + 0.5 + math.sin(t * 15 + i) * 0.3
+        local bx = x + math.cos(a2) * (r + 7)
+        local by = y + math.sin(a2) * (r + 7)
+        love.graphics.setColor(0.80, 0.55, 1.0, 0.85)
+        love.graphics.setLineWidth(1)
+        love.graphics.line(ax, ay, bx, by)
+    end
+
+    -- ── 7) Bright highlight on the sun-facing side ──
+    love.graphics.setColor(1, 0.85, 0.55, 0.35)
+    love.graphics.circle("fill", x - r * 0.3, y - r * 0.3, r * 0.35)
+end
+
 return planet
