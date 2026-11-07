@@ -1,8 +1,6 @@
--- CRT shader effect: scanlines + chromatic aberration + vignette.
--- Loaded optionally by main.lua. Provides:
---   crt.load()       — compile shader (returns true/false)
---   crt.apply(canvas) — draw canvas through shader onto screen
---   crt.enabled      — bool flag (user can toggle)
+-- CRT shader effect for VoidDesk LÖVE frontend.
+-- Scanlines + chromatic aberration + vignette.
+-- Works as passthrough if shader compilation fails (e.g. on weak GLES).
 local crt = {}
 
 crt.enabled = true
@@ -17,7 +15,6 @@ extern number vignette;
 extern vec2 resolution;
 
 vec4 effect(vec4 color, Image tex, vec2 texcoord, vec2 screen_coord) {
-    // Chromatic aberration: shift R and B channels slightly
     vec2 dir = texcoord - vec2(0.5);
     vec2 offset = dir * aberration / resolution;
     vec4 c;
@@ -26,11 +23,9 @@ vec4 effect(vec4 color, Image tex, vec2 texcoord, vec2 screen_coord) {
     c.b = Texel(tex, texcoord - offset).b;
     c.a = 1.0;
 
-    // Scanlines
     float scan = 0.5 + 0.5 * sin(screen_coord.y * 3.14159 * 2.0 / 3.0);
     c.rgb *= (1.0 - scanline_alpha * (1.0 - scan));
 
-    // Vignette
     float d = length(dir) * 2.0;
     float vig = 1.0 - vignette * smoothstep(0.4, 1.0, d);
     c.rgb *= vig;
@@ -39,8 +34,12 @@ vec4 effect(vec4 color, Image tex, vec2 texcoord, vec2 screen_coord) {
 }
 ]]
 
-function crt.load()
+-- crt.load() and crt.init() are aliases. Both compile the shader.
+local function _load_impl()
     if crt.loaded then return true end
+    if not (love.graphics and love.graphics.newShader) then
+        return false
+    end
     local ok, shader = pcall(love.graphics.newShader, SHADER_SRC)
     if ok and shader then
         crt.shader = shader
@@ -52,9 +51,11 @@ function crt.load()
     return false
 end
 
+function crt.load()   return _load_impl() end
+function crt.init()   return _load_impl() end
+
 function crt.apply(canvas)
     if not crt.enabled or not crt.loaded or not crt.shader then
-        -- Passthrough: draw canvas as-is
         if canvas then
             love.graphics.setShader()
             love.graphics.setColor(1, 1, 1, 1)
@@ -74,15 +75,13 @@ function crt.apply(canvas)
     love.graphics.setShader()
 end
 
+function crt.draw(canvas)   crt.apply(canvas) end
+function crt.render(canvas) crt.apply(canvas) end
+function crt.setup()        return crt.load() end
+
 function crt.toggle()
     crt.enabled = not crt.enabled
-    -- Aliases: main.lua calls crt.init(), crt.apply(), crt.draw(), crt.render()
-crt.init   = crt.load
-crt.draw   = crt.apply
-crt.render = crt.apply
-crt.setup  = crt.load
-
-return crt.enabled
+    return crt.enabled
 end
 
 return crt

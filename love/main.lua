@@ -11,7 +11,7 @@ function love.load()
     config.load()
     theme.apply(config.get("theme", "cyberpunk"))
     bridge.init()
-    crt.init()
+    if crt and (crt.init or crt.load) then (crt.init or crt.load)() end
 
     -- joystick discovery (log only if VOIDDESK_DEBUG_INPUT=1)
     if os.getenv("VOIDDESK_DEBUG_INPUT") == "1" then
