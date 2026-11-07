@@ -42,9 +42,11 @@ function bridge.poll()
 
     local f = io.open(bridge.resp_path(), "r")
     if not f then
-        -- timeout dopo 10s
+        -- timeout dopo 25s (wifi/bt scan possono impiegare diversi
+        -- secondi; i comandi davvero lunghi come xfce_install girano
+        -- in background sul lato Python e rispondono subito)
         local now = love.timer.getTime()
-        while #pending > 0 and (now - pending[1].since) > 10 do
+        while #pending > 0 and (now - pending[1].since) > 25 do
             local p = table.remove(pending, 1)
             if p.cb then p.cb({ ok = false, error = "timeout" }) end
         end

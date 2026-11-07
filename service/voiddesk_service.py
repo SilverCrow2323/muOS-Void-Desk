@@ -8,20 +8,13 @@ import json
 import os
 import platform
 import shutil
+import subprocess
 import sys
 import time
 import traceback
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent.parent
-
-# ── IPTV module import ──
-try:
-    import iptv_module
-    iptv_module.APP_DIR = APP_DIR
-except ImportError:
-    iptv_module = None
-
 DATA    = APP_DIR / "data"
 REQ     = DATA / ".love_request.json"
 RESP    = DATA / ".love_response.json"
@@ -29,6 +22,14 @@ CFG     = DATA / "desk_config.json"
 DATA.mkdir(parents=True, exist_ok=True)
 
 IS_DEVICE = platform.machine().lower() in ("aarch64", "armv7l", "arm64")
+
+# Reuse the existing, already-battle-tested device probing code from the
+# pygame engine instead of duplicating wifi/bt detection logic here.
+sys.path.insert(0, str(APP_DIR / "desk"))
+try:
+    import sysinfo as deskinfo
+except Exception:
+    deskinfo = None
 
 def log(msg):
     print(f"[service] {msg}", file=sys.stderr, flush=True)
@@ -96,81 +97,322 @@ def device_only(cmd):
         return {"ok": False, "reason": "device-only", "command": cmd}
     return None
 
-def h_xfce_install(args):
-    """Install XFCE on PC. Tries pkexec -> sudo -> apt-get with password-less sudo."""
-    import shutil, subprocess, os as _os
-    if IS_DEVICE:
-        return {"ok": True, "note": "device: use VoidDesk chroot bootstrap (Sprint 2)"}
+# ── system / network / media status ─────────────────────────
+# These were referenced in HANDLERS below but never defined: the whole
+# service crashed with a NameError at import time before it could even
+# start its main loop, so EVERY bridge.call from the LÖVE frontend
+# (including xfce_install) always hit the 10s client-side timeout,
+# because no service was ever actually running to answer it.
 
-    # Already installed?
+def _cpu_pct():
+    try:
+        load1 = os.getloadavg()[0]
+        ncpu = os.cpu_count() or 1
+        return max(0, min(100, round(load1 / ncpu * 100)))
+    except Exception:
+        return 0
+
+def _ram_info():
+    try:
+        vals = {}
+        with open("/proc/meminfo") as f:
+            for ln in f:
+                k, _, v = ln.partition(":")
+                if k in ("MemTotal", "MemAvailable"):
+                    vals[k] = int(v.strip().split()[0])  # kB
+        total_kb = vals.get("MemTotal", 0)
+        avail_kb = vals.get("MemAvailable", total_kb)
+        used_kb = max(0, total_kb - avail_kb)
+        pct = round(used_kb / total_kb * 100) if total_kb else 0
+        return {"used_mb": used_kb // 1024, "total_mb": total_kb // 1024,
+                "pct": pct}
+    except Exception:
+        return {"used_mb": 0, "total_mb": 0, "pct": 0}
+
+def _disk_info():
+    out = []
+    seen = set()
+    mounts = ["/"]
+    for extra in ("/mnt/mmc", "/mnt/sdcard"):
+        if os.path.isdir(extra):
+            mounts.append(extra)
+    for mount in mounts:
+        try:
+            du = shutil.disk_usage(mount)
+            if du.total in seen:
+                continue
+            seen.add(du.total)
+            pct = round(du.used / du.total * 100) if du.total else 0
+            out.append({"mount": mount,
+                        "free_gb": round(du.free / 1e9, 1), "pct": pct})
+        except Exception:
+            continue
+    return out
+
+def _uptime_s():
+    try:
+        return float(open("/proc/uptime").read().split()[0])
+    except Exception:
+        return 0
+
+def _temp_c():
+    for p in ("/sys/class/thermal/thermal_zone0/temp",):
+        try:
+            v = int(open(p).read().strip())
+            return round(v / 1000.0, 1) if v > 1000 else float(v)
+        except Exception:
+            continue
+    return None
+
+def h_system_status(args):
+    try:
+        return {"ok": True, "system": {
+            "cpu": _cpu_pct(),
+            "ram": _ram_info(),
+            "disk": _disk_info(),
+            "uptime_s": _uptime_s(),
+            "temp_c": _temp_c(),
+            "kernel": platform.release(),
+            "xfce_installed": (DATA / ".xfce_ready").exists(),
+        }}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def _gateway_ip():
+    try:
+        with open("/proc/net/route") as f:
+            for ln in f.readlines()[1:]:
+                p = ln.split()
+                if len(p) >= 3 and p[1] == "00000000":
+                    h = p[2]
+                    return ".".join(str(int(h[i:i + 2], 16))
+                                   for i in (6, 4, 2, 0))
+    except Exception:
+        pass
+    return ""
+
+def h_network_status(args):
+    try:
+        if deskinfo is not None:
+            connected, ssid, lvl, _iface, ip = deskinfo.wifi_status()
+            bt_on = deskinfo.bt_status()
+        else:
+            connected, ssid, lvl, ip, bt_on = False, None, None, None, None
+        signal_pct = {0: 20, 1: 45, 2: 70, 3: 95}.get(lvl, 0) \
+            if lvl is not None else 0
+        hs_marker = DATA / ".hotspot_active"
+        hotspot_on = hs_marker.exists()
+        hotspot_ssid = ""
+        if hotspot_on:
+            try:
+                hotspot_ssid = hs_marker.read_text().strip()
+            except Exception:
+                pass
+        return {"ok": True, "network": {
+            "wifi": {"connected": bool(connected), "ssid": ssid or "—",
+                     "signal": signal_pct, "ip": ip or "—"},
+            "bt": {"on": bool(bt_on), "count": 0},
+            "hotspot": {"on": hotspot_on, "ssid": hotspot_ssid or "—"},
+            "info": {"hostname": platform.node(),
+                     "gateway": _gateway_ip() or "—"},
+        }}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def h_media_status(args):
+    try:
+        vol = deskinfo.volume() if deskinfo is not None else None
+        return {"ok": True, "media": {
+            "volume": vol if vol is not None else 0,
+            "now_playing": None,
+            "library_count": 0,
+            "recordings": 0,
+        }}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def h_hotspot_toggle(args):
+    dcheck = device_only("hotspot_toggle")
+    if dcheck:
+        return dcheck
+    active = (DATA / ".hotspot_active").exists()
+    script = APP_DIR / "bin" / \
+        ("vd_hotspot_stop.sh" if active else "vd_hotspot_start.sh")
+    try:
+        r = subprocess.run(["sh", str(script)], capture_output=True,
+                           text=True, timeout=20)
+        now_on = (DATA / ".hotspot_active").exists()
+        if r.returncode == 0:
+            return {"ok": True, "state": "on" if now_on else "off"}
+        return {"ok": False,
+                "error": (r.stderr or r.stdout or "hotspot script failed")[-300:]}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "hotspot script timed out"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def h_wifi_scan(args):
+    if not IS_DEVICE:
+        return {"ok": True, "networks": []}
+    nets, seen = [], set()
+    try:
+        if shutil.which("nmcli"):
+            r = subprocess.run(
+                ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "dev",
+                 "wifi", "list"], capture_output=True, text=True, timeout=15)
+            for ln in r.stdout.splitlines():
+                p = ln.split(":")
+                if p and p[0] and p[0] not in seen:
+                    seen.add(p[0])
+                    nets.append({
+                        "ssid": p[0],
+                        "signal": int(p[1]) if len(p) > 1 and p[1].isdigit() else 0,
+                        "secure": bool(p[2]) if len(p) > 2 else True})
+        elif shutil.which("iwlist") and deskinfo is not None:
+            ifs = deskinfo.wireless_ifaces() or ["wlan0"]
+            r = subprocess.run(["iwlist", ifs[0], "scan"],
+                               capture_output=True, text=True, timeout=15)
+            for ln in r.stdout.splitlines():
+                ln = ln.strip()
+                if ln.startswith("ESSID:"):
+                    ssid = ln.split(":", 1)[1].strip('"')
+                    if ssid and ssid not in seen:
+                        seen.add(ssid)
+                        nets.append({"ssid": ssid, "signal": 0, "secure": True})
+        else:
+            return {"ok": False, "error": "no nmcli/iwlist available"}
+        return {"ok": True, "networks": nets}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "scan timed out"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def h_bt_scan(args):
+    if not IS_DEVICE:
+        return {"ok": True, "devices": []}
+    if not shutil.which("bluetoothctl"):
+        return {"ok": False, "error": "bluetoothctl not found"}
+    devs = []
+    try:
+        try:
+            subprocess.run(["bluetoothctl", "scan", "on"],
+                           capture_output=True, text=True, timeout=2.5)
+        except subprocess.TimeoutExpired:
+            pass  # expected: "scan on" blocks until stopped
+        subprocess.run(["bluetoothctl", "scan", "off"],
+                       capture_output=True, text=True, timeout=3)
+        r = subprocess.run(["bluetoothctl", "devices"],
+                           capture_output=True, text=True, timeout=3)
+        for ln in r.stdout.splitlines():
+            p = ln.split(" ", 2)
+            if len(p) == 3 and p[0] == "Device":
+                devs.append({"mac": p[1], "name": p[2]})
+        return {"ok": True, "devices": devs}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def h_session_list(args):
+    try:
+        return {"ok": True, "sessions": [
+            {"id": "xfce", "name": "XFCE",
+             "installed": (DATA / ".xfce_ready").exists()},
+        ]}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def h_session_launch(args):
+    sess_id = args.get("id")
+    if sess_id != "xfce":
+        return {"ok": False, "error": f"unknown session: {sess_id}"}
+    if IS_DEVICE:
+        # Taking over the screen from a running LÖVE process (handing the
+        # framebuffer/X to xfce_launch.sh, then returning to VoidDesk on
+        # logout) is a real session hand-off, not a background bridge
+        # call — the original code left this stubbed ("Sprint 2") rather
+        # than guess at it. Flagging clearly instead of faking success.
+        return {"ok": False,
+                "error": "device session hand-off not wired yet (needs "
+                         "mux_launch.sh integration, see bin/xfce_launch.sh)"}
+    return h_xfce_launch(args)
+
+def h_apt_update(args):
+    if IS_DEVICE:
+        if not (DATA / ".xfce_ready").exists():
+            return {"ok": False, "error": "XFCE not installed"}
+        try:
+            log_path = DATA / "apt_update.log"
+            with open(log_path, "ab") as lf:
+                subprocess.Popen(
+                    [sys.executable, str(APP_DIR / "bin" / "xfce_update.py")],
+                    stdout=lf, stderr=lf, start_new_session=True)
+            return {"ok": True, "note": "update started in background — "
+                                        "see data/apt_update.log"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    try:
+        r = subprocess.run(["pkexec", "apt-get", "update"],
+                           capture_output=True, text=True, timeout=8)
+        if r.returncode == 0:
+            return {"ok": True, "note": "apt cache updated"}
+        return {"ok": False, "error": (r.stderr or r.stdout)[-300:]}
+    except subprocess.TimeoutExpired:
+        return {"ok": True, "note": "update still running in background"}
+    except FileNotFoundError:
+        return {"ok": False, "error": "pkexec missing"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def h_xfce_install(args):
+    """Install XFCE:
+       - on device: kicks off bin/xfce_bootstrap.py in the background
+         (a real 10-20 min install needing network + ~5GB free) instead
+         of the previous stub that always reported fake success without
+         installing anything.
+       - on PC: apt install xfce4 + Xephyr via pkexec (GUI prompt),
+         also backgrounded so a long install can't block the whole
+         service (and therefore every other status query) for minutes."""
+    lock = DATA / ".xfce_install_running"
+    if IS_DEVICE:
+        if (DATA / ".xfce_ready").exists():
+            return {"ok": True, "already": True, "note": "XFCE already installed"}
+        if lock.exists():
+            try:
+                os.kill(int(lock.read_text().strip()), 0)
+                return {"ok": True, "note": "install already running in background"}
+            except Exception:
+                try: lock.unlink()
+                except OSError: pass
+        try:
+            log_path = DATA / "xfce_bootstrap.log"
+            with open(log_path, "ab") as lf:
+                proc = subprocess.Popen(
+                    [sys.executable, str(APP_DIR / "bin" / "xfce_bootstrap.py")],
+                    stdout=lf, stderr=lf, start_new_session=True)
+            lock.write_text(str(proc.pid))
+            return {"ok": True,
+                    "note": "install started in background (10-20 min) — "
+                            "progress in data/xfce_bootstrap.log"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
     if shutil.which("startxfce4"):
         return {"ok": True, "already": True, "note": "XFCE already installed"}
-
-    log_path = APP_DIR / "data" / "xfce_install.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    apt_cmd = ["apt-get", "install", "-y", "--no-install-recommends",
-               "xfce4", "xfce4-terminal", "xserver-xephyr", "dbus-x11"]
-
-    def _log(msg):
-        try:
-            with open(log_path, "a") as f:
-                f.write(msg + chr(10))
-        except OSError:
-            pass
-
-    _log("=" * 60)
-    _log("XFCE install attempt: " + " ".join(apt_cmd))
-
-    # Method 1: pkexec (may fail headless without polkit agent)
-    if shutil.which("pkexec"):
-        _log("Method 1: pkexec")
-        try:
-            r = subprocess.run(["pkexec"] + apt_cmd,
-                              capture_output=True, text=True, timeout=1800)
-            if r.returncode == 0:
-                _log("pkexec: success")
-                return {"ok": True, "note": "XFCE installed via pkexec",
-                        "log": str(log_path)}
-            _log(f"pkexec failed rc={r.returncode}: {(r.stderr or '')[-200:]}")
-        except subprocess.TimeoutExpired:
-            return {"ok": False, "error": "pkexec timeout (>30min)"}
-        except Exception as e:
-            _log(f"pkexec exception: {e}")
-
-    # Method 2: sudo with password-less (NOPASSWD configured)
-    if shutil.which("sudo"):
-        _log("Method 2: sudo -n (non-interactive)")
-        try:
-            r = subprocess.run(["sudo", "-n"] + apt_cmd,
-                              capture_output=True, text=True, timeout=1800)
-            if r.returncode == 0:
-                _log("sudo -n: success")
-                return {"ok": True, "note": "XFCE installed via sudo",
-                        "log": str(log_path)}
-            _log(f"sudo -n failed rc={r.returncode}")
-        except Exception as e:
-            _log(f"sudo -n exception: {e}")
-
-    # Method 3: direct (only works if service runs as root or already elevated)
-    _log("Method 3: direct (service may already be root)")
     try:
-        r = subprocess.run(apt_cmd, capture_output=True, text=True, timeout=1800)
-        if r.returncode == 0:
-            _log("direct: success")
-            return {"ok": True, "note": "XFCE installed directly",
-                    "log": str(log_path)}
-        _log(f"direct failed rc={r.returncode}: {(r.stderr or '')[-200:]}")
+        log_path = DATA / "xfce_pc_install.log"
+        with open(log_path, "ab") as lf:
+            subprocess.Popen(
+                ["pkexec", "apt-get", "install", "-y", "--no-install-recommends",
+                 "xfce4", "xfce4-terminal", "xserver-xephyr"],
+                stdout=lf, stderr=lf, start_new_session=True)
+        return {"ok": True, "note": "install started in background — "
+                                    "check data/xfce_pc_install.log"}
+    except FileNotFoundError:
+        return {"ok": False, "error": "pkexec missing — install polkit (sudo apt install pkexec)"}
     except Exception as e:
-        _log(f"direct exception: {e}")
+        return {"ok": False, "error": str(e)}
 
-    # All failed
-    return {"ok": False,
-            "error": "apt install failed (see log)",
-            "log": str(log_path),
-            "hint": "Run manually: sudo apt install xfce4 xfce4-terminal xserver-xephyr dbus-x11"}
-
-
+# Track XFCE/Xephyr subprocesses so we can clean up on exit
+import atexit
+_XFCE_PROCS = []
 def _kill_xfce_procs():
     for name, proc in _XFCE_PROCS:
         if proc.poll() is None:
@@ -194,7 +436,13 @@ def _tail_log(path, n=12):
 def h_xfce_launch(args):
     """Launch XFCE on PC inside Xephyr. Robust against slow first start."""
     if IS_DEVICE:
-        return {"ok": True, "note": "device: launch via chroot (Sprint 2)"}
+        # bin/xfce_launch.sh takes over the console's framebuffer/X for a
+        # full session hand-off (like mux_launch.sh choosing py vs love),
+        # which is not something a background JSON bridge call can do
+        # safely. Previously this silently reported fake success instead.
+        return {"ok": False,
+                "error": "device session hand-off not wired yet (needs "
+                         "mux_launch.sh integration, see bin/xfce_launch.sh)"}
 
     import shutil, subprocess, time, os
     if not shutil.which("startxfce4"):
@@ -303,577 +551,17 @@ def h_xfce_launch(args):
     return {"ok": False, "error": "XFCE never started — log: " + _tail_log(log_path, 12)}
 
 
-def _muos_app_roots():
-    import os
-    env = os.environ.get("VD_MUOS_APP_ROOTS",
-                          "/mnt/mmc/MUOS/application:/mnt/sdcard/MUOS/application")
-    return [p for p in env.split(":") if os.path.isdir(p)]
-
-def _scan_muos_apps():
-    import os
-    apps = []
-    srcs = []
-    for root in _muos_app_roots():
-        srcs.append(root)
-        try:
-            for name in sorted(os.listdir(root)):
-                full = os.path.join(root, name)
-                if not os.path.isdir(full):
-                    continue
-                # App must have a mux_launch.sh or similar
-                has_launcher = False
-                for fn in ("mux_launch.sh", "launch.sh", "run.sh", "start.sh"):
-                    if os.path.isfile(os.path.join(full, fn)):
-                        has_launcher = True
-                        break
-                if has_launcher:
-                    apps.append({
-                        "name": name,
-                        "path": full,
-                        "source": root,
-                    })
-        except OSError:
-            continue
-    return apps, ":".join(srcs) if srcs else "(no MUOS/application dirs found)"
-
-def h_list_muos_apps(args):
-    apps, src = _scan_muos_apps()
-    if not apps and not IS_DEVICE:
-        return {"ok": False,
-                "error": "device-only: no muOS application folder on PC",
-                "apps": [],
-                "source": "/mnt/mmc/MUOS/application (device only)",
-                "reason": "device-only"}
-    return {"ok": True, "apps": apps, "source": src}
-
-def h_launch_muos_app(args):
-    if not IS_DEVICE:
-        return {"ok": False, "reason": "device-only",
-                "error": "launching muOS apps requires the handheld"}
-    import subprocess, os
-    path = args.get("path", "")
-    name = args.get("name", "app")
-    if not os.path.isdir(path):
-        return {"ok": False, "error": f"invalid path: {path}"}
-    launcher = None
-    for fn in ("mux_launch.sh", "launch.sh", "run.sh", "start.sh"):
-        c = os.path.join(path, fn)
-        if os.path.isfile(c):
-            launcher = c
-            break
-    if not launcher:
-        return {"ok": False, "error": "no launcher found"}
-    try:
-        subprocess.Popen(["sh", launcher], cwd=path,
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         start_new_session=True)
-        return {"ok": True, "note": f"launched {name}"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-def h_toolbox_stats(args):
-    import os, glob
-    data_dir = APP_DIR / "data"
-    notes_count = 0
-    texts_count = 0
-    try:
-        notes_dir = data_dir / "notes"
-        if notes_dir.is_dir():
-            notes_count = sum(1 for _ in notes_dir.iterdir()
-                              if _.suffix == ".txt")
-    except Exception:
-        pass
-    try:
-        texts_dir = data_dir / "Texts"
-        if texts_dir.is_dir():
-            texts_count = sum(1 for _ in texts_dir.iterdir()
-                              if _.is_file())
-    except Exception:
-        pass
-    apps, _ = _scan_muos_apps()
-    return {"ok": True,
-            "notes_count": notes_count,
-            "text_files": texts_count,
-            "apps_count": len(apps)}
-
-
-# ── IPTV handlers ──────────────────────────────────────────────────
-_iptv_cache = {"playlist": None, "playlist_url": None,
-               "epg": None, "epg_urls": []}
-
-def h_iptv_load_playlist(args):
-    if iptv_module is None:
-        return {"ok": False, "error": "iptv module not available"}
-    url = args.get("url", "").strip()
-    if not url:
-        return {"ok": False, "error": "no URL provided"}
-    try:
-        text = iptv_module.fetch_text(url)
-        data = iptv_module.parse_m3u(text)
-        _iptv_cache["playlist"] = data
-        _iptv_cache["playlist_url"] = url
-        return {"ok": True,
-                "channels": data["channels"],
-                "groups": data["groups"],
-                "epg_urls": data["epg_urls"],
-                "count": len(data["channels"])}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-def h_iptv_load_epg(args):
-    if iptv_module is None:
-        return {"ok": False, "error": "iptv module not available"}
-    urls = args.get("urls", [])
-    if not urls and _iptv_cache.get("playlist"):
-        urls = _iptv_cache["playlist"].get("epg_urls", [])
-    if not urls:
-        return {"ok": False, "error": "no EPG URLs"}
-    merged = {}
-    errors = []
-    for u in urls:
-        try:
-            data = iptv_module.fetch_bytes(u)
-            parsed = iptv_module.parse_xmltv(data)
-            for k, progs in parsed.items():
-                merged.setdefault(k, []).extend(progs)
-            # limit total to avoid memory blowup
-            if sum(len(v) for v in merged.values()) > 8000:
-                break
-        except Exception as e:
-            errors.append({"url": u, "error": str(e)[:120]})
-    for progs in merged.values():
-        progs.sort(key=lambda p: p["start"])
-    _iptv_cache["epg"] = merged
-    _iptv_cache["epg_urls"] = urls
-    return {"ok": True, "loaded": len(urls) - len(errors),
-            "errors": errors, "channels_with_epg": len(merged)}
-
-def h_iptv_epg_for(args):
-    if iptv_module is None or not _iptv_cache.get("epg"):
-        return {"ok": True, "now": None, "next": None}
-    channel = args.get("channel", {})
-    cur, nxt = iptv_module.epg_now_next(_iptv_cache["epg"], channel)
-    return {"ok": True, "now": cur, "next": nxt}
-
-def h_iptv_play(args):
-    if iptv_module is None:
-        return {"ok": False, "error": "iptv module not available"}
-    url = args.get("url", "")
-    name = args.get("name", "stream")
-    ok = iptv_module.play(url, name)
-    return {"ok": ok, "state": iptv_module.status()["state"],
-            "error": iptv_module.status().get("error", "")}
-
-def h_iptv_stop(args):
-    if iptv_module is None:
-        return {"ok": False, "error": "iptv module not available"}
-    iptv_module.stop()
-    return {"ok": True}
-
-def h_iptv_status(args):
-    if iptv_module is None:
-        return {"ok": True, "state": "idle", "channel": None}
-    return {"ok": True, **iptv_module.status()}
-
-def h_iptv_get_config(args):
-    cfg_path = APP_DIR / "data" / "iptv_config.json"
-    default = {
-        "playlist_url": "https://iptv-org.github.io/iptv/countries/it.m3u",
-        "epg_urls": [],
-        "last_channel_url": "",
-    }
-    try:
-        with open(cfg_path) as f:
-            data = json.load(f)
-            for k, v in default.items(): data.setdefault(k, v)
-            return {"ok": True, "config": data}
-    except Exception:
-        return {"ok": True, "config": default}
-
-def h_iptv_save_config(args):
-    cfg_path = APP_DIR / "data" / "iptv_config.json"
-    cfg = args.get("config", {})
-    try:
-        with open(cfg_path, "w") as f:
-            json.dump(cfg, f, indent=1)
-        return {"ok": True}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-
-# ── External tools ────────────────────────────────────────────────
-_EXTERNAL_PROCS = []
-
-def _load_external_tools():
-    import json as _j
-    path = APP_DIR / "external" / "tools.json"
-    try:
-        return _j.loads(path.read_text())
-    except Exception:
-        return {"tools": []}
-
-def _resolve_path(rel):
-    """Resolve a path relative to APP_DIR."""
-    from pathlib import Path as _P
-    base = APP_DIR
-    if rel.startswith("../"):
-        base = base.parent
-        rel = rel[3:]
-    return (base / rel).resolve()
-
-def h_list_external(args):
-    data = _load_external_tools()
-    out = []
-    for t in data.get("tools", []):
-        p = _resolve_path(t.get("path", ""))
-        exists = p.is_dir() or p.is_file()
-        # resolve launcher
-        launcher = t.get("launcher", "")
-        if launcher:
-            lp = _resolve_path(launcher)
-            launcher_exists = lp.is_file()
-        else:
-            launcher_exists = exists
-        out.append({**t, "exists": exists,
-                    "launcher_exists": launcher_exists,
-                    "resolved_path": str(p)})
-    return {"ok": True, "tools": out}
-
-def h_launch_external(args):
-    """Launch a tool by id. Logs everything to data/external_launch.log."""
-    import subprocess, os as _os, shutil, time
-    from datetime import datetime
-    tid = args.get("id", "")
-    data = _load_external_tools()
-    tool = None
-    for t in data.get("tools", []):
-        if t.get("id") == tid:
-            tool = t
-            break
-    if not tool:
-        return {"ok": False, "error": f"unknown tool: {tid}"}
-
-    lpath = _resolve_external_path(tool.get("launcher", ""))
-    if not lpath.exists():
-        return {"ok": False,
-                "error": f"not installed: {lpath}",
-                "hint": "run: cd external && git clone <repo>"}
-
-    ltype = tool.get("launcher_type", "sh")
-    log_path = APP_DIR / "data" / "external_launch.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    env = dict(_os.environ)
-    env.pop("SDL_VIDEODRIVER", None)
-
-    try:
-        if ltype == "sh":
-            cmd = ["sh", str(lpath)]
-            cwd = str(lpath.parent)
-        elif ltype == "love":
-            love_bin = None
-            for cand in (str(APP_DIR / "lib" / "love"),
-                         "/usr/bin/love",
-                         shutil.which("love") or ""):
-                if cand and Path(cand).is_file() and _os.access(cand, _os.X_OK):
-                    love_bin = cand
-                    break
-            if not love_bin:
-                return {"ok": False,
-                        "error": "LOVE binary not found",
-                        "hint": "sudo apt install love (PC) "
-                                "or ensure lib/love is executable (device)"}
-            env["LD_LIBRARY_PATH"] = str(APP_DIR / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
-            env["VOIDDESK_APP_DIR"] = str(APP_DIR)
-            cmd = [love_bin, str(lpath)]
-            cwd = str(lpath.parent)
-        elif ltype == "python":
-            cmd = ["python3", str(lpath)]
-            cwd = str(lpath.parent)
-        else:
-            return {"ok": False, "error": f"unknown launcher_type: {ltype}"}
-
-        # Log headers
-        try:
-            with open(log_path, "a") as lf:
-                sep = "=" * 60
-                now_iso = datetime.now().isoformat()
-                lf.write("\n" + sep + "\n")
-                lf.write("[" + now_iso + "] Launch: " + tid + "\n")
-                lf.write("cmd: " + " ".join(cmd) + "\n")
-                lf.write("cwd: " + cwd + "\n")
-                lf.write("DISPLAY: " + str(env.get("DISPLAY", "(none)")) + "\n")
-        except OSError:
-            pass
-
-        # Spawn with log redirection
-        with open(log_path, "ab") as logf:
-            proc = subprocess.Popen(cmd, cwd=cwd, env=env,
-                                    stdout=logf, stderr=logf,
-                                    start_new_session=True)
-        _EXTERNAL_PROCS.append((tid, proc, str(log_path)))
-
-        # Wait 1.5s to detect fast crash
-        time.sleep(1.5)
-        if proc.poll() is not None:
-            # Died fast - read log tail
-            tail = ""
-            try:
-                with open(log_path) as f:
-                    tail = f.read()[-600:]
-            except OSError:
-                pass
-            return {"ok": False,
-                    "error": f"exited in 1.5s (code {proc.returncode})",
-                    "log_tail": tail,
-                    "log_file": str(log_path),
-                    "cmd": " ".join(cmd),
-                    "cwd": cwd}
-
-        return {"ok": True,
-                "note": f"launched {tool.get('name', tid)}",
-                "pid": proc.pid,
-                "log_file": str(log_path),
-                "cmd": " ".join(cmd)}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-
-def h_external_status(args):
-    out = []
-    for entry in _EXTERNAL_PROCS[:]:
-        tid = entry[0]
-        proc = entry[1]
-        log_path = entry[2] if len(entry) > 2 else None
-        alive = proc.poll() is None
-        info = {"id": tid, "pid": proc.pid, "alive": alive}
-        if not alive:
-            info["exit_code"] = proc.returncode
-            if log_path:
-                try:
-                    with open(log_path) as f:
-                        info["log_tail"] = f.read()[-400:]
-                except OSError:
-                    pass
-            _EXTERNAL_PROCS.remove(entry)
-        out.append(info)
-    return {"ok": True, "running": out}
-
-
-# ── Job manager ────────────────────────────────────────────────────
-_JOBS = {}
-
-try:
-    import threading as _threading
-except Exception:
-    _threading = None
-
-_JOB_COLORS = [
-    [0.90, 0.31, 0.75], [0.94, 0.35, 0.24], [0.31, 0.80, 1.00],
-    [0.37, 0.82, 0.55], [0.69, 0.43, 0.94], [0.59, 0.63, 0.71],
-]
-
-def _next_job_color():
-    return _JOB_COLORS[len(_JOBS) % len(_JOB_COLORS)]
-
-def _add_job_log(job_id, line):
-    j = _JOBS.get(job_id)
-    if not j:
-        return
-    j["log"].append(line)
-    if len(j["log"]) > 200:
-        j["log"] = j["log"][-200:]
-
-def h_job_start(args):
-    import subprocess, os as _os, shutil, time as _time
-    tool_id = args.get("tool_id", "")
-    cmd_str = args.get("cmd", "")
-    name    = args.get("name", tool_id or cmd_str or "job")
-    hub     = args.get("hub", "toolbox")
-    job_id = "job_%d" % int(_time.time() * 1000)
-
-    if tool_id:
-        data = _load_external_tools()
-        tool = None
-        for t in data.get("tools", []):
-            if t.get("id") == tool_id:
-                tool = t; break
-        if not tool:
-            return {"ok": False, "error": "unknown tool: " + tool_id}
-        lpath = _resolve_external_path(tool.get("launcher", ""))
-        if not lpath.exists():
-            return {"ok": False, "error": "not installed: " + str(lpath)}
-        ltype = tool.get("launcher_type", "sh")
-        env = dict(_os.environ); env.pop("SDL_VIDEODRIVER", None)
-        if ltype == "sh":
-            cmd = ["sh", str(lpath)]; cwd = str(lpath.parent)
-        elif ltype == "love":
-            love_bin = None
-            for cand in (str(APP_DIR / "lib" / "love"), "/usr/bin/love",
-                         shutil.which("love") or ""):
-                if cand and Path(cand).is_file() and _os.access(cand, _os.X_OK):
-                    love_bin = cand; break
-            if not love_bin:
-                return {"ok": False, "error": "LOVE binary not found"}
-            env["LD_LIBRARY_PATH"] = str(APP_DIR / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
-            env["VOIDDESK_APP_DIR"] = str(APP_DIR)
-            cmd = [love_bin, str(lpath)]; cwd = str(lpath.parent)
-        elif ltype == "python":
-            cmd = ["python3", str(lpath)]; cwd = str(lpath.parent)
-        elif ltype == "portable-voidcast":
-            # VoidCast: python3 voidcast/main.py — with venv on PC, runtime on device
-            main_py = lpath / "voidcast" / "main.py"
-            if not main_py.is_file():
-                return {"ok": False, "error": "VoidCast main.py not found"}
-            env["VOIDCAST_FB"] = "0" if not IS_DEVICE else "1"
-            # PC: use venv desktop if present (has pygame)
-            venv_py = APP_DIR / ".venv_desktop" / "bin" / "python"
-            if not IS_DEVICE and venv_py.is_file():
-                cmd = [str(venv_py), str(main_py)]
-            else:
-                # Device: use VoidDesk runtime
-                env["PYTHONPATH"] = str(APP_DIR / "runtime") + ":" + env.get("PYTHONPATH", "")
-                cmd = ["python3", str(main_py)]
-            cwd = str(lpath)
-            env["SDL_VIDEODRIVER"] = "dummy" if IS_DEVICE else ""
-            if not IS_DEVICE and not env.get("DISPLAY"):
-                env["DISPLAY"] = ":0"
-        else:
-            return {"ok": False, "error": "unknown launcher_type: " + ltype}
-        name = tool.get("name", tool_id)
-        hub = tool.get("hub", hub)
-        color = tool.get("color") or _next_job_color()
-    elif cmd_str:
-        cmd = ["sh", "-c", cmd_str]; cwd = str(APP_DIR)
-        env = dict(_os.environ); color = _next_job_color()
-    else:
-        return {"ok": False, "error": "no tool_id or cmd"}
-
-    _JOBS[job_id] = {"id": job_id, "name": name, "hub": hub, "color": color,
-                     "status": "starting", "progress": 0, "log": [],
-                     "pid": None, "proc": None,
-                     "started": _time.time(), "ended": None, "exit_code": None}
-    _add_job_log(job_id, "$ " + " ".join(cmd))
-
-    def _runner():
-        import re as _re
-        try:
-            proc = subprocess.Popen(cmd, cwd=cwd, env=env,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT,
-                                    start_new_session=True, text=True, bufsize=1)
-            _JOBS[job_id]["proc"] = proc
-            _JOBS[job_id]["pid"] = proc.pid
-            _JOBS[job_id]["status"] = "running"
-            for line in iter(proc.stdout.readline, ""):
-                if not line:
-                    break
-                _add_job_log(job_id, line.rstrip()[:200])
-                m = _re.search(r"(\d{1,3})%", line)
-                if m:
-                    _JOBS[job_id]["progress"] = min(99, int(m.group(1)))
-                else:
-                    m2 = _re.search(r"\((\d+)/(\d+)\)", line)
-                    if m2:
-                        cur, tot = int(m2.group(1)), int(m2.group(2))
-                        if tot > 0:
-                            _JOBS[job_id]["progress"] = min(99, int(100 * cur / tot))
-            proc.wait()
-            _JOBS[job_id]["exit_code"] = proc.returncode
-            if proc.returncode == 0:
-                _JOBS[job_id]["status"] = "done"
-                _JOBS[job_id]["progress"] = 100
-                _add_job_log(job_id, "[done] exit 0")
-            else:
-                _JOBS[job_id]["status"] = "error"
-                _add_job_log(job_id, "[error] exit %d" % proc.returncode)
-            _JOBS[job_id]["ended"] = _time.time()
-        except Exception as e:
-            _JOBS[job_id]["status"] = "error"
-            _add_job_log(job_id, "[fatal] " + str(e))
-            _JOBS[job_id]["ended"] = _time.time()
-
-    if _threading:
-        t = _threading.Thread(target=_runner, daemon=True)
-        t.start()
-    else:
-        _runner()
-
-    return {"ok": True, "job_id": job_id, "name": name, "color": color}
-
-def h_job_list(args):
-    import time as _time
-    now = _time.time()
-    expired = []
-    for jid, j in list(_JOBS.items()):
-        if j.get("ended") and (now - j["ended"]) > 300:
-            expired.append(jid)
-    for jid in expired:
-        _JOBS.pop(jid, None)
-    out = []
-    for jid, j in _JOBS.items():
-        out.append({"id": jid, "name": j["name"], "hub": j["hub"],
-                    "color": j["color"], "status": j["status"],
-                    "progress": j["progress"], "pid": j.get("pid"),
-                    "started": j["started"], "ended": j.get("ended"),
-                    "exit_code": j.get("exit_code")})
-    out.sort(key=lambda x: x["started"], reverse=True)
-    return {"ok": True, "jobs": out}
-
-def h_job_log(args):
-    jid = args.get("job_id", "")
-    j = _JOBS.get(jid)
-    if not j:
-        return {"ok": False, "error": "unknown job"}
-    return {"ok": True, "lines": list(j["log"]), "status": j["status"],
-            "progress": j["progress"], "name": j["name"], "color": j["color"]}
-
-def h_job_cancel(args):
-    jid = args.get("job_id", "")
-    j = _JOBS.get(jid)
-    if not j:
-        return {"ok": False, "error": "unknown job"}
-    proc = j.get("proc")
-    if proc and proc.poll() is None:
-        try:
-            proc.terminate(); proc.wait(timeout=3)
-        except Exception:
-            try: proc.kill()
-            except Exception: pass
-        j["status"] = "cancelled"
-        _add_job_log(jid, "[cancelled]")
-        return {"ok": True}
-    return {"ok": False, "error": "job not running"}
-
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
     "set_config": h_set_config,
     "system_info": h_system_info,
     "network_status": h_network_status,
-    "list_external": h_list_external,
-    "launch_external": h_launch_external,
-    "external_status": h_external_status,
-
-    "iptv_load_playlist": h_iptv_load_playlist,
-    "iptv_load_epg": h_iptv_load_epg,
-    "iptv_epg_for": h_iptv_epg_for,
-    "iptv_play": h_iptv_play,
-    "iptv_stop": h_iptv_stop,
-    "iptv_status": h_iptv_status,
-    "iptv_get_config": h_iptv_get_config,
-    "iptv_save_config": h_iptv_save_config,
-
     "system_status": h_system_status,
     "media_status": h_media_status,
     "hotspot_toggle": h_hotspot_toggle,
 
     "session_list": h_session_list,
-    "list_muos_apps": h_list_muos_apps,
-    "launch_muos_app": h_launch_muos_app,
-    "toolbox_stats":   h_toolbox_stats,
-
     "session_launch": h_session_launch,
     "wifi_scan": h_wifi_scan,
     "bt_scan": h_bt_scan,
@@ -882,11 +570,6 @@ HANDLERS = {
     "xfce_install": h_xfce_install,
     "xfce_launch": h_xfce_launch,
     "apt_update": h_apt_update,
-    "job_start": h_job_start,
-    "job_list": h_job_list,
-    "job_log": h_job_log,
-    "job_cancel": h_job_cancel,
-
 }
 
 # ── main loop ────────────────────────────────────────────
