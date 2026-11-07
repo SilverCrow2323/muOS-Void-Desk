@@ -16,6 +16,7 @@ function love.load()
         inputdbg.dump_joysticks()
     end
 
+    sm.register("bootanim",  require("scenes.bootanim"))
     sm.register("intro",     require("scenes.intro"))
     sm.register("nexus",     require("scenes.nexus"))
     sm.register("hub_forge", require("scenes.hub_forge"))

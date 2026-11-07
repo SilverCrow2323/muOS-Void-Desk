@@ -20,7 +20,11 @@ function config.load()
             return
         end
     end
-    data = { lang = "en", theme = "cyberpunk", home_style = "nexus" }
+    data = {
+        lang = "en", theme = "cyberpunk", home_style = "nexus",
+        engine = "love", bg_anim = true, sfx = true, music = true,
+        show_bootanim = true,
+    }
 end
 
 function config.get(k, default)
