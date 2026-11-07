@@ -749,8 +749,8 @@ class App:
         self.cfg = load_config()
         self.lang = self.cfg.get("lang", "en")
         self.scan_source = self.cfg.get("scan_source", "both")
-        self.pc_input_dir = self.cfg.get("pc_input_dir", DEFAULT_PC_INPUT)
-        self.pc_output_dir = self.cfg.get("pc_output_dir", DEFAULT_PC_OUTPUT)
+        self.pc_input_dir = self.cfg.get("pc_input_dir") or DEFAULT_PC_INPUT
+        self.pc_output_dir = self.cfg.get("pc_output_dir") or DEFAULT_PC_OUTPUT
         self.theme = self.cfg.get("theme", CURRENT_THEME)
         self.target_lufs = float(self.cfg.get("target_lufs", TARGET_LUFS))
         self.sample_rate = int(self.cfg.get("sample_rate", SAMPLE_RATE))
@@ -831,7 +831,7 @@ class App:
         if IS_PC:
             if self.pc_input_dir:
                 os.makedirs(os.path.expanduser(self.pc_input_dir), exist_ok=True)
-            return [self.pc_input_dir]
+            return [os.path.expanduser(self.pc_input_dir)]
         dirs = []
         if self.scan_source in ("sd1", "both"):
             dirs.append(self.sd_paths["1"]["input"])
@@ -857,7 +857,7 @@ class App:
         elif IS_PC:
             if self.pc_output_dir:
                 os.makedirs(os.path.expanduser(self.pc_output_dir), exist_ok=True)
-            return self.pc_output_dir
+            return os.path.expanduser(self.pc_output_dir)
         elif self.out_mode == "custom" and self.custom_out_dir:
             return self.custom_out_dir
         else:
