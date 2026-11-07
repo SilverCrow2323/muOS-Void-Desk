@@ -325,6 +325,7 @@ HUBS = {
     ("voidcast", "video",   "m_iptv",  "m_iptv_s",  "act"),
     ("library",  "folder",  "m_lib",   "m_lib_s",   "act"),
     ("bgmnorm",  "music",   "m_bgm",   "m_bgm_s",   "act"),
+    ("bgmnormalizer", "music", "m_bgm_ext", "m_bgm_ext_s", "act"),
  ]),
  "toolbox": ("toolbox", "h_tool", [
     ("calc",    "calc",    "t_calc",  "t_calc_s",  "push"),
@@ -3280,6 +3281,8 @@ class App(object):
             elif key == "library":
                 self.play_media_boot("library")
                 self.fm_open(ext_filter=MEDIA_EXTS)
+            elif key == "bgmnormalizer":
+                self.launch_external_tool("bgm_normalizer")
             elif key == "bgmnorm":
                 self.play_media_boot("normalize")
                 dirs = []
