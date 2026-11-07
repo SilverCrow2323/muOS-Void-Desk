@@ -48,7 +48,7 @@ return dashboard.new({
           action = function(scene) scene.set_status("Radio: soon"); return "Radio" end },
         { icon = "video", label = "VoidCast IPTV", value = "LIVE",
           desc = "TV streams and EPG guide (LÖVE prototype)",
-          action = function() sm.switch("hub_iptv", {}) end },
+          action = function() sm.push("hub_iptv", {}) end },
         { icon = "folder", label = "Media Library", desc = "Browse local audio/video on SD",
           action = function(scene) scene.set_status("Library: soon"); return "Library" end },
         { icon = "music", label = "BGM Normalizer", value = "PY",
@@ -62,6 +62,6 @@ return dashboard.new({
               return "Launching..."
           end },
         { icon = "back", label = "Back", desc = "Return to Nexus",
-          action = function() sm.switch("nexus", {}) end },
+          action = function() sm.back() end },
     },
 })

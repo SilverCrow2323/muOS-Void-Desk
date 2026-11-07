@@ -128,6 +128,6 @@ return dashboard.new({
           action = function(scene) scene.set_status("Repair: coming soon"); return "Repair: coming soon" end },
         { icon = "back", label = "Back",
           desc = "Return to Nexus",
-          action = function() sm.switch("nexus", {}) end },
+          action = function() sm.back() end },
     },
 })

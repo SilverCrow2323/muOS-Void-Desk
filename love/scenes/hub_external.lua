@@ -60,7 +60,7 @@ local function items_for(cat)
     table.insert(list, {
         badge = "<", label = "Back",
         desc = "Return to Nexus",
-        action = function() sm.switch("nexus", {}) end,
+        action = function() sm.back() end,
     })
     return list
 end

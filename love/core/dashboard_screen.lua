@@ -63,6 +63,9 @@ function M.new(config)
         t_enter = 0
         status_msg = config.status or "Ready"
         scene._t = 0
+        if args and args.restore_state then
+            scene.restore_state(args.restore_state)
+        end
         if on_enter then on_enter(scene, args) end
         input.clear()
         input.on("press", function(action)
@@ -257,6 +260,20 @@ function M.new(config)
         if th.scanlines then effects.scanlines(W, H, 0.06) end
         if th.vignette  then effects.vignette(W, H, 0.35) end
         love.graphics.setColor(1, 1, 1, 1)
+    end
+
+    function scene.save_state()
+        return {
+            selected = selected,
+            scroll_offset = scroll_offset,
+        }
+    end
+
+    function scene.restore_state(state)
+        if not state then return end
+        if state.selected then selected = state.selected end
+        if state.scroll_offset then scroll_offset = state.scroll_offset end
+        ensure_visible()
     end
 
     return scene

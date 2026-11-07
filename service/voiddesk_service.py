@@ -671,6 +671,24 @@ def h_job_start(args):
             cmd = [love_bin, str(lpath)]; cwd = str(lpath.parent)
         elif ltype == "python":
             cmd = ["python3", str(lpath)]; cwd = str(lpath.parent)
+        elif ltype == "portable-voidcast":
+            # VoidCast: python3 voidcast/main.py — with venv on PC, runtime on device
+            main_py = lpath / "voidcast" / "main.py"
+            if not main_py.is_file():
+                return {"ok": False, "error": "VoidCast main.py not found"}
+            env["VOIDCAST_FB"] = "0" if not IS_DEVICE else "1"
+            # PC: use venv desktop if present (has pygame)
+            venv_py = APP_DIR / ".venv_desktop" / "bin" / "python"
+            if not IS_DEVICE and venv_py.is_file():
+                cmd = [str(venv_py), str(main_py)]
+            else:
+                # Device: use VoidDesk runtime
+                env["PYTHONPATH"] = str(APP_DIR / "runtime") + ":" + env.get("PYTHONPATH", "")
+                cmd = ["python3", str(main_py)]
+            cwd = str(lpath)
+            env["SDL_VIDEODRIVER"] = "dummy" if IS_DEVICE else ""
+            if not IS_DEVICE and not env.get("DISPLAY"):
+                env["DISPLAY"] = ":0"
         else:
             return {"ok": False, "error": "unknown launcher_type: " + ltype}
         name = tool.get("name", tool_id)

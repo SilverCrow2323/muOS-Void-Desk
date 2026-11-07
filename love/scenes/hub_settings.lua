@@ -128,7 +128,7 @@ local function rebuild_items(scene)
               return "Preview..."
           end },
         { icon = "back", label = "Back", desc = "Return to Nexus",
-          action = function() sm.switch("nexus", {}) end },
+          action = function() sm.back() end },
     }
 end
 

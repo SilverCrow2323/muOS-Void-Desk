@@ -7,8 +7,8 @@
       "desc": "IPTV client: M3U, EPG multi-source, PVR recording, addons",
       "native_engine": "py",
       "hub": "media",
-      "launcher_type": "sh",
-      "launcher": "../VoidCast/mux_launch.sh",
+      "launcher_type": "portable-voidcast",
+      "launcher": "../VoidCast",
       "icon": "video",
       "color": [
         0.9,
