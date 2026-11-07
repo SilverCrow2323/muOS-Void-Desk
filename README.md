@@ -1,11 +1,35 @@
 
 <div align="center">
   
-#  ◈ VOID-Desk <i>'Nexus'</i>
+ <div align="center">
 
-**The definitive desktop layer for muOS.**
-*A real Linux machine lives inside your handheld. VoidDesk is how you drive it.*
+# ◈ VoidDesk Project
 
+**Multifunctional AIO Desktop Hub for H700 Linux Handhelds**
+
+[![GitHub Release](https://img.shields.io/github/v/release/SilverCrow2323/Void-Desk-Project?style=for-the-badge&color=7057ff&labelColor=0d1117)](https://github.com/SilverCrow2323/Void-Desk-Project/releases)
+[![MIT License](https://img.shields.io/badge/License-MIT-07a2c2?style=for-the-badge&labelColor=0d1117)](LICENSE)
+[![GitHub Discussions](https://img.shields.io/github/discussions/SilverCrow2323/Void-Desk-Project?style=for-the-badge&color=1f883d&labelColor=0d1117)](https://github.com/SilverCrow2323/Void-Desk-Project/discussions)
+[![GitHub Issues](https://img.shields.io/github/issues/SilverCrow2323/Void-Desk-Project?style=for-the-badge&color=d9381e&labelColor=0d1117)](https://github.com/SilverCrow2323/Void-Desk-Project/issues)
+
+---
+
+![Supported Firmware](https://img.shields.io/badge/Firmware-muOS%20%7C%20ROCKNIX%20%7C%20Knulli-d4c5f9?style=flat-square)
+![Target Architecture](https://img.shields.io/badge/SoC-Allwinner%20H700-a2eeef?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT%20(Nicola%20Santato)-07a2c2?style=flat-square)
+
+</div>
+
+---
+
+### ⚡ Welcome to the Playground
+
+A warm greeting to all the wretches passing through here! This is the dark alley I’ve opened to communicate better with anyone who wants to know more about this project — which, I’ll admit, is pretty much my personal playground.
+
+Today it might be an office suite tool; tomorrow, an IPTV player.
+At the end of the day, that’s just who I am: picking something up and pushing it to the absolute limit, caring zero about "you shouldn't do that" or "don't even try".
+
+Well, we try anyway. And fuck your corporate ethos.
 <!--
   ╔══════════════════════════════════════════════════════════════════════════╗
   ║  VOID-DESK v10.2.1-NEXUS  —  README.md  —  SPDW Factory Lab             ║
