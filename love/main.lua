@@ -5,6 +5,8 @@ local theme      = require("theme.loader")
 local input      = require("core.input")
 local inputdbg   = require("core.input_debug")
 local notifications = require("core.notifications")
+local jobs    = require("core.jobs")
+local term    = require("core.terminal_overlay")
 
 function love.load()
     config.load()
@@ -38,6 +40,7 @@ function love.update(dt)
     sm.update(dt)
     bridge.poll()
     notifications.update()
+    jobs.update(dt)
 end
 
 function love.draw()
@@ -45,6 +48,9 @@ function love.draw()
     local chrome = require("core.chrome")
     local theme = require("theme.loader")
     notifications.draw(theme.get(), chrome.HEADER_H)
+    -- Terminal ID overlay on top
+    local W, H = love.graphics.getDimensions()
+    term.draw(W, H)
 end
 
 -- ─── KEYBOARD ──────────────────────────────────────────────
@@ -52,6 +58,11 @@ function love.keypressed(key, sc, isrepeat)
     if isrepeat then return end
     if key == "f11" then
         love.window.setFullscreen(not love.window.getFullscreen())
+        return
+    end
+    if term.keypressed(key) then return end
+    if key == "tab" or key == "l2" then
+        jobs.toggle_overlay()
         return
     end
     if key == "m" then

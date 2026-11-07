@@ -615,12 +615,234 @@ def h_external_status(args):
     return {"ok": True, "running": out}
 
 
+# ── Job manager ────────────────────────────────────────────────────
+_JOBS = {}   # id -> {name, hub, color, status, progress, log, pid, proc, start}
+_JOB_LOCK = None
+try:
+    import threading
+    _JOB_LOCK = threading.Lock()
+except Exception:
+    pass
+
+_JOB_COLORS = [
+    [0.90, 0.31, 0.75],   # media (magenta)
+    [0.94, 0.35, 0.24],   # forge (orange-red)
+    [0.31, 0.80, 1.00],   # uplink (cyan)
+    [0.37, 0.82, 0.55],   # toolbox (green)
+    [0.69, 0.43, 0.94],   # workshop (purple)
+    [0.59, 0.63, 0.71],   # info (gray)
+]
+
+def _next_job_color():
+    n = len(_JOBS) % len(_JOB_COLORS)
+    return _JOB_COLORS[n]
+
+def _add_job_log(job_id, line):
+    j = _JOBS.get(job_id)
+    if not j:
+        return
+    if _JOB_LOCK:
+        with _JOB_LOCK:
+            j["log"].append(line)
+            if len(j["log"]) > 200:
+                j["log"] = j["log"][-200:]
+    else:
+        j["log"].append(line)
+        if len(j["log"]) > 200:
+            j["log"] = j["log"][-200:]
+
+def h_job_start(args):
+    """Start a background job. Wraps external tool launch OR shell cmd."""
+    import subprocess, os as _os, shutil, time as _time
+    from datetime import datetime
+
+    tool_id = args.get("tool_id", "")
+    cmd_str = args.get("cmd", "")   # for direct shell commands
+    name    = args.get("name", tool_id or cmd_str or "job")
+    hub     = args.get("hub", "toolbox")
+
+    job_id = f"job_{int(_time.time() * 1000)}"
+
+    # Build command
+    if tool_id:
+        data = _load_external_tools()
+        tool = None
+        for t in data.get("tools", []):
+            if t.get("id") == tool_id:
+                tool = t; break
+        if not tool:
+            return {"ok": False, "error": f"unknown tool: {tool_id}"}
+        lpath = _resolve_external_path(tool.get("launcher", ""))
+        if not lpath.exists():
+            return {"ok": False, "error": f"not installed: {lpath}"}
+        ltype = tool.get("launcher_type", "sh")
+        env = dict(_os.environ)
+        env.pop("SDL_VIDEODRIVER", None)
+        if ltype == "sh":
+            cmd = ["sh", str(lpath)]
+            cwd = str(lpath.parent)
+        elif ltype == "love":
+            love_bin = None
+            for cand in (str(APP_DIR / "lib" / "love"),
+                         "/usr/bin/love",
+                         shutil.which("love") or ""):
+                if cand and Path(cand).is_file() and _os.access(cand, _os.X_OK):
+                    love_bin = cand; break
+            if not love_bin:
+                return {"ok": False, "error": "LOVE binary not found"}
+            env["LD_LIBRARY_PATH"] = str(APP_DIR / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
+            env["VOIDDESK_APP_DIR"] = str(APP_DIR)
+            cmd = [love_bin, str(lpath)]
+            cwd = str(lpath.parent)
+        elif ltype == "python":
+            cmd = ["python3", str(lpath)]
+            cwd = str(lpath.parent)
+        else:
+            return {"ok": False, "error": f"unknown launcher_type: {ltype}"}
+        name = tool.get("name", tool_id)
+        hub = tool.get("hub", hub)
+        color = tool.get("color") or _next_job_color()
+    elif cmd_str:
+        cmd = ["sh", "-c", cmd_str]
+        cwd = str(APP_DIR)
+        env = dict(_os.environ)
+        color = _next_job_color()
+    else:
+        return {"ok": False, "error": "no tool_id or cmd"}
+
+    # Init job
+    _JOBS[job_id] = {
+        "id": job_id,
+        "name": name,
+        "hub": hub,
+        "color": color,
+        "status": "starting",
+        "progress": 0,
+        "log": [],
+        "pid": None,
+        "proc": None,
+        "started": _time.time(),
+        "ended": None,
+        "exit_code": None,
+    }
+    _add_job_log(job_id, f"$ {' '.join(cmd)}")
+
+    # Spawn and track in a thread
+    def _runner():
+        try:
+            proc = subprocess.Popen(cmd, cwd=cwd, env=env,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT,
+                                    start_new_session=True,
+                                    text=True, bufsize=1)
+            _JOBS[job_id]["proc"] = proc
+            _JOBS[job_id]["pid"] = proc.pid
+            _JOBS[job_id]["status"] = "running"
+            # Read stdout streaming
+            for line in iter(proc.stdout.readline, ""):
+                if not line:
+                    break
+                _add_job_log(job_id, line.rstrip()[:200])
+                # Parse progress: look for NN% or (N/M) patterns
+                import re as _re
+                m = _re.search(r'(\d{1,3})%', line)
+                if m:
+                    _JOBS[job_id]["progress"] = min(99, int(m.group(1)))
+                else:
+                    m2 = _re.search(r'\((\d+)/(\d+)\)', line)
+                    if m2:
+                        cur, tot = int(m2.group(1)), int(m2.group(2))
+                        if tot > 0:
+                            _JOBS[job_id]["progress"] = min(99, int(100 * cur / tot))
+            proc.wait()
+            _JOBS[job_id]["exit_code"] = proc.returncode
+            if proc.returncode == 0:
+                _JOBS[job_id]["status"] = "done"
+                _JOBS[job_id]["progress"] = 100
+                _add_job_log(job_id, f"[done] exit 0")
+            else:
+                _JOBS[job_id]["status"] = "error"
+                _add_job_log(job_id, f"[error] exit {proc.returncode}")
+            _JOBS[job_id]["ended"] = _time.time()
+        except Exception as e:
+            _JOBS[job_id]["status"] = "error"
+            _add_job_log(job_id, f"[fatal] {e}")
+            _JOBS[job_id]["ended"] = _time.time()
+
+    import threading
+    t = threading.Thread(target=_runner, daemon=True)
+    t.start()
+
+    return {"ok": True, "job_id": job_id, "name": name, "color": color}
+
+def h_job_list(args):
+    """Return list of jobs (active + recently finished)."""
+    import time as _time
+    now = _time.time()
+    out = []
+    # Purge finished jobs older than 5 min
+    expired = []
+    for jid, j in list(_JOBS.items()):
+        if j.get("ended") and (now - j["ended"]) > 300:
+            expired.append(jid)
+    for jid in expired:
+        _JOBS.pop(jid, None)
+    for jid, j in _JOBS.items():
+        out.append({
+            "id": jid,
+            "name": j["name"],
+            "hub": j["hub"],
+            "color": j["color"],
+            "status": j["status"],
+            "progress": j["progress"],
+            "pid": j.get("pid"),
+            "started": j["started"],
+            "ended": j.get("ended"),
+            "exit_code": j.get("exit_code"),
+        })
+    # Sort by started desc
+    out.sort(key=lambda x: x["started"], reverse=True)
+    return {"ok": True, "jobs": out}
+
+def h_job_log(args):
+    """Return the log lines of a specific job."""
+    jid = args.get("job_id", "")
+    j = _JOBS.get(jid)
+    if not j:
+        return {"ok": False, "error": "unknown job"}
+    return {"ok": True, "lines": list(j["log"]), "status": j["status"],
+            "progress": j["progress"], "name": j["name"], "color": j["color"]}
+
+def h_job_cancel(args):
+    """Kill a running job."""
+    jid = args.get("job_id", "")
+    j = _JOBS.get(jid)
+    if not j:
+        return {"ok": False, "error": "unknown job"}
+    proc = j.get("proc")
+    if proc and proc.poll() is None:
+        try:
+            proc.terminate(); proc.wait(timeout=3)
+        except Exception:
+            try: proc.kill()
+            except Exception: pass
+        j["status"] = "cancelled"
+        _add_job_log(jid, "[cancelled by user]")
+        return {"ok": True}
+    return {"ok": False, "error": "job not running"}
+
+
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
     "set_config": h_set_config,
     "system_info": h_system_info,
     "network_status": h_network_status,
+    "job_start": h_job_start,
+    "job_list": h_job_list,
+    "job_log": h_job_log,
+    "job_cancel": h_job_cancel,
+
     "list_external": h_list_external,
     "launch_external": h_launch_external,
     "external_status": h_external_status,

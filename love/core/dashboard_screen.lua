@@ -9,6 +9,7 @@ local anim    = require("core.anim")
 local bg_anim = require("core.bg_anim")
 local widgets = require("core.widgets")
 local icon    = require("core.icon")
+local jobs    = require("core.jobs")
 
 local M = {}
 
@@ -89,6 +90,7 @@ function M.new(config)
         if t_enter < 1 then t_enter = math.min(1, t_enter + dt / 0.55) end
         if on_update then on_update(scene, dt) end
     end
+    -- Note: jobs.update(dt) is called from main.lua globally
 
     function scene.set_status(msg) status_msg = msg end
     function scene.set_data(k, v) scene._data[k] = v end
@@ -166,6 +168,84 @@ function M.new(config)
             love.graphics.setFont(status_font)
             love.graphics.setColor(th.text[1], th.text[2], th.text[3], 0.92 * st)
             love.graphics.print("> " .. status_msg, 20, sy + 6)
+        end
+
+        -- Item job indicators (spinner on item with active job)
+        for i = 1, visible_rows do
+            local idx = scroll_offset + i
+            if idx > #live then break end
+            local item = live[idx]
+            if item.label then
+                local n_active = jobs.count_for_name(item.label)
+                if n_active > 0 then
+                    local y = menu_top + (i - 1) * row_h
+                    -- spinner rotating near right side
+                    local sx = W - 42
+                    local sy = y + row_h / 2
+                    local t_now = love.timer.getTime()
+                    local c = item.job_color or node_color
+                    for k = 0, 5 do
+                        local ang = t_now * 4 + k * math.pi / 3
+                        local a = 0.3 + 0.7 * (1 - k / 6)
+                        love.graphics.setColor(c[1], c[2], c[3], a)
+                        love.graphics.circle("fill",
+                            sx + math.cos(ang) * 6,
+                            sy + math.sin(ang) * 6, 1.5)
+                    end
+                    -- count badge if > 1
+                    if n_active > 1 then
+                        love.graphics.setColor(0, 0, 0, 0.9)
+                        love.graphics.circle("fill", sx + 10, sy - 8, 7)
+                        love.graphics.setColor(c[1], c[2], c[3], 1)
+                        love.graphics.circle("line", sx + 10, sy - 8, 7)
+                        local f_b = font.bold(9) or love.graphics.newFont(9)
+                        love.graphics.setFont(f_b)
+                        love.graphics.setColor(c[1], c[2], c[3], 1)
+                        love.graphics.print(tostring(n_active), sx + 7, sy - 12)
+                    end
+                end
+            end
+        end
+
+        -- Status strip (only if jobs active)
+        local running = jobs.total_running()
+        if running > 0 then
+            local strip_y = H - chrome.FOOTER_H - 26
+            love.graphics.setColor(0.04, 0.06, 0.10, 0.95)
+            love.graphics.rectangle("fill", 0, strip_y, W, 22)
+            love.graphics.setColor(node_color[1], node_color[2], node_color[3], 0.5)
+            love.graphics.rectangle("fill", 0, strip_y, W, 1)
+            -- find first running job
+            local first = nil
+            for _, j in pairs(jobs.active) do
+                if j.status == "running" or j.status == "starting" then
+                    first = j; break
+                end
+            end
+            if first then
+                local c = first.color or node_color
+                love.graphics.setColor(c[1], c[2], c[3], 1)
+                love.graphics.circle("fill", 14, strip_y + 11, 4)
+                local f_st = font.regular(11) or love.graphics.newFont(11)
+                love.graphics.setFont(f_st)
+                love.graphics.setColor(0.85, 0.88, 0.92, 1)
+                local txt2 = string.format("[%d] %s  %d%%",
+                    running, first.name, first.progress or 0)
+                love.graphics.print(txt2, 24, strip_y + 5)
+                -- inline bar
+                local bx = W - 200
+                local bw = 100
+                love.graphics.setColor(0.10, 0.12, 0.16, 1)
+                love.graphics.rectangle("fill", bx, strip_y + 8, bw, 6, 2)
+                local fw = bw * (first.progress or 0) / 100
+                if fw > 1 then
+                    love.graphics.setColor(c[1], c[2], c[3], 1)
+                    love.graphics.rectangle("fill", bx, strip_y + 8, fw, 6, 2)
+                end
+                -- hint
+                love.graphics.setColor(0.55, 0.6, 0.65, 1)
+                love.graphics.print("SELECT: details", W - 90, strip_y + 5)
+            end
         end
 
         -- Chrome

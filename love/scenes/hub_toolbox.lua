@@ -64,12 +64,17 @@ return dashboard.new({
         { icon = "folder", label = "File Manager", value = "File-GD X",
           desc = "Dual-pane file manager with diagnostics",
           action = function(scene)
-              scene.set_status("Launching File-GD X...")
-              ext.launch("file_gd_x", function(resp)
-                  if resp.ok then scene.set_status("File-GD X launched")
-                  else scene.set_status("Failed: " .. (resp.error or "?")) end
-              end)
-              return "Launching..."
+              scene.set_status("Starting File-GD X...")
+              local jobs = require("core.jobs")
+              jobs.start_tool("file_gd_x", "File-GD X", "toolbox", nil,
+                  function(resp)
+                      if resp.ok then
+                          scene.set_status("File-GD X started — SELECT for details")
+                      else
+                          scene.set_status("Failed: " .. (resp.error or "?"))
+                      end
+                  end)
+              return "Starting..."
           end },
         { icon = "calc", label = "Calculator", desc = "Scientific + RPN styles",
           action = function(scene) scene.set_status("Calculator: soon"); return "Calculator" end },
