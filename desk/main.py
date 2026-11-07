@@ -6274,6 +6274,61 @@ class App(object):
 
 # --- [R2] CRT Off Animation // HUB: END SESSION ---
     def notify(self, title, body="", kind="standard"):
+
+    def launch_external_tool(self, tool_id):
+        """Launch an external tool by id from external/tools.json."""
+        import json as _json, subprocess, os as _os
+        tools_path = os.path.join(APP_DIR, "external", "tools.json")
+        try:
+            with open(tools_path) as f:
+                tools = _json.load(f).get("tools", [])
+        except Exception:
+            self.notify("External tools registry missing", "warning")
+            return
+        tool = None
+        for t in tools:
+            if t.get("id") == tool_id:
+                tool = t; break
+        if not tool:
+            self.notify(f"Unknown tool: {tool_id}", "warning")
+            return
+        base = APP_DIR
+        path = tool.get("path", "")
+        if path.startswith("../"):
+            base = os.path.dirname(APP_DIR)
+            path = path[3:]
+        full = os.path.join(base, path)
+        if not os.path.exists(full):
+            self.notify(f"Not installed: {tool.get('name', tool_id)}", "warning")
+            return
+        launcher = tool.get("launcher", "")
+        if launcher:
+            lb = os.path.dirname(base) if launcher.startswith("../") else base
+            launcher_abs = os.path.join(lb, launcher.lstrip("../") if launcher.startswith("../") else launcher)
+            if not os.path.isfile(launcher_abs):
+                self.notify(f"Launcher missing: {launcher_abs}", "warning")
+                return
+            try:
+                subprocess.Popen(["sh", launcher_abs],
+                                 cwd=os.path.dirname(launcher_abs),
+                                 start_new_session=True)
+                self.notify(f"Launching {tool.get('name', tool_id)}...")
+            except Exception as e:
+                self.notify(f"Launch failed: {e}", "warning")
+        else:
+            # LÖVE engine: try love
+            love_bin = os.path.join(APP_DIR, "lib", "love")
+            if not os.path.isfile(love_bin):
+                import shutil
+                love_bin = shutil.which("love")
+            if not love_bin:
+                self.notify("LÖVE binary not found", "warning")
+                return
+            try:
+                subprocess.Popen([love_bin, full], start_new_session=True)
+                self.notify(f"Launching {tool.get('name', tool_id)}...")
+            except Exception as e:
+                self.notify(f"Launch failed: {e}", "warning")
         """Mette in coda una notifica cyberpunk. Richiamabile da
         qualunque punto dell'app: messaggi dal Basestation, eventi
         interni (screenshot inviata, aggiornamento completed...)."""

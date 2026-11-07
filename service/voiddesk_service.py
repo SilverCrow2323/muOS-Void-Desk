@@ -452,12 +452,127 @@ def h_iptv_save_config(args):
         return {"ok": False, "error": str(e)[:200]}
 
 
+# ── External tools ────────────────────────────────────────────────
+_EXTERNAL_PROCS = []
+
+def _load_external_tools():
+    import json as _j
+    path = APP_DIR / "external" / "tools.json"
+    try:
+        return _j.loads(path.read_text())
+    except Exception:
+        return {"tools": []}
+
+def _resolve_path(rel):
+    """Resolve a path relative to APP_DIR."""
+    from pathlib import Path as _P
+    base = APP_DIR
+    if rel.startswith("../"):
+        base = base.parent
+        rel = rel[3:]
+    return (base / rel).resolve()
+
+def h_list_external(args):
+    data = _load_external_tools()
+    out = []
+    for t in data.get("tools", []):
+        p = _resolve_path(t.get("path", ""))
+        exists = p.is_dir() or p.is_file()
+        # resolve launcher
+        launcher = t.get("launcher", "")
+        if launcher:
+            lp = _resolve_path(launcher)
+            launcher_exists = lp.is_file()
+        else:
+            launcher_exists = exists
+        out.append({**t, "exists": exists,
+                    "launcher_exists": launcher_exists,
+                    "resolved_path": str(p)})
+    return {"ok": True, "tools": out}
+
+def h_launch_external(args):
+    import subprocess, os as _os
+    tid = args.get("id", "")
+    data = _load_external_tools()
+    tool = None
+    for t in data.get("tools", []):
+        if t.get("id") == tid:
+            tool = t
+            break
+    if not tool:
+        return {"ok": False, "error": f"unknown tool: {tid}"}
+
+    path = _resolve_path(tool.get("path", ""))
+    if not path.exists():
+        return {"ok": False,
+                "error": f"tool not found: {path} (run git clone)"}
+
+    engine = tool.get("engine", "py")
+    launcher = tool.get("launcher", "")
+
+    try:
+        if launcher:
+            lp = _resolve_path(launcher)
+            if not lp.is_file():
+                return {"ok": False, "error": f"launcher missing: {lp}"}
+            # Determine how to run it
+            if lp.suffix == ".sh":
+                cmd = ["sh", str(lp)]
+            else:
+                cmd = [str(lp)]
+            proc = subprocess.Popen(cmd, cwd=str(lp.parent),
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    start_new_session=True)
+            _EXTERNAL_PROCS.append((tid, proc))
+            return {"ok": True,
+                    "note": f"launched {tid}",
+                    "pid": proc.pid}
+        else:
+            # engine=love, no launcher: run love on the folder
+            import shutil
+            love_bin = None
+            for cand in (APP_DIR / "lib" / "love",
+                         Path("/usr/bin/love")):
+                if Path(cand).is_file():
+                    love_bin = str(cand); break
+            if not love_bin:
+                love_bin = shutil.which("love")
+            if not love_bin:
+                return {"ok": False, "error": "LÖVE binary not found"}
+            env = dict(_os.environ)
+            env["LD_LIBRARY_PATH"] = str(APP_DIR / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
+            proc = subprocess.Popen([love_bin, str(path)],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    env=env,
+                                    start_new_session=True)
+            _EXTERNAL_PROCS.append((tid, proc))
+            return {"ok": True, "note": f"launched {tid} (LÖVE)",
+                    "pid": proc.pid}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+def h_external_status(args):
+    out = []
+    for tid, proc in _EXTERNAL_PROCS[:]:
+        alive = proc.poll() is None
+        out.append({"id": tid, "pid": proc.pid, "alive": alive})
+        if not alive:
+            _EXTERNAL_PROCS.remove((tid, proc))
+    return {"ok": True, "running": out}
+
+
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
     "set_config": h_set_config,
     "system_info": h_system_info,
     "network_status": h_network_status,
+    "list_external": h_list_external,
+    "launch_external": h_launch_external,
+    "external_status": h_external_status,
+
     "iptv_load_playlist": h_iptv_load_playlist,
     "iptv_load_epg": h_iptv_load_epg,
     "iptv_epg_for": h_iptv_epg_for,

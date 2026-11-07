@@ -1,0 +1,94 @@
+{
+  "tools": [
+    {
+      "id": "voidcast",
+      "name": "VoidCast IPTV",
+      "desc": "IPTV client: M3U playlists, EPG guide, PVR recording",
+      "engine": "py",
+      "path": "../VoidCast",
+      "launcher": "../VoidCast/mux_launch.sh",
+      "icon": "video",
+      "color": [
+        0.9,
+        0.31,
+        0.75
+      ],
+      "category": "media"
+    },
+    {
+      "id": "file_grid_diver",
+      "name": "File Grid-Diver XX",
+      "desc": "File manager, muOS apps, disk analyzer, duplicate finder",
+      "engine": "py",
+      "path": "external/File-Grid-Diver-XX",
+      "launcher": "external/File-Grid-Diver-XX/mux_launch.sh",
+      "icon": "folder",
+      "color": [
+        0.37,
+        0.82,
+        0.55
+      ],
+      "category": "toolbox"
+    },
+    {
+      "id": "bgm_normalizer",
+      "name": "BGM Normalizer",
+      "desc": "Convert + LUFS-normalize music to OGG for handheld BGM",
+      "engine": "py",
+      "path": "external/muOS-BGM-Normalizer",
+      "launcher": "external/muOS-BGM-Normalizer/mux_launch.sh",
+      "icon": "music",
+      "color": [
+        0.24,
+        0.9,
+        0.78
+      ],
+      "category": "media"
+    },
+    {
+      "id": "file_gd_x",
+      "name": "File-GD X",
+      "desc": "L\u00d6VE dual-pane file manager + diagnostics + storage hub",
+      "engine": "love",
+      "path": "external/muos-prototypes",
+      "launcher": "",
+      "icon": "folder",
+      "color": [
+        0.37,
+        0.82,
+        0.55
+      ],
+      "category": "toolbox"
+    },
+    {
+      "id": "rt_tailscale_m",
+      "name": "Rt:Tailscale-M",
+      "desc": "Tailscale VPN service + QR login + exit nodes + web panel",
+      "engine": "love",
+      "path": "external/rt-tailscale-m",
+      "launcher": "",
+      "icon": "uplink",
+      "color": [
+        0.31,
+        0.8,
+        1.0
+      ],
+      "category": "uplink"
+    },
+    {
+      "id": "prototypes_lab",
+      "name": "Prototypes Lab",
+      "desc": "muOS Prototypes collection (File-GD X, diagnostics, tools)",
+      "engine": "love",
+      "path": "external/muos-prototypes",
+      "launcher": "",
+      "icon": "gear",
+      "color": [
+        0.94,
+        0.35,
+        0.24
+      ],
+      "category": "workshop"
+    }
+  ]
+}

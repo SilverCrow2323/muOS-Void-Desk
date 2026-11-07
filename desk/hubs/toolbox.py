@@ -158,6 +158,18 @@ class ToolboxHub(HubMixin):
         app.ts_open()
 
     def tool_open(self, key):
+
+    def external_tools(self):
+        """Open the external tools chooser."""
+        self.app.push_state("external_tools")
+
+    def file_grid_diver(self):
+        """Launch File Grid-Diver XX (external Pygame app)."""
+        self.app.launch_external_tool("file_grid_diver")
+
+    def rt_tailscale(self):
+        """Launch Rt:Tailscale-M (external LÖVE app)."""
+        self.app.launch_external_tool("rt_tailscale_m")
         """Open a CLI tool package."""
         from desk.main import TOOL_PKGS
         app = self.app

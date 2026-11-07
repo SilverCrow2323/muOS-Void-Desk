@@ -39,12 +39,17 @@ function M.new(config)
         if on_enter then on_enter(scene, args) end
         input.clear()
         input.on("press", function(action)
+            local live = items
+            if scene._get_items then
+                local ok, res = pcall(scene._get_items)
+                if ok and type(res) == "table" then live = res end
+            end
             if action == "up" then
                 selected = math.max(1, selected - 1)
             elseif action == "down" then
-                selected = math.min(#items, selected + 1)
+                selected = math.min(#live, selected + 1)
             elseif action == "a" then
-                local item = items[selected]
+                local item = live[selected]
                 if item and item.action then
                     local msg = item.action(scene)
                     if msg then status_msg = msg end
@@ -83,7 +88,12 @@ function M.new(config)
         end
 
         -- Menu (staggered, starts at 0.30)
-        for i, item in ipairs(items) do
+        local live_items = items
+        if scene._get_items then
+            local ok, res = pcall(scene._get_items)
+            if ok and type(res) == "table" then live_items = res end
+        end
+        for i, item in ipairs(live_items) do
             local delay = 0.30 + (i - 1) * 0.05
             local it = math.max(0, math.min(1, (t_enter - delay) / 0.25))
             if it > 0.01 then
