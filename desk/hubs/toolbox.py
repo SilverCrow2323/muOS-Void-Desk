@@ -115,13 +115,6 @@ class ToolboxHub(HubMixin):
         self.app.launch_external_tool("file_gd_x")
 
 
-        File-GD X is a standalone LÖVE app living in external/muos-prototypes.
-        It's launched engine-agnostically via external/tools.json so the
-        SAME binary is used from Pygame and LÖVE.
-        """
-        self.app.launch_external_tool("file_gd_x")
-
-
     def ftp(self):
         """FTP client."""
         app = self.app
@@ -165,6 +158,11 @@ class ToolboxHub(HubMixin):
         app.ts_open()
 
     def tool_open(self, key):
+        """Open a CLI tool package."""
+        from desk.main import TOOL_PKGS
+        app = self.app
+        label, pkgs = TOOL_PKGS[key]
+        app.tool_open(key)
 
     def external_tools(self):
         """Open the external tools chooser."""
@@ -177,8 +175,3 @@ class ToolboxHub(HubMixin):
     def rt_tailscale(self):
         """Launch Rt:Tailscale-M (external LÖVE app)."""
         self.app.launch_external_tool("rt_tailscale_m")
-        """Open a CLI tool package."""
-        from desk.main import TOOL_PKGS
-        app = self.app
-        label, pkgs = TOOL_PKGS[key]
-        app.tool_open(key)

@@ -889,7 +889,7 @@
           "license": "Unknown"
         },
         {
-          "id": "aesthetic",
+          "id": "aesthetic-joneavila",
           "name": "Aesthetic",
           "glyph": "📦",
           "status": "release",
@@ -911,7 +911,7 @@
           "license": "Unknown"
         },
         {
-          "id": "app-downloader",
+          "id": "app-downloader-andersmmg",
           "name": "App Downloader",
           "glyph": "⬇️",
           "status": "release",
@@ -1131,7 +1131,7 @@
           "license": "Unknown"
         },
         {
-          "id": "iptvviewer",
+          "id": "iptvviewer-vasinsky",
           "name": "Iptvviewer",
           "glyph": "📦",
           "status": "release",
@@ -1175,7 +1175,7 @@
           "license": "Unknown"
         },
         {
-          "id": "rgterm",
+          "id": "rgterm-apostolicus",
           "name": "Rgterm",
           "glyph": "📦",
           "status": "release",
@@ -2196,7 +2196,7 @@
           "license": "Unknown"
         },
         {
-          "id": "dinojam",
+          "id": "dinojam-red-dino",
           "name": "Dinojam",
           "glyph": "🎧",
           "status": "release",
@@ -2240,7 +2240,7 @@
           "license": "Unknown"
         },
         {
-          "id": "retro-chiaki",
+          "id": "retro-chiaki-robvestibular692",
           "name": "Retro Chiaki",
           "glyph": "🎮",
           "status": "release",
@@ -2423,7 +2423,7 @@
           "license": "Unknown"
         },
         {
-          "id": "muos-artwork",
+          "id": "muos-artwork-gerpy",
           "name": "Muos Artwork",
           "glyph": "🎨",
           "status": "release",
@@ -2865,7 +2865,7 @@
           "license": "Unknown"
         },
         {
-          "id": "muos-artwork",
+          "id": "muos-artwork-dizkneelande",
           "name": "Muos Artwork",
           "glyph": "🎨",
           "status": "release",
@@ -3637,7 +3637,7 @@
           "license": "Unknown"
         },
         {
-          "id": "syncthing-tailscale",
+          "id": "syncthing-tailscale-nolandtech",
           "name": "Syncthing Tailscale",
           "glyph": "🔄",
           "status": "release",

@@ -10,7 +10,8 @@ SETUP_APP "$APP_BIN" ""
 
 SETUP_STAGE_OVERLAY
 
-APP_DIR="/run/muos/storage/application/EthoStore"
+SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+APP_DIR="$SCRIPT_DIR"
 LOG_DIR="${APP_DIR}/logs"
 LOG_FILE="${LOG_DIR}/mux-launch.log"
 

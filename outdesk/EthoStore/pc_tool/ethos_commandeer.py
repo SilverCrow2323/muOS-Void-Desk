@@ -19,10 +19,17 @@ import re
 import time
 import threading
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox, filedialog
+from tkinter import ttk, scrolledtext, messagebox, filedialog, simpledialog
 from urllib.parse import urlparse, quote
-import requests
-from PIL import Image, ImageTk
+try:
+    import requests
+except ImportError:
+    requests = None
+try:
+    from PIL import Image, ImageTk
+except ImportError:
+    Image = None
+    ImageTk = None
 import io
 import shutil
 from datetime import datetime
@@ -770,11 +777,11 @@ class EthosCommandeer:
             messagebox.showinfo("Info", "No categories found in catalog.")
             return
 
-        cat = tk.simpledialog.askstring("New App", "Category:", initialvalue=cats[0] if cats else "")
+        cat = simpledialog.askstring("New App", "Category:", initialvalue=cats[0] if cats else "")
         if not cat or cat not in self.catalog["macro_categories"]:
             return
 
-        app_id = tk.simpledialog.askstring("New App", "App ID (unique):")
+        app_id = simpledialog.askstring("New App", "App ID (unique):")
         if not app_id:
             return
 

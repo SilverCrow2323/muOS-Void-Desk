@@ -85,7 +85,7 @@ export PYTHONPATH="$VOIDDESK_DIR/runtime:$PYTHONPATH"
 
 # Avvia outdeskintro con il logo e il comando per Disc Crusher
 INTRO_SCRIPT="$VOIDDESK_DIR/outdesk/outdeskintro.py"
-DC_SCRIPT="$VOIDDESK_DIR/outdesk/Disc_Crusher/disc_crusher.py"
+DC_SCRIPT="$VOIDDESK_DIR/outdesk/Disc_Crusher/discs_crusher.py"
 LOGO_PATH="$VOIDDESK_DIR/assets/logos/disc_crusher.png"
 
 if [ -f "$INTRO_SCRIPT" ] && [ -f "$DC_SCRIPT" ]; then
