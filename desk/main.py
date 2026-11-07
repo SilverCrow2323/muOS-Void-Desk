@@ -6274,6 +6274,20 @@ class App(object):
 
 # --- [R2] CRT Off Animation // HUB: END SESSION ---
     def notify(self, title, body="", kind="standard"):
+        """Show a toast notification. Recovered minimal body."""
+        try:
+            if not hasattr(self, "_notifs_log"):
+                self._notifs_log = []
+            self._notifs_log.append({
+                "title": title,
+                "body": body,
+                "kind": kind,
+                "ts": time.time(),
+            })
+            if len(self._notifs_log) > 50:
+                self._notifs_log = self._notifs_log[-50:]
+        except Exception:
+            pass
 
     def launch_external_tool(self, tool_id):
         """Launch an external tool by id from external/tools.json."""
