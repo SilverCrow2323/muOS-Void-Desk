@@ -15,6 +15,9 @@
 
 ![Supported Firmware](https://img.shields.io/badge/Firmware-muOS%20%7C%20ROCKNIX%20%7C%20Knulli-d4c5f9?style=flat-square)
 ![Target Architecture](https://img.shields.io/badge/SoC-Allwinner%20H700-a2eeef?style=flat-square)
+[![Python](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)](#)
+[![Pygame](https://img.shields.io/badge/Pygame-Framebuffer-90EE90?style=flat-square)](#)
+[![Chroot](https://img.shields.io/badge/Desktop-Ubuntu%20chroot-E95420?style=flat-square&logo=ubuntu&logoColor=white)](#)
 
 </div>
 
@@ -36,37 +39,9 @@ Well, we try anyway. And fuck your corporate ethos.
 -->
 
 
-
-
-<br><br>
-
-[![muOS](https://img.shields.io/badge/muOS-Compatible-7B68EE?style=flat-square)](#)
-[![Device](https://img.shields.io/badge/Device-RG35XX--H-FF6F00?style=flat-square)](#)
-[![Python](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)](#)
-[![Pygame](https://img.shields.io/badge/Pygame-Framebuffer-90EE90?style=flat-square)](#)
-[![Chroot](https://img.shields.io/badge/Desktop-Ubuntu%20chroot-E95420?style=flat-square&logo=ubuntu&logoColor=white)](#)
-[![Version](https://img.shields.io/badge/Version-10.2.1--Nexus-FF6B6B?style=flat-square)](#)
-[![SPDW Factory](https://img.shields.io/badge/SPDW_Factory_Lab-00FFCC?style=for-the-badge)](#)
-
 </div>
 
----
 
-> <div style="border-left: 4px solid #E74C3C; padding: 20px 24px; background: #0a0a0a; border-radius: 0 14px 14px 0;">
-> <div style="display: flex; align-items: flex-start; gap: 16px;">
-> <div style="font-family: 'Courier New', monospace; font-size: 11px; color: #e74c3c; line-height: 1.4; white-space: pre;">
-> </div>
-> <div>
-> <p style="font-family: 'Impact', sans-serif; font-size: 16px; color: #E74C3C; margin: 0;"><b>[I.R.] Minoru⁷</b> ( ——)</p>
-> <p style="font-family: 'Georgia', serif; font-size: 12px; color: #666; font-style: italic; margin: 4px 0 0 0;">has hijacked the broadcast.</p>
-> <br>
-> <p style="font-family: 'Segoe UI', sans-serif; font-size: 14px; color: #ddd; line-height: 1.7; margin: 0;">"Oh good. Another GitHub README. I was praying for a ransom note, but I suppose a feature list is the next best thing. Try not to fall asleep before the chroot section — <b>that's where the trauma begins</b>."</p>
-> </div>
-> <img src="resources/minoru.png" width="80" style="border-radius: 8px; border: 1px solid #333;">
-> </div>
-> </div>
-
----
 
 <h1 align="center" style="font-family: Impact, 'Arial Black', sans-serif; font-size: 40px; color: #FF6B6B; text-shadow: 2px 2px 6px #000; letter-spacing: 5px;">
 📖 CONTENTS
