@@ -3,8 +3,8 @@ local icon    = require("core.icon")
 local effects = require("core.effects")
 
 local chrome = {}
-chrome.HEADER_H = 56
-chrome.FOOTER_H = 44
+chrome.HEADER_H = 62
+chrome.FOOTER_H = 50
 
 local function f_bold(sz) return font.bold(sz) or love.graphics.newFont(sz) end
 local function f_reg(sz)  return font.regular(sz) or love.graphics.newFont(sz) end
@@ -29,7 +29,7 @@ function chrome.draw_header(opts)
     love.graphics.setColor(accent[1], accent[2], accent[3], 1)
     love.graphics.rectangle("fill", 0, H - 3, W, 3)
 
-    local ft = f_bold(24)
+    local ft = f_bold(28)
     love.graphics.setFont(ft)
     love.graphics.setColor(shadow[1], shadow[2], shadow[3], shadow[4] or 0.6)
     love.graphics.print(title, 17, 15)
@@ -44,7 +44,7 @@ function chrome.draw_header(opts)
 
     -- Right side
     local x = W - 14
-    local fs = f_reg(15)
+    local fs = f_reg(18)
     love.graphics.setFont(fs)
 
     if os.getenv("VOIDDESK_PC") == "1" then
@@ -99,7 +99,7 @@ function chrome.draw_footer(opts)
     love.graphics.setColor(accent[1], accent[2], accent[3], 1)
     love.graphics.rectangle("fill", 0, y0, W, 2)
 
-    local f = f_reg(13)
+    local f = f_reg(16)
     love.graphics.setFont(f)
     local x = 14
     local yy = y0 + 14

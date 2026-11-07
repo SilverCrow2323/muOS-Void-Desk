@@ -38,7 +38,7 @@ return dashboard.new({
     title = "RT:TOOLBOX",
     node_idx = 4,
     widget_height = 128,
-    row_height = 38,
+    row_height = 46,
     status = "Productivity tools",
 
     on_enter = function(scene) refresh(scene, false) end,

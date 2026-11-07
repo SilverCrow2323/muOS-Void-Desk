@@ -101,9 +101,30 @@ function love.joystickpressed(joystick, button)
 end
 
 function love.joystickhat(joystick, hat, direction)
+    -- Hat takes priority. Mark device has hat so axis is ignored.
+    joystick._has_hat = true
     if direction == "u" then input.press("up",    "hat:u")
     elseif direction == "d" then input.press("down",  "hat:d")
     elseif direction == "l" then input.press("left",  "hat:l")
     elseif direction == "r" then input.press("right", "hat:r")
+    end
+end
+
+function love.joystickaxis(joystick, axis, value)
+    -- If device has hat, ignore axis for dpad (prevents double-fire)
+    if joystick._has_hat or joystick:getHatCount() > 0 then return end
+    if axis > 1 then return end
+    local prev = axis_state[axis] or 0
+    local dir = 0
+    if value > input.DEADZONE then dir = 1
+    elseif value < -input.DEADZONE then dir = -1 end
+    axis_state[axis] = dir
+    if dir == prev then return end
+    if axis == 0 then
+        if dir == 1 then input.press("right", "axis:x+")
+        elseif dir == -1 then input.press("left", "axis:x-") end
+    elseif axis == 1 then
+        if dir == -1 then input.press("up", "axis:y-")
+        elseif dir == 1 then input.press("down", "axis:y+") end
     end
 end

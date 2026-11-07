@@ -97,30 +97,81 @@ def device_only(cmd):
     return None
 
 def h_xfce_install(args):
-    """Install XFCE:
-       - on device: deferred (arm64 chroot via device bootstrap)
-       - on PC: apt install xfce4 + Xephyr via pkexec (GUI prompt)."""
+    """Install XFCE on PC. Tries pkexec -> sudo -> apt-get with password-less sudo."""
+    import shutil, subprocess, os as _os
     if IS_DEVICE:
-        return {"ok": True, "note": "device: install via VoidDesk chroot (Sprint 2)"}
-    import shutil, subprocess
+        return {"ok": True, "note": "device: use VoidDesk chroot bootstrap (Sprint 2)"}
+
+    # Already installed?
     if shutil.which("startxfce4"):
         return {"ok": True, "already": True, "note": "XFCE already installed"}
-    try:
-        r = subprocess.run(
-            ["pkexec", "apt-get", "install", "-y", "--no-install-recommends",
-             "xfce4", "xfce4-terminal", "xserver-xephyr"],
-            capture_output=True, text=True, timeout=900)
-        if r.returncode == 0:
-            return {"ok": True, "note": "XFCE installed on PC"}
-        return {"ok": False, "error": (r.stderr or r.stdout)[-300:] or "apt failed"}
-    except FileNotFoundError:
-        return {"ok": False, "error": "pkexec missing — install polkit (sudo apt install pkexec)"}
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "error": "install timed out (>15 min)"}
 
-# Track XFCE/Xephyr subprocesses so we can clean up on exit
-import atexit
-_XFCE_PROCS = []
+    log_path = APP_DIR / "data" / "xfce_install.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    apt_cmd = ["apt-get", "install", "-y", "--no-install-recommends",
+               "xfce4", "xfce4-terminal", "xserver-xephyr", "dbus-x11"]
+
+    def _log(msg):
+        try:
+            with open(log_path, "a") as f:
+                f.write(msg + "
+")
+        except OSError:
+            pass
+
+    _log("=" * 60)
+    _log("XFCE install attempt: " + " ".join(apt_cmd))
+
+    # Method 1: pkexec (may fail headless without polkit agent)
+    if shutil.which("pkexec"):
+        _log("Method 1: pkexec")
+        try:
+            r = subprocess.run(["pkexec"] + apt_cmd,
+                              capture_output=True, text=True, timeout=1800)
+            if r.returncode == 0:
+                _log("pkexec: success")
+                return {"ok": True, "note": "XFCE installed via pkexec",
+                        "log": str(log_path)}
+            _log(f"pkexec failed rc={r.returncode}: {(r.stderr or '')[-200:]}")
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "error": "pkexec timeout (>30min)"}
+        except Exception as e:
+            _log(f"pkexec exception: {e}")
+
+    # Method 2: sudo with password-less (NOPASSWD configured)
+    if shutil.which("sudo"):
+        _log("Method 2: sudo -n (non-interactive)")
+        try:
+            r = subprocess.run(["sudo", "-n"] + apt_cmd,
+                              capture_output=True, text=True, timeout=1800)
+            if r.returncode == 0:
+                _log("sudo -n: success")
+                return {"ok": True, "note": "XFCE installed via sudo",
+                        "log": str(log_path)}
+            _log(f"sudo -n failed rc={r.returncode}")
+        except Exception as e:
+            _log(f"sudo -n exception: {e}")
+
+    # Method 3: direct (only works if service runs as root or already elevated)
+    _log("Method 3: direct (service may already be root)")
+    try:
+        r = subprocess.run(apt_cmd, capture_output=True, text=True, timeout=1800)
+        if r.returncode == 0:
+            _log("direct: success")
+            return {"ok": True, "note": "XFCE installed directly",
+                    "log": str(log_path)}
+        _log(f"direct failed rc={r.returncode}: {(r.stderr or '')[-200:]}")
+    except Exception as e:
+        _log(f"direct exception: {e}")
+
+    # All failed
+    return {"ok": False,
+            "error": "apt install failed (see log)",
+            "log": str(log_path),
+            "hint": "Run manually: sudo apt install xfce4 xfce4-terminal xserver-xephyr dbus-x11"}
+
+
 def _kill_xfce_procs():
     for name, proc in _XFCE_PROCS:
         if proc.poll() is None:

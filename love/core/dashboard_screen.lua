@@ -32,8 +32,8 @@ function M.new(config)
 
     local menu_top = chrome.HEADER_H + widget_h + 10
     local menu_bottom = 480 - chrome.FOOTER_H - 34
-    local row_h = config.row_height or 38
-    local status_font = font.regular(11) or love.graphics.newFont(11)
+    local row_h = config.row_height or 46
+    local status_font = font.regular(14) or love.graphics.newFont(11)
 
     local function get_live_items()
         if scene._get_items then
@@ -206,7 +206,7 @@ function M.new(config)
                 local c = first.color or node_color
                 love.graphics.setColor(c[1], c[2], c[3], 1)
                 love.graphics.circle("fill", 14, strip_y + 11, 4)
-                local f_st = font.regular(11) or love.graphics.newFont(11)
+                local f_st = font.regular(14) or love.graphics.newFont(11)
                 love.graphics.setFont(f_st)
                 love.graphics.setColor(0.85, 0.88, 0.92, 1)
                 love.graphics.print(

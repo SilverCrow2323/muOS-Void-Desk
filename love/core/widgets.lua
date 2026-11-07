@@ -6,8 +6,8 @@ local W = {}
 
 function W.stat_bar(x, y, w, h, label, value_text, pct, color, alpha)
     alpha = alpha or 1
-    local f_l = font.regular(11) or love.graphics.newFont(11)
-    local f_v = font.bold(11) or love.graphics.newFont(11)
+    local f_l = font.regular(14) or love.graphics.newFont(11)
+    local f_v = font.bold(14) or love.graphics.newFont(11)
     love.graphics.setFont(f_l)
     love.graphics.setColor(0.70, 0.76, 0.82, alpha)
     love.graphics.print(label, x, y)
@@ -40,12 +40,12 @@ function W.status_card(x, y, w, h, icon_key, title, subtitle, state_color, state
     if icon_key then
         pcall(icon.draw, icon_key, x + 8, y + 8, 22, state_color, { alpha = alpha })
     end
-    local f_t = font.bold(12) or love.graphics.newFont(12)
+    local f_t = font.bold(15) or love.graphics.newFont(12)
     love.graphics.setFont(f_t)
     love.graphics.setColor(0.95, 0.95, 0.95, alpha)
     love.graphics.print(title, x + 36, y + 7)
     if subtitle then
-        local f_s = font.regular(10) or love.graphics.newFont(10)
+        local f_s = font.regular(13) or love.graphics.newFont(10)
         love.graphics.setFont(f_s)
         love.graphics.setColor(0.60, 0.66, 0.72, alpha)
         local sub = subtitle
@@ -65,8 +65,8 @@ end
 
 function W.info_row(x, y, w, label, value, color, alpha)
     alpha = alpha or 1
-    local f_l = font.regular(10) or love.graphics.newFont(10)
-    local f_v = font.bold(11) or love.graphics.newFont(11)
+    local f_l = font.regular(13) or love.graphics.newFont(10)
+    local f_v = font.bold(14) or love.graphics.newFont(11)
     love.graphics.setFont(f_l)
     love.graphics.setColor(0.55, 0.60, 0.66, alpha)
     love.graphics.print(label, x, y)
@@ -96,7 +96,7 @@ function W.gauge(cx, cy, r, pct, label, color, alpha)
     love.graphics.setColor(1, 1, 1, alpha)
     love.graphics.print(txt, cx - tw/2, cy - 9)
     if label then
-        local f_l = font.regular(9) or love.graphics.newFont(9)
+        local f_l = font.regular(12) or love.graphics.newFont(9)
         love.graphics.setFont(f_l)
         local lw = f_l:getWidth(label)
         love.graphics.setColor(0.60, 0.66, 0.72, alpha)
@@ -150,7 +150,7 @@ function W.menu_row(x, y, w, h, a1, a2, a3, a4, a5, a6, a7)
         love.graphics.setColor(icol[1], icol[2], icol[3], alpha)
         love.graphics.setLineWidth(1)
         love.graphics.rectangle("line", ix, iy, isz, isz, 3)
-        local f_b = font.bold(12) or love.graphics.newFont(12)
+        local f_b = font.bold(15) or love.graphics.newFont(12)
         love.graphics.setFont(f_b)
         local tw = f_b:getWidth(opts.badge)
         love.graphics.setColor(icol[1], icol[2], icol[3], alpha)
@@ -163,7 +163,7 @@ function W.menu_row(x, y, w, h, a1, a2, a3, a4, a5, a6, a7)
 
     -- Right side: value + chevron
     local right_w = 0
-    local f_val = font.bold(12) or love.graphics.newFont(12)
+    local f_val = font.bold(15) or love.graphics.newFont(12)
     local val_text = opts.value
     local val_color = opts.value_color or nc
     if val_text then
@@ -179,7 +179,7 @@ function W.menu_row(x, y, w, h, a1, a2, a3, a4, a5, a6, a7)
     end
 
     -- label (bold, top)
-    local f_l = font.bold(13) or love.graphics.newFont(13)
+    local f_l = font.bold(16) or love.graphics.newFont(13)
     love.graphics.setFont(f_l)
     local label = opts.label or ""
     while #label > 3 and f_l:getWidth(label) > text_w do
@@ -191,7 +191,7 @@ function W.menu_row(x, y, w, h, a1, a2, a3, a4, a5, a6, a7)
 
     -- description (small, bottom)
     if opts.desc and opts.desc ~= "" then
-        local f_d = font.regular(10) or love.graphics.newFont(10)
+        local f_d = font.regular(13) or love.graphics.newFont(10)
         love.graphics.setFont(f_d)
         love.graphics.setColor(th_dim[1]*0.8, th_dim[2]*0.8, th_dim[3]*0.8,
                                0.9 * alpha)
