@@ -10,6 +10,7 @@ local bg_anim = require("core.bg_anim")
 local widgets = require("core.widgets")
 local icon    = require("core.icon")
 local jobs    = require("core.jobs")
+local layout  = require("core.layout")
 
 local M = {}
 
@@ -24,16 +25,10 @@ function M.new(config)
     local scroll_offset = 0
     local status_msg = config.status or "Ready"
 
-    local widget_h = config.widget_height or 150
     local widgets_draw = config.widgets_draw
     local on_enter = config.on_enter
     local on_update = config.on_update
     scene._data = {}
-
-    local menu_top = chrome.HEADER_H + widget_h + 10
-    local menu_bottom = 480 - chrome.FOOTER_H - 34
-    local row_h = config.row_height or 46
-    local status_font = font.regular(14) or love.graphics.newFont(11)
 
     local function get_live_items()
         if scene._get_items then
@@ -41,20 +36,6 @@ function M.new(config)
             if ok and type(res) == "table" then return res end
         end
         return items
-    end
-
-    local function ensure_visible()
-        local live = get_live_items()
-        local visible_rows = math.max(1, math.floor((menu_bottom - menu_top) / row_h))
-        if selected < 1 then selected = 1 end
-        if selected > #live then selected = #live end
-        if selected < scroll_offset + 1 then
-            scroll_offset = selected - 1
-        elseif selected > scroll_offset + visible_rows then
-            scroll_offset = selected - visible_rows
-        end
-        local max_offset = math.max(0, #live - visible_rows)
-        scroll_offset = math.max(0, math.min(scroll_offset, max_offset))
     end
 
     function scene.enter(args)
@@ -72,10 +53,8 @@ function M.new(config)
             local live = get_live_items()
             if action == "up" then
                 selected = math.max(1, selected - 1)
-                ensure_visible()
             elseif action == "down" then
                 selected = math.min(#live, selected + 1)
-                ensure_visible()
             elseif action == "a" then
                 local item = live[selected]
                 if item and item.action then
@@ -83,15 +62,25 @@ function M.new(config)
                     if msg then status_msg = msg end
                 end
             elseif action == "b" then
-                sm.switch("nexus", {})
+                sm.back()
             elseif action == "select" then
                 jobs.toggle_overlay()
             end
         end)
     end
 
+    function scene.save_state()
+        return { selected = selected, scroll_offset = scroll_offset }
+    end
+
+    function scene.restore_state(state)
+        if not state then return end
+        selected = state.selected or 1
+        scroll_offset = state.scroll_offset or 0
+    end
+
     function scene.update(dt)
-        if t_enter < 1 then t_enter = math.min(1, t_enter + dt / 0.55) end
+        if t_enter < 1 then t_enter = math.min(1, t_enter + dt / 0.5) end
         if on_update then on_update(scene, dt) end
     end
 
@@ -100,52 +89,66 @@ function M.new(config)
     function scene.get_data(k) return scene._data[k] end
 
     function scene.draw()
-        local W, H = love.graphics.getDimensions()
+        local L = layout.get()
+        local W, H = love.graphics.getWidth(), love.graphics.getHeight()
         local th = theme.get()
 
         love.graphics.clear(0, 0, 0, 1)
 
+        -- Background animation
         local bg_a = math.min(1, t_enter * 2.5)
         if bg_a > 0.02 then
             bg_anim.draw(bg_kind, W, H, love.timer.getTime(), node_color, bg_a * 0.55)
         end
 
+        -- Widget panel
         local w_t = math.max(0, math.min(1, (t_enter - 0.10) / 0.40))
-        if w_t > 0.02 and widgets_draw then
+        local has_widgets = widgets_draw ~= nil
+        local widget_h = has_widgets and L.widget_h or 0
+        if w_t > 0.02 and has_widgets then
             widgets_draw(scene, w_t)
         end
 
-        local live = get_live_items()
-        local visible_rows = math.max(1, math.floor((menu_bottom - menu_top) / row_h))
+        -- Menu geometry
+        local menu_top = L.header_h + widget_h + math.floor(10 * L.scale)
+        local running = jobs.total_running()
+        local strip_h = running > 0 and L.strip_h or 0
+        local menu_bottom = H - L.footer_h - L.status_h - strip_h - math.floor(8 * L.scale)
+        local visible_rows = math.max(1, math.floor((menu_bottom - menu_top) / L.row_h))
 
-        -- Menu items (with scissor)
+        local live = get_live_items()
+
+        -- Ensure selection is visible
+        if selected < scroll_offset + 1 then
+            scroll_offset = selected - 1
+        elseif selected > scroll_offset + visible_rows then
+            scroll_offset = selected - visible_rows
+        end
+        scroll_offset = math.max(0, math.min(scroll_offset, math.max(0, #live - visible_rows)))
+
+        -- Menu items with scissor
         love.graphics.setScissor(0, menu_top - 2, W, menu_bottom - menu_top + 4)
         for i = 1, visible_rows do
             local idx = scroll_offset + i
             if idx > #live then break end
             local item = live[idx]
-            local delay = 0.30 + (i - 1) * 0.04
-            local it = math.max(0, math.min(1, (t_enter - delay) / 0.25))
+            local delay = 0.25 + (i - 1) * 0.03
+            local it = math.max(0, math.min(1, (t_enter - delay) / 0.2))
             if it > 0.01 then
-                local y = menu_top + (i - 1) * row_h + (1 - it) * 10
-                widgets.menu_row(16, y, W - 32, row_h - 2, {
-                    icon = item.icon,
-                    badge = item.badge,
-                    label = item.label or "",
-                    desc = item.desc,
-                    value = item.value,
-                    value_color = item.value_color,
+                local y = menu_top + (i - 1) * L.row_h + (1 - it) * math.floor(10 * L.scale)
+                widgets.menu_row(16, y, W - 32, L.row_h - 2, {
+                    icon = item.icon, badge = item.badge,
+                    label = item.label or "", desc = item.desc,
+                    value = item.value, value_color = item.value_color,
                     chevron = item.chevron ~= false and not item.value,
-                    selected = (idx == selected),
-                    theme = th,
-                    node_color = node_color,
-                    alpha = it,
+                    selected = (idx == selected), theme = th,
+                    node_color = node_color, alpha = it,
                 })
             end
         end
         love.graphics.setScissor()
 
-        -- Item job spinners (drawn OUTSIDE scissor to avoid clipping)
+        -- Item spinners for jobs
         for i = 1, visible_rows do
             local idx = scroll_offset + i
             if idx > #live then break end
@@ -153,28 +156,19 @@ function M.new(config)
             if item.label then
                 local n_active = jobs.count_for_name(item.label)
                 if n_active > 0 then
-                    local y = menu_top + (i - 1) * row_h
-                    local sx = W - 42
-                    local sy = y + row_h / 2
+                    local y = menu_top + (i - 1) * L.row_h
+                    local sx = W - math.floor(42 * L.scale)
+                    local sy = y + L.row_h / 2
                     local t_now = love.timer.getTime()
                     local c = item.job_color or node_color
+                    local rad = math.floor(6 * L.scale)
                     for k = 0, 5 do
                         local ang = t_now * 4 + k * math.pi / 3
                         local a = 0.3 + 0.7 * (1 - k / 6)
                         love.graphics.setColor(c[1], c[2], c[3], a)
                         love.graphics.circle("fill",
-                            sx + math.cos(ang) * 6,
-                            sy + math.sin(ang) * 6, 1.5)
-                    end
-                    if n_active > 1 then
-                        love.graphics.setColor(0, 0, 0, 0.9)
-                        love.graphics.circle("fill", sx + 10, sy - 8, 7)
-                        love.graphics.setColor(c[1], c[2], c[3], 1)
-                        love.graphics.circle("line", sx + 10, sy - 8, 7)
-                        local f_b = font.bold(9) or love.graphics.newFont(9)
-                        love.graphics.setFont(f_b)
-                        love.graphics.setColor(c[1], c[2], c[3], 1)
-                        love.graphics.print(tostring(n_active), sx + 7, sy - 12)
+                            sx + math.cos(ang) * rad,
+                            sy + math.sin(ang) * rad, math.max(1, rad/4))
                     end
                 end
             end
@@ -182,18 +176,21 @@ function M.new(config)
 
         -- Scroll indicators
         if scroll_offset > 0 then
-            pcall(icon.draw, "arrow_up", W - 26, menu_top - 4, 16, node_color, { alpha = 0.6 })
+            pcall(icon.draw, "arrow_up", W - math.floor(26 * L.scale),
+                  menu_top - math.floor(4 * L.scale),
+                  math.floor(16 * L.scale), node_color, { alpha = 0.6 })
         end
         if scroll_offset + visible_rows < #live then
-            pcall(icon.draw, "arrow_down", W - 26, menu_bottom - 14, 16, node_color, { alpha = 0.6 })
+            pcall(icon.draw, "arrow_down", W - math.floor(26 * L.scale),
+                  menu_bottom - math.floor(14 * L.scale),
+                  math.floor(16 * L.scale), node_color, { alpha = 0.6 })
         end
 
-        -- Status strip (only if jobs active)
-        local running = jobs.total_running()
+        -- Status strip (if jobs active)
         if running > 0 then
-            local strip_y = H - chrome.FOOTER_H - 26
+            local strip_y = H - L.footer_h - L.status_h - L.strip_h
             love.graphics.setColor(0.04, 0.06, 0.10, 0.95)
-            love.graphics.rectangle("fill", 0, strip_y, W, 22)
+            love.graphics.rectangle("fill", 0, strip_y, W, L.strip_h)
             love.graphics.setColor(node_color[1], node_color[2], node_color[3], 0.5)
             love.graphics.rectangle("fill", 0, strip_y, W, 1)
             local first = nil
@@ -204,44 +201,50 @@ function M.new(config)
             end
             if first then
                 local c = first.color or node_color
+                local f_st = font.regular(L.font_status) or love.graphics.newFont(L.font_status)
+                local cy = strip_y + math.floor((L.strip_h - f_st:getHeight()) / 2)
                 love.graphics.setColor(c[1], c[2], c[3], 1)
-                love.graphics.circle("fill", 14, strip_y + 11, 4)
-                local f_st = font.regular(14) or love.graphics.newFont(11)
+                love.graphics.circle("fill", math.floor(14 * L.scale),
+                                    strip_y + L.strip_h / 2, math.floor(4 * L.scale))
                 love.graphics.setFont(f_st)
                 love.graphics.setColor(0.85, 0.88, 0.92, 1)
-                love.graphics.print(
-                    string.format("[%d] %s  %d%%",
-                        running, first.name, first.progress or 0),
-                    24, strip_y + 5)
-                local bx = W - 200
-                local bw = 100
+                love.graphics.print(string.format("[%d] %s  %d%%",
+                    running, first.name, first.progress or 0), math.floor(24 * L.scale), cy)
+                -- Inline bar
+                local bw = math.floor(100 * L.scale)
+                local bx = W - bw - math.floor(120 * L.scale)
+                local bh = math.floor(6 * L.scale)
+                local by = strip_y + math.floor((L.strip_h - bh)/2)
                 love.graphics.setColor(0.10, 0.12, 0.16, 1)
-                love.graphics.rectangle("fill", bx, strip_y + 8, bw, 6, 2)
+                love.graphics.rectangle("fill", bx, by, bw, bh, 2)
                 local fw = bw * (first.progress or 0) / 100
                 if fw > 1 then
                     love.graphics.setColor(c[1], c[2], c[3], 1)
-                    love.graphics.rectangle("fill", bx, strip_y + 8, fw, 6, 2)
+                    love.graphics.rectangle("fill", bx, by, fw, bh, 2)
                 end
                 love.graphics.setColor(0.55, 0.6, 0.65, 1)
-                love.graphics.print("SELECT: details", W - 100, strip_y + 5)
+                love.graphics.print("SELECT: details",
+                    W - math.floor(110 * L.scale), cy)
             end
         end
 
         -- Status panel
         local st = math.max(0, math.min(1, (t_enter - 0.55) / 0.30))
         if st > 0.01 then
-            local sy = H - chrome.FOOTER_H - 30 - (running > 0 and 22 or 0)
+            local sy = H - L.footer_h - L.status_h - math.floor(4 * L.scale)
             love.graphics.setColor(th.panel_bg[1], th.panel_bg[2], th.panel_bg[3], 0.92 * st)
-            love.graphics.rectangle("fill", 12, sy, W - 24, 24, 4)
+            love.graphics.rectangle("fill", 12, sy, W - 24, L.status_h, 4)
             love.graphics.setColor(node_color[1], node_color[2], node_color[3], 0.6 * st)
-            love.graphics.rectangle("line", 12, sy, W - 24, 24, 4)
-            love.graphics.setFont(status_font)
+            love.graphics.rectangle("line", 12, sy, W - 24, L.status_h, 4)
+            local fs = font.regular(L.font_status) or love.graphics.newFont(L.font_status)
+            love.graphics.setFont(fs)
             love.graphics.setColor(th.text[1], th.text[2], th.text[3], 0.92 * st)
-            love.graphics.print("> " .. status_msg, 20, sy + 6)
+            local ty = sy + math.floor((L.status_h - fs:getHeight())/2)
+            love.graphics.print("> " .. status_msg, math.floor(20 * L.scale), ty)
         end
 
         -- Chrome
-        if t_enter > 0.25 then
+        if t_enter > 0.20 then
             chrome.draw_header({
                 theme = th, title = "Void-DESK", subtitle = title,
                 status_icons = { "wifi", "battery" },
@@ -253,27 +256,13 @@ function M.new(config)
                     { icon = "btn_a", label = "Run" },
                     { icon = "btn_b", label = "Back" },
                 },
-                right_text = string.format("%d/%d  v10.5.1", selected, #live),
+                right_text = string.format("%d/%d", selected, #live),
             })
         end
 
         if th.scanlines then effects.scanlines(W, H, 0.06) end
         if th.vignette  then effects.vignette(W, H, 0.35) end
         love.graphics.setColor(1, 1, 1, 1)
-    end
-
-    function scene.save_state()
-        return {
-            selected = selected,
-            scroll_offset = scroll_offset,
-        }
-    end
-
-    function scene.restore_state(state)
-        if not state then return end
-        if state.selected then selected = state.selected end
-        if state.scroll_offset then scroll_offset = state.scroll_offset end
-        ensure_visible()
     end
 
     return scene
