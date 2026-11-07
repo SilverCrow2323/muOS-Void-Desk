@@ -42,7 +42,7 @@
  "termid_id": "20260733110111",
  "lang": "en",
  "home_style": "nexus",
- "engine": "py",
+ "engine": "love",
  "bg_anim": true,
  "sfx": true,
  "music": true,

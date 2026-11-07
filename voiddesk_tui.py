@@ -26,12 +26,32 @@ def write_cfg(cfg):
         print(f"  [ERR] {e}")
 
 def which_love():
-    """Prefer device love, then system."""
+    """Return the correct LÖVE binary for the current architecture.
+
+    On aarch64/armv7l (device): prefer lib/love (bundled ARM binary).
+    On x86_64 (PC):             prefer system love (ARM binary won't load).
+    """
+    import platform, shutil
+    arch = platform.machine().lower()
+    is_arm = arch in ("aarch64", "armv7l", "arm64")
+
     local = APP_DIR / "lib" / "love"
-    if local.is_file() and os.access(local, os.X_OK):
-        return str(local)
-    import shutil
-    return shutil.which("love")
+    local_ok = local.is_file() and os.access(local, os.X_OK)
+    system_love = shutil.which("love")
+
+    if is_arm:
+        if local_ok:
+            return str(local)
+        return system_love
+    else:
+        # PC: use system love first, ignore lib/love (it's ARM)
+        if system_love:
+            return system_love
+        # Fallback: warn if only ARM binary is present
+        if local_ok:
+            print("  ⚠️  lib/love is ARM binary; cannot run on " + arch)
+            print("     Install LÖVE for PC:  sudo apt install love")
+        return None
 
 def launch_love():
     love = which_love()
@@ -163,6 +183,33 @@ def action_repair():
             print("    ✅ All Lua files compile")
     return 0
 
+
+def action_install_love():
+    """Install LÖVE on PC (via apt). On device, verify lib/love instead."""
+    import platform, shutil, subprocess
+    arch = platform.machine().lower()
+    if arch in ("aarch64", "armv7l", "arm64"):
+        local = APP_DIR / "lib" / "love"
+        if local.is_file():
+            print(f"\n  ✅ lib/love present: {local}")
+            print(f"     Try: ./voiddesk.sh --love")
+            return 0
+        print("\n  ⚠️  lib/love missing on device")
+        return 1
+
+    if shutil.which("love"):
+        print(f"\n  ✅ LOVE already installed: {shutil.which('love')}")
+        return 0
+
+    print("\n  LOVE not installed. Installing via apt (requires sudo)...")
+    try:
+        r = subprocess.run(["sudo", "apt", "install", "-y", "love"],
+                          timeout=300)
+        return 0 if r.returncode == 0 else 1
+    except Exception as e:
+        print(f"  ❌ {e}")
+        return 1
+
 MENU = [
     ("Launch VoidDesk (config engine)",    lambda: action_launch(read_cfg().get("engine", "love"))),
     ("Launch VoidDesk → LÖVE",             lambda: action_launch("love")),
@@ -171,6 +218,7 @@ MENU = [
     ("Open config",                        action_open_config),
     ("View logs",                          action_logs),
     ("Check dependencies",                 action_check_deps),
+    ("Install LOVE (PC)",                  action_install_love),
     ("Repair / validate",                  action_repair),
 ]
 
@@ -186,7 +234,7 @@ def main():
     print(f"  0) Exit")
     print()
     try:
-        choice = input("  Choice [0-8]: ").strip()
+        choice = input("  Choice [0-9]: ").strip()
     except (KeyboardInterrupt, EOFError):
         return 0
     if choice == "0" or not choice:
