@@ -547,17 +547,13 @@ def h_launch_external(args):
         # Log headers
         try:
             with open(log_path, "a") as lf:
-                lf.write(f"
-{'='*60}
-")
-                lf.write(f"[{datetime.now().isoformat()}] Launch: {tid}
-")
-                lf.write(f"cmd: {' '.join(cmd)}
-")
-                lf.write(f"cwd: {cwd}
-")
-                lf.write(f"DISPLAY: {env.get('DISPLAY', '(none)')}
-")
+                sep = "=" * 60
+                now_iso = datetime.now().isoformat()
+                lf.write("\n" + sep + "\n")
+                lf.write("[" + now_iso + "] Launch: " + tid + "\n")
+                lf.write("cmd: " + " ".join(cmd) + "\n")
+                lf.write("cwd: " + cwd + "\n")
+                lf.write("DISPLAY: " + str(env.get("DISPLAY", "(none)")) + "\n")
         except OSError:
             pass
 

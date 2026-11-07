@@ -8,6 +8,14 @@ local notifications = require("core.notifications")
 local jobs       = require("core.jobs")
 local term       = require("core.terminal_overlay")
 
+-- Named gamepad button → numeric id for terminal overlay routing.
+-- NOTE: Lua does NOT allow ({...}[key]) — must be a named local first.
+local GAMEPAD_TO_ID = {
+    a = 0, b = 1, x = 2, y = 3,
+    leftshoulder = 4, rightshoulder = 5,
+    back = 6, start = 7,
+}
+
 function love.load()
     config.load()
     theme.apply(config.get("theme", "cyberpunk"))
@@ -17,21 +25,21 @@ function love.load()
         inputdbg.dump_joysticks()
     end
 
-    sm.register("bootanim",   require("scenes.bootanim"))
-    sm.register("intro",      require("scenes.intro"))
-    sm.register("nexus",      require("scenes.nexus"))
-    sm.register("hub_forge",  require("scenes.hub_forge"))
-    sm.register("hub_session",require("scenes.hub_session"))
-    sm.register("hub_uplink", require("scenes.hub_uplink"))
-    sm.register("hub_media",  require("scenes.hub_media"))
-    sm.register("hub_iptv",   require("scenes.hub_iptv"))
+    sm.register("bootanim",     require("scenes.bootanim"))
+    sm.register("intro",        require("scenes.intro"))
+    sm.register("nexus",        require("scenes.nexus"))
+    sm.register("hub_forge",    require("scenes.hub_forge"))
+    sm.register("hub_session",  require("scenes.hub_session"))
+    sm.register("hub_uplink",   require("scenes.hub_uplink"))
+    sm.register("hub_media",    require("scenes.hub_media"))
+    sm.register("hub_iptv",     require("scenes.hub_iptv"))
     sm.register("hub_workshop", require("scenes.hub_workshop"))
-    sm.register("hub_toolbox",require("scenes.hub_toolbox"))
-    sm.register("hub_mapps",  require("scenes.hub_mapps"))
+    sm.register("hub_toolbox",  require("scenes.hub_toolbox"))
+    sm.register("hub_mapps",    require("scenes.hub_mapps"))
     sm.register("hub_settings", require("scenes.hub_settings"))
-    sm.register("hub_info",   require("scenes.hub_info"))
+    sm.register("hub_info",     require("scenes.hub_info"))
     sm.register("hub_external", require("scenes.hub_external"))
-    sm.register("hub_stub",   require("scenes.hub_stub"))
+    sm.register("hub_stub",     require("scenes.hub_stub"))
 
     sm.switch("intro", { duration = 2.0 })
 
@@ -47,9 +55,9 @@ end
 
 function love.draw()
     sm.draw()
-    local chrome = require("core.chrome")
-    local theme_mod = require("theme.loader")
-    notifications.draw(theme_mod.get(), chrome.HEADER_H)
+    local chrome_mod = require("core.chrome")
+    local theme_mod  = require("theme.loader")
+    notifications.draw(theme_mod.get(), chrome_mod.HEADER_H)
     local W, H = love.graphics.getDimensions()
     term.draw(W, H)
 end
@@ -78,10 +86,8 @@ function love.keypressed(key, sc, isrepeat)
 end
 
 function love.gamepadpressed(joystick, button)
-    -- Route to overlay first
-    local btn_id = ({a=0, b=1, x=2, y=3,
-                    leftshoulder=4, rightshoulder=5,
-                    back=6, start=7}[button])
+    -- Route to terminal overlay first (if open)
+    local btn_id = GAMEPAD_TO_ID[button]
     if btn_id and term.joystickpressed(joystick, btn_id) then return end
 
     local logical = input.GAMEPAD_NAMES[button]
@@ -90,9 +96,7 @@ end
 
 function love.joystickpressed(joystick, button)
     if joystick:isGamepad() then return end
-    -- Raw fallback for unmapped joysticks
-    local map = input.JOYBTN_FALLBACK
-    local logical = map[button]
+    local logical = input.JOYBTN_FALLBACK[button]
     if logical then input.press(logical, "joybtn:" .. button) end
 end
 
