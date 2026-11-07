@@ -134,22 +134,22 @@ def _tail_log(path, n=12):
         return ""
 
 def h_xfce_launch(args):
-    """Launch XFCE on PC inside Xephyr. Returns detailed error on failure."""
+    """Launch XFCE on PC inside Xephyr. Robust against slow first start."""
     if IS_DEVICE:
-        return {"ok": True, "note": "device: launch via VoidDesk chroot (Sprint 2)"}
+        return {"ok": True, "note": "device: launch via chroot (Sprint 2)"}
 
     import shutil, subprocess, time, os
     if not shutil.which("startxfce4"):
         return {"ok": False, "error": "XFCE not installed — use Install XFCE Desktop first"}
     if not shutil.which("Xephyr"):
-        return {"ok": False, "error": "Xephyr missing — install: sudo apt install xserver-xephyr"}
+        return {"ok": False, "error": "Xephyr missing — sudo apt install xserver-xephyr"}
     if not shutil.which("dbus-run-session") and not shutil.which("dbus-launch"):
-        return {"ok": False, "error": "dbus-run-session missing — install: sudo apt install dbus"}
+        return {"ok": False, "error": "dbus missing — sudo apt install dbus dbus-x11"}
 
-    # Kill stale Xephyr on :99
+    # Kill stale Xephyr :99
     subprocess.run(["pkill", "-f", "Xephyr :99"],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-    time.sleep(0.5)
+    time.sleep(0.6)
 
     log_path = APP_DIR / "data" / "xfce_pc.log"
     try:
@@ -157,7 +157,7 @@ def h_xfce_launch(args):
     except OSError as e:
         return {"ok": False, "error": f"cannot write log: {e}"}
 
-    # ── 1) Launch Xephyr ──
+    # ── 1) Start Xephyr ──
     try:
         xephyr = subprocess.Popen(
             ["Xephyr", ":99",
@@ -168,132 +168,81 @@ def h_xfce_launch(args):
             preexec_fn=os.setsid)
     except Exception as e:
         log_file.close()
-        return {"ok": False, "error": f"Xephyr failed to start: {e}"}
+        return {"ok": False, "error": f"Xephyr failed: {e}"}
     _XFCE_PROCS.append(("xephyr", xephyr))
 
-    # ── 2) Wait for X11 socket ──
+    # ── 2) Wait for X11 socket (up to 15s) ──
     sock = "/tmp/.X11-unix/X99"
     ready = False
-    for _ in range(60):  # 6s max
+    for _ in range(150):
         if os.path.exists(sock):
             ready = True
             break
         if xephyr.poll() is not None:
             log_file.close()
-            return {"ok": False,
-                    "error": "Xephyr exited: " + _tail_log(log_path, 8)}
+            return {"ok": False, "error": "Xephyr exited: " + _tail_log(log_path, 8)}
         time.sleep(0.1)
     if not ready:
         try: xephyr.terminate()
-        except Exception: pass
+        except: pass
         log_file.close()
-        return {"ok": False,
-                "error": "Xephyr socket /tmp/.X11-unix/X99 never appeared (maybe :99 busy)"}
+        return {"ok": False, "error": "X11 socket :99 never appeared (is :99 busy?)"}
 
-    time.sleep(0.4)  # let X settle
+    time.sleep(0.6)
 
     # ── 3) Launch XFCE with dbus session ──
     env = os.environ.copy()
     env["DISPLAY"] = ":99"
-    # Remove our pygame-specific vars that might confuse GTK
     for k in ("SDL_VIDEODRIVER", "VOIDDESK_PC", "VOIDDESK_APP_DIR"):
         env.pop(k, None)
 
-    cmd = ["dbus-run-session", "--", "startxfce4"]
-    if not shutil.which("dbus-run-session"):
-        # fallback to dbus-launch shim
+    if shutil.which("dbus-run-session"):
+        cmd = ["dbus-run-session", "--", "startxfce4"]
+    elif shutil.which("dbus-launch"):
         cmd = ["dbus-launch", "startxfce4"]
+    else:
+        cmd = ["xfce4-session"]
 
     try:
-        xfce = subprocess.Popen(
-            cmd, env=env,
-            stdout=log_file, stderr=log_file,
-            preexec_fn=os.setsid)
+        xfce = subprocess.Popen(cmd, env=env,
+                                stdout=log_file, stderr=log_file,
+                                preexec_fn=os.setsid)
     except Exception as e:
         log_file.close()
         try: xephyr.terminate()
-        except Exception: pass
-        return {"ok": False, "error": f"startxfce4 failed: {e}"}
+        except: pass
+        return {"ok": False, "error": f"launch failed: {e}"}
     _XFCE_PROCS.append(("xfce", xfce))
 
-    # ── 4) Wait for xfce4-panel to appear (or fail) ──
-    for _ in range(100):  # 10s
+    # ── 4) Detect xfce4-session process (fast, not panel) ──
+    for _ in range(300):  # 30s
         if xfce.poll() is not None:
             log_file.close()
             return {"ok": False,
-                    "error": "XFCE exited immediately — log: " + _tail_log(log_path, 12)}
-        r = subprocess.run(["pgrep", "-f", "xfce4-panel"],
+                    "error": "XFCE exited — log: " + _tail_log(log_path, 12)}
+        r = subprocess.run(["pgrep", "-x", "xfce4-session"],
                            stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL, check=False)
         if r.returncode == 0:
             log_file.close()
             return {"ok": True,
-                    "note": "XFCE running in the 'VoidDesk XFCE (PC)' window",
+                    "note": "XFCE running in the Xephyr window",
                     "xfce_pid": xfce.pid,
                     "xephyr_pid": xephyr.pid,
                     "log": str(log_path)}
         time.sleep(0.1)
 
+    # Process still alive but session not detected → accept it
+    if xfce.poll() is None:
+        log_file.close()
+        return {"ok": True,
+                "note": "XFCE process running (session warmup in progress)",
+                "xfce_pid": xfce.pid,
+                "xephyr_pid": xephyr.pid,
+                "log": str(log_path)}
+
     log_file.close()
-    return {"ok": True,
-            "note": "XFCE running (panel not detected yet — may be slow to start)",
-            "xfce_pid": xfce.pid,
-            "xephyr_pid": xephyr.pid,
-            "log": str(log_path)}
-
-
-def h_session_list(args):
-    import shutil
-    xfce_inst = (shutil.which("startxfce4") is not None) if not IS_DEVICE else True
-    return {"ok": True, "sessions": [
-        {"id": "xfce",  "name": "XFCE",  "installed": xfce_inst},
-        {"id": "icewm", "name": "IceWM", "installed": False},
-        {"id": "lxde",  "name": "LXDE",  "installed": False},
-    ]}
-
-def h_session_launch(args):
-    sid = args.get("id", "xfce")
-    if sid == "xfce":
-        return h_xfce_launch(args)
-    return {"ok": False, "error": f"{sid} not yet supported on this platform"}
-
-def h_wifi_scan(args):
-    if not IS_DEVICE:
-        return {"ok": False, "reason": "device-only", "networks": []}
-    import subprocess
-    try:
-        out = subprocess.check_output(["iwlist", "wlan0", "scan"],
-                                       stderr=subprocess.DEVNULL,
-                                       text=True, timeout=15)
-        nets, cur = [], {}
-        for line in out.splitlines():
-            line = line.strip()
-            if "ESSID:" in line:
-                cur["ssid"] = line.split(":", 1)[1].strip().strip('"')
-                nets.append(cur); cur = {}
-            elif "Signal level=" in line:
-                try: cur["signal"] = line.split("=")[1].split(" ")[0]
-                except Exception: pass
-        return {"ok": True, "networks": nets}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200], "networks": []}
-
-def h_bt_scan(args):
-    import shutil, subprocess
-    if not shutil.which("bluetoothctl"):
-        return {"ok": False, "reason": "no bluetoothctl", "devices": []}
-    try:
-        out = subprocess.check_output(["bluetoothctl", "devices"],
-                                       stderr=subprocess.DEVNULL,
-                                       text=True, timeout=10)
-        devs = []
-        for line in out.splitlines():
-            parts = line.split(" ", 2)
-            if len(parts) >= 3 and parts[0] == "Device":
-                devs.append({"mac": parts[1], "name": parts[2]})
-        return {"ok": True, "devices": devs}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200], "devices": []}
+    return {"ok": False, "error": "XFCE never started — log: " + _tail_log(log_path, 12)}
 
 
 HANDLERS = {
@@ -301,6 +250,11 @@ HANDLERS = {
     "get_config": h_get_config,
     "set_config": h_set_config,
     "system_info": h_system_info,
+    "network_status": h_network_status,
+    "system_status": h_system_status,
+    "media_status": h_media_status,
+    "hotspot_toggle": h_hotspot_toggle,
+
     "session_list": h_session_list,
     "session_launch": h_session_launch,
     "wifi_scan": h_wifi_scan,

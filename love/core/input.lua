@@ -38,7 +38,6 @@ input.KEYMAP = {
     ["e"] = "l2", ["r"] = "r2",
     ["tab"] = "select",
     [" "] = "start",
-    ["escape"] = "menu", ["m"] = "menu",
 }
 
 -- SDL gamepad named buttons → logical

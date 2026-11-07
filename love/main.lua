@@ -4,6 +4,7 @@ local config     = require("core.config")
 local theme      = require("theme.loader")
 local input      = require("core.input")
 local inputdbg   = require("core.input_debug")
+local notifications = require("core.notifications")
 
 function love.load()
     config.load()
@@ -32,10 +33,14 @@ end
 function love.update(dt)
     sm.update(dt)
     bridge.poll()
+    notifications.update()
 end
 
 function love.draw()
     sm.draw()
+    local chrome = require("core.chrome")
+    local theme = require("theme.loader")
+    notifications.draw(theme.get(), chrome.HEADER_H)
 end
 
 -- ─── KEYBOARD ──────────────────────────────────────────────
@@ -43,6 +48,14 @@ function love.keypressed(key, sc, isrepeat)
     if isrepeat then return end
     if key == "f11" then
         love.window.setFullscreen(not love.window.getFullscreen())
+        return
+    end
+    if key == "m" then
+        notifications.toggle()
+        return
+    end
+    if key == "escape" then
+        input.press("b", "key:escape")
         return
     end
     local logical = input.KEYMAP[key]

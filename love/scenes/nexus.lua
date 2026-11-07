@@ -207,6 +207,21 @@ local function build_bodies()
     return out
 end
 
+local function build_comet_tail(b, N)
+    N = N or 24
+    local samples = {}
+    local orbit_r = RING_RADII[b.node.ring] or 240
+    for i = 0, N do
+        local ang = (b.angle or 0) - i * 0.055
+        samples[i+1] = {
+            x = 320 + math.cos(ang) * orbit_r,
+            y = 240 + math.sin(ang) * orbit_r * SQUASH,
+            t = i / N,
+        }
+    end
+    return samples
+end
+
 local function compute_positions()
     for _, b in ipairs(bodies) do
         if b.node.type == "sun" then
@@ -264,7 +279,7 @@ function nexus.enter(args)
             else
                 warp.target_scene = "hub_stub"; warp.use_stub=true; warp.quit=false
             end
-        elseif action == "b" or action == "menu" then
+        elseif action == "b" then
             love.event.quit()
         end
     end)
@@ -394,20 +409,26 @@ function nexus.draw()
         local c = b.color
         local rr = b.r * scl
 
+        -- Light direction: from sun (320,240) toward body
+        local lx = 320 - b.x
+        local ly = 240 - b.y
+        local llen = math.sqrt(lx*lx + ly*ly)
+        if llen > 0 then lx, ly = lx/llen, ly/llen end
+
         if b.node.type == "sun" then
             planet.draw_sun(b.x, b.y, rr, c, time)
         elseif b.node.type == "satellite" then
             planet.draw_satellite(b.x, b.y, rr, c, time)
         elseif b.node.type == "comet" then
-            planet.draw_comet(b.x, b.y, rr, c, time, b)
+            local samples = build_comet_tail(b, 24)
+            planet.draw_comet(b.x, b.y, rr, c, time, b, samples)
         else
             planet.draw_planet(b.x, b.y, rr, c, time, {
                 ring = b.node.ring_kind,
-                ring_tilt = b.node.ring_tilt,
                 moon = b.node.moon,
                 rot_speed = b.node.rot_speed,
                 surface = b.node.surface or "gas_bands",
-            }, b)
+            }, b, lx, ly)
         end
 
         if b.icon and b.node.type ~= "sun" then
