@@ -14,6 +14,14 @@ import traceback
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent.parent
+
+# ── IPTV module import ──
+try:
+    import iptv_module
+    iptv_module.APP_DIR = APP_DIR
+except ImportError:
+    iptv_module = None
+
 DATA    = APP_DIR / "data"
 REQ     = DATA / ".love_request.json"
 RESP    = DATA / ".love_response.json"
@@ -340,12 +348,125 @@ def h_toolbox_stats(args):
             "apps_count": len(apps)}
 
 
+# ── IPTV handlers ──────────────────────────────────────────────────
+_iptv_cache = {"playlist": None, "playlist_url": None,
+               "epg": None, "epg_urls": []}
+
+def h_iptv_load_playlist(args):
+    if iptv_module is None:
+        return {"ok": False, "error": "iptv module not available"}
+    url = args.get("url", "").strip()
+    if not url:
+        return {"ok": False, "error": "no URL provided"}
+    try:
+        text = iptv_module.fetch_text(url)
+        data = iptv_module.parse_m3u(text)
+        _iptv_cache["playlist"] = data
+        _iptv_cache["playlist_url"] = url
+        return {"ok": True,
+                "channels": data["channels"],
+                "groups": data["groups"],
+                "epg_urls": data["epg_urls"],
+                "count": len(data["channels"])}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+def h_iptv_load_epg(args):
+    if iptv_module is None:
+        return {"ok": False, "error": "iptv module not available"}
+    urls = args.get("urls", [])
+    if not urls and _iptv_cache.get("playlist"):
+        urls = _iptv_cache["playlist"].get("epg_urls", [])
+    if not urls:
+        return {"ok": False, "error": "no EPG URLs"}
+    merged = {}
+    errors = []
+    for u in urls:
+        try:
+            data = iptv_module.fetch_bytes(u)
+            parsed = iptv_module.parse_xmltv(data)
+            for k, progs in parsed.items():
+                merged.setdefault(k, []).extend(progs)
+            # limit total to avoid memory blowup
+            if sum(len(v) for v in merged.values()) > 8000:
+                break
+        except Exception as e:
+            errors.append({"url": u, "error": str(e)[:120]})
+    for progs in merged.values():
+        progs.sort(key=lambda p: p["start"])
+    _iptv_cache["epg"] = merged
+    _iptv_cache["epg_urls"] = urls
+    return {"ok": True, "loaded": len(urls) - len(errors),
+            "errors": errors, "channels_with_epg": len(merged)}
+
+def h_iptv_epg_for(args):
+    if iptv_module is None or not _iptv_cache.get("epg"):
+        return {"ok": True, "now": None, "next": None}
+    channel = args.get("channel", {})
+    cur, nxt = iptv_module.epg_now_next(_iptv_cache["epg"], channel)
+    return {"ok": True, "now": cur, "next": nxt}
+
+def h_iptv_play(args):
+    if iptv_module is None:
+        return {"ok": False, "error": "iptv module not available"}
+    url = args.get("url", "")
+    name = args.get("name", "stream")
+    ok = iptv_module.play(url, name)
+    return {"ok": ok, "state": iptv_module.status()["state"],
+            "error": iptv_module.status().get("error", "")}
+
+def h_iptv_stop(args):
+    if iptv_module is None:
+        return {"ok": False, "error": "iptv module not available"}
+    iptv_module.stop()
+    return {"ok": True}
+
+def h_iptv_status(args):
+    if iptv_module is None:
+        return {"ok": True, "state": "idle", "channel": None}
+    return {"ok": True, **iptv_module.status()}
+
+def h_iptv_get_config(args):
+    cfg_path = APP_DIR / "data" / "iptv_config.json"
+    default = {
+        "playlist_url": "https://iptv-org.github.io/iptv/countries/it.m3u",
+        "epg_urls": [],
+        "last_channel_url": "",
+    }
+    try:
+        with open(cfg_path) as f:
+            data = json.load(f)
+            for k, v in default.items(): data.setdefault(k, v)
+            return {"ok": True, "config": data}
+    except Exception:
+        return {"ok": True, "config": default}
+
+def h_iptv_save_config(args):
+    cfg_path = APP_DIR / "data" / "iptv_config.json"
+    cfg = args.get("config", {})
+    try:
+        with open(cfg_path, "w") as f:
+            json.dump(cfg, f, indent=1)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
     "set_config": h_set_config,
     "system_info": h_system_info,
     "network_status": h_network_status,
+    "iptv_load_playlist": h_iptv_load_playlist,
+    "iptv_load_epg": h_iptv_load_epg,
+    "iptv_epg_for": h_iptv_epg_for,
+    "iptv_play": h_iptv_play,
+    "iptv_stop": h_iptv_stop,
+    "iptv_status": h_iptv_status,
+    "iptv_get_config": h_iptv_get_config,
+    "iptv_save_config": h_iptv_save_config,
+
     "system_status": h_system_status,
     "media_status": h_media_status,
     "hotspot_toggle": h_hotspot_toggle,
