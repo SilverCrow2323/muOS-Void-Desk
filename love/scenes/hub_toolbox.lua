@@ -84,7 +84,7 @@ return dashboard.new({
           action = function(scene) scene.set_status("Notes: coming soon"); return "Notes" end },
         { badge = "F", label = "File manager",
           desc = "Browse SD, copy, delete",
-          action = function(scene) scene.set_status("Files: coming soon"); return "Files" end },
+          action = function(scene) return ext.launch("file_gd_x") or "Launching File-GD X..."; },
         { badge = "E", label = "Text editor",
           desc = "VOID EDIT — D-pad native",
           action = function(scene) scene.set_status("Editor: coming soon"); return "Editor" end },

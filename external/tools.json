@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "tools": [
     {
       "id": "voidcast",
@@ -32,24 +32,9 @@
       ]
     },
     {
-      "id": "file_grid_diver",
-      "name": "File Grid-Diver XX",
-      "desc": "File manager, disk analyzer, duplicate finder, app catalog",
-      "native_engine": "py",
-      "hub": "toolbox",
-      "launcher_type": "sh",
-      "launcher": "external/File-Grid-Diver-XX/mux_launch.sh",
-      "icon": "folder",
-      "color": [
-        0.37,
-        0.82,
-        0.55
-      ]
-    },
-    {
       "id": "file_gd_x",
       "name": "File-GD X",
-      "desc": "L\u00d6VE dual-pane file manager with diagnostics",
+      "desc": "Definitive dual-pane file manager: archives, undo, trash, editor, diagnostics",
       "native_engine": "love",
       "hub": "toolbox",
       "launcher_type": "love",
@@ -74,21 +59,6 @@
         0.31,
         0.8,
         1.0
-      ]
-    },
-    {
-      "id": "prototypes_lab",
-      "name": "Prototypes Lab",
-      "desc": "Experimental L\u00d6VE apps and diagnostics collection",
-      "native_engine": "love",
-      "hub": "workshop",
-      "launcher_type": "love",
-      "launcher": "external/muos-prototypes",
-      "icon": "gear",
-      "color": [
-        0.94,
-        0.35,
-        0.24
       ]
     }
   ]

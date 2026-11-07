@@ -106,14 +106,14 @@ class ToolboxHub(HubMixin):
                     ext_filter={".py"}, pick=run_and_open)
 
     def fileman(self):
-        """File manager."""
-        app = self.app
-        try:
-            app.play_files_intro()
-        except Exception as e:
-            sys.stderr.write(
-                "bootanim files failed: %s\n" % e)
-        app.fm_open()
+        """Launch File-GD X (definitive LÖVE file manager).
+
+        File-GD X is a standalone LÖVE app living in external/muos-prototypes.
+        It's launched engine-agnostically via external/tools.json so the
+        SAME binary is used from Pygame and LÖVE.
+        """
+        self.app.launch_external_tool("file_gd_x")
+
 
     def ftp(self):
         """FTP client."""
