@@ -47,22 +47,22 @@ return dashboard.new({
     end,
 
     items = {
-        { badge = "A", label = "About VoidDesk",
+        { icon = "info", label = "About VoidDesk",
           desc = "Version, credits, ecosystem",
           action = function(scene)
               scene.set_status("VoidDesk v10.5.1 · LÖVE 11.5 · SPDW Factory")
               return "About"
           end },
-        { badge = "M", label = "Controls guide",
+        { icon = "gamepad", label = "Controls guide",
           desc = "D-pad, A, B, M and gestures",
           action = function(scene)
               scene.set_status("D-pad: navigate  ·  A: open  ·  B: back  ·  M: notifications")
               return "Controls guide"
           end },
-        { badge = "P", label = "Platform check",
+        { icon = "refresh", label = "Platform check",
           desc = "Refresh OS/machine/IP info",
           action = function(scene) refresh(scene); return "Refreshing..." end },
-        { badge = "<", label = "Back",
+        { icon = "back", label = "Back",
           desc = "Return to Nexus",
           action = function() sm.switch("nexus", {}) end },
     },

@@ -491,7 +491,9 @@ def h_list_external(args):
     return {"ok": True, "tools": out}
 
 def h_launch_external(args):
-    import subprocess, os as _os
+    """Launch a tool by id. Logs everything to data/external_launch.log."""
+    import subprocess, os as _os, shutil, time
+    from datetime import datetime
     tid = args.get("id", "")
     data = _load_external_tools()
     tool = None
@@ -502,64 +504,114 @@ def h_launch_external(args):
     if not tool:
         return {"ok": False, "error": f"unknown tool: {tid}"}
 
-    path = _resolve_path(tool.get("path", ""))
-    if not path.exists():
+    lpath = _resolve_external_path(tool.get("launcher", ""))
+    if not lpath.exists():
         return {"ok": False,
-                "error": f"tool not found: {path} (run git clone)"}
+                "error": f"not installed: {lpath}",
+                "hint": "run: cd external && git clone <repo>"}
 
-    engine = tool.get("engine", "py")
-    launcher = tool.get("launcher", "")
+    ltype = tool.get("launcher_type", "sh")
+    log_path = APP_DIR / "data" / "external_launch.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    env = dict(_os.environ)
+    env.pop("SDL_VIDEODRIVER", None)
 
     try:
-        if launcher:
-            lp = _resolve_path(launcher)
-            if not lp.is_file():
-                return {"ok": False, "error": f"launcher missing: {lp}"}
-            # Determine how to run it
-            if lp.suffix == ".sh":
-                cmd = ["sh", str(lp)]
-            else:
-                cmd = [str(lp)]
-            proc = subprocess.Popen(cmd, cwd=str(lp.parent),
-                                    stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL,
-                                    start_new_session=True)
-            _EXTERNAL_PROCS.append((tid, proc))
-            return {"ok": True,
-                    "note": f"launched {tid}",
-                    "pid": proc.pid}
-        else:
-            # engine=love, no launcher: run love on the folder
-            import shutil
+        if ltype == "sh":
+            cmd = ["sh", str(lpath)]
+            cwd = str(lpath.parent)
+        elif ltype == "love":
             love_bin = None
-            for cand in (APP_DIR / "lib" / "love",
-                         Path("/usr/bin/love")):
-                if Path(cand).is_file():
-                    love_bin = str(cand); break
+            for cand in (str(APP_DIR / "lib" / "love"),
+                         "/usr/bin/love",
+                         shutil.which("love") or ""):
+                if cand and Path(cand).is_file() and _os.access(cand, _os.X_OK):
+                    love_bin = cand
+                    break
             if not love_bin:
-                love_bin = shutil.which("love")
-            if not love_bin:
-                return {"ok": False, "error": "LÖVE binary not found"}
-            env = dict(_os.environ)
+                return {"ok": False,
+                        "error": "LOVE binary not found",
+                        "hint": "sudo apt install love (PC) "
+                                "or ensure lib/love is executable (device)"}
             env["LD_LIBRARY_PATH"] = str(APP_DIR / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
-            proc = subprocess.Popen([love_bin, str(path)],
-                                    stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL,
-                                    env=env,
+            env["VOIDDESK_APP_DIR"] = str(APP_DIR)
+            cmd = [love_bin, str(lpath)]
+            cwd = str(lpath.parent)
+        elif ltype == "python":
+            cmd = ["python3", str(lpath)]
+            cwd = str(lpath.parent)
+        else:
+            return {"ok": False, "error": f"unknown launcher_type: {ltype}"}
+
+        # Log headers
+        try:
+            with open(log_path, "a") as lf:
+                lf.write(f"
+{'='*60}
+")
+                lf.write(f"[{datetime.now().isoformat()}] Launch: {tid}
+")
+                lf.write(f"cmd: {' '.join(cmd)}
+")
+                lf.write(f"cwd: {cwd}
+")
+                lf.write(f"DISPLAY: {env.get('DISPLAY', '(none)')}
+")
+        except OSError:
+            pass
+
+        # Spawn with log redirection
+        with open(log_path, "ab") as logf:
+            proc = subprocess.Popen(cmd, cwd=cwd, env=env,
+                                    stdout=logf, stderr=logf,
                                     start_new_session=True)
-            _EXTERNAL_PROCS.append((tid, proc))
-            return {"ok": True, "note": f"launched {tid} (LÖVE)",
-                    "pid": proc.pid}
+        _EXTERNAL_PROCS.append((tid, proc, str(log_path)))
+
+        # Wait 1.5s to detect fast crash
+        time.sleep(1.5)
+        if proc.poll() is not None:
+            # Died fast - read log tail
+            tail = ""
+            try:
+                with open(log_path) as f:
+                    tail = f.read()[-600:]
+            except OSError:
+                pass
+            return {"ok": False,
+                    "error": f"exited in 1.5s (code {proc.returncode})",
+                    "log_tail": tail,
+                    "log_file": str(log_path),
+                    "cmd": " ".join(cmd),
+                    "cwd": cwd}
+
+        return {"ok": True,
+                "note": f"launched {tool.get('name', tid)}",
+                "pid": proc.pid,
+                "log_file": str(log_path),
+                "cmd": " ".join(cmd)}
     except Exception as e:
         return {"ok": False, "error": str(e)[:200]}
 
+
 def h_external_status(args):
     out = []
-    for tid, proc in _EXTERNAL_PROCS[:]:
+    for entry in _EXTERNAL_PROCS[:]:
+        tid = entry[0]
+        proc = entry[1]
+        log_path = entry[2] if len(entry) > 2 else None
         alive = proc.poll() is None
-        out.append({"id": tid, "pid": proc.pid, "alive": alive})
+        info = {"id": tid, "pid": proc.pid, "alive": alive}
         if not alive:
-            _EXTERNAL_PROCS.remove((tid, proc))
+            info["exit_code"] = proc.returncode
+            if log_path:
+                try:
+                    with open(log_path) as f:
+                        info["log_tail"] = f.read()[-400:]
+                except OSError:
+                    pass
+            _EXTERNAL_PROCS.remove(entry)
+        out.append(info)
     return {"ok": True, "running": out}
 
 

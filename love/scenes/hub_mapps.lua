@@ -72,13 +72,13 @@ return dashboard.new({
         -- Dynamic: shown in menu below. Static "scan" + "back" always.
         -- Apps are rendered manually inside the menu because the list changes.
         return {
-            { badge = "R", label = "Rescan applications",
+            { icon = "refresh", label = "Rescan applications",
               desc = "Search again MUOS/application folder",
               action = function(scene) refresh(scene, false); return "Rescanning..." end },
-            { badge = "L", label = "Launch selected app",
+            { icon = "play", label = "Launch selected app",
               desc = "Run the first app in the list",
               action = function(scene) return launch_app(scene, 1) end },
-            { badge = "<", label = "Back",
+            { icon = "back", label = "Back",
               desc = "Return to Nexus",
               action = function() sm.switch("nexus", {}) end },
         }

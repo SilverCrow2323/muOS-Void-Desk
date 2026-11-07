@@ -8,6 +8,7 @@ local nodes   = require("core.nodes")
 local anim    = require("core.anim")
 local bg_anim = require("core.bg_anim")
 local widgets = require("core.widgets")
+local icon    = require("core.icon")
 
 local M = {}
 
@@ -19,6 +20,7 @@ function M.new(config)
     local bg_kind = bg_anim.for_node(config.node_idx or 0)
     local t_enter = 0
     local selected = 1
+    local scroll_offset = 0     -- NEW: scroll position
     local status_msg = config.status or "Ready"
 
     local widget_h = config.widget_height or 150
@@ -28,26 +30,49 @@ function M.new(config)
     scene._data = {}
 
     local menu_top = chrome.HEADER_H + widget_h + 10
-    local row_h = 32
+    local menu_bottom = 480 - chrome.FOOTER_H - 34
+    local row_h = config.row_height or 38
     local status_font = font.regular(11) or love.graphics.newFont(11)
+
+    local function get_live_items()
+        if scene._get_items then
+            local ok, res = pcall(scene._get_items)
+            if ok and type(res) == "table" then return res end
+        end
+        return items
+    end
+
+    local function ensure_visible()
+        local live = get_live_items()
+        local visible_rows = math.max(1, math.floor((menu_bottom - menu_top) / row_h))
+        if selected < 1 then selected = 1 end
+        if selected > #live then selected = #live end
+        -- keep selected inside [scroll_offset+1, scroll_offset+visible_rows]
+        if selected < scroll_offset + 1 then
+            scroll_offset = selected - 1
+        elseif selected > scroll_offset + visible_rows then
+            scroll_offset = selected - visible_rows
+        end
+        local max_offset = math.max(0, #live - visible_rows)
+        scroll_offset = math.max(0, math.min(scroll_offset, max_offset))
+    end
 
     function scene.enter(args)
         selected = 1
+        scroll_offset = 0
         t_enter = 0
         status_msg = config.status or "Ready"
         scene._t = 0
         if on_enter then on_enter(scene, args) end
         input.clear()
         input.on("press", function(action)
-            local live = items
-            if scene._get_items then
-                local ok, res = pcall(scene._get_items)
-                if ok and type(res) == "table" then live = res end
-            end
+            local live = get_live_items()
             if action == "up" then
                 selected = math.max(1, selected - 1)
+                ensure_visible()
             elseif action == "down" then
                 selected = math.min(#live, selected + 1)
+                ensure_visible()
             elseif action == "a" then
                 local item = live[selected]
                 if item and item.action then
@@ -75,46 +100,72 @@ function M.new(config)
 
         love.graphics.clear(0, 0, 0, 1)
 
-        -- Background animation
         local bg_a = math.min(1, t_enter * 2.5)
         if bg_a > 0.02 then
-            bg_anim.draw(bg_kind, W, H, love.timer.getTime(), node_color, bg_a * 0.65)
+            bg_anim.draw(bg_kind, W, H, love.timer.getTime(), node_color, bg_a * 0.55)
         end
 
-        -- Widget area (entrance from 0.1 to 0.5 of t_enter)
+        -- Widget area
         local w_t = math.max(0, math.min(1, (t_enter - 0.10) / 0.40))
         if w_t > 0.02 and widgets_draw then
             widgets_draw(scene, w_t)
         end
 
-        -- Menu (staggered, starts at 0.30)
-        local live_items = items
-        if scene._get_items then
-            local ok, res = pcall(scene._get_items)
-            if ok and type(res) == "table" then live_items = res end
-        end
-        for i, item in ipairs(live_items) do
-            local delay = 0.30 + (i - 1) * 0.05
+        -- Menu with SCROLLING
+        local live = get_live_items()
+        local visible_rows = math.max(1, math.floor((menu_bottom - menu_top) / row_h))
+
+        -- Clip region for menu (prevent overflow)
+        love.graphics.setScissor(0, menu_top - 2, W, menu_bottom - menu_top + 4)
+
+        for i = 1, visible_rows do
+            local idx = scroll_offset + i
+            if idx > #live then break end
+            local item = live[idx]
+            local delay = 0.30 + (i - 1) * 0.04
             local it = math.max(0, math.min(1, (t_enter - delay) / 0.25))
             if it > 0.01 then
-                local y = menu_top + (i - 1) * row_h + (1 - it) * 12
-                widgets.menu_row(16, y, W - 32, row_h - 2,
-                                  item.badge or "?", item.label or "",
-                                  item.desc, i == selected, th, node_color, it)
+                local y = menu_top + (i - 1) * row_h + (1 - it) * 10
+                widgets.menu_row(16, y, W - 32, row_h - 2, {
+                    icon = item.icon,
+                    badge = item.badge,
+                    label = item.label or "",
+                    desc = item.desc,
+                    value = item.value,
+                    value_color = item.value_color,
+                    chevron = item.chevron ~= false and not item.value,
+                    selected = (idx == selected),
+                    theme = th,
+                    node_color = node_color,
+                    alpha = it,
+                })
             end
+        end
+
+        love.graphics.setScissor()
+
+        -- Scroll indicators
+        if scroll_offset > 0 then
+            -- up arrow at top of menu
+            love.graphics.setColor(node_color[1], node_color[2], node_color[3], 0.6)
+            pcall(icon.draw, "arrow_up", W - 26, menu_top - 4, 16, node_color, { alpha = 0.6 })
+        end
+        if scroll_offset + visible_rows < #live then
+            love.graphics.setColor(node_color[1], node_color[2], node_color[3], 0.6)
+            pcall(icon.draw, "arrow_down", W - 26, menu_bottom - 14, 16, node_color, { alpha = 0.6 })
         end
 
         -- Status panel
         local st = math.max(0, math.min(1, (t_enter - 0.55) / 0.30))
         if st > 0.01 then
-            local sy = H - chrome.FOOTER_H - 32
+            local sy = H - chrome.FOOTER_H - 30
             love.graphics.setColor(th.panel_bg[1], th.panel_bg[2], th.panel_bg[3], 0.92 * st)
-            love.graphics.rectangle("fill", 12, sy, W - 24, 26, 4)
+            love.graphics.rectangle("fill", 12, sy, W - 24, 24, 4)
             love.graphics.setColor(node_color[1], node_color[2], node_color[3], 0.6 * st)
-            love.graphics.rectangle("line", 12, sy, W - 24, 26, 4)
+            love.graphics.rectangle("line", 12, sy, W - 24, 24, 4)
             love.graphics.setFont(status_font)
             love.graphics.setColor(th.text[1], th.text[2], th.text[3], 0.92 * st)
-            love.graphics.print("> " .. status_msg, 20, sy + 7)
+            love.graphics.print("> " .. status_msg, 20, sy + 6)
         end
 
         -- Chrome
@@ -130,7 +181,8 @@ function M.new(config)
                     { icon = "btn_a", label = "Run" },
                     { icon = "btn_b", label = "Back" },
                 },
-                right_text = "v10.5.1",
+                right_text = string.format("%d/%d  v10.5.1",
+                    selected, #live),
             })
         end
 

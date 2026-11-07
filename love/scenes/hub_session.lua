@@ -94,7 +94,7 @@ return dashboard.new({
     end,
 
     items = {
-        { badge = "X", label = "Launch XFCE Desktop",
+        { icon = "start", label = "Launch XFCE Desktop",
           desc = "Full desktop environment (with boot animation)",
           action = function(scene)
               if not installed("xfce") then
@@ -103,7 +103,7 @@ return dashboard.new({
               end
               return play_bootanim_and_launch(scene, "xfce", "XFCE")
           end },
-        { badge = "+", label = "Install XFCE Desktop",
+        { icon = "plus", label = "Install XFCE Desktop",
           desc = "Auto-install on PC via pkexec (sudo prompt)",
           action = function(scene)
               scene.set_status("Installing XFCE (may prompt sudo)...")
@@ -117,16 +117,16 @@ return dashboard.new({
               end)
               return "Installing XFCE..."
           end },
-        { badge = "I", label = "IceWM session",
+        { icon = "window", label = "IceWM session",
           desc = "Light window manager (~10MB RAM)",
           action = function(scene) scene.set_status("IceWM: coming soon"); return "IceWM: coming soon" end },
-        { badge = "L", label = "LXDE session",
+        { icon = "desktop", label = "LXDE session",
           desc = "Lightweight full desktop",
           action = function(scene) scene.set_status("LXDE: coming soon"); return "LXDE: coming soon" end },
-        { badge = "R", label = "Repair desktop image",
+        { icon = "refresh", label = "Repair desktop image",
           desc = "Verify and repair the chroot",
           action = function(scene) scene.set_status("Repair: coming soon"); return "Repair: coming soon" end },
-        { badge = "<", label = "Back",
+        { icon = "back", label = "Back",
           desc = "Return to Nexus",
           action = function() sm.switch("nexus", {}) end },
     },

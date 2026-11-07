@@ -26,7 +26,7 @@ local function items_for(cat)
         local badge_letter = (t.icon or "?"):sub(1,1):upper()
         local native_badge = (t.native_engine == "love") and "LOVE" or "PY"
         table.insert(list, {
-            badge = badge_letter,
+            icon = t.icon or "gear",
             label = t.name .. "  [" .. native_badge .. "]",
             desc = (t.desc or "") .. (t.exists and "" or "  [NOT INSTALLED]"),
             action = function(scene)

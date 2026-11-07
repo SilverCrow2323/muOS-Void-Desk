@@ -69,7 +69,7 @@ return dashboard.new({
     end,
 
     items = {
-        { badge = "I", label = "Install XFCE Desktop",
+        { icon = "pkg", label = "Install XFCE Desktop",
           desc = "Install or repair the desktop chroot",
           action = function(scene)
               scene.set_status("Installing...")
@@ -83,7 +83,7 @@ return dashboard.new({
               end)
               return "Installing..."
           end },
-        { badge = "L", label = "Launch XFCE Desktop",
+        { icon = "play", label = "Launch XFCE Desktop",
           desc = "Open the full desktop now",
           action = function(scene)
               scene.set_status("Launching XFCE...")
@@ -96,7 +96,7 @@ return dashboard.new({
               end)
               return "Launching..."
           end },
-        { badge = "U", label = "Update system",
+        { icon = "refresh", label = "Update system",
           desc = "apt update + upgrade in chroot",
           action = function(scene)
               scene.set_status("Updating...")
@@ -109,13 +109,13 @@ return dashboard.new({
               end)
               return "Updating..."
           end },
-        { badge = "C", label = "Clean apt cache",
+        { icon = "trash", label = "Clean apt cache",
           desc = "Reclaim disk space",
           action = function(scene) scene.set_status("Clean: coming soon"); return "Clean: coming soon" end },
-        { badge = "T", label = "Shell terminal",
+        { icon = "terminal", label = "Shell terminal",
           desc = "Open a terminal with on-screen keyboard",
           action = function(scene) scene.set_status("Terminal: coming soon"); return "Terminal: coming soon" end },
-        { badge = "<", label = "Back",
+        { icon = "back", label = "Back",
           desc = "Return to Nexus",
           action = function() sm.switch("nexus", {}) end },
     },
