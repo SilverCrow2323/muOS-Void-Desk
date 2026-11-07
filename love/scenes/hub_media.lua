@@ -22,7 +22,7 @@ return dashboard.new({
     title = "MEDIA VAULT",
     node_idx = 2,
     widget_height = 128,
-    row_height = 46,
+    row_height = 50,
     status = "Media control center",
 
     on_enter = function(scene) refresh(scene, false) end,

@@ -28,7 +28,7 @@ return dashboard.new({
     title = "UPLINK",
     node_idx = 5,
     widget_height = 158,
-    row_height = 46,
+    row_height = 50,
     status = "Network control",
 
     on_enter = function(scene) refresh(scene, false) end,

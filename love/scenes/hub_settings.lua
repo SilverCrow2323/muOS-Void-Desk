@@ -136,7 +136,7 @@ local scene = dashboard.new({
     title = "SETTINGS",
     node_idx = 7,
     widget_height = 128,
-    row_height = 46,
+    row_height = 50,
     status = "Configuration",
     items = {},
 
