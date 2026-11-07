@@ -76,7 +76,13 @@ end
 
 function crt.toggle()
     crt.enabled = not crt.enabled
-    return crt.enabled
+    -- Aliases: main.lua calls crt.init(), crt.apply(), crt.draw(), crt.render()
+crt.init   = crt.load
+crt.draw   = crt.apply
+crt.render = crt.apply
+crt.setup  = crt.load
+
+return crt.enabled
 end
 
 return crt
