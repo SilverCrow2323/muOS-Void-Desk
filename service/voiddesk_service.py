@@ -245,6 +245,101 @@ def h_xfce_launch(args):
     return {"ok": False, "error": "XFCE never started — log: " + _tail_log(log_path, 12)}
 
 
+def _muos_app_roots():
+    import os
+    env = os.environ.get("VD_MUOS_APP_ROOTS",
+                          "/mnt/mmc/MUOS/application:/mnt/sdcard/MUOS/application")
+    return [p for p in env.split(":") if os.path.isdir(p)]
+
+def _scan_muos_apps():
+    import os
+    apps = []
+    srcs = []
+    for root in _muos_app_roots():
+        srcs.append(root)
+        try:
+            for name in sorted(os.listdir(root)):
+                full = os.path.join(root, name)
+                if not os.path.isdir(full):
+                    continue
+                # App must have a mux_launch.sh or similar
+                has_launcher = False
+                for fn in ("mux_launch.sh", "launch.sh", "run.sh", "start.sh"):
+                    if os.path.isfile(os.path.join(full, fn)):
+                        has_launcher = True
+                        break
+                if has_launcher:
+                    apps.append({
+                        "name": name,
+                        "path": full,
+                        "source": root,
+                    })
+        except OSError:
+            continue
+    return apps, ":".join(srcs) if srcs else "(no MUOS/application dirs found)"
+
+def h_list_muos_apps(args):
+    apps, src = _scan_muos_apps()
+    if not apps and not IS_DEVICE:
+        return {"ok": False,
+                "error": "device-only: no muOS application folder on PC",
+                "apps": [],
+                "source": "/mnt/mmc/MUOS/application (device only)",
+                "reason": "device-only"}
+    return {"ok": True, "apps": apps, "source": src}
+
+def h_launch_muos_app(args):
+    if not IS_DEVICE:
+        return {"ok": False, "reason": "device-only",
+                "error": "launching muOS apps requires the handheld"}
+    import subprocess, os
+    path = args.get("path", "")
+    name = args.get("name", "app")
+    if not os.path.isdir(path):
+        return {"ok": False, "error": f"invalid path: {path}"}
+    launcher = None
+    for fn in ("mux_launch.sh", "launch.sh", "run.sh", "start.sh"):
+        c = os.path.join(path, fn)
+        if os.path.isfile(c):
+            launcher = c
+            break
+    if not launcher:
+        return {"ok": False, "error": "no launcher found"}
+    try:
+        subprocess.Popen(["sh", launcher], cwd=path,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+        return {"ok": True, "note": f"launched {name}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+def h_toolbox_stats(args):
+    import os, glob
+    data_dir = APP_DIR / "data"
+    notes_count = 0
+    texts_count = 0
+    try:
+        notes_dir = data_dir / "notes"
+        if notes_dir.is_dir():
+            notes_count = sum(1 for _ in notes_dir.iterdir()
+                              if _.suffix == ".txt")
+    except Exception:
+        pass
+    try:
+        texts_dir = data_dir / "Texts"
+        if texts_dir.is_dir():
+            texts_count = sum(1 for _ in texts_dir.iterdir()
+                              if _.is_file())
+    except Exception:
+        pass
+    apps, _ = _scan_muos_apps()
+    return {"ok": True,
+            "notes_count": notes_count,
+            "text_files": texts_count,
+            "apps_count": len(apps)}
+
+
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
@@ -256,6 +351,10 @@ HANDLERS = {
     "hotspot_toggle": h_hotspot_toggle,
 
     "session_list": h_session_list,
+    "list_muos_apps": h_list_muos_apps,
+    "launch_muos_app": h_launch_muos_app,
+    "toolbox_stats":   h_toolbox_stats,
+
     "session_launch": h_session_launch,
     "wifi_scan": h_wifi_scan,
     "bt_scan": h_bt_scan,

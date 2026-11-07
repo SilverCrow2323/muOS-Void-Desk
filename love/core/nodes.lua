@@ -39,9 +39,9 @@ nodes.LIST = {
 
     { idx=4, name="TOOLBOX", icon="toolbox", ring=3,
       type="planet", size=14, surface="rocky_craters",
-      ring_kind="saturn_thick", moon=true, rot_speed=0.8, scene="hub_stub" },
+      ring_kind="saturn_thick", moon=true, rot_speed=0.8, scene="hub_toolbox" },
     { idx=1, name="MUOS APPS", icon="window", ring=3,
-      type="satellite", size=9, orbit_mult=2.5, scene="hub_stub" },
+      type="satellite", size=9, orbit_mult=2.5, scene="hub_mapps" },
     { idx=7, name="SETTINGS", icon="gear", ring=3,
       type="planet", size=13, surface="gas_bands",
       rot_speed=0.6, scene="hub_settings" },
