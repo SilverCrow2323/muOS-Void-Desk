@@ -1,10 +1,8 @@
--- Job manager (client-side mirror + polling)
 local bridge = require("core.bridge")
 
 local jobs = {}
-jobs.active = {}       -- id -> job (mirror of service)
+jobs.active = {}
 jobs.overlay_open = false
-jobs.overlay_index = 1
 jobs.poll_timer = 0
 jobs.POLL_INTERVAL = 0.6
 
@@ -28,7 +26,7 @@ function jobs.update(dt)
     end
 end
 
-function jobs.start_tool(tool_id, name, hub, color, on_done)
+function jobs.start_tool(tool_id, name, hub, on_done)
     bridge.call("job_start", { tool_id = tool_id, name = name, hub = hub }, function(resp)
         if resp.ok then jobs.refresh() end
         if on_done then on_done(resp) end
@@ -55,7 +53,6 @@ function jobs.get_log(job_id, on_done)
     end)
 end
 
--- Helper: count jobs matching a tool name (for item badge)
 function jobs.count_for_name(name)
     local n = 0
     for _, j in pairs(jobs.active) do
@@ -69,8 +66,8 @@ end
 function jobs.list_active()
     local out = {}
     for _, j in pairs(jobs.active) do
-        if j.status == "running" or j.status == "starting" or j.status == "error"
-            or j.status == "done" then
+        if j.status == "running" or j.status == "starting"
+           or j.status == "error" or j.status == "done" then
             table.insert(out, j)
         end
     end
@@ -90,10 +87,7 @@ end
 
 function jobs.toggle_overlay()
     jobs.overlay_open = not jobs.overlay_open
-    if jobs.overlay_open then
-        jobs.refresh()
-        jobs.overlay_index = 1
-    end
+    if jobs.overlay_open then jobs.refresh() end
 end
 
 return jobs

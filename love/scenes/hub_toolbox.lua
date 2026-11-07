@@ -4,6 +4,7 @@ local sm        = require("core.scene_manager")
 local nodes     = require("core.nodes")
 local widgets   = require("core.widgets")
 local ext       = require("core.external")
+local jobs      = require("core.jobs")
 
 local state = { uptime_s = 0, ram_pct = 0, notes_count = 0, text_files = 0 }
 
@@ -65,8 +66,7 @@ return dashboard.new({
           desc = "Dual-pane file manager with diagnostics",
           action = function(scene)
               scene.set_status("Starting File-GD X...")
-              local jobs = require("core.jobs")
-              jobs.start_tool("file_gd_x", "File-GD X", "toolbox", nil,
+              jobs.start_tool("file_gd_x", "File Manager", "toolbox",
                   function(resp)
                       if resp.ok then
                           scene.set_status("File-GD X started — SELECT for details")
