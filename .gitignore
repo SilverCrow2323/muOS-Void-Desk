@@ -57,3 +57,4 @@ Thumbs.db
 .venv_desktop/
 data/.love_request.json
 data/.love_response.json
+*.pyc
