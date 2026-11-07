@@ -1,1 +1,65 @@
-{"void_nebula":true,"st_batt":true,"clock_badge":true,"vfx_trans":4,"font_scale":"normale","controller_bindings":[],"nexus_bg":{"orbit_style":"glow","stars":true,"enabled":false,"image_path":"","orbit_width":2,"comets":true,"opacity":0.6,"orbit_color":[74,206,224],"scanlines":true,"vignette":true,"glitch":false,"nebula":true},"vfx_fx":4,"void_trails":true,"st_usb":true,"termid_name":"qq","st_hotspot":true,"void_gravity":true,"st_bt":true,"st_vol":true,"bgm":true,"vfx_bg":5,"battery":true,"void_comets":true,"void_stars":true,"desk_env":"xfce","void_glitch":false,"st_wifi":true,"termid_id":"20260733110111","lang":"en","home_style":"nexus","engine":"py","bg_anim":true,"sfx":true,"music":true,"show_bootanim":true,"notification_history":[{"kind":"message","title":"gia' mappato","body":"A","ts":1785815582.1146},{"kind":"warning","title":"Desktop Mode","body":"XFCE installation requires the RG35XX-H handheld (arm64 Ubuntu chroot).","ts":1794011785.5502}],"theme":"crimson"}
+{
+ "void_nebula": true,
+ "st_batt": true,
+ "clock_badge": true,
+ "vfx_trans": 4,
+ "font_scale": "normale",
+ "controller_bindings": [],
+ "nexus_bg": {
+  "orbit_style": "glow",
+  "stars": true,
+  "enabled": false,
+  "image_path": "",
+  "orbit_width": 2,
+  "comets": true,
+  "opacity": 0.6,
+  "orbit_color": [
+   74,
+   206,
+   224
+  ],
+  "scanlines": true,
+  "vignette": true,
+  "glitch": false,
+  "nebula": true
+ },
+ "vfx_fx": 4,
+ "void_trails": true,
+ "st_usb": true,
+ "termid_name": "qq",
+ "st_hotspot": true,
+ "void_gravity": true,
+ "st_bt": true,
+ "st_vol": true,
+ "bgm": true,
+ "vfx_bg": 5,
+ "battery": true,
+ "void_comets": true,
+ "void_stars": true,
+ "desk_env": "icewm",
+ "void_glitch": false,
+ "st_wifi": true,
+ "termid_id": "20260733110111",
+ "lang": "en",
+ "home_style": "nexus",
+ "engine": "py",
+ "bg_anim": true,
+ "sfx": true,
+ "music": true,
+ "show_bootanim": true,
+ "notification_history": [
+  {
+   "kind": "message",
+   "title": "gia' mappato",
+   "body": "A",
+   "ts": 1785815582.1146
+  },
+  {
+   "kind": "warning",
+   "title": "Desktop Mode",
+   "body": "XFCE installation requires the RG35XX-H handheld (arm64 Ubuntu chroot).",
+   "ts": 1794011785.5502
+  }
+ ],
+ "theme": "crimson"
+}
