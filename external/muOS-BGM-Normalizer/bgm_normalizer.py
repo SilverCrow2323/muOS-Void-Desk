@@ -829,7 +829,8 @@ class App:
 
     def _get_scan_dirs(self):
         if IS_PC:
-            os.makedirs(self.pc_input_dir, exist_ok=True)
+            if self.pc_input_dir:
+                os.makedirs(os.path.expanduser(self.pc_input_dir), exist_ok=True)
             return [self.pc_input_dir]
         dirs = []
         if self.scan_source in ("sd1", "both"):
@@ -854,7 +855,8 @@ class App:
         if self.out_mode == "inplace":
             return os.path.dirname(full_path)
         elif IS_PC:
-            os.makedirs(self.pc_output_dir, exist_ok=True)
+            if self.pc_output_dir:
+                os.makedirs(os.path.expanduser(self.pc_output_dir), exist_ok=True)
             return self.pc_output_dir
         elif self.out_mode == "custom" and self.custom_out_dir:
             return self.custom_out_dir
