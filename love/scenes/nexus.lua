@@ -25,7 +25,7 @@ local sel = {
 local warp = { active=false, t=0, target_idx=nil,
                target_scene=nil, use_stub=false, quit=false }
 
-local RING_RADII = { [1]=0, [2]=240, [3]=340, [4]=420 }
+local RING_RADII = { [1]=0, [2]=175, [3]=235, [4]=290 }
 local SQUASH = 0.42
 
 local function lerp(a, b, t) return a + (b - a) * t end

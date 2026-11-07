@@ -4,10 +4,9 @@ nodes.COLOR = {
     [0]={1.00,0.80,0.47}, [3]={0.94,0.35,0.24}, [5]={0.31,0.80,1.00},
     [2]={0.90,0.31,0.75}, [6]={0.69,0.43,0.94}, [4]={0.37,0.82,0.55},
     [1]={0.88,0.88,0.92}, [7]={0.39,0.51,0.82}, [8]={0.59,0.63,0.71},
-    [9]={0.84,0.31,0.14}, [10]={1.00,0.71,0.20}, [11]={0.24,0.90,0.78},
+    [9]={0.55,0.15,0.72}, [10]={1.00,0.71,0.20}, [11]={0.24,0.90,0.78},
     [12]={0.78,0.59,1.00}, [13]={1.00,0.47,0.63}, [14]={0.31,0.31,0.35},
 }
-
 nodes.PLANET_FILE = {
     start="start.png", window="muos.png", speaker="media_vault.png",
     forge="the_forge.png", toolbox="rt_toolbox.png", uplink="net_sphere.png",
@@ -16,18 +15,11 @@ nodes.PLANET_FILE = {
     community="community.png", outerdesk="outerdesk.png", legacy="legacy.png",
 }
 
--- Surface types assigned per node personality:
---   FORGE = volcanic (lava planet)
---   MEDIA VAULT = ocean_clouds (blue with land + clouds)
---   UPLINK = icy (ice world with cracks)
---   WORKSHOP = rocky_craters (moon-like)
---   TOOLBOX = rocky_craters (industrial)
---   SETTINGS = gas_bands (Jupiter-like)
---   INFO = icy (archive)
---   END NODE = volcanic (small dark red)
+-- END NODE alone on ring 4. Ring 1 = sun only, ring 2 = inner planets,
+-- ring 3 = outer planets, ring 4 = END NODE comet alone.
 nodes.LIST = {
     { idx=0, name="START SESSION", icon="start", ring=1,
-      type="sun", size=34, scene=nil },
+      type="sun", size=34, scene="hub_session" },
 
     { idx=3, name="THE FORGE", icon="forge", ring=2,
       type="planet", size=22, surface="volcanic",
@@ -36,29 +28,30 @@ nodes.LIST = {
     { idx=5, name="UPLINK", icon="uplink", ring=2,
       type="planet", size=18, surface="icy",
       ring_kind="signal", ring_tilt=0.55, rot_speed=0.9,
-      orbit_mult=1.2, scene=nil },
+      orbit_mult=1.2, scene="hub_uplink" },
     { idx=2, name="MEDIA VAULT", icon="speaker", ring=2,
       type="planet", size=20, surface="ocean_clouds",
       ring_kind="double", ring_tilt=0.30, rot_speed=0.5,
-      orbit_mult=1.1, scene=nil },
+      orbit_mult=1.1, scene="hub_media" },
     { idx=6, name="WORKSHOP", icon="workshop", ring=2,
       type="planet", size=15, surface="rocky_craters",
-      rot_speed=1.0, scene=nil },
+      rot_speed=1.0, scene="hub_workshop" },
 
     { idx=4, name="TOOLBOX", icon="toolbox", ring=3,
       type="planet", size=14, surface="rocky_craters",
-      moon=true, rot_speed=0.8, scene=nil },
+      moon=true, rot_speed=0.8, scene="hub_stub" },
     { idx=1, name="MUOS APPS", icon="window", ring=3,
-      type="satellite", size=9, orbit_mult=2.5, scene=nil },
+      type="satellite", size=9, orbit_mult=2.5, scene="hub_stub" },
     { idx=7, name="SETTINGS", icon="gear", ring=3,
       type="planet", size=13, surface="gas_bands",
-      rot_speed=0.6, scene=nil },
+      rot_speed=0.6, scene="hub_settings" },
     { idx=8, name="INFO", icon="book", ring=3,
       type="planet", size=12, surface="icy",
-      rot_speed=0.4, scene=nil },
-    { idx=9, name="END NODE", icon="power", ring=3,
-      type="comet", size=7, rot_speed=0.3, orbit_mult=0.7,
-      scene="quit" },
+      rot_speed=0.4, scene="hub_info" },
+
+    -- END NODE on its OWN outer orbit (ring 4), alone
+    { idx=9, name="END NODE", icon="power", ring=4,
+      type="comet", size=8, rot_speed=0.3, orbit_mult=0.5, scene="quit" },
 
     { idx=10, name="GAMES", icon="games", ring=2, hidden=true,
       type="planet", size=16, surface="gas_bands", rot_speed=0.7 },

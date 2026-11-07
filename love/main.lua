@@ -19,6 +19,12 @@ function love.load()
     sm.register("nexus",     require("scenes.nexus"))
     sm.register("hub_forge", require("scenes.hub_forge"))
     sm.register("hub_stub",  require("scenes.hub_stub"))
+    sm.register("hub_session", require("scenes.hub_session"))
+    sm.register("hub_uplink", require("scenes.hub_uplink"))
+    sm.register("hub_media", require("scenes.hub_media"))
+    sm.register("hub_workshop", require("scenes.hub_workshop"))
+    sm.register("hub_settings", require("scenes.hub_settings"))
+    sm.register("hub_info", require("scenes.hub_info"))
 
     sm.switch("intro", { duration = 2.0 })
 end

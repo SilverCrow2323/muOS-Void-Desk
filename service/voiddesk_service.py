@@ -46,11 +46,20 @@ def h_set_config(args):
 def h_system_info(args):
     try:
         du = shutil.disk_usage("/")
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            local_ip = "127.0.0.1"
         return {"ok": True, "info": {
             "os":       platform.system(),
             "machine":  platform.machine(),
             "hostname": platform.node(),
             "is_device": IS_DEVICE,
+            "ip":       local_ip,
             "disk_free_gb": round(du.free / 1e9, 1),
         }}
     except Exception as e:
@@ -233,11 +242,70 @@ def h_xfce_launch(args):
             "log": str(log_path)}
 
 
+def h_session_list(args):
+    import shutil
+    xfce_inst = (shutil.which("startxfce4") is not None) if not IS_DEVICE else True
+    return {"ok": True, "sessions": [
+        {"id": "xfce",  "name": "XFCE",  "installed": xfce_inst},
+        {"id": "icewm", "name": "IceWM", "installed": False},
+        {"id": "lxde",  "name": "LXDE",  "installed": False},
+    ]}
+
+def h_session_launch(args):
+    sid = args.get("id", "xfce")
+    if sid == "xfce":
+        return h_xfce_launch(args)
+    return {"ok": False, "error": f"{sid} not yet supported on this platform"}
+
+def h_wifi_scan(args):
+    if not IS_DEVICE:
+        return {"ok": False, "reason": "device-only", "networks": []}
+    import subprocess
+    try:
+        out = subprocess.check_output(["iwlist", "wlan0", "scan"],
+                                       stderr=subprocess.DEVNULL,
+                                       text=True, timeout=15)
+        nets, cur = [], {}
+        for line in out.splitlines():
+            line = line.strip()
+            if "ESSID:" in line:
+                cur["ssid"] = line.split(":", 1)[1].strip().strip('"')
+                nets.append(cur); cur = {}
+            elif "Signal level=" in line:
+                try: cur["signal"] = line.split("=")[1].split(" ")[0]
+                except Exception: pass
+        return {"ok": True, "networks": nets}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200], "networks": []}
+
+def h_bt_scan(args):
+    import shutil, subprocess
+    if not shutil.which("bluetoothctl"):
+        return {"ok": False, "reason": "no bluetoothctl", "devices": []}
+    try:
+        out = subprocess.check_output(["bluetoothctl", "devices"],
+                                       stderr=subprocess.DEVNULL,
+                                       text=True, timeout=10)
+        devs = []
+        for line in out.splitlines():
+            parts = line.split(" ", 2)
+            if len(parts) >= 3 and parts[0] == "Device":
+                devs.append({"mac": parts[1], "name": parts[2]})
+        return {"ok": True, "devices": devs}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200], "devices": []}
+
+
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
     "set_config": h_set_config,
     "system_info": h_system_info,
+    "session_list": h_session_list,
+    "session_launch": h_session_launch,
+    "wifi_scan": h_wifi_scan,
+    "bt_scan": h_bt_scan,
+
     "list_files": h_list_files,
     "xfce_install": h_xfce_install,
     "xfce_launch": h_xfce_launch,
