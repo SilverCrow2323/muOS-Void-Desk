@@ -3,7 +3,7 @@
   
  <div align="center">
 
-# ◈ VoidDesk Project
+![Void-Desk Logo](resources/vdlogo.png )
 
 **Multifunctional AIO Desktop Hub for H700 Linux Handhelds**
 
@@ -36,7 +36,7 @@ Well, we try anyway. And fuck your corporate ethos.
 -->
 
 
-<img src="https://i.ibb.co/27cw4TZt/muos-20260725-175855.png" width="720" alt="Void-DESK Banner">
+
 
 <br><br>
 
