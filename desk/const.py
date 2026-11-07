@@ -191,6 +191,7 @@ CYCLES = {
     "ctrl":  ("controller", ["sinistro", "classico", "custom"]),
     "fscale": ("font_scale", ["piccolo", "normale", "grande",
                               "molto grande"]),
+    "engine": ("engine", ["py", "love"]),
 }
 FONT_SCALES = {"piccolo": 0.85, "normale": 1.0, "grande": 1.15,
               "molto grande": 1.3}
@@ -1842,6 +1843,8 @@ TR = {
   "opt_st_usb": "Icona USB/ADB",
   "opt_st_hotspot": "Icona hotspot",
    "opt_intro": "Sigla d'avvio",
+   "opt_engine": "Motore grafico",
+   "opt_engine_s": "py (stabile) / love (sperimentale)",
    "opt_nexus_bg": "Sfondo Nexus",
    "opt_nexus_bg_s": "personalizza lo sfondo del planetario",
   "sess": "START SESSION",
@@ -2048,6 +2051,8 @@ TR = {
   "opt_st_usb": "USB/ADB icon",
   "opt_st_hotspot": "Hotspot icon",
    "opt_intro": "Intro animation",
+   "opt_engine": "Frontend engine",
+   "opt_engine_s": "py (stable) / love (experimental)",
    "opt_nexus_bg": "Nexus background",
    "opt_nexus_bg_s": "customize the planetarium background",
   "sess": "START SESSION",

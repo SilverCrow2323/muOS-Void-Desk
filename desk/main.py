@@ -13072,6 +13072,7 @@ class App(object):
             ("opt_home_style", "home_style", HOME_STYLES),
             ("opt_font_scale", "font_scale", CYCLES["fscale"][1]),
             ("opt_intro", "intro", [True, False]),
+            ("opt_engine", "intro", [True, False]),
             ("opt_batt", "battery", [True, False]),
             ("hdr", "ANIMAZIONI & EFFETTI" if it else "ANIMATIONS & VFX",
              None),
@@ -22440,6 +22441,8 @@ class App(object):
             pygame.display.flip = real_flip
 
     def play_intro(self):
+        if not self.cfg.get("show_bootanim", True):
+            return
         # Andromeda: prefer LÖVE for the intro (shaders, bloom)
         try:
             resp = love_bridge.run_scene("intro", {"duration": 2.5})
