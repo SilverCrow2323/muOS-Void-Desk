@@ -49,7 +49,7 @@ def test_shell_pty_start_poll_send_and_stop(monkeypatch, tmp_path):
     def fake_read(_fd, _size):
         if not read_once["done"]:
             read_once["done"] = True
-            return b"hello\\r\\n"
+            return b"hello\r\n"
         raise BlockingIOError()
 
     monkeypatch.setattr(service.os, "read", fake_read)
