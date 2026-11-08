@@ -5,6 +5,7 @@ local scenes = {}
 local current = nil
 local current_name = ""
 local last_error = nil
+local current_error = nil
 
 -- Stack of {name, args, state}. Last entry = current.
 local stack = {}
@@ -69,9 +70,10 @@ local function _enter(name, args, restore_state)
         return false
     end
 
-    local previous, previous_name = current, current_name
+    local previous, previous_name, previous_error = current, current_name, current_error
     current_name = name
     current = scenes[name]
+    current_error = nil
 
     local a = _copy(args)
     if restore_state then a.restore_state = restore_state end
@@ -80,7 +82,7 @@ local function _enter(name, args, restore_state)
         if not ok then
             last_error = tostring(err)
             print("[scene] enter failed " .. name .. ": " .. last_error)
-            current, current_name = previous, previous_name
+            current, current_name, current_error = previous, previous_name, previous_error
             return false
         end
     end
@@ -144,14 +146,45 @@ function sm.update(dt)
     if current and current.update then
         local ok, err = pcall(current.update, dt)
         if not ok then
-            last_error = tostring(err)
+            current_error = tostring(err)
+            last_error = current_error
             print("[scene] update failed " .. current_name .. ": " .. last_error)
         end
     end
 end
 
+function sm.current_error()
+    return current_error
+end
+
+local function draw_error_notice(message)
+    if not love or not love.graphics then return end
+    pcall(function()
+        local W, H = love.graphics.getDimensions()
+        love.graphics.setColor(0.025, 0.03, 0.045, 1)
+        love.graphics.rectangle("fill", 0, 0, W, H)
+        love.graphics.setColor(1, 0.32, 0.32, 1)
+        love.graphics.setFont(love.graphics.newFont(18))
+        love.graphics.printf("SCENE RENDER ERROR", 20, H * 0.34, W - 40, "center")
+        love.graphics.setColor(0.88, 0.9, 0.94, 1)
+        love.graphics.setFont(love.graphics.newFont(11))
+        love.graphics.printf(tostring(message):sub(1, 240), 24, H * 0.44,
+                             W - 48, "center")
+    end)
+end
+
 function sm.draw()
-    if current and current.draw then current.draw() end
+    if current and current.draw then
+        local ok, err = pcall(current.draw)
+        if not ok then
+            current_error = tostring(err)
+            last_error = current_error
+            print("[scene] draw failed " .. current_name .. ": " .. current_error)
+            draw_error_notice(current_error)
+            return false, current_error
+        end
+    end
+    return true
 end
 
 function sm.keypressed(key, sc, isrepeat)
