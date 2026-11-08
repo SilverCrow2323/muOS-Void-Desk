@@ -197,7 +197,7 @@ local config = {
         if state.qr_matrix then
             local matrix = state.qr_matrix
             local n = #matrix
-            local cell = math.min(1.5, 88 / (n + 8))
+            local cell = math.min(2.5, 88 / (n + 8))
             local size = (n + 8) * cell
             local x = W - size - 16
             local y = 122
