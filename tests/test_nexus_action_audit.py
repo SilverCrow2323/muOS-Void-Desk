@@ -1,0 +1,39 @@
+from pathlib import Path
+import re
+
+
+ROOT = Path(__file__).resolve().parents[1]
+AUDITED_SCENES = (
+    "hub_session.lua",
+    "hub_forge.lua",
+    "hub_workshop.lua",
+    "hub_toolbox.lua",
+)
+
+
+def test_visible_hub_actions_have_no_dead_coming_soon_placeholders():
+    for name in AUDITED_SCENES:
+        source = (ROOT / "love" / "scenes" / name).read_text(encoding="utf-8")
+        assert not re.search(
+            r"coming soon|not implemented|TODO", source, re.IGNORECASE
+        ), f"unfinished placeholder remains in {name}"
+
+
+def test_hub_scene_routes_resolve_to_real_scene_files():
+    for name in AUDITED_SCENES:
+        source = (ROOT / "love" / "scenes" / name).read_text(encoding="utf-8")
+        for target in re.findall(r'sm\.push\(["\']([^"\']+)["\']', source):
+            target_path = ROOT / "love" / "scenes" / f"{target}.lua"
+            assert target_path.is_file(), (
+                f"{name} routes to missing scene {target}"
+            )
+
+
+def test_workshop_actions_are_connected_to_real_tools():
+    workshop = (ROOT / "love" / "scenes" / "hub_workshop.lua").read_text(
+        encoding="utf-8"
+    )
+    assert 'sm.push("hub_diagnostics"' in workshop
+    assert 'sm.push("hub_monitor"' in workshop
+    assert 'sm.push("hub_apt", {tab = "SYSTEM"})' in workshop
+    assert 'sm.push("hub_apt", {tab = "JOBS"})' in workshop
