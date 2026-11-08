@@ -18,6 +18,7 @@ KEYMAP = {
     308: "L1", 309: "R1", 314: "L2", 315: "R2",
     310: "SELECT", 311: "START", 312: "MENU",
     114: "VOL-", 115: "VOL+",
+    88: "SCREENSHOT",  # Linux input KEY_F12
 }
 
 _state = {"fds": [], "hx": 0, "hy": 0, "active": False, "raw": []}
