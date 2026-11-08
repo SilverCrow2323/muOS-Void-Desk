@@ -5,14 +5,7 @@
 
 ---
 
-## Unreleased — reliability and security hardening
-
-- Restored normal HTTPS certificate verification in the Pygame bootstrap; device clock and CA problems now produce an actionable diagnostic.
-- Verify the Pygame wheel against the SHA-256 digest published by PyPI before accepting the download.
-- Validate ZIP members before extraction, rejecting traversal, absolute paths, duplicate names, symbolic links, special files and oversized expanded archives.
-- Extract and import-test Pygame in a staging directory; replace the active runtime only after validation and restore the previous runtime if the swap fails.
-- Expanded archive-extraction regression tests.
-- Reworked CI so Python compilation, unit tests, critical Ruff checks, shell parsing and LuaJIT compilation can fail the workflow instead of being swallowed by # 🗺️ ROADMAP — what's next
+# 🗺️ ROADMAP — what's next
 
 ## Part A — Open issues (GitHub)
 - **A1** 🔥 Stuttering on RG35XXSP at launch — BT-related · ~1-2 h
