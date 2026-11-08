@@ -65,6 +65,16 @@ The device bootstrap discovers a compatible manylinux wheel from PyPI. It verifi
 
 The handheld package includes lib/love and the project under love/. The PC launcher prefers a system love executable because the bundled binary is target-architecture-specific. LÖVE syntax is validated in CI with LuaJIT.
 
+## Non-blocking host status
+
+The Pygame frontend reads header indicators through \`App.status_snapshot()\`. This method is a cache read only. A \`StatusPoller\` worker refreshes battery, Wi-Fi, Bluetooth, volume, USB and hotspot state at a bounded interval. Slow commands such as \`hciconfig\` and \`bluetoothctl show\` therefore cannot suspend the NEXUS render/input loop. Only one refresh is allowed at a time; a failed probe leaves the last known snapshot available and permits a later retry.
+
+## Device power-off sequence
+
+For the muOS package launcher, the Pygame frontend writes \`data/.pending_poweroff\` and exits normally. The shell launcher detects the marker, stops and waits for \`service/voiddesk_service.py\`, synchronizes filesystem writes, and invokes the forced power-off command with fallbacks. This avoids leaving the VoidDesk companion service running while the system is asked to power down.
+
+The direct power-off fallback in the standalone/PC path is separate from the device hand-off. Neither path can be certified by headless CI; final behaviour must be checked on the target hardware.
+
 ## Service and hand-off
 
 The local service provides the bridge used by frontends for system information, network state, media state, jobs and desktop session actions. The launcher uses data/.pending_session as a hand-off marker: the frontend exits, the shell launcher starts the requested session after the display has been released, and VoidDesk is launched again when that session ends.
