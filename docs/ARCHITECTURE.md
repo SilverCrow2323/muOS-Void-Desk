@@ -21,7 +21,7 @@ mux_launch.sh
                                   -> return to VoidDesk
 ~~~
 
-The launcher re-reads the configured engine before each run. If the Pygame runtime is not ready, it calls bin/bootstrap_lite.py. If setup or the Pygame frontend fails, the launcher falls back to LÖVE and records the event in data/voiddesk.log.
+The launcher re-reads the configured engine before each run. If the Pygame runtime is not ready, it calls bin/bootstrap_lite.py. Pygame is the recommended, more complete frontend. If the Pygame process fails, the launcher can start LÖVE as an emergency fallback; that fallback is an experimental, incomplete prototype and is not feature-equivalent.
 
 The PC launcher, voiddesk.py, is a separate development convenience. It checks for a system LÖVE binary on PC and can create .venv_desktop for the Pygame path. It is not the handheld package entry point.
 
@@ -61,9 +61,13 @@ Generated paths that should not be committed:
 
 The device bootstrap discovers a compatible manylinux wheel from PyPI. It verifies the wheel's SHA-256 digest from PyPI metadata, checks ZIP entries before extraction, extracts to a staging directory and verifies import pygame before replacing runtime/. A failed validation should leave the previous runtime available.
 
-### LÖVE
+### LÖVE (experimental)
 
-The handheld package includes lib/love and the project under love/. The PC launcher prefers a system love executable because the bundled binary is target-architecture-specific. LÖVE syntax is validated in CI with LuaJIT.
+The handheld package includes lib/love and the project under love/. The PC launcher prefers a system love executable because the bundled binary is target-architecture-specific. LÖVE is incomplete and is not yet at Pygame feature parity. Some routes and actions are still placeholders; keep it opt-in for development and testing. CI validates Lua syntax with LuaJIT and selected core behaviour with focused tests.
+
+## LÖVE-to-Python service bridge
+
+The LÖVE bridge serializes requests through the single request/response file pair: only one request is published at a time, each response is matched by request ID, and the service claims requests with an atomic rename before writing an atomic response. This avoids overwriting simultaneous requests on SD filesystems.
 
 ## Non-blocking host status
 
@@ -80,6 +84,10 @@ The direct power-off fallback in the standalone/PC path is separate from the dev
 The local service provides the bridge used by frontends for system information, network state, media state, jobs and desktop session actions. The launcher uses data/.pending_session as a hand-off marker: the frontend exits, the shell launcher starts the requested session after the display has been released, and VoidDesk is launched again when that session ends.
 
 Treat the service and any local web/file integrations as privileged surfaces. Do not expose them to untrusted networks.
+
+## Visual capture and asset inventory
+
+Both frontends support F12 screenshot capture. PNG images and JSON metadata are saved locally under data/visual-captures/. The dependency-free tools/visual_capture.py script indexes captures, scans images and fonts, records file dimensions and SHA-256 hashes, and checks that active LÖVE NEXUS nodes have their referenced textures. Captures are excluded from Git by default; review them for private network and device information before exporting selected images.
 
 ## Extension points
 
