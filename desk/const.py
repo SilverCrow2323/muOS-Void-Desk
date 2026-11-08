@@ -947,8 +947,6 @@ def comp_color(c):
     return (r, g, b)
 
 
-TS_BIN = os.environ.get("VD_TS_BIN", "/opt/muos/bin/tailscale")
-TS_SOCK = os.environ.get("VD_TS_SOCK", "/run/tailscale/tailscaled.sock")
 TS_GRAY = (196, 200, 208)
 
 WMO_CODES = {
