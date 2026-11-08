@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
+r"""
 VOIDDESK NEXUS v10.5.2 — Advanced Launcher & PC Runtime Environment
 SPDW Factory · Single-File Hybrid Launcher & Diagnostics Suite
 

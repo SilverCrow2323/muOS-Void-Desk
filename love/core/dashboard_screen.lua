@@ -101,6 +101,14 @@ function M.new(config)
             bg_anim.draw(bg_kind, W, H, love.timer.getTime(), node_color, bg_a * 0.55)
         end
 
+        -- Chrome header FIRST (so it doesn't cover widget cards)
+        if t_enter > 0.05 then
+            chrome.draw_header({
+                theme = th, title = "Void-DESK", subtitle = title,
+                status_icons = { "wifi", "battery" },
+            })
+        end
+
         -- Widget panel
         local w_t = math.max(0, math.min(1, (t_enter - 0.10) / 0.40))
         local has_widgets = widgets_draw ~= nil
@@ -245,10 +253,6 @@ function M.new(config)
 
         -- Chrome
         if t_enter > 0.20 then
-            chrome.draw_header({
-                theme = th, title = "Void-DESK", subtitle = title,
-                status_icons = { "wifi", "battery" },
-            })
             chrome.draw_footer({
                 theme = th,
                 hints = {
