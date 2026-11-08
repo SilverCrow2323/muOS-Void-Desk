@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Deterministic smoke captures for the Pygame home-screen visual variants.
+"""Deterministic visual smoke captures for Pygame home styles and render states.
 
-This deliberately captures the five supported home styles only. It does not
-claim that every interactive hub or hardware-dependent workflow is covered.
+Direct state rendering checks the screen renderer, not navigation or actions.
 """
 from __future__ import annotations
 
 import argparse
 import inspect
 import json
-import re
 import os
+import re
 import sys
 import tempfile
 import time
@@ -120,9 +119,11 @@ def main() -> int:
         if args.all_states:
             render_source = inspect.getsource(app_module.App.render_state)
             state_names = list(dict.fromkeys(re.findall(
-                r'^\\s*(?:if|elif)\\s+top\\s*==\\s*["\\']([^"\\']+)["\\']',
+                r"""^\s*(?:if|elif)\s+top\s*==\s*["']([^"']+)["']""",
                 render_source, re.MULTILINE,
             )))
+            if not state_names:
+                raise RuntimeError("could not discover App.render_state branches")
             for state_name in state_names:
                 if state_name == "home":
                     continue  # covered by all five home-style variants
@@ -161,15 +162,19 @@ def main() -> int:
 
     manifest = {
         "engine": "pygame",
-        "capture_kind": "home-style-smoke",
+        "capture_kind": "home-and-render-state-smoke" if args.all_states
+                         else "home-style-smoke",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "expected_screens": list(styles) + (
+        "expected_screens": ["home-" + style for style in styles] + (
             ["state-" + name for name in state_names if name != "home"]
             if args.all_states else []
         ),
         "captured": results,
         "errors": errors,
-        "complete": len(results) == len(styles) and not errors,
+        "complete": len(results) == len(styles) + (
+            len([name for name in state_names if name != "home"])
+            if args.all_states else 0
+        ) and not errors,
         "note": (
             "Home-style plus App.render_state branch smoke coverage; direct state "
             "rendering is not proof of navigation reachability, working actions, "
