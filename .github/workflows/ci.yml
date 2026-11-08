@@ -101,6 +101,33 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  muxapp-package:
+    name: Reproducible .muxapp package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build and validate the single-root package
+        run: |
+          python tools/build_muxapp.py \
+            --output "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
+          python tools/validate_muxapp.py \
+            "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
+          cd "$RUNNER_TEMP"
+          sha256sum -c Void-Desk-10.5.4.muxapp.sha256
+      - name: Upload installable package and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: voiddesk-muxapp-10.5.4
+          path: |
+            \${{ runner.temp }}/Void-Desk-10.5.4.muxapp
+            \${{ runner.temp }}/Void-Desk-10.5.4.muxapp.sha256
+          retention-days: 30
+
   tailscale-integration:
     name: Rt:Tailscale-M tests
     runs-on: ubuntu-24.04
