@@ -19,7 +19,8 @@ VoidDesk turns a Linux handheld into a controller-first workstation. It combines
 
 | | |
 |---|---|
-| Project line | **10.5.3-NEXUS** (see CHANGELOG.md) |
+| Project line | **10.5.4-NEXUS** (release candidate in `main`; see CHANGELOG.md) |
+| Latest published package | **v10.2.0** (published 2026-08-11; v10.5.4 is not yet downloadable) |
 | Primary target | Anbernic RG35XX-H / Allwinner H700 |
 | Primary firmware path | muOS application launcher |
 | Native UI | Python + Pygame framebuffer frontend |
@@ -81,8 +82,10 @@ See [Architecture](docs/ARCHITECTURE.md) for execution flow.
 
 ## Installation on the handheld
 
-1. Open [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) and download the current .muxapp package.
-2. Copy it to the muOS application directory: mnt/mmc/MUOS/application/.
+> **Release status (2026-11-08):** the latest published handheld package is `VoidDesk_v10.2.0.muxapp` (release `v10.2.0`, published 2026-08-11). The `main` branch has advanced to the `v10.5.4-NEXUS` release candidate, but that candidate has **not** been published as a `.muxapp` package yet. The v10.2.0 download therefore does not include the v10.5.4 changes listed in the changelog.
+
+1. Open [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) and download the latest **published `.muxapp` asset**. Check the release tag before installing; the source-code ZIP is not a replacement for the muOS application package.
+2. Copy the `.muxapp` file to the muOS application directory: `mnt/mmc/MUOS/application/`.
 3. Launch VoidDesk from the muOS Apps menu.
 4. Open **START SESSION** and follow the on-screen setup/repair flow for the optional desktop image.
 
