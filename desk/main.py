@@ -16051,7 +16051,19 @@ class App(object):
             elif btn == "X" and mode == "folders" and items:
                 self.sync_action("scan")
             elif btn == "Y" and mode == "folders" and items:
-                self.sync_action("override")
+                folder = items[self.sync_sel]
+                label = folder.get("label") or folder.get("id") or "folder"
+
+                def confirm_override():
+                    self.sync_action("override")
+
+                self.confirm = ((
+                    "Sovrascrivere i dati remoti con quelli locali di %s?" % label
+                    if self.lang == "it" else
+                    "Override remote data with the local copy of %s?" % label),
+                    confirm_override, "SYNCTHING", "refresh-cw",
+                    "Potentially destructive: confirm only if the handheld copy is authoritative.")
+                self.push("confirm")
             elif btn == "SELECT":
                 self.sync_open_refresh()
             elif btn == "B":
