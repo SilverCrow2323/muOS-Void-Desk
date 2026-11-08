@@ -178,6 +178,35 @@ def main() -> int:
             elif state_name == "imgview":
                 app.img_path = str(ROOT / "love" / "assets" / "logos"
                                    / "voiddesk.png")
+            elif state_name == "syncpanel":
+                app.sync = {
+                    "id": "VOIDDESK-CI-DEVICE",
+                    "url": "http://127.0.0.1:7070",
+                    "key": "fixture-only",
+                    "connected": 1,
+                    "folders": [{
+                        "id": "roms",
+                        "label": "ROMs",
+                        "path": "/mnt/mmc/ROMS",
+                        "pct": 84,
+                        "paused": False,
+                    }, {
+                        "id": "saves",
+                        "label": "Save files",
+                        "path": "/mnt/mmc/SAVES",
+                        "pct": 100,
+                        "paused": True,
+                    }],
+                    "devices": [{
+                        "id": "FIXTURE-DEVICE-ID",
+                        "name": "Desktop PC",
+                        "connected": True,
+                        "paused": False,
+                        "address": "192.168.1.20:22000",
+                    }],
+                }
+                app.sync_mode = "folders"
+                app.sync_sel = 0
 
         if args.all_states:
             render_source = inspect.getsource(app_module.App.render_state)
