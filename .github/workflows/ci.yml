@@ -87,7 +87,7 @@ jobs:
       - name: Install Pygame runtime
         run: python -m pip install --disable-pip-version-check pygame==2.6.1
       - name: Capture supported Pygame home styles
-        run: python tools/capture_pygame_screenshots.py
+        run: python tools/capture_pygame_screenshots.py --all-states
       - name: Upload Pygame visual captures
         if: always()
         uses: actions/upload-artifact@v4
