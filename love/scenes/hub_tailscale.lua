@@ -9,6 +9,7 @@ local state = {
     installed = false,
     backend = "Checking",
     daemon = false,
+    setup_running = false,
     panel = false,
     watchdog = false,
     peers = {},
@@ -32,6 +33,7 @@ local function refresh(scene, silent)
         end
         state.installed = resp.installed == true
         state.daemon = resp.daemon == true
+        state.setup_running = resp.setup_running == true
         state.panel = resp.panel == true
         state.watchdog = resp.watchdog == true
         state.backend = resp.backend or (state.installed and "Stopped" or "Not installed")
@@ -48,7 +50,8 @@ local function refresh(scene, silent)
         state.self = resp.self or {}
         state.autostart = resp.autostart == true
         state.error = resp.error or ""
-        local label = state.installed and state.backend or "service files missing"
+        local label = state.setup_running and "Installing / starting" or
+            (state.installed and state.backend or "service files missing")
         scene.set_status(label .. " · " .. tostring(#state.peers) .. " peers")
     end)
 end
@@ -78,7 +81,7 @@ local function items_for()
             action = function(scene) refresh(scene, false); return "Refreshing..." end,
         },
         {
-            icon = "play", label = "Start / repair service",
+            icon = "play", label = state.setup_running and "Setup in progress" or "Start / repair service",
             desc = "Use Rt manager; never spawn a second tailscaled",
             action = function(scene) return run_action(scene, "start", "", "Starting service...") end,
         },
