@@ -9,6 +9,7 @@ import fcntl
 import json
 import os
 import platform
+import re
 import pty
 import select
 import shlex
@@ -525,6 +526,67 @@ def h_shell_kill(args):
 _JOBS = {}
 _JOB_SEQ = 0
 _ALLOWED_JOB_PACKAGES = {"htop", "ncdu", "ffmpeg", "curl"}
+_APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]{0,127}$")
+_APT_ACTIONS = {"update", "upgrade", "clean", "install", "remove"}
+_APT_CATALOG_MODES = {"search", "installed", "info"}
+
+
+def _valid_apt_packages(values):
+    return (isinstance(values, list) and 1 <= len(values) <= 20
+            and all(isinstance(value, str) and _APT_PACKAGE_RE.fullmatch(value)
+                    for value in values))
+
+
+def h_apt_catalog(args):
+    """Read package metadata from the Debian/Ubuntu XFCE chroot, never host APT."""
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "mode": str(args.get("mode") or "search"),
+                "packages": [], "note": "visual capture fixture"}
+    mode = str(args.get("mode") or "search")
+    if mode not in _APT_CATALOG_MODES:
+        return {"ok": False, "error": "unsupported catalog mode"}
+    script = APP_DIR / "bin" / "vd_apt_manage.sh"
+    if not script.is_file():
+        return {"ok": False, "error": "APT manager is missing"}
+    command = ["sh", str(script), "catalog", mode]
+    if mode == "search":
+        query = str(args.get("query") or "").strip()[:80]
+        if not query or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 +_.-]*", query):
+            return {"ok": False, "error": "search query contains unsupported characters"}
+        command.append(query)
+    elif mode == "info":
+        packages = args.get("packages")
+        if not _valid_apt_packages(packages):
+            return {"ok": False, "error": "one to twenty valid package names are required"}
+        command.extend(packages)
+    elif args.get("packages"):
+        return {"ok": False, "error": "installed mode takes no package arguments"}
+    try:
+        result = subprocess.run(command, cwd=str(APP_DIR), capture_output=True,
+                                text=True, timeout=35, check=False)
+        output = (result.stdout or "")[-24000:]
+        if result.returncode:
+            return {"ok": False, "error": (result.stderr or output or
+                    "APT catalog query failed")[-600:]}
+        packages = []
+        for line in output.splitlines():
+            if mode == "search":
+                name, sep, description = line.partition(" - ")
+                if sep and _APT_PACKAGE_RE.fullmatch(name.strip()):
+                    packages.append({"name": name.strip(),
+                                     "description": description.strip()[:240]})
+            elif mode == "installed":
+                name, sep, version = line.partition("\\t")
+                if sep and _APT_PACKAGE_RE.fullmatch(name.strip().split(":", 1)[0]):
+                    packages.append({"name": name.strip(), "version": version.strip()})
+        return {"ok": True, "mode": mode, "packages": packages[:100],
+                "details": output if mode == "info" else ""}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "APT catalog query timed out"}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot run APT catalog: " + str(exc)}
+
+
 
 
 def _job_refresh(job):
@@ -559,7 +621,22 @@ def h_job_start(args):
     cmd_text = args.get("cmd")
     tool_id = args.get("tool_id")
 
-    if cmd_text:
+    apt_action = args.get("apt_action")
+    if apt_action is not None:
+        action = str(apt_action)
+        if action not in _APT_ACTIONS:
+            return {"ok": False, "error": "APT action is not allowlisted"}
+        packages = args.get("packages", [])
+        if action in ("install", "remove"):
+            if not _valid_apt_packages(packages):
+                return {"ok": False, "error": "one to twenty valid package names are required"}
+        elif packages:
+            return {"ok": False, "error": "this APT action takes no package arguments"}
+        script = APP_DIR / "bin" / "vd_apt_manage.sh"
+        if not script.is_file():
+            return {"ok": False, "error": "APT manager is missing"}
+        command = ["sh", str(script), action] + list(packages)
+    elif cmd_text:
         try:
             tokens = shlex.split(str(cmd_text))
         except ValueError as exc:
@@ -1143,6 +1220,7 @@ HANDLERS = {
     "shell_poll": h_shell_poll,
     "shell_send": h_shell_send,
     "shell_kill": h_shell_kill,
+    "apt_catalog": h_apt_catalog,
     "job_start": h_job_start,
     "job_list": h_job_list,
     "job_cancel": h_job_cancel,
