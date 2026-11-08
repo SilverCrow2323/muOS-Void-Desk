@@ -55,7 +55,7 @@ def test_syncthing_status_returns_native_folder_and_device_data_without_api_key(
     result = service.h_syncthing_status({})
 
     assert result["ok"] and result["available"]
-    assert result["id"] == "VOIDDESK-LOCAL-DE"
+    assert result["id"] == "VOIDDESK-LOCAL-DEV"
     assert result["folders"][0]["pct"] == 75
     assert result["devices"][0]["connected"] is True
     assert result["connected"] == 1
