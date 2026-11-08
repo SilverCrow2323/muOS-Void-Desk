@@ -124,3 +124,21 @@ def test_unknown_action_is_rejected(tmp_path):
     result = manager.action(tmp_path, "arbitrary_shell", extra_roots=[root])
     assert result["ok"] is False
     assert "unsupported" in result["error"]
+
+
+def test_web_panel_is_enabled_only_on_localhost(tmp_path):
+    manager = load_manager()
+    root = make_install(tmp_path)
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        return Result("")
+
+    result = manager.action(tmp_path, "panel_on", extra_roots=[root], runner=runner)
+    assert result["ok"] is True
+    assert calls == [
+        [str(root / "rt"), "conf", "set", "PANEL_BIND", "127.0.0.1"],
+        [str(root / "rt"), "conf", "set", "PANEL", "1"],
+        [str(root / "rt"), "panel", "start"],
+    ]
