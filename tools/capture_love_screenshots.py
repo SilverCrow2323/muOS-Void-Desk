@@ -103,6 +103,7 @@ def main() -> int:
     env.update({
         "VOIDDESK_APP_DIR": str(ROOT),
         "VOIDDESK_CAPTURE_ALL": "1",
+        "VOIDDESK_VISUAL_CAPTURE": "1",
         "VOIDDESK_CAPTURE_SETTLE": str(args.settle),
         "VOIDDESK_FULLSCREEN": "0",
         "LIBGL_ALWAYS_SOFTWARE": "1",
