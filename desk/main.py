@@ -8629,7 +8629,7 @@ class App(object):
         if not snapshot.get("installed"):
             return {"state": "Not installed", "ip": "", "host": "",
                     "ssh": False, "peers": [], "service": False,
-                    "autostart": False}
+                    "setup_running": False, "autostart": False}
         me = snapshot.get("self") or {}
         peers = []
         for peer in snapshot.get("peers") or []:
@@ -8640,12 +8640,14 @@ class App(object):
                 "os": peer.get("os", ""),
                 "exit": bool(peer.get("exit_node")),
                 "using": bool(peer.get("using"))})
-        return {"state": snapshot.get("backend", "?"),
+        return {"state": ("Setup in progress" if snapshot.get("setup_running")
+                          else snapshot.get("backend", "?")),
                 "ip": (me.get("ips") or [""])[0],
                 "host": me.get("name", ""),
                 "ssh": False,
                 "peers": peers,
                 "service": bool(snapshot.get("daemon")),
+                "setup_running": bool(snapshot.get("setup_running")),
                 "autostart": bool(snapshot.get("autostart")),
                 "panel": bool(snapshot.get("panel")),
                 "auth_url": snapshot.get("auth_url", "")}
