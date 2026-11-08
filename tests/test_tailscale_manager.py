@@ -111,7 +111,10 @@ def test_actions_use_rt_manager_not_a_second_tailscaled(tmp_path):
 
     result = manager.action(tmp_path, "start", extra_roots=[root], runner=runner)
     assert result["ok"] is True
-    assert calls == [[str(root / "rt"), "start"]]
+    assert calls == [
+        [str(root / "rt"), "install"],
+        [str(root / "rt"), "start"],
+    ]
     assert not any("tailscaled" in part for command in calls for part in command)
 
 
