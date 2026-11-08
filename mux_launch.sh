@@ -109,13 +109,27 @@ while true; do
         rm -f "$PENDING"
         echo "$(date) session hand-off requested: $SESSION" >>"$LOG"
         case "$SESSION" in
-            xfce)
+            xfce|icewm|lxde)
+                # one shared launcher for all three — it reads "desk_env"
+                # from desk_config.json (already set by h_session_launch
+                # before it dropped this marker) and starts the right one
                 if [ -x "$APP_DIR/bin/xfce_launch.sh" ]; then
                     "$APP_DIR/bin/xfce_launch.sh" >>"$LOG" 2>&1
-                    echo "$(date) xfce session ended (rc=$?), returning to VoidDesk" >>"$LOG"
+                    echo "$(date) $SESSION session ended (rc=$?), returning to VoidDesk" >>"$LOG"
                 else
                     echo "$(date) bin/xfce_launch.sh missing or not executable, skipping hand-off" >>"$LOG"
                 fi
+                continue
+                ;;
+            voidcast)
+                # standalone pygame app, same runtime the "py" engine
+                # already uses (built on demand above) — not a chroot
+                # desktop session, so it runs directly, no xfce_launch.sh
+                echo "$(date) launching VoidCast" >>"$LOG"
+                PYTHONPATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" \
+                    PYGAME_HIDE_SUPPORT_PROMPT=1 \
+                    python3 "$APP_DIR/outdesk/VoidCast/voidcast/main.py" >>"$LOG" 2>&1
+                echo "$(date) VoidCast ended (rc=$?), returning to VoidDesk" >>"$LOG"
                 continue
                 ;;
             *)

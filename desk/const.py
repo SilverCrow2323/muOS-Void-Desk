@@ -552,6 +552,18 @@ OUTERDESK_APPS = [
         "mux": None,
     },
     {
+        "key": "voidcast",
+        "name": ("VoidCast", "VoidCast"),
+        "icon": "video",
+        "logo": None,  # original PNG wasn't text-transferable, see commit notes
+        "desc": ("IPTV: liste M3U, EPG multi-fonte, guida TV, addon PVR",
+                 "IPTV: M3U playlists, multi-source EPG, TV guide, PVR addons"),
+        "color": ACCENTS["cremisi"],
+        "req": None,
+        "script": "outdesk/VoidCast/voidcast/main.py",
+        "mux": None,  # launched via the shared py runtime, no own launcher
+    },
+    {
         "key": "little_mischief",
         "name": ("Little Mischief", "Little Mischief"),
         "icon": "wifi",

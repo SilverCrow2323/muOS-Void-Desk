@@ -1,0 +1,17 @@
+{
+  "active_playlist": "pl_1",
+  "playlists": [
+    {
+      "id": "pl_1",
+      "name": "Italian TV",
+      "source": "https://inthemix.altervista.org/tv.m3u",
+      "type": "url"
+    }
+  ],
+  "epg_use_playlist_sources": true,
+  "epg_manual_urls": [
+    "http://epg-guide.com/wltv.gz",
+    "https://github.com/matthuisman/i.mjh.nz/raw/master/SamsungTVPlus/it.xml.gz"
+  ],
+  "fx_scanlines": false
+}

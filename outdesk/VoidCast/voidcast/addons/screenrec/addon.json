@@ -1,0 +1,7 @@
+{
+  "name": "Screen Recorder",
+  "desc": "Records current or background playback to SD (ffmpeg stream-copy).",
+  "entry": "addon.py",
+  "version": "2.0.0",
+  "author": "SPDW Factory"
+}

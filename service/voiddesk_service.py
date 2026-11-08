@@ -311,41 +311,121 @@ def h_bt_scan(args):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+# bin/xfce_launch.sh is the ONE shared launcher for all three desktop
+# environments already — it reads "desk_env" from desk_config.json and
+# falls back to xfce if the chosen one isn't actually installed in the
+# chroot (see its DESKENV case block). So "adding" icewm/lxde support
+# here is: report their own install markers, and on launch write
+# desk_env + drop the SAME pending-session hand-off xfce already uses
+# (xfce_launch.sh itself decides what to start from desk_env).
+ENV_MARKERS = {
+    "xfce": ".xfce_ready",
+    "icewm": ".icewm_ready",
+    "lxde": ".lxde_ready",
+}
+ENV_NAMES = {"xfce": "XFCE", "icewm": "IceWM", "lxde": "LXDE"}
+
 def h_session_list(args):
     try:
         return {"ok": True, "sessions": [
-            {"id": "xfce", "name": "XFCE",
-             "installed": (DATA / ".xfce_ready").exists()},
+            {"id": eid, "name": ENV_NAMES[eid],
+             "installed": (DATA / marker).exists()}
+            for eid, marker in ENV_MARKERS.items()
         ]}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 def h_session_launch(args):
     sess_id = args.get("id")
-    if sess_id != "xfce":
+    if sess_id not in ENV_MARKERS:
         return {"ok": False, "error": f"unknown session: {sess_id}"}
-    if not (DATA / ".xfce_ready").exists():
-        return {"ok": False, "error": "XFCE not installed"}
+    if not (DATA / ENV_MARKERS[sess_id]).exists():
+        return {"ok": False, "error": f"{ENV_NAMES[sess_id]} not installed"}
     if IS_DEVICE:
         # The service process can't itself hand over the framebuffer/X
         # session — it's a background helper, not the thing holding the
         # screen. The actual hand-off has to happen at the level that
         # DOES own the screen: mux_launch.sh, which starts the LÖVE
         # process in the first place. So instead of trying (and failing)
-        # to take the display from here, drop a "pending session"
-        # marker and ask LÖVE to quit cleanly; mux_launch.sh notices the
-        # marker after LÖVE exits, runs bin/xfce_launch.sh to completion
-        # (full screen, no conflict with LÖVE since LÖVE is gone by
-        # then), and relaunches the engine afterwards. See mux_launch.sh
-        # for the other half of this.
+        # to take the display from here, write which environment was
+        # picked, drop a "pending session" marker and ask LÖVE to quit
+        # cleanly; mux_launch.sh notices the marker after LÖVE exits,
+        # runs bin/xfce_launch.sh to completion (full screen, no
+        # conflict with LÖVE since LÖVE is gone by then — that one
+        # script starts whichever env desk_env says), and relaunches
+        # the engine afterwards. See mux_launch.sh for the other half.
         try:
+            cfg = {}
+            if CFG.exists():
+                try:
+                    cfg = json.loads(CFG.read_text())
+                except Exception:
+                    cfg = {}
+            cfg["desk_env"] = sess_id
+            CFG.write_text(json.dumps(cfg, indent=1))
             (DATA / ".pending_session").write_text(sess_id)
             return {"ok": True, "handoff": True,
-                    "note": "handing off to XFCE — VoidDesk will restart "
-                            "automatically when you log out"}
+                    "note": f"handing off to {ENV_NAMES[sess_id]} — VoidDesk "
+                            "will restart automatically when you log out"}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+    if sess_id != "xfce":
+        return {"ok": False, "error": "PC path only supports XFCE for now"}
     return h_xfce_launch(args)
+
+def h_env_install(args):
+    """Install icewm or lxde into the existing XFCE chroot (device only —
+    there's no PC-side equivalent, those run XFCE itself via apt/Xephyr)."""
+    env_id = args.get("id")
+    if env_id not in ("icewm", "lxde"):
+        return {"ok": False, "error": f"unknown env: {env_id}"}
+    dcheck = device_only("env_install")
+    if dcheck:
+        return dcheck
+    if not (DATA / ".xfce_ready").exists():
+        return {"ok": False, "error": "install XFCE first — this adds onto it"}
+    marker = DATA / ENV_MARKERS[env_id]
+    if marker.exists():
+        return {"ok": True, "already": True,
+                "note": f"{ENV_NAMES[env_id]} already installed"}
+    lock = DATA / f".{env_id}_install_running"
+    if lock.exists():
+        try:
+            os.kill(int(lock.read_text().strip()), 0)
+            return {"ok": True, "note": "install already running in background"}
+        except Exception:
+            try: lock.unlink()
+            except OSError: pass
+    try:
+        log_path = DATA / f"{env_id}_install.log"
+        with open(log_path, "ab") as lf:
+            proc = subprocess.Popen(
+                [sys.executable, str(APP_DIR / "bin" / "env_install.py"), env_id],
+                stdout=lf, stderr=lf, start_new_session=True)
+        lock.write_text(str(proc.pid))
+        return {"ok": True,
+                "note": f"installing {ENV_NAMES[env_id]} in background — "
+                        f"progress in data/{env_id}_install.log"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def h_voidcast_launch(args):
+    """Launch the bundled VoidCast IPTV app (outdesk/VoidCast). Same
+    quit-and-handoff trick as session_launch, minus the install check —
+    it ships inside VoidDesk itself, no separate chroot/package needed."""
+    dcheck = device_only("voidcast_launch")
+    if dcheck:
+        return dcheck
+    script = APP_DIR / "outdesk" / "VoidCast" / "voidcast" / "main.py"
+    if not script.exists():
+        return {"ok": False, "error": "outdesk/VoidCast/voidcast/main.py missing"}
+    try:
+        (DATA / ".pending_session").write_text("voidcast")
+        return {"ok": True, "handoff": True,
+                "note": "handing off to VoidCast — VoidDesk will restart "
+                        "automatically when you quit it"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 def h_apt_update(args):
     if IS_DEVICE:
@@ -582,6 +662,8 @@ HANDLERS = {
     "xfce_install": h_xfce_install,
     "xfce_launch": h_xfce_launch,
     "apt_update": h_apt_update,
+    "env_install": h_env_install,
+    "voidcast_launch": h_voidcast_launch,
 }
 
 # ── main loop ────────────────────────────────────────────

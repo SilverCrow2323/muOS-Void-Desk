@@ -1,0 +1,7 @@
+{
+  "name": "Recordings Player",
+  "desc": "Browse and play PVR recordings from SD.",
+  "entry": "addon.py",
+  "version": "1.0.0",
+  "author": "SPDW Factory"
+}

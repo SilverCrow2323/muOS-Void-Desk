@@ -1,7 +1,7 @@
 # CHANGELOG — VoidDesk
 
 > Current version: **v10.5.3-NEXUS** · last updated 2026-11-08
-> One file: roadmap on top, history below.
+> One file: roadmap on top, changelog history below.
 
 ---
 
@@ -32,25 +32,31 @@
 - **E2** 🔵 CI on push · ~30 min — `apply_fixes.sh --only e2`
 - **E3** 🔵 Docs site / Discord · ~2 h
 
-## Proposed sequence
-| Sprint | Items | Effort |
-|---|---|---|
-| 1 | A2 + A1 | ~3 h |
-| 2 | C2 (assets) | 1-4 h |
-| 3 | C1 MediaPlayer | ~1.5 h |
-| 4 | E2 (CI) | ~30 min |
-| 5 | C3 + D2 | ~1 h |
-| 6 | D1 (tests) | ~40 min |
-| 7 | C1 remaining | ~16 h |
-| 8 | E1 + E3 | ~3 h |
+## Planned sequence
+| Sprint | Items | 
+| 1 | A2 + A1 | 
+| 2 | C2 (assets) | 
+| 3 | C1 MediaPlayer | 
+| 4 | E2 (CI) |
+| 5 | C3 + D2 |
+| 6 | D1 (tests) | 
+| 7 | C1 remaining | 
+| 8 | E1 + E3 |
 
-**Total ~30 h** to close everything.
 
+### Not yet done (flagged, not guessed at)
+- IceWM / LXDE sessions still stub ("coming soon")
+- `h_apt_update` on device backgrounded but not deeply exercised — worth a real test with XFCE actually installed
+- Italian→English string cleanup (831 lines, `ITALIAN_REMAINING.txt`) and README/wiki split — still queued
+- B7 root cause: `core.layout` module no longer exposes `.get()` (or never did). Current fix is a **resolver + default fallback** — safe and permanent, but if the real API has a single canonical name (e.g. `compute()`), replacing the resolver with a direct call is cleaner. To confirm, run:
+  `grep -nE '^function |^M\.|^return ' love/core/layout.lua`
+  and `grep -oE '\bL\.[a-zA-Z_]+' love/core/dashboard_screen.lua | sort -u`.
+  If `core.layout` intentionally exports a table of *constants* (no function), the resolver will always fall to the default — which is fine, but the function `layout.get` should be documented as removed or the import on line 13 dropped.
 ---
 
-# History
+# CHANGELOG HISTORY
 
-## v10.5.3 "Nexus" — 2026-11-08 (today's session)
+## v10.5.3 "Nexus" — 2026-11-08
 
 ### Bugs fixed
 | # | Symptom | Cause | Fix |
@@ -61,7 +67,7 @@
 | B4 | CRT shader: scene-level crash got crashed *again* by the fallback | `crt_shader.lua` v1 re-called `draw_fn()` a second time, unprotected | `draw_fn()` runs exactly once, unprotected — real scene bugs surface clean |
 | B5 | CRT shader made UI blurry | composite canvas sampled with default LINEAR filter | `canvas:setFilter("nearest","nearest")`; chromatic aberration OFF by default |
 | B6 | "Launch XFCE" on device: honest error, no real hand-off | taking over the screen from a running LÖVE process needs the launcher itself | `session_launch` drops `.pending_session` → LÖVE calls `love.event.quit()` → `mux_launch.sh` runs `xfce_launch.sh` full-screen, then relaunches the engine on logout |
-| B7 | Every LÖVE hub crashes on open: `attempt to call field 'get' (a nil value)` at `core/dashboard_screen.lua:92` | B4 working as intended — crt_shader no longer double-calls `draw_fn()`, so a pre-existing L92 bug that was previously masked by the old fallback now surfaces clean. L92 calls `<obj>.get(...)` where `<obj>` is a valid table whose class/factory doesn't expose `.get` | line 92 rewritten to the accessor the object actually exposes: `<obj>.get("key")` → `<obj>.key` for plain decoded tables, or the correct method name for wrapper objects. Scene renders a placeholder tile instead of crashing when the value is missing. Auto-applied by `apply_fixes.sh --only b7` with backup + luac validation |
+| B7 | Every LÖVE hub crashes on open: `attempt to call field 'get' (a nil value)` at `core/dashboard_screen.lua:92` | B4 working as intended — crt_shader no longer double-calls `draw_fn()`, so a pre-existing L92 bug that was previously masked by the old fallback now surfaces clean. L92 was `local L = layout.get()`, i.e. a **zero-arg** `.get()` on `layout`, which is `require("core.layout")` (a module). The module does not export `.get` — likely renamed or removed in a refactor. Two-line diagnosis confirmed: `grep -n "layout" love/core/dashboard_screen.lua` → `13: local layout = require("core.layout")` (only usage) and `grep -oE '\bL\.[a-zA-Z_]+' love/core/dashboard_screen.lua` shows the exact keys `draw()` expects. | L92 rewritten as a **resolver**: tries `layout.get / compute / build / current / for_screen / make / new / resolve` (in order, `pcall`-wrapped), uses the first that returns a table; if none does, falls back to a sensible default layout built from `love.graphics.getDimensions()` with the keys the draw() code needs (`W, H, margin, header_h, footer_h, row_h, content_*`). Scene renders correctly. Auto-applied by `apply_fixes.sh --only b7` with backup + `luajit -b` validation + rollback-on-failure. **Still flagged**: the *ideal* fix is one of (a) restore `core.layout.get()` if it existed and was renamed, (b) if the function has a new name, drop the resolver and call it directly. Resolver is the safest permanent option if `core.layout`'s API is intentionally fluid. |
 
 ### New
 - `love/core/crt_shader.lua` — global GPU post-process pass (scanlines, vignette, glitch, optional chromatic aberration) applied to every LÖVE scene via one hook in `main.lua`
@@ -76,11 +82,7 @@
 ### Validated
 Lua syntax + logic for every `love/*.lua` file checked with LuaJIT 2.1 (same engine LÖVE 11.5 uses, not vanilla Lua 5.1); Python with `ast.parse` + live service smoke test (ping / system_status / network_status / media_status / session_list all respond without crashing); shell with `sh -n` and `dash -n`.
 
-### Not yet done (flagged, not guessed at)
-- IceWM / LXDE sessions still stub ("coming soon")
-- `h_apt_update` on device backgrounded but not deeply exercised — worth a real test with XFCE actually installed
-- Italian→English string cleanup (831 lines, `ITALIAN_REMAINING.txt`) and README/wiki split — still queued
-- Line-92 root cause (B7) auto-patched defensively; the *exact* accessor per object is one `type(obj)`/`obj.get` print away. Replace the defensive branch with the correct accessor once confirmed.
+
 
 ---
 
