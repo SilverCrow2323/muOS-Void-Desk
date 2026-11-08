@@ -66,3 +66,21 @@ A successful GitHub Actions run proves syntax, focused unit tests, selected stat
 - every IPTV playlist, provider, network or media decoder.
 
 Those require manual verification on the target device and should be reported as such.
+
+
+## LÖVE frontend status and regression checks
+
+LÖVE is an **experimental, incomplete prototype**. Do not describe it as a second complete frontend or claim feature parity with Pygame. Pygame remains the reference implementation for expected behaviour.
+
+CI compiles all Lua files with LuaJIT and runs focused core tests for lazy scene loading, scene navigation and single-flight service requests.
+
+## Visual capture and asset audit
+
+The visual workflow is deliberately separate for the two engines. Press **F12** while either frontend is visible; each frontend writes a PNG and JSON sidecar under data/visual-captures/.
+
+~~~bash
+python3 tools/visual_capture.py
+python3 tools/visual_capture.py --check
+~~~
+
+The report inventories images and fonts, verifies active LÖVE NEXUS planet images and records which UI scenes have screenshots. Captures are not committed automatically because network and system panels may show private information. See [Visual capture workflow](visual/README.md).

@@ -17,7 +17,9 @@ from pathlib import Path
 APP_DIR = Path(__file__).resolve().parent.parent
 DATA    = APP_DIR / "data"
 REQ     = DATA / ".love_request.json"
+PROCESSING = DATA / ".love_request.processing"
 RESP    = DATA / ".love_response.json"
+RESP_TMP = DATA / ".love_response.tmp"
 CFG     = DATA / "desk_config.json"
 DATA.mkdir(parents=True, exist_ok=True)
 
@@ -670,31 +672,68 @@ HANDLERS = {
 def main():
     log(f"started  machine={platform.machine()}  device={IS_DEVICE}")
     log(f"req={REQ}  resp={RESP}")
-    last_mtime = 0
+    # A previous service process may have been interrupted mid-request.
+    # Its claim file is no longer owned by a live worker.
+    try:
+        PROCESSING.unlink(missing_ok=True)
+    except OSError as e:
+        log(f"cannot clear stale processing file: {e}")
+
     while True:
         try:
-            if not REQ.exists():
-                time.sleep(0.05)
-                continue
-            mtime = REQ.stat().st_mtime
-            if mtime == last_mtime:
-                time.sleep(0.05)
-                continue
-            last_mtime = mtime
-            req = json.loads(REQ.read_text())
-            cmd  = req.get("cmd", "")
-            args = req.get("args", {})
-            rid  = req.get("id", 0)
-            fn = HANDLERS.get(cmd)
+            # Claim the request with an atomic rename. Unlike mtime polling,
+            # this works on FAT/exFAT volumes where timestamps have coarse
+            # resolution and two quick requests can share the same mtime.
             try:
-                resp = fn(args) if fn else {"ok": False, "error": f"unknown cmd: {cmd}"}
+                REQ.replace(PROCESSING)
+            except FileNotFoundError:
+                time.sleep(0.05)
+                continue
+
+            try:
+                req = json.loads(PROCESSING.read_text())
+                if not isinstance(req, dict):
+                    raise ValueError("request must be a JSON object")
+                cmd = req.get("cmd", "")
+                args = req.get("args", {})
+                rid = req.get("id", 0)
+                if not isinstance(args, dict):
+                    args = {}
+                fn = HANDLERS.get(cmd)
+                try:
+                    resp = fn(args) if fn else {
+                        "ok": False, "error": f"unknown cmd: {cmd}"
+                    }
+                except Exception:
+                    resp = {
+                        "ok": False,
+                        "error": traceback.format_exc(limit=3),
+                    }
+                if not isinstance(resp, dict):
+                    resp = {"ok": False, "error": "handler returned invalid response"}
+                resp["id"] = rid
             except Exception:
-                resp = {"ok": False, "error": traceback.format_exc(limit=3)}
-            resp["id"] = rid
-            RESP.write_text(json.dumps(resp))
+                resp = {
+                    "ok": False,
+                    "error": traceback.format_exc(limit=3),
+                    "id": 0,
+                }
+
+            # Publish a complete response atomically; the LÖVE side never
+            # observes a partially written JSON document.
+            RESP_TMP.write_text(json.dumps(resp))
+            RESP_TMP.replace(RESP)
+        except OSError as e:
+            log(f"request loop error: {e}")
+            time.sleep(0.1)
         except Exception as e:
             log(f"loop error: {e}")
-            time.sleep(0.5)
+            time.sleep(0.1)
+        finally:
+            try:
+                PROCESSING.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 if __name__ == "__main__":
     main()

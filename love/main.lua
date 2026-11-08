@@ -6,7 +6,9 @@ local input      = require("core.input")
 local inputdbg   = require("core.input_debug")
 local notifications = require("core.notifications")
 local crt        = require("core.crt_shader")
+local visual_capture = require("core.visual_capture")
 local crt_on     = true
+local axis_state = {} -- analog-stick edge tracking (per axis)
 
 function love.load()
     config.load()
@@ -53,6 +55,13 @@ end
 -- ─── KEYBOARD ──────────────────────────────────────────────
 function love.keypressed(key, sc, isrepeat)
     if isrepeat then return end
+    if key == "f12" then
+        local ok, err = visual_capture.capture(sm.current_name())
+        if not ok then
+            print("[visual-capture] " .. tostring(err or "capture failed"))
+        end
+        return
+    end
     if key == "f11" then
         love.window.setFullscreen(not love.window.getFullscreen())
         return

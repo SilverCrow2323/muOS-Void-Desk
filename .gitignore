@@ -67,3 +67,8 @@ fix_*.log
 fix_*.log
 # manual backups from earlier sessions
 .backup_*/
+
+
+# Local screenshots: review and explicitly export selected images before publishing.
+data/visual-captures/*
+!data/visual-captures/.gitkeep

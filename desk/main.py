@@ -13229,6 +13229,20 @@ class App(object):
 
     # -------------------------------------------------------------- input
     def on_button(self, btn):
+        if btn == "SCREENSHOT":
+            try:
+                from desk.utils.visual_capture import capture_surface
+                path, error = capture_surface(
+                    self.surface, APP_DIR, "pygame", self.stack[-1])
+                if path:
+                    self.notify("Visual capture saved",
+                                os.path.basename(path), "success")
+                else:
+                    self.notify("Visual capture failed",
+                                str(error or "unknown error")[:100], "warning")
+            except Exception as exc:
+                self.notify("Visual capture failed", str(exc)[:100], "warning")
+            return
         if btn in ("UP", "DOWN", "LEFT", "RIGHT"):
             self.play("move")
         top = self.stack[-1]

@@ -1,36 +1,95 @@
--- Bridge via JSON files: LÖVE writes .love_request.json,
--- Python service reads it, writes .love_response.json.
--- Polling every 100ms — no external dependencies.
-local json    = require("lib.json")
-local bridge  = {}
-local pending = {}   -- callback queue
-local timer   = 0
-local POLL    = 0.08
+-- Single-flight JSON bridge between the LÖVE frontend and Python service.
+-- Requests are queued because the service exposes one request/response file pair.
+local json = require("lib.json")
+local bridge = {}
+
+local queue = {}
+local active = nil
+local timer = 0
+local POLL = 0.08
+local TIMEOUT = 25
 
 local function app_dir()
     return os.getenv("VOIDDESK_APP_DIR") or "."
 end
 
-function bridge.req_path()  return app_dir().."/data/.love_request.json"  end
-function bridge.resp_path() return app_dir().."/data/.love_response.json" end
+function bridge.req_path()
+    return app_dir() .. "/data/.love_request.json"
+end
+
+function bridge.resp_path()
+    return app_dir() .. "/data/.love_response.json"
+end
+
+local function notify(req, response)
+    if req and req.cb then
+        local ok, err = pcall(req.cb, response)
+        if not ok then
+            print("[bridge] callback failed: " .. tostring(err))
+        end
+    end
+end
+
+-- Only one request may be visible to the service at a time. Write to a
+-- per-request temporary file and rename it into place to avoid partial JSON.
+local function pump()
+    if active then return end
+
+    while #queue > 0 do
+        local req = table.remove(queue, 1)
+        local path = bridge.req_path()
+        local tmp = path .. ".tmp." .. tostring(req.id)
+        local f, open_err = io.open(tmp, "w")
+
+        if not f then
+            notify(req, { ok = false, error = "cannot write request: " .. tostring(open_err) })
+        else
+            local wrote, write_err = f:write(json.encode({
+                id = req.id,
+                cmd = req.cmd,
+                args = req.args,
+            }))
+            local closed, close_err = f:close()
+
+            if not wrote or not closed then
+                os.remove(tmp)
+                notify(req, {
+                    ok = false,
+                    error = "cannot finish request: " .. tostring(write_err or close_err),
+                })
+            else
+                local renamed, rename_err = os.rename(tmp, path)
+                if renamed then
+                    req.since = love.timer.getTime()
+                    active = req
+                    return
+                end
+                os.remove(tmp)
+                notify(req, { ok = false, error = "cannot publish request: " .. tostring(rename_err) })
+            end
+        end
+    end
+end
 
 function bridge.init()
     bridge._id = 0
-    -- rimuovi file stale
+    queue = {}
+    active = nil
+    timer = 0
+    -- Remove only an old response. The service owns the processing marker.
     os.remove(bridge.resp_path())
 end
 
 function bridge.call(cmd, args, cb)
-    bridge._id = bridge._id + 1
-    local req = { id = bridge._id, cmd = cmd, args = args or {} }
-    local f = io.open(bridge.req_path(), "w")
-    if not f then
-        if cb then cb({ ok = false, error = "cannot write request" }) end
-        return
-    end
-    f:write(json.encode(req))
-    f:close()
-    table.insert(pending, { id = bridge._id, cb = cb, since = love.timer.getTime() })
+    bridge._id = (bridge._id or 0) + 1
+    table.insert(queue, {
+        id = bridge._id,
+        cmd = cmd,
+        args = args or {},
+        cb = cb,
+    })
+    pump()
+    return bridge._id
 end
 
 function bridge.poll()
@@ -38,44 +97,47 @@ function bridge.poll()
     if timer < POLL then return end
     timer = 0
 
-    if #pending == 0 then return end
+    if not active then
+        pump()
+        return
+    end
 
     local f = io.open(bridge.resp_path(), "r")
-    if not f then
-        -- timeout dopo 25s (wifi/bt scan possono impiegare diversi
-        -- secondi; i comandi davvero lunghi come xfce_install girano
-        -- in background sul lato Python e rispondono subito)
-        local now = love.timer.getTime()
-        while #pending > 0 and (now - pending[1].since) > 25 do
-            local p = table.remove(pending, 1)
-            if p.cb then p.cb({ ok = false, error = "timeout" }) end
-        end
-        return
-    end
+    if f then
+        local body = f:read("*a")
+        f:close()
+        os.remove(bridge.resp_path())
 
-    local s = f:read("*a") ; f:close() ; os.remove(bridge.resp_path())
-    local ok, resp = pcall(json.decode, s)
-    if not ok or type(resp) ~= "table" then
-        if #pending > 0 then
-            local p = table.remove(pending, 1)
-            if p.cb then p.cb({ ok = false, error = "bad json" }) end
-        end
-        return
-    end
-
-    -- match per id
-    for i, p in ipairs(pending) do
-        if p.id == resp.id then
-            table.remove(pending, i)
-            if p.cb then p.cb(resp) end
+        local ok, response = pcall(json.decode, body)
+        if not ok or type(response) ~= "table" then
+            local finished = active
+            active = nil
+            notify(finished, { ok = false, error = "bad json response" })
+            pump()
             return
         end
+
+        if tonumber(response.id) == active.id then
+            local finished = active
+            active = nil
+            notify(finished, response)
+            pump()
+            return
+        end
+        -- A response from a request that timed out is stale. Discard it,
+        -- but keep waiting for the current request's matching response.
     end
-    -- fallback: rispondi al primo
-    if #pending > 0 then
-        local p = table.remove(pending, 1)
-        if p.cb then p.cb(resp) end
+
+    if active and (love.timer.getTime() - active.since) > TIMEOUT then
+        local finished = active
+        active = nil
+        notify(finished, { ok = false, error = "timeout" })
+        pump()
     end
+end
+
+function bridge.pending_count()
+    return #queue + (active and 1 or 0)
 end
 
 return bridge

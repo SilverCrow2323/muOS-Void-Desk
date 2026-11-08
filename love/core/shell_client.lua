@@ -5,6 +5,7 @@ client.output = ""
 client.ready = false
 client.poll_timer = 0
 client.POLL_INTERVAL = 0.15
+client.poll_inflight = false
 
 function client.start(cb)
     bridge.call("shell_start", {}, function(resp)
@@ -14,12 +15,14 @@ function client.start(cb)
 end
 
 function client.poll(dt)
-    if not client.ready then return end
+    if not client.ready or client.poll_inflight then return end
     client.poll_timer = client.poll_timer + dt
     if client.poll_timer < client.POLL_INTERVAL then return end
     client.poll_timer = 0
+    client.poll_inflight = true
     bridge.call("shell_poll", {}, function(resp)
-        if resp.ok and resp.output and #resp.output > 0 then
+        client.poll_inflight = false
+        if client.ready and resp.ok and resp.output and #resp.output > 0 then
             client.output = client.output .. resp.output
             if #client.output > 60000 then
                 client.output = client.output:sub(-60000)
@@ -35,6 +38,7 @@ end
 function client.stop()
     bridge.call("shell_kill", {}, function() end)
     client.ready = false
+    client.poll_inflight = false
     client.output = ""
 end
 
