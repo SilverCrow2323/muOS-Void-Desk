@@ -30,6 +30,17 @@ equal(sm.current_name(), "lazy_probe", "lazy scene should be current")
 equal(sm.back(), true, "back should restore previous scene")
 equal(sm.current_name(), "base_probe", "base scene should be restored")
 
+-- A broken scene must be reported and must not crash the screenshot loop.
+sm.register("broken_draw_probe", {
+    enter = function() end,
+    draw = function() error("synthetic draw failure") end,
+})
+equal(sm.switch("broken_draw_probe", {}), true, "broken scene should enter")
+local draw_ok = sm.draw()
+equal(draw_ok, false, "draw failure should be caught")
+assert(tostring(sm.current_error()):find("synthetic draw failure", 1, true),
+       "draw failure should remain inspectable")
+
 -- The bridge has a single request/response file pair. Requests must queue.
 local now = 0
 love = {
