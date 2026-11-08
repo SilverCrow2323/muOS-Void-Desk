@@ -16,6 +16,7 @@ local BATCH_SCENES = {
     { name = "hub_apt", args = {} },
     { name = "hub_uplink", args = {} },
     { name = "hub_tailscale", args = {} },
+    { name = "hub_syncthing", args = {} },
     { name = "hub_media", args = {} },
     { name = "hub_workshop", args = {} },
     { name = "hub_toolbox", args = {} },
