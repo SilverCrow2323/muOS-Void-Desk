@@ -70,6 +70,15 @@ return dashboard.new({
     end,
 
     items = {
+        { icon = "pkg", label = "APT Package Manager",
+          desc = "Search, install, remove and maintain XFCE packages",
+          action = function(scene)
+              if sm.push("hub_apt", {}) then
+                  return "Opening APT manager..."
+              end
+              scene.set_status("APT manager: " .. tostring(sm.last_error() or "cannot open"))
+              return "APT manager unavailable"
+          end },
         { icon = "pkg", label = "Install XFCE Desktop",
           desc = "Install or repair the desktop chroot",
           action = function(scene)
