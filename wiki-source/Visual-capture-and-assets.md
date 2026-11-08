@@ -12,6 +12,18 @@ The script starts the Python companion service, runs the LÖVE frontend, switche
 
 This pass verifies that scenes can be opened and rendered in the desktop runtime. GitHub Actions uploads a `voiddesk-love-visual-captures` artifact from each run (screenshots, JSON sidecars, manifest and logs; 30-day retention). Open the workflow run and download it from **Artifacts**. Synthetic system/network status is used for this test, not live host data. It is not hardware validation for muOS or a claim that all LÖVE actions are complete.
 
+## Automated Pygame home-style smoke capture
+
+On Linux/CI, run:
+
+~~~bash
+python3 tools/capture_pygame_screenshots.py
+~~~
+
+The harness boots the real Pygame application with an isolated temporary config and SDL's dummy video/audio drivers, then renders the five supported home styles: BLAME, HUD, Terminal, Orbit and NEXUS. It writes PNGs with JSON sidecars plus `data/visual-captures/pygame-home-manifest.json`.
+
+GitHub Actions uploads these files as `voiddesk-pygame-visual-captures` (30-day retention). A failed style makes the command fail and is recorded in the manifest. This is a home-screen rendering smoke test, not automated traversal of every hub, action, controller path or handheld hardware workflow.
+
 ## Capture one current screen
 
 Both frontends support F12. PNG screenshots and JSON metadata sidecars are saved under data/visual-captures/.
