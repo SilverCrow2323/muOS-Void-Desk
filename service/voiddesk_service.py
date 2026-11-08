@@ -1325,6 +1325,7 @@ def h_syncthing_status(args):
         config = _syncthing_rest(url, key, "/rest/config")
         connections = _syncthing_rest(
             url, key, "/rest/system/connections").get("connections", {})
+        from urllib.parse import quote
         folders = []
         for folder in config.get("folders", [])[:8]:
             folder_id = str(folder.get("id") or "")
@@ -1333,8 +1334,7 @@ def h_syncthing_status(args):
                 try:
                     completion = _syncthing_rest(
                         url, key, "/rest/db/completion?folder=" +
-                        __import__("urllib.parse", fromlist=["quote"]).quote(
-                            folder_id, safe=""))
+                        quote(folder_id, safe=""))
                     pct = int(completion.get("completion", 0))
                 except Exception:
                     pass
