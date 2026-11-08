@@ -750,8 +750,6 @@ def comp_color(c):
     return (r, g, b)
 
 
-TS_BIN = os.environ.get("VD_TS_BIN", "/opt/muos/bin/tailscale")
-TS_SOCK = os.environ.get("VD_TS_SOCK", "/run/tailscale/tailscaled.sock")
 TS_GRAY = (196, 200, 208)
 
 WMO_CODES = {
@@ -8671,7 +8669,7 @@ class App(object):
         if not self.ts:
             self.info_lines = self.stub_lines(
                 "TAILSCALE",
-                ["demone unreachable (socket %s)" % TS_SOCK])
+                ["daemon Rt:Tailscale-M non raggiungibile" if it else "Rt:Tailscale-M daemon unreachable"])
             self.scroll = 0
             self.info_title = "TAILSCALE"
             self.push("info")
