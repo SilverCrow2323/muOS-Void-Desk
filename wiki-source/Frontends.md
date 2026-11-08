@@ -12,6 +12,14 @@ Pygame is the main and more complete VoidDesk frontend.
 
 The Pygame UI is the reference implementation for user-visible features and expected behaviour.
 
+### Pygame visual verification
+
+- F12 saves the current composed frame to `data/visual-captures/`.
+- `python3 tools/capture_pygame_screenshots.py` smoke-renders all five supported home styles (BLAME, HUD, Terminal, Orbit and NEXUS).
+- CI publishes the generated screenshots and manifest as the `voiddesk-pygame-visual-captures` artifact.
+
+The automated Pygame pass currently covers the home presentation variants only. It must not be interpreted as full hub/action coverage or handheld hardware certification.
+
 ## LÖVE (experimental)
 
 The LÖVE frontend under love/ is an incomplete prototype. It is included for active development and testing, not as a feature-equivalent production option.
