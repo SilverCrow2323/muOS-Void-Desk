@@ -73,7 +73,7 @@ def test_apt_job_accepts_valid_package_list(tmp_path, monkeypatch):
     monkeypatch.setattr(service, "DATA", tmp_path / "data")
     monkeypatch.setattr(service, "_JOBS", {})
     monkeypatch.setattr(service, "_JOB_SEQ", 0)
-    script = tmp_path / "bin" / "vd_apt_manage.sh"
+    script = tmp_path / "bin" / "vd_apt_manage.py"
     script.parent.mkdir()
     script.write_text("#!/bin/sh\n")
     process = FakeProcess()
