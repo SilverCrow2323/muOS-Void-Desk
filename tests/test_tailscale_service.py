@@ -43,3 +43,23 @@ def test_tailscale_action_handler_rejects_missing_adapter(monkeypatch):
     monkeypatch.setattr(service, "tailscale_manager", None)
     assert service.h_tailscale_status({})["ok"] is False
     assert service.h_tailscale_action({"action": "start"})["ok"] is False
+
+
+def test_tailscale_first_start_is_dispatched_to_background_job(monkeypatch):
+    service = load_service()
+    captured = {}
+    monkeypatch.setattr(
+        service, "tailscale_manager",
+        SimpleNamespace(status=lambda app_dir: {"ok": True}),
+    )
+
+    def fake_job(args):
+        captured.update(args)
+        return {"ok": True, "job": {"id": "7"}}
+
+    monkeypatch.setattr(service, "h_job_start", fake_job)
+    result = service.h_tailscale_action({"action": "start"})
+
+    assert result["ok"] is True
+    assert captured["service_task"] == "tailscale_start"
+    assert captured["hub"] == "uplink"
