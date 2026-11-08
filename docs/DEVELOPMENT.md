@@ -79,8 +79,9 @@ CI compiles all Lua files with LuaJIT and runs focused core tests for lazy scene
 The visual workflow is deliberately separate for the two engines. Press **F12** while either frontend is visible; each frontend writes a PNG and JSON sidecar under data/visual-captures/.
 
 ~~~bash
+python3 tools/capture_love_screenshots.py
 python3 tools/visual_capture.py
 python3 tools/visual_capture.py --check
 ~~~
 
-The report inventories images and fonts, verifies active LÖVE NEXUS planet images and records which UI scenes have screenshots. Captures are not committed automatically because network and system panels may show private information. See [Visual capture workflow](visual/README.md).
+The first command opens every LÖVE scene in sequence and records an automated screenshot pass. It requires LÖVE 11.5 and Xvfb if no display is available. The report inventories images and fonts, verifies active LÖVE NEXUS planet images and records screenshot coverage for both engines. Captures are not committed automatically because network and system panels may show private information. See [Visual capture workflow](visual/README.md).
