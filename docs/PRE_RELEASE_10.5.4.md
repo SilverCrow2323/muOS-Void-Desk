@@ -108,7 +108,7 @@ Preserve the mature service capabilities:
 - Taildrop send/receive;
 - start-at-boot through muOS User Init Scripts, with explicit status and safe disable;
 - service diagnostics, update and recovery;
-- optional PIN-protected web panel, bound and exposed deliberately.
+- optional PIN-protected web panel, disabled by default in the Void Desk package; when explicitly enabled from the native UI it binds to `127.0.0.1` only.
 
 Integration requirements:
 
