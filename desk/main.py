@@ -16023,7 +16023,23 @@ class App(object):
             elif btn == "B":
                 self.pop_state()
         elif top == "syncpanel":
-            if btn == "A":
+            mode = getattr(self, "sync_mode", "folders")
+            items = (self.sync or {}).get(
+                "devices" if mode == "devices" else "folders", [])
+            if btn == "UP" and items:
+                self.sync_sel = (self.sync_sel - 1) % len(items)
+            elif btn == "DOWN" and items:
+                self.sync_sel = (self.sync_sel + 1) % len(items)
+            elif btn in ("L1", "R1"):
+                self.sync_mode = "devices" if mode == "folders" else "folders"
+                self.sync_sel = 0
+            elif btn == "A" and items:
+                self.sync_action("toggle")
+            elif btn == "X" and mode == "folders" and items:
+                self.sync_action("scan")
+            elif btn == "Y" and mode == "folders" and items:
+                self.sync_action("override")
+            elif btn == "SELECT":
                 self.sync_open_refresh()
             elif btn == "B":
                 self.pop_state()
