@@ -7,7 +7,6 @@ local widgets = require("core.widgets")
 local state = {
     system = {},
     network = {},
-    media = {},
     tailscale = {},
     syncthing = {},
     errors = {},
@@ -15,7 +14,7 @@ local state = {
 
 local function refresh(scene, silent)
     state.errors = {}
-    local pending = 5
+    local pending = 4
     local function done()
         pending = pending - 1
         if pending <= 0 and not silent then
@@ -35,11 +34,6 @@ local function refresh(scene, silent)
     bridge.call("network_status", {}, function(resp)
         if resp.ok then state.network = resp.network or {}
         else failed("Network", resp) end
-        done()
-    end)
-    bridge.call("media_status", {}, function(resp)
-        if resp.ok then state.media = resp.media or {}
-        else failed("Media", resp) end
         done()
     end)
     bridge.call("tailscale_status", {}, function(resp)
