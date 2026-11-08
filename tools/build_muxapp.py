@@ -118,7 +118,9 @@ def build_archive(repo_root: Path, output: Path):
             name = source.name
             if name in SKIP_DIRS or name in SKIP_FILES or name in SKIP_ROOT_FILES:
                 continue
-            if name.startswith(".venv") or name.startswith(".cache"):
+            if (name.startswith(".venv") or name.startswith(".cache")
+                    or name == ".env"
+                    or (name.startswith(".env.") and name != ".env.example")):
                 continue
             if source.is_symlink():
                 raise RuntimeError(f"symbolic link is not packageable: {source}")
