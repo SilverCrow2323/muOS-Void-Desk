@@ -8719,8 +8719,11 @@ class App(object):
                   else "Network diagnostics"))
         A.append(("recv", "Receive files (Taildrop)" if it
                   else "Receive files (Taildrop)"))
-        A.append(("start_service", "Avvia servizio" if it
-                  else "Start service"))
+        A.append(("start_service",
+                  ("Setup in corso" if (self.ts or {}).get("setup_running")
+                   else "Avvia servizio") if it else
+                  ("Setup in progress" if (self.ts or {}).get("setup_running")
+                   else "Start service")))
         A.append(("autostart", "Avvio automatico: %s" %
                   ("ON" if (self.ts or {}).get("autostart") else "OFF")))
         A.append(("panel", "Pannello web locale: %s" %
