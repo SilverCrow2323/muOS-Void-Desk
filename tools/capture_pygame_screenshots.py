@@ -116,6 +116,69 @@ def main() -> int:
                       (style, exc), file=sys.stderr)
 
         state_names = []
+        fixture_app_dir = sandbox_data / "mapp-fixture"
+        fixture_app_dir.mkdir(parents=True, exist_ok=True)
+        (fixture_app_dir / "mux_launch.sh").write_text(
+            "#!/bin/sh\\n# ICON: fixture\\n", encoding="utf-8"
+        )
+
+        def prepare_state(state_name):
+            # These states are normally entered with data prepared by an
+            # interaction. Supply inert, isolated fixtures so we can test
+            # their renderer without starting a PTY, scanning devices or
+            # touching real applications and files.
+            if state_name == "rtshell":
+                app.rtsh_buf = app_module.rtshell.TermBuffer(
+                    app.rtsh_cols, app.rtsh_rows
+                )
+                app.rtsh_buf.feed(b"VOIDDESK VISUAL TEST\\r\\n$ ")
+                app.rtsh_sess = None
+                app.rtsh_welcome = False
+            elif state_name == "chddetail":
+                app.chd_detail_sd_idx = 0
+                app.chd_detail_file = {
+                    "name": "visual-fixture.cue",
+                    "linked": [{
+                        "name": "visual-fixture.bin",
+                        "missing": False,
+                        "size": 4096,
+                    }],
+                    "total_size": 4096,
+                }
+            elif state_name == "capture":
+                app.map_sel = min(1, len(app.map_rows()) - 1)
+                app.capture_t = time.time()
+            elif state_name == "swap":
+                keys = list(app_module.FUNC_BY_KEY)
+                key, other = keys[0], keys[1]
+                events = app.cur_map().get(key) or []
+                app.pending = (key, events[0] if events else 304, other)
+            elif state_name in ("mappdetail", "glyphpick"):
+                app.mapp_cur = {
+                    "name": "Visual Fixture",
+                    "sd": "CI",
+                    "dir": str(fixture_app_dir),
+                    "icon": None,
+                }
+                app.mapp_size = 4096
+                app.det_sel = 0
+                app.gp_list = []
+                app.gp_sel = 0
+            elif state_name == "ctrlswap":
+                app.ctrl_pending = (
+                    "Visual fixture controller",
+                    "hid:304", "hid:305", "hid:307",
+                )
+            elif state_name == "fmsearch":
+                app.fm_search_q = "visual fixture"
+                app.fm_search_results = []
+                app.fm_search_sel = 0
+            elif state_name == "fmbookmarks":
+                app.fmbm_sel = 0
+            elif state_name == "imgview":
+                app.img_path = str(ROOT / "love" / "assets" / "logos"
+                                   / "voiddesk.png")
+
         if args.all_states:
             render_source = inspect.getsource(app_module.App.render_state)
             state_names = list(dict.fromkeys(re.findall(
@@ -130,6 +193,7 @@ def main() -> int:
                 screen_name = "state-" + state_name
                 try:
                     app.stack = [state_name]
+                    prepare_state(state_name)
                     app.surface.fill((0, 0, 0))
                     app.render_state()
                     pygame.display.flip()
