@@ -1,4 +1,6 @@
-import io, tarfile, pytest
+import io
+import tarfile
+import pytest
 from desk.utils.safe_extract import safe_tar_extractall
 
 def _tar(name, data=b"x"):

@@ -347,4 +347,4 @@ def set_volume(pct):
 
 def sound_cards():
     c = _read("/proc/asound/cards", "")
-    return [l for l in c.splitlines() if l.strip()]
+    return [line for line in c.splitlines() if line.strip()]
