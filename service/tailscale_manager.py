@@ -10,6 +10,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 EXIT_NODE_RE = re.compile(r"^[A-Za-z0-9_.:\-]{1,255}$")
@@ -120,6 +121,45 @@ def cli(app_dir: Path, *args, timeout=10):
         return subprocess.CompletedProcess(args, 124, "", "Tailscale command timed out")
     except OSError as exc:
         return subprocess.CompletedProcess(args, 127, "", str(exc))
+
+
+def _setup_job_active(lock_path: Path):
+    try:
+        pid = int(lock_path.read_text(encoding="ascii").strip())
+        if pid <= 1:
+            return False
+        os.kill(pid, 0)
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\\0", b" ")
+        return b"tailscale_job.py" in cmdline
+    except (OSError, ValueError):
+        return False
+
+
+def start_async(app_dir: Path):
+    """Start the verified install/start sequence without blocking Pygame."""
+    app_dir = Path(app_dir)
+    data_dir = app_dir / "data"
+    script = app_dir / "service" / "tailscale_job.py"
+    if not script.is_file():
+        return {"ok": False, "error": "Tailscale setup job is missing"}
+    data_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = data_dir / ".tailscale_setup.pid"
+    if lock_path.exists() and _setup_job_active(lock_path):
+        return {"ok": True, "already_running": True}
+    try:
+        lock_path.unlink(missing_ok=True)
+        log_file = (data_dir / "tailscale_setup.log").open("ab")
+        try:
+            process = subprocess.Popen(
+                [sys.executable, str(script)], cwd=str(app_dir),
+                stdin=subprocess.DEVNULL, stdout=log_file,
+                stderr=subprocess.STDOUT, start_new_session=True,
+            )
+        finally:
+            log_file.close()
+        return {"ok": True, "pid": process.pid, "message": "Tailscale setup started"}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot start Tailscale setup: " + str(exc)}
 
 
 def status(app_dir: Path, extra_roots=(), runner=subprocess.run):
