@@ -31,12 +31,12 @@ This is a software-rendered desktop capture pass, not a substitute for screensho
 Run on Linux (also used by CI):
 
 ~~~bash
-python3 tools/capture_pygame_screenshots.py
+python3 tools/capture_pygame_screenshots.py --all-states
 ~~~
 
-The harness starts the real Pygame application with isolated test configuration and SDL dummy video/audio drivers. It renders all five supported home styles (BLAME, HUD, Terminal, Orbit and NEXUS), then writes PNGs, JSON sidecars and `data/visual-captures/pygame-home-manifest.json`. GitHub Actions uploads them as `voiddesk-pygame-visual-captures` with 30-day retention.
+The harness starts the real Pygame application with isolated test configuration and SDL dummy video/audio drivers. It renders all five supported home styles (BLAME, HUD, Terminal, Orbit and NEXUS), then smoke-renders every state branch declared in `App.render_state()`. It writes PNGs, JSON sidecars and `data/visual-captures/pygame-home-manifest.json`. GitHub Actions uploads them as `voiddesk-pygame-visual-captures` with 30-day retention.
 
-This is deliberately a home-style smoke test. It does not yet traverse every hub, action, controller flow or device-only feature.
+Directly rendering a state does not prove it is reachable through navigation or that its actions work. This is renderer coverage, not end-to-end navigation, controller or hardware validation.
 
 ## Capture a single screen on-device
 
