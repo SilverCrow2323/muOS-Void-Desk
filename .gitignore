@@ -60,3 +60,10 @@ data/.love_response.json
 *.pyc
 fix_*.log
 *.bak.b7*
+
+# voiddesk fix artifacts
+*.bak.b7*
+*.bak.b7v*
+fix_*.log
+# manual backups from earlier sessions
+.backup_*/
