@@ -1,4 +1,5 @@
 #!/bin/sh
+# VOIDDESK v10.5.4 — muOS device launcher
 # HELP: VoidDesk - Void suite (LÖVE or Pygame frontend, switchable in Settings)
 # ICON: voiddesk
 # GRID: voiddesk
@@ -89,7 +90,9 @@ except Exception:
 }
 
 PENDING="$DATA/.pending_session"
-rm -f "$PENDING"
+POWER_OFF="$DATA/.pending_poweroff"
+rm -f "$PENDING" "$POWER_OFF"
+POWER_OFF_REQUESTED=0
 
 # Start Python service
 python3 "$APP_DIR/service/voiddesk_service.py" >>"$LOG" 2>&1 &
@@ -103,6 +106,13 @@ SERVICE_PID=$!
 # the UI, no pending session) breaks out and ends the script as before.
 while true; do
     run_engine
+
+    if [ -f "$POWER_OFF" ]; then
+        rm -f "$POWER_OFF"
+        POWER_OFF_REQUESTED=1
+        echo "$(date) power-off requested by frontend" >>"$LOG"
+        break
+    fi
 
     if [ -f "$PENDING" ]; then
         SESSION="$(cat "$PENDING" 2>/dev/null)"
@@ -142,6 +152,29 @@ while true; do
     break
 done
 
+# Stop the companion service before device shutdown.
 kill "$SERVICE_PID" 2>/dev/null
+wait "$SERVICE_PID" 2>/dev/null
+
+if [ "$POWER_OFF_REQUESTED" -eq 1 ]; then
+    echo "$(date) syncing storage before forced power-off" >>"$LOG"
+    sync
+
+    if command -v poweroff >/dev/null 2>&1; then
+        poweroff -f >>"$LOG" 2>&1
+        echo "$(date) poweroff returned; trying poweroff reboot fallback" >>"$LOG"
+    fi
+    if command -v reboot >/dev/null 2>&1; then
+        reboot -p -f >>"$LOG" 2>&1
+        echo "$(date) reboot -p -f returned; trying halt fallback" >>"$LOG"
+    fi
+    if command -v halt >/dev/null 2>&1; then
+        halt -f -p >>"$LOG" 2>&1
+    fi
+
+    echo "$(date) ERROR: every power-off command returned" >>"$LOG"
+    exit 1
+fi
+
 echo "$(date) exit rc=$RC" >>"$LOG"
 exit $RC

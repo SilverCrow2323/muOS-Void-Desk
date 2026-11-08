@@ -656,7 +656,7 @@ BGM_EXTS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma",
 MEDIA_EXTS = BGM_EXTS | {".mkv", ".avi", ".mov", ".m3u", ".m3u8"}
 BGM_SAMPLE_RATE = 44100
 BGM_OGG_QUALITY = "6"
-VERSION = "10.5.1"
+VERSION = "10.5.4"
 VERSION_CODENAME = "Nexus"
 MENU_DEST_COLORS = [
     (60, 200, 130),   # 0 START SESSION -- verde, avvio
@@ -2349,7 +2349,15 @@ class App(object):
         self.scroll = 0
         self.log_lines = []
         self.info_lines = None
-        self._stat = ({}, 0.0)
+        self._status_poller = sysinfo.StatusPoller(
+            self._read_status_snapshot,
+            interval=8.0,
+            initial={
+                "batt": None, "chg": False, "ssid": None, "wifi": None,
+                "conn": None, "iface": None, "ip": None, "bt": None,
+                "vol": None, "usb": None, "hot": False,
+            },
+        )
         # v10: cache LRU per self.text() -- render() del font e' la
         # chiamata piu' ripetuta di tutta l'app (500+ call site), e
         # per la stragrande maggioranza disegna la stessa stringa
@@ -12141,19 +12149,28 @@ class App(object):
         if checked:
             pygame.draw.rect(self.surface, self.accent, (x + 3, y + 3, 8, 8))
 
+    def _read_status_snapshot(self):
+        """Collect host state in the background status worker."""
+        pct, chg = sysinfo.battery()
+        conn, ssid, lvl, iface, ip = sysinfo.wifi_status()
+        return {
+            "batt": pct,
+            "chg": chg,
+            "ssid": ssid,
+            "wifi": lvl if conn else None,
+            "conn": conn,
+            "iface": iface,
+            "ip": ip,
+            "bt": sysinfo.bt_status(),
+            "vol": sysinfo.volume(),
+            "usb": sysinfo.usb_mode(),
+            "hot": self.hot_active(),
+        }
+
     def status_snapshot(self):
-        now = time.time()
-        if now - self._stat[1] > 8:
-            pct, chg = sysinfo.battery()
-            conn, ssid, lvl, iface, ip = sysinfo.wifi_status()
-            self._stat = ({"batt": pct, "chg": chg, "ssid": ssid,
-                           "wifi": lvl if conn else None, "conn": conn,
-                           "iface": iface, "ip": ip,
-                           "bt": sysinfo.bt_status(),
-                           "vol": sysinfo.volume(),
-                           "usb": sysinfo.usb_mode(),
-                           "hot": self.hot_active()}, now)
-        return self._stat[0]
+        # hciconfig / bluetoothctl may wait for an unavailable or slow
+        # adapter. Never let a peripheral probe stall the frame loop.
+        return self._status_poller.snapshot()
 
     def header(self, title, right="", icon=None, accent=None):
         """accent: se dato, sovrascrive SOLO il primario/secondario di
@@ -16761,12 +16778,30 @@ class App(object):
             return
         if key == "poweroff":
             self.crt_off()
-            for cmd in (["poweroff"], ["systemctl", "poweroff"],
-                       ["shutdown", "-h", "now"]):
+            if os.environ.get("VOIDDESK_FULLSCREEN") == "1":
+                marker = os.path.join(DATA, ".pending_poweroff")
                 try:
-                    subprocess.run(cmd, timeout=5)
+                    os.makedirs(DATA, exist_ok=True)
+                    with open(marker + ".tmp", "w") as output:
+                        output.write("poweroff\n")
+                    os.replace(marker + ".tmp", marker)
                     return
-                except Exception:
+                except OSError as exc:
+                    sys.stderr.write("power-off hand-off failed: %s\n" % exc)
+
+            # Standalone / PC fallback after the user explicitly confirmed.
+            try:
+                os.sync()
+            except (AttributeError, OSError):
+                pass
+            for cmd in (["poweroff", "-f"], ["reboot", "-p", "-f"],
+                        ["halt", "-f", "-p"]):
+                try:
+                    subprocess.run(cmd, timeout=8)
+                    # If the command returns, it did not power the device off.
+                except subprocess.TimeoutExpired:
+                    return
+                except OSError:
                     continue
             sys.exit(0)
 

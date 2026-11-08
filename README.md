@@ -96,6 +96,28 @@ See [Architecture](docs/ARCHITECTURE.md) for execution flow.
 
 The Pygame frontend can bootstrap its runtime on demand. The improved bootstrap validates HTTPS certificates, verifies the published PyPI SHA-256 digest, checks archive paths and tests the import before replacing the active runtime. The desktop image bootstrap is separate.
 
+## Web browsers on muOS
+
+VoidDesk exposes optional desktop browsers through the **XFCE environment**. NetSurf (`netsurf-gtk`), Falkon (`falkon`) and Dillo (`dillo`) are package choices for the Ubuntu desktop image; they are not browser binaries installed directly into the muOS host.
+
+To use one:
+
+1. Install and start the optional XFCE desktop from **START SESSION**.
+2. Open **THE FORGE → BROWSER / RETE** and install the browser into the desktop image.
+3. Launch it from the XFCE application menu or an XFCE terminal.
+
+The separate `qtWebBrowser` entry in EthoStore is a third-party muOS application. It is not the same component as the XFCE browsers above and is not bundled or maintained by VoidDesk.
+
+### Browser launch errors
+
+An `Input/output error` is not specific enough to identify one cause. Record which browser was selected, whether it was launched from XFCE or from the muOS application grid, and the complete error text. Useful logs are:
+
+- `data/xfce_session.log` — XFCE session output.
+- `data/session_xfce.log` — X/desktop startup output.
+- `data/voiddesk.log` — VoidDesk launcher and session hand-off output.
+
+Installing a browser inside the XFCE image does not make it executable from the muOS host; those are separate environments.
+
 ## Controls
 
 | Input | Default action |
@@ -202,6 +224,12 @@ GitHub Actions checks Python compilation, focused tests, critical Ruff diagnosti
 | Update or repair fails | Preserve logs and open an issue with device/firmware details |
 
 Bug reports should include version, device, firmware, selected engine, reproduction steps and a short relevant log excerpt. Redact usernames, network names, IP addresses, tokens and private data.
+
+### Device power-off
+
+When VoidDesk is started as a muOS application, the power-off action returns control to `mux_launch.sh`. The launcher stops the local companion service, syncs pending filesystem writes, then requests a forced power-off, with kernel power-off fallbacks if the first command returns. This is separate from **END SESSION → Close**, which only exits VoidDesk.
+
+If the device does not power off, preserve `data/voiddesk.log` and report the device model, muOS build and whether the screen/LED state changed. Avoid repeated hard resets while storage writes may still be in progress.
 
 ## Security and responsible use
 

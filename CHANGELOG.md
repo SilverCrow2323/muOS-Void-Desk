@@ -1,57 +1,45 @@
 # CHANGELOG — VoidDesk
 
-> Current version: **v10.5.3-NEXUS** · last updated 2026-11-08
-> One file: roadmap on top, changelog history below.
+> **Release candidate:** `v10.5.4-NEXUS`  
+> **Status:** prepared for review; not yet published as a GitHub Release  
+> **Date:** 2026-11-08
+
+This file records user-visible changes by release. The next candidate is documented separately from the previous release history. Hardware-dependent behaviour is not marked verified until it has been exercised on the target handheld.
 
 ---
 
-# 🗺️ ROADMAP — what's next
+## v10.5.4 "Nexus" — release candidate · 2026-11-08
 
-## Part A — Open issues (GitHub)
-- **A1** 🔥 Stuttering on RG35XXSP at launch — BT-related · ~1-2 h
-  *(synchronous `bluetoothctl` in the render path — cache async, thread+queue)*
-- **A2** 🔥 Shutdown hangs — LED off, system stays warm · ~45 min
-  *(add `sync` + `poweroff -f` + kill orphan children + fallback to `reboot -f`)*
+### Fixed
 
-## Part C — Functional gaps
-- **C1** 🟠 7 `outdesk/*` placeholders · ~16 h total
-  — start with **MediaPlayer** (~1.5 h), then ImageViewer, Disc_Crusher,
-  Portable_Forger, EthoStore, BootAnimManager, Little_Mischief
-- **C2** 🟠 Missing assets · 1-4 h
-  — `bin/vd_bootanim.py`, `bin/vd_hotkey.py`, `assets/*/xinitrc`,
-  `assets/xfce/qjoypad_*.lyt`, `assets/logos/*.png`
-  — first step: `git log --all --oneline -- bin/vd_bootanim.py`
-- **C3** 🟡 `EthosCommandeer.export_to_github()` stub · ~45 min
+| Reference | Reported problem | Change in this candidate | Verification status |
+|---|---|---|---|
+| [#2](https://github.com/SilverCrow2323/Void-Desk-Project/issues/2) | Bluetooth activity could stall the NEXUS animation and delay controller input | Host status collection now runs in a single background worker. The render path reads a cached snapshot and never waits for `hciconfig` or `bluetoothctl` to respond. | Automated regression tests added; RG35XXSP confirmation still required |
+| [#2](https://github.com/SilverCrow2323/Void-Desk-Project/issues/2) | Device power-off could leave the RG35XXSP powered with its LED off | The muOS shutdown path now hands the request back to `mux_launch.sh`; the launcher stops the local service, runs `sync`, then tries forced power-off and device power-off fallbacks. | Shell and Python checks can validate the hand-off; physical RG35XXSP test still required |
 
-## Part D — Quality
-- **D1** 🟡 Tests for `desk/utils/*` · ~40 min — `apply_fixes.sh --only d1`
-- **D2** 🟡 PC/Android-only docs + guards · ~20 min — `apply_fixes.sh --only d2`
+### Documentation and maintenance
 
-## Part E — Suggestions
-- **E1** 🔵 Centralized logging · ~1 h
-- **E2** 🔵 CI on push · ~30 min — `apply_fixes.sh --only e2`
-- **E3** 🔵 Docs site / Discord · ~2 h
+- Clarified that NetSurf, Falkon and Dillo are optional browsers inside the XFCE desktop image, while `qtWebBrowser` is a separate third-party muOS application.
+- Added a browser error-reporting checklist and the relevant VoidDesk/XFCE log paths.
+- Expanded the architecture notes for the asynchronous status cache and device power-off hand-off.
+- Added regression tests for non-blocking status reads, cached snapshots and recovery after a failed probe.
+- Aligned the Python application and launcher version metadata on the 10.5.4 release line and extended `BUILDCHECK.py` to inspect the PC launcher too.
 
-## Planned sequence
-| Sprint | Items | 
-| 1 | A2 + A1 | 
-| 2 | C2 (assets) | 
-| 3 | C1 MediaPlayer | 
-| 4 | E2 (CI) |
-| 5 | C3 + D2 |
-| 6 | D1 (tests) | 
-| 7 | C1 remaining | 
-| 8 | E1 + E3 |
+### Validation
 
+The automated CI run for this candidate is the source of truth for compilation, unit tests, lint, shell parsing and LuaJIT syntax. A green CI run does **not** replace testing on the RG35XXSP or other H700 hardware.
 
-### Not yet done (flagged, not guessed at)
-- IceWM / LXDE sessions still stub ("coming soon")
-- `h_apt_update` on device backgrounded but not deeply exercised — worth a real test with XFCE actually installed
-- Italian→English string cleanup (831 lines, `ITALIAN_REMAINING.txt`) and README/wiki split — still queued
-- B7 root cause: `core.layout` module no longer exposes `.get()` (or never did). Current fix is a **resolver + default fallback** — safe and permanent, but if the real API has a single canonical name (e.g. `compute()`), replacing the resolver with a direct call is cleaner. To confirm, run:
-  `grep -nE '^function |^M\.|^return ' love/core/layout.lua`
-  and `grep -oE '\bL\.[a-zA-Z_]+' love/core/dashboard_screen.lua | sort -u`.
-  If `core.layout` intentionally exports a table of *constants* (no function), the resolver will always fall to the default — which is fine, but the function `layout.get` should be documented as removed or the import on line 13 dropped.
+### Open follow-ups
+
+- **[#1 — internet browser not working](https://github.com/SilverCrow2323/Void-Desk-Project/issues/1):** not marked fixed. The report contains only “output input error”; it does not identify the browser or the screen from which it was launched. Reproduction details and the complete error/log are still needed.
+- **[#2 — stutters and hangs](https://github.com/SilverCrow2323/Void-Desk-Project/issues/2):** both code paths are addressed in this candidate, but keep the issue open until the result is validated on an RG35XXSP running muOS.
+
+### Remaining project work
+
+- Several optional applications under `outdesk/` are still prototypes/placeholders and are not part of this release's completion claim.
+- IceWM/LXDE availability depends on the optional desktop image and installed packages; XFCE remains the documented baseline.
+- Device-only operations such as package installation, desktop-image repair, session hand-off and power management still require physical hardware validation.
+
 ---
 
 # CHANGELOG HISTORY

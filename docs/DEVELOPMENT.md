@@ -29,6 +29,16 @@ The optional smoke mode starts the Python frontend headlessly for a short interv
 python BUILDCHECK.py --smoke
 ~~~
 
+## Status-poller regression tests
+
+`tests/test_status_poller.py` exercises the asynchronous status cache without requiring Pygame or handheld hardware. It verifies that callers receive an immediate cached snapshot while a system probe is blocked, that reads do not create parallel workers, and that a failed probe does not permanently disable refresh.
+
+The CI result is a code-level check only. Before publishing a muOS release, verify on an RG35XXSP (and preferably an RG35XX-H) that:
+- the orbit animation and D-pad response remain smooth with Bluetooth enabled and disabled;
+- the UPLINK Bluetooth panel can still bring the adapter up/down normally;
+- END SESSION → Power off turns the device fully off and does not leave it warm with the LED off;
+- normal reboot, app close and XFCE session hand-off still behave as before.
+
 ## Lua and shell checks
 
 On Debian/Ubuntu, install LuaJIT:

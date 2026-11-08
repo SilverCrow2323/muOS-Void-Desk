@@ -165,8 +165,10 @@ for f in ("desk/const.py", "desk/main.py"):
     vs[f] = m.group(1) if m else None
 m = re.search(r'VOIDDESK v([0-9.]+)', la)
 vs["mux_launch.sh"] = m.group(1) if m else None
+m = re.search(r'VOIDDESK NEXUS v([0-9.]+)', read("voiddesk.py"))
+vs["voiddesk.py"] = m.group(1) if m else None
 if len(set(vs.values())) == 1 and None not in vs.values():
-    ok("version %s everywhere" % list(vs.values())[0])
+    ok("version %s across app and launchers" % list(vs.values())[0])
 else:
     err("mismatched versions: %s" % vs)
 
