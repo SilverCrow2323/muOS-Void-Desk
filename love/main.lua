@@ -7,6 +7,7 @@ local inputdbg   = require("core.input_debug")
 local notifications = require("core.notifications")
 local crt        = require("core.crt_shader")
 local crt_on     = true
+local axis_state = {} -- analog-stick edge tracking (per axis)
 
 function love.load()
     config.load()
