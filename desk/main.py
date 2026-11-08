@@ -13308,13 +13308,13 @@ class App(object):
                     self.crt_off()
             elif style == "nexus":
                 if btn == "LEFT":
-                    self.nexus_ring_switch(-1)
-                elif btn == "RIGHT":
-                    self.nexus_ring_switch(1)
-                elif btn == "UP":
                     self.nexus_ring_rotate(-1)
-                elif btn == "DOWN":
+                elif btn == "RIGHT":
                     self.nexus_ring_rotate(1)
+                elif btn == "UP":
+                    self.nexus_ring_switch(-1)
+                elif btn == "DOWN":
+                    self.nexus_ring_switch(1)
                 elif btn == "A":
                     self.activate(self.sel)
                 elif btn == "START":

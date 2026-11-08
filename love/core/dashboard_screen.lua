@@ -95,10 +95,14 @@ function M.new(config)
 
         love.graphics.clear(0, 0, 0, 1)
 
-        -- Background animation
+        -- Background animation (config.background_draw overrides bg_anim)
         local bg_a = math.min(1, t_enter * 2.5)
         if bg_a > 0.02 then
-            bg_anim.draw(bg_kind, W, H, love.timer.getTime(), node_color, bg_a * 0.55)
+            if config.background_draw then
+                config.background_draw(W, H, love.timer.getTime(), node_color, bg_a)
+            else
+                bg_anim.draw(bg_kind, W, H, love.timer.getTime(), node_color, bg_a * 0.55)
+            end
         end
 
         -- Chrome header FIRST (so it doesn't cover widget cards)

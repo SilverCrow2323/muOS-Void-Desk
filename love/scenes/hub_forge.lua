@@ -50,6 +50,7 @@ return dashboard.new({
         if scene._t > 5 then scene._t = 0; refresh(scene, true) end
     end,
 
+    background_draw = require("effects.forge_bg").draw,
     widgets_draw = function(scene, alpha)
         local W = love.graphics.getWidth()
         local nc = nodes.color_for(3)
