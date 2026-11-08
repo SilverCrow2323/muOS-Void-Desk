@@ -227,6 +227,15 @@ function capture.update(dt)
     if batch.elapsed < batch.settle_seconds then return end
 
     local target = batch.current
+    local draw_error = batch.manager.current_error
+        and batch.manager.current_error()
+    if draw_error then
+        add_failed(target.name, draw_error)
+        batch.index = batch.index + 1
+        switch_to_next_scene()
+        return
+    end
+
     batch.phase = "capture"
     local ok, err = queue_capture(target.name, "automated", function(saved, result)
         if not batch then return end
