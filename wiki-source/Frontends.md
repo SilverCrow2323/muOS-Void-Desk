@@ -36,6 +36,7 @@ Some screens exist, but several actions are placeholders or do not yet have a wo
 
 - LÖVE Toolbox links Calculator and Clock to existing scenes, reads Calendar events from the shared `data/calendar.json` store, and displays live note/text counts from the service. Notes, RSS and Weather remain incomplete.
 - THE FORGE uses a process-backed job queue for package installation; arbitrary shell commands are rejected by the service allowlist.
+- External Tools reads the shared `external/tools.json` registry, reports whether each launcher is actually present, and starts only registered launchers. Missing optional submodules are shown as not installed rather than being treated as successful launches.
 - Workshop diagnostics, live monitor, logs and cleanup are incomplete.
 - Media Library and Radio flows need parity work.
 - Desktop repair is a placeholder.
