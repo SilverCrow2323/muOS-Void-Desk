@@ -56,6 +56,7 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path):
     assert "Void-Desk/love/main.lua" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py" in names
+    assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf" in names
     assert not any(name.startswith("Void-Desk/tests/") for name in names)
     assert "Void-Desk/.env" not in names
     assert "Void-Desk/data/user-config.json" not in names
