@@ -68,3 +68,38 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/voiddesk/data/visual-captures"
           VOIDDESK_APP_DIR="$RUNNER_TEMP/voiddesk" luajit tests/test_love_core.lua
+
+
+  love-visual-capture:
+    name: LÖVE visual capture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LÖVE 11.5 and virtual display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y love xvfb libgl1-mesa-dri
+      - name: Confirm LÖVE runtime
+        run: |
+          love --version
+          love --version | grep -F "11.5"
+      - name: Capture every registered LÖVE screen
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          SDL_AUDIODRIVER: "dummy"
+        run: |
+          python3 tools/capture_love_screenshots.py \
+            --timeout 300 \
+            --settle 0.85
+      - name: Upload screenshot set and capture diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voiddesk-love-visual-captures
+          path: |
+            data/visual-captures/*.png
+            data/visual-captures/*.json
+            data/visual-captures/*.log
+          if-no-files-found: warn
+          retention-days: 30
