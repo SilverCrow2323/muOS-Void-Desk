@@ -45,6 +45,19 @@ local function safe_token(value)
     return token:sub(1, 48)
 end
 
+local function shell_quote(value)
+    return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
+end
+
+local function ensure_output_dir()
+    local command = "mkdir -p " .. shell_quote(output_dir())
+    local ok, why, code = os.execute(command)
+    if ok == true or ok == 0 or code == 0 then
+        return true
+    end
+    return false, tostring(why or code or "mkdir failed")
+end
+
 local function write_atomic(path, contents)
     local temporary = path .. ".tmp"
     local f, err = io.open(temporary, "wb")
@@ -96,6 +109,10 @@ end
 local function queue_capture(screen_name, mode, callback)
     if pending then
         return false, "a screenshot is already being saved"
+    end
+    local dir_ok, dir_err = ensure_output_dir()
+    if not dir_ok then
+        return false, "cannot create screenshot directory: " .. tostring(dir_err)
     end
     pending = true
 
@@ -181,6 +198,10 @@ end
 
 function capture.start_batch(scene_manager, settle_seconds)
     if batch then return false, "batch capture is already running" end
+    local dir_ok, dir_err = ensure_output_dir()
+    if not dir_ok then
+        return false, "cannot create screenshot directory: " .. tostring(dir_err)
+    end
     batch = {
         manager = scene_manager,
         scenes = BATCH_SCENES,
