@@ -252,6 +252,85 @@ def h_network_status(args):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+def h_toolbox_stats(args):
+    """Read-only counts for the LÖVE Toolbox dashboard."""
+    notes_dir = DATA / "notes"
+    texts_dir = DATA / "Texts"
+    text_exts = {
+        ".txt", ".md", ".log", ".cfg", ".ini", ".json", ".csv",
+        ".yml", ".yaml", ".sh", ".conf", ".xml",
+    }
+
+    def count_files(directory, allowed=None):
+        try:
+            with os.scandir(directory) as entries:
+                return sum(
+                    1 for entry in entries
+                    if entry.is_file(follow_symlinks=False)
+                    and (allowed is None or
+                         Path(entry.name).suffix.lower() in allowed)
+                )
+        except OSError:
+            return 0
+
+    return {
+        "ok": True,
+        "notes_count": count_files(notes_dir, {".txt"}),
+        "text_files": count_files(texts_dir, text_exts),
+    }
+
+
+def h_calendar_events(args):
+    """Return month-scoped events in the shape expected by LÖVE Calendar."""
+    try:
+        year = int(args.get("year"))
+        month = int(args.get("month"))
+        if month < 1 or month > 12:
+            raise ValueError("month must be between 1 and 12")
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "invalid calendar year or month"}
+
+    path = DATA / "calendar.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raw = []
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": "cannot read calendar: " + str(exc)}
+
+    if not isinstance(raw, list):
+        return {"ok": False, "error": "calendar data must be a list"}
+
+    from datetime import date
+    events = {}
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            event_date = date(
+                int(item["y"]), int(item["mo"]), int(item["d"])
+            )
+            hour = max(0, min(23, int(item.get("h", 0))))
+            minute = max(0, min(59, int(item.get("mi", 0))))
+            importance = max(0, min(2, int(item.get("imp", 0))))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+        if event_date.year != year or event_date.month != month:
+            continue
+        key = event_date.strftime("%Y-%m-%d")
+        events.setdefault(key, []).append({
+            "title": str(item.get("t") or "Untitled event")[:160],
+            "category": "personal",
+            "hour": hour,
+            "minute": minute,
+            "importance": importance,
+        })
+
+    for day_events in events.values():
+        day_events.sort(key=lambda event: (event["hour"], event["minute"]))
+    return {"ok": True, "events": events}
+
+
 def h_media_status(args):
     try:
         if IS_VISUAL_CAPTURE:
@@ -691,6 +770,8 @@ HANDLERS = {
     "network_status": h_network_status,
     "system_status": h_system_status,
     "media_status": h_media_status,
+    "toolbox_stats": h_toolbox_stats,
+    "calendar_events": h_calendar_events,
     "hotspot_toggle": h_hotspot_toggle,
 
     "session_list": h_session_list,
