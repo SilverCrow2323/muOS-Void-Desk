@@ -6,7 +6,10 @@ claim that every interactive hub or hardware-dependent workflow is covered.
 """
 from __future__ import annotations
 
+import argparse
+import inspect
 import json
+import re
 import os
 import sys
 import tempfile
@@ -30,6 +33,13 @@ class _NullPoller:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--all-states", action="store_true",
+        help="also smoke-render every state branch in App.render_state",
+    )
+    args = parser.parse_args()
+
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
@@ -105,6 +115,42 @@ def main() -> int:
                 })
                 print("[pygame-capture] failed home-%s: %s" %
                       (style, exc), file=sys.stderr)
+
+        state_names = []
+        if args.all_states:
+            render_source = inspect.getsource(app_module.App.render_state)
+            state_names = list(dict.fromkeys(re.findall(
+                r'^\\s*(?:if|elif)\\s+top\\s*==\\s*["\\']([^"\\']+)["\\']',
+                render_source, re.MULTILINE,
+            )))
+            for state_name in state_names:
+                if state_name == "home":
+                    continue  # covered by all five home-style variants
+                screen_name = "state-" + state_name
+                try:
+                    app.stack = [state_name]
+                    app.surface.fill((0, 0, 0))
+                    app.render_state()
+                    pygame.display.flip()
+                    path, error = capture_surface(
+                        app.surface, ROOT, "pygame", screen_name)
+                    if not path:
+                        raise RuntimeError(error or "capture returned no path")
+                    results.append({
+                        "screen": screen_name,
+                        "state": state_name,
+                        "image": Path(path).name,
+                        "width": app.surface.get_width(),
+                        "height": app.surface.get_height(),
+                    })
+                    print("[pygame-capture] saved %s" % path)
+                except Exception as exc:
+                    errors.append({
+                        "screen": screen_name,
+                        "error": "%s: %s" % (type(exc).__name__, exc),
+                    })
+                    print("[pygame-capture] failed %s: %s" %
+                          (screen_name, exc), file=sys.stderr)
     finally:
         if app is not None:
             try:
@@ -117,19 +163,28 @@ def main() -> int:
         "engine": "pygame",
         "capture_kind": "home-style-smoke",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "expected_screens": list(styles),
+        "expected_screens": list(styles) + (
+            ["state-" + name for name in state_names if name != "home"]
+            if args.all_states else []
+        ),
         "captured": results,
         "errors": errors,
         "complete": len(results) == len(styles) and not errors,
-        "note": "Home-style smoke coverage only; not full hub or hardware validation.",
+        "note": (
+            "Home-style plus App.render_state branch smoke coverage; direct state "
+            "rendering is not proof of navigation reachability, working actions, "
+            "or handheld hardware validation."
+            if args.all_states else
+            "Home-style smoke coverage only; not full hub or hardware validation."
+        ),
     }
     manifest_path = ROOT / "data" / "visual-captures" / "pygame-home-manifest.json"
     temporary = manifest_path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(manifest, indent=2) + "\n",
                          encoding="utf-8")
     temporary.replace(manifest_path)
-    print("[pygame-capture] %d/%d home styles captured" %
-          (len(results), len(styles)))
+    print("[pygame-capture] %d/%d screens captured" %
+          (len(results), len(manifest["expected_screens"])))
     return 0 if manifest["complete"] else 1
 
 
