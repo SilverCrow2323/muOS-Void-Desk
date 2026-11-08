@@ -10,9 +10,10 @@ See the source-controlled [v10.5.4 completion and acceptance plan](../docs/PRE_R
 - Evolve Pygame while keeping it the reference frontend.
 - Verify every NEXUS node and selectable action end to end.
 - Add a searchable APT catalogue to THE FORGE, usable from VoidDesk without launching XFCE. APT operations remain inside the existing Debian/Ubuntu chroot; muOS itself is Buildroot-based.
-- Integrate Rt:Tailscale-M as a native managed service, including install, login, peers, exit nodes, Taildrop, boot lifecycle and diagnostics. Its pinned upstream source now passes the upstream static/UI suite and 21 QEMU service checks in CI; the VoidDesk-native UI and package embedding are still pending.
-- Give Syncthing a complete native panel using the Andromeda Web Service. The Pygame client now discovers the Andromeda configuration and port 7070 and avoids starting a duplicate daemon; physical-device validation and the complete management actions remain pending.
+- Integrate Rt:Tailscale-M as a native managed service. LÖVE and Pygame now have in-app panels for status, QR login, peers, exit nodes, Taildrop inventory and boot startup; install/start is delegated to the upstream manager and never launches a second daemon. The upstream static/UI suite and 21 QEMU service checks passed before these UI changes; post-change CI and physical-device validation remain pending.
+- Extend the native Syncthing panel using the Andromeda Web Service. Pygame now lists shared folders and devices, completion/connection state, and supports folder pause/resume, scan, override and device pause/resume. It discovers the Andromeda config on port 7070 and does not start a duplicate daemon. Add/remove flows and physical-device validation remain pending.
 - Extend PC Uplink with secure pairing, remote input and remote display.
+- Add `tools/build_muxapp.py`, a reproducible single-root package builder that refuses an uninitialized Tailscale submodule and vendors only its service files (not the standalone UI or identity state). Its tests and physical package install/upgrade validation are still pending.
 
 ## Validation policy
 
