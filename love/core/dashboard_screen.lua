@@ -112,7 +112,7 @@ function M.new(config)
         -- Widget panel
         local w_t = math.max(0, math.min(1, (t_enter - 0.10) / 0.40))
         local has_widgets = widgets_draw ~= nil
-        local widget_h = has_widgets and L.widget_h or 0
+        local widget_h = has_widgets and (config.widget_height or L.widget_h) or 0
         if w_t > 0.02 and has_widgets then
             widgets_draw(scene, w_t)
         end

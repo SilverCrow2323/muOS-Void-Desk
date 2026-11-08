@@ -395,6 +395,11 @@ return dashboard.new({
           end },
 
 
+        { icon = "pkg", label = "Void Installer", desc = "Install/reinstall software (L1: tabs)", action = function(s) s.set_status("Opening installer..."); bridge.call("comp_install", {}, function(r) s.set_status(r.ok and (r.note or "ready") or ("err: " .. (r.error or "?"))) end); return "Installer..." end },
+        { icon = "start", label = "Startup apps", desc = "Programs that boot with the desktop", action = function(s) s.set_status("Opening startup..."); bridge.call("comp_autostart", {}, function(r) s.set_status(r.ok and (r.note or "ready") or ("err: " .. (r.error or "?"))) end); return "Startup..." end },
+        { icon = "refresh", label = "Update Environments", desc = "apt update + upgrade", action = function(s) s.set_status("Updating..."); bridge.call("apt_update", {}, function(r) s.set_status(r.ok and "updated" or ("err: " .. (r.error or r.reason or "?"))) end); return "Updating..." end },
+        { icon = "download", label = "Void-Desk Update", desc = "GitHub releases", action = function(s) s.set_status("Checking GitHub..."); bridge.call("gh_fetch_releases", {}, function(r) s.set_status(r.ok and ("latest: " .. (r.tag or "?")) or ("err: " .. (r.error or "?"))) end); return "Checking..." end },
+        { icon = "terminal", label = "CLI Shooter", desc = "Terminal tools", action = function(s) s.set_status("Opening CLI..."); bridge.call("clihub_list", {}, function(r) s.set_status(r.ok and (r.note or "ready") or ("err: " .. (r.error or "?"))) end); return "CLI..." end },
         { icon = "back", label = "Back",
           desc = "Return to Nexus",
           action = function() sm.back() end },

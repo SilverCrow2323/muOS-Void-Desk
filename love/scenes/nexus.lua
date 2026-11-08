@@ -305,7 +305,7 @@ function nexus.update(dt)
                 local ok, mod = pcall(require, "scenes." .. warp.target_scene)
                 if ok and mod then
                     sm.register(warp.target_scene, mod)
-                    sm.switch(warp.target_scene, { idx = warp.target_idx })
+                    sm.push(warp.target_scene, { idx = warp.target_idx })
                 end
             end
             warp.active = false; warp.t = 0

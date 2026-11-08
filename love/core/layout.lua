@@ -7,8 +7,8 @@ local L = {
     STATUS_H = 30,
 
     -- Menu
-    MENU_ROW_H = 54,
-    WIDGET_H = 180,
+    MENU_ROW_H = 46,
+    WIDGET_H = 140,
 
     -- Font sizes
     FONT = {
