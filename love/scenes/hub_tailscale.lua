@@ -3,6 +3,7 @@ local bridge = require("core.bridge")
 local sm = require("core.scene_manager")
 local nodes = require("core.nodes")
 local widgets = require("core.widgets")
+local qr = require("lib.qr")
 
 local state = {
     installed = false,
@@ -10,6 +11,7 @@ local state = {
     peers = {},
     taildrop = {},
     auth_url = "",
+    qr_matrix = nil,
     tailnet = "",
     self = {},
     autostart = false,
@@ -29,6 +31,11 @@ local function refresh(scene, silent)
         state.peers = resp.peers or {}
         state.taildrop = resp.taildrop or {}
         state.auth_url = resp.auth_url or ""
+        state.qr_matrix = nil
+        if state.auth_url ~= "" then
+            local ok, matrix = qr.encode(state.auth_url)
+            if ok then state.qr_matrix = matrix end
+        end
         state.tailnet = resp.tailnet or ""
         state.self = resp.self or {}
         state.autostart = resp.autostart == true
@@ -152,12 +159,35 @@ local config = {
             "Peers", string.format("%d / %d online", online, peer_count),
             online > 0 and {0.4, 0.9, 0.5} or {0.55, 0.58, 0.62},
             online > 0 and "UP" or "—", alpha)
-        widgets.info_row(20, 130, W - 40, "Tailnet",
+        widgets.info_row(20, 130, W - 150, "Tailnet",
             state.tailnet ~= "" and state.tailnet or "Not authenticated", nc, alpha)
         local auth = state.auth_url
         if auth == "" then auth = state.error ~= "" and state.error or "No pending authorization" end
         if #auth > 64 then auth = auth:sub(1, 61) .. "..." end
-        widgets.info_row(20, 150, W - 40, "Auth", auth, {0.35, 0.8, 1.0}, alpha)
+        widgets.info_row(20, 150, W - 150, "Auth", auth, {0.35, 0.8, 1.0}, alpha)
+
+        if state.qr_matrix then
+            local matrix = state.qr_matrix
+            local n = #matrix
+            local cell = math.min(1.5, 88 / (n + 8))
+            local size = (n + 8) * cell
+            local x = W - size - 16
+            local y = 122
+            love.graphics.setColor(1, 1, 1, alpha)
+            love.graphics.rectangle("fill", x, y, size, size)
+            love.graphics.setColor(0.025, 0.035, 0.05, alpha)
+            for row = 1, n do
+                for col = 1, n do
+                    if matrix[row][col] then
+                        love.graphics.rectangle("fill",
+                            x + (col + 3) * cell,
+                            y + (row + 3) * cell,
+                            cell, cell)
+                    end
+                end
+            end
+            love.graphics.setColor(1, 1, 1, alpha)
+        end
     end,
     items = {},
 }
