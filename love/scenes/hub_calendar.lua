@@ -13,9 +13,11 @@ local L       = require("core.layout")
 local scene = {}
 local nc = nodes.color_for(4)
 
-local cur_year, cur_month = 2026, 11
-local sel_day = 7
-local today_year, today_month, today_day = 2026, 11, 7
+local today = os.date("*t")
+local cur_year, cur_month = today.year, today.month
+local sel_day = today.day
+local today_year, today_month, today_day =
+    today.year, today.month, today.day
 local events = {}
 local t_enter = 0
 local t_month_change = 1.0     -- 0..1 animation
