@@ -40,6 +40,9 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
     make_project(project)
+    (project / ".env").write_text("API_KEY=must-not-ship\n")
+    (project / "data").mkdir()
+    (project / "data" / "user-config.json").write_text("{\"private\": true}")
     output = tmp_path / "dist" / "Void-Desk.muxapp"
 
     result = builder.build_archive(project, output)
@@ -54,6 +57,8 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path):
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py" in names
     assert not any(name.startswith("Void-Desk/tests/") for name in names)
+    assert "Void-Desk/.env" not in names
+    assert "Void-Desk/data/user-config.json" not in names
 
 
 def test_builder_fails_if_pinned_submodule_is_not_initialized(tmp_path):
