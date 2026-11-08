@@ -50,6 +50,9 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path):
     assert result == output
     with zipfile.ZipFile(output) as archive:
         names = archive.namelist()
+        tailscale_config = archive.read(
+            "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf"
+        ).decode("utf-8")
     assert names
     assert all(name.startswith("Void-Desk/") for name in names)
     assert "Void-Desk/mux_launch.sh" in names
@@ -57,6 +60,8 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path):
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf" in names
+    assert "PANEL=0" in tailscale_config
+    assert "PANEL_BIND=127.0.0.1" in tailscale_config
     assert not any(name.startswith("Void-Desk/tests/") for name in names)
     assert "Void-Desk/.env" not in names
     assert "Void-Desk/data/user-config.json" not in names
