@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 r"""
-VOIDDESK NEXUS v10.5.2 — Advanced Launcher & PC Runtime Environment
+VOIDDESK NEXUS v10.5.3 — Advanced Launcher & PC Runtime Environment
 SPDW Factory · Single-File Hybrid Launcher & Diagnostics Suite
 
 Modes (dispatched by cli()):
@@ -50,7 +50,7 @@ BANNER = rf"""{Color.CYAN}{Color.BOLD}
  ║    / . \| |_) |_| |_| |__| | |__| | |____ ____) | | | |____) |   ║
  ║   /_/ \_\____/|_____|_____/|_____/|______|_____/|_| |_|_____/    ║
  ║                                                                  ║
- ║   {Color.GREEN}NEXUS HYBRID CONTROL INTERFACE · SPDW FACTORY v10.5.2{Color.CYAN}          ║
+ ║   {Color.GREEN}NEXUS HYBRID CONTROL INTERFACE · SPDW FACTORY v10.5.3{Color.CYAN}          ║
  ╚══════════════════════════════════════════════════════════════════╝{Color.RESET}"""
 
 DEFAULT_CONFIG = {

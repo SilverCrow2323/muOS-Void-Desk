@@ -1,4 +1,5 @@
 #!/bin/sh
+# VOIDDESK v10.5.3 — muOS device launcher
 # HELP: VoidDesk - Void suite (LÖVE or Pygame frontend, switchable in Settings)
 # ICON: voiddesk
 # GRID: voiddesk
