@@ -13,6 +13,7 @@ local BATCH_SCENES = {
     { name = "nexus", args = {} },
     { name = "hub_session", args = {} },
     { name = "hub_forge", args = {} },
+    { name = "hub_apt", args = {} },
     { name = "hub_uplink", args = {} },
     { name = "hub_media", args = {} },
     { name = "hub_workshop", args = {} },
