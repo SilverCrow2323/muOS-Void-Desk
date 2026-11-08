@@ -254,6 +254,72 @@ def h_network_status(args):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+def _external_tool_target(tool):
+    """Resolve a registry launcher without permitting arbitrary path escape."""
+    launcher = str(tool.get("launcher") or "")
+    kind = tool.get("launcher_type")
+    if kind == "portable-voidcast" and launcher == "../VoidCast":
+        target = (APP_DIR.parent / "VoidCast").resolve()
+        if target.parent == APP_DIR.parent.resolve():
+            return target
+        return None
+    target = (APP_DIR / launcher).resolve()
+    try:
+        target.relative_to(APP_DIR.resolve())
+    except ValueError:
+        return None
+    return target
+
+
+def h_list_external(args):
+    registry_path = APP_DIR / "external" / "tools.json"
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        return {"ok": False, "error": "cannot read external tools: " + str(exc)}
+    tools = []
+    for tool in registry.get("tools", []):
+        if not isinstance(tool, dict):
+            continue
+        target = _external_tool_target(tool)
+        kind = tool.get("launcher_type")
+        if target is None:
+            exists = False
+        elif kind == "love":
+            exists = target.is_file() or (
+                target.is_dir() and (target / "main.lua").is_file()
+            )
+        elif kind == "sh":
+            exists = target.is_file()
+        elif kind == "portable-voidcast":
+            exists = target.is_dir() and (
+                (target / "mux_launch.sh").is_file()
+                or (target / "voidcast.py").is_file()
+            )
+        else:
+            exists = False
+        tools.append({
+            "id": str(tool.get("id") or ""),
+            "name": str(tool.get("name") or "External tool"),
+            "desc": str(tool.get("desc") or ""),
+            "hub": str(tool.get("hub") or "system"),
+            "native_engine": str(tool.get("native_engine") or ""),
+            "launcher_type": str(kind or ""),
+            "icon": str(tool.get("icon") or "gear"),
+            "exists": exists,
+        })
+    return {"ok": True, "tools": tools}
+
+
+def h_launch_external(args):
+    tool_id = str(args.get("id") or "")
+    return h_job_start({
+        "tool_id": tool_id,
+        "name": "External: " + tool_id,
+        "hub": "external",
+    })
+
+
 def h_toolbox_stats(args):
     """Read-only counts for the LÖVE Toolbox dashboard."""
     notes_dir = DATA / "notes"
@@ -403,27 +469,45 @@ def h_job_start(args):
             return {"ok": False, "error": "unknown external tool"}
         launcher_type = tool.get("launcher_type")
         launcher = tool.get("launcher", "")
-        target = (APP_DIR / launcher).resolve()
-        try:
-            target.relative_to(APP_DIR.resolve())
-        except ValueError:
-            return {"ok": False, "error": "external tool path escapes app directory"}
-        if launcher_type == "love":
-            if not target.exists():
-                return {"ok": False, "error": "external tool is not installed"}
-            love_bin = APP_DIR / "lib" / "love"
-            love_exec = str(love_bin) if love_bin.is_file() else shutil.which("love")
-            if not love_exec:
-                return {"ok": False, "error": "LÖVE runtime is not installed"}
-            command = [love_exec, str(target)]
-            cwd = target if target.is_dir() else target.parent
-        elif launcher_type == "sh":
-            if not target.is_file():
-                return {"ok": False, "error": "external launcher is not installed"}
-            command = ["sh", str(target)]
-            cwd = target.parent
+        if launcher_type == "portable-voidcast":
+            if launcher != "../VoidCast":
+                return {"ok": False, "error": "external tool path is not allowlisted"}
+            target = (APP_DIR.parent / "VoidCast").resolve()
+            if target.parent != APP_DIR.parent.resolve() or not target.is_dir():
+                return {"ok": False, "error": "VoidCast is not installed"}
+            shell_launcher = target / "mux_launch.sh"
+            python_launcher = target / "voidcast.py"
+            if shell_launcher.is_file():
+                command = ["sh", str(shell_launcher)]
+            elif python_launcher.is_file():
+                command = [sys.executable, str(python_launcher)]
+            else:
+                return {"ok": False, "error": "VoidCast launcher is missing"}
+            cwd = target
         else:
-            return {"ok": False, "error": "unsupported external launcher type"}
+            target = (APP_DIR / launcher).resolve()
+            try:
+                target.relative_to(APP_DIR.resolve())
+            except ValueError:
+                return {"ok": False, "error": "external tool path escapes app directory"}
+            if launcher_type == "love":
+                if not target.is_file() and not (
+                    target.is_dir() and (target / "main.lua").is_file()
+                ):
+                    return {"ok": False, "error": "external tool is not installed"}
+                love_bin = APP_DIR / "lib" / "love"
+                love_exec = str(love_bin) if love_bin.is_file() else shutil.which("love")
+                if not love_exec:
+                    return {"ok": False, "error": "LÖVE runtime is not installed"}
+                command = [love_exec, str(target)]
+                cwd = target if target.is_dir() else target.parent
+            elif launcher_type == "sh":
+                if not target.is_file():
+                    return {"ok": False, "error": "external launcher is not installed"}
+                command = ["sh", str(target)]
+                cwd = target.parent
+            else:
+                return {"ok": False, "error": "unsupported external launcher type"}
     else:
         return {"ok": False, "error": "job requires cmd or tool_id"}
 
@@ -939,6 +1023,8 @@ HANDLERS = {
     "job_cancel": h_job_cancel,
     "job_log": h_job_log,
     "media_status": h_media_status,
+    "list_external": h_list_external,
+    "launch_external": h_launch_external,
     "toolbox_stats": h_toolbox_stats,
     "calendar_events": h_calendar_events,
     "hotspot_toggle": h_hotspot_toggle,
