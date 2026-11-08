@@ -8728,9 +8728,9 @@ class App(object):
     def ts_menu_do(self, key):
         it = (self.lang == "it")
         if key == "start_service":
-            result = self.run_busy(
+            self.run_busy(
                 "avvio servizio..." if it else "starting service...",
-                lambda: self.ts_manager().action(APP_DIR, "start"))
+                lambda: self.ts_manager().start_async(APP_DIR))
             self.ts_refresh()
         elif key == "autostart":
             action = ("autostart_off" if (self.ts or {}).get("autostart")
