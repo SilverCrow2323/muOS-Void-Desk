@@ -231,12 +231,20 @@ def run_pygame_runtime():
         except ImportError:
             pass
 
+    capture_screen = {"name": "home"}
+
     def install_guards():
         try:
             import desk.main as m
             _orig_render = m.App.render
             def render_with_flip(self, *a, **k):
                 res = _orig_render(self, *a, **k)
+                try:
+                    stack = getattr(self, "stack", None)
+                    if stack:
+                        capture_screen["name"] = str(stack[-1])
+                except Exception:
+                    pass
                 try: pygame.display.flip()
                 except Exception: pass
                 return res
@@ -256,9 +264,38 @@ def run_pygame_runtime():
         except Exception as e:
             print(f"[desktop] Main import notice: {e}")
 
+    def install_visual_capture():
+        """Bind the documented F12 shortcut to the Pygame screenshot writer."""
+        real_get = pygame.event.get
+
+        def get_with_capture(*a, **k):
+            events = real_get(*a, **k)
+            for event in events:
+                if (event.type == pygame.KEYDOWN
+                        and event.key == pygame.K_F12):
+                    try:
+                        from utils.visual_capture import capture_surface
+                        surface = pygame.display.get_surface()
+                        if surface is None:
+                            print("[visual-capture] no active display surface")
+                            continue
+                        path, error = capture_surface(
+                            surface, APP, "pygame", capture_screen["name"])
+                        if path:
+                            print("[visual-capture] saved " + path)
+                        else:
+                            print("[visual-capture] failed: " + str(error))
+                    except Exception as exc:
+                        print("[visual-capture] failed: %s: %s" %
+                              (type(exc).__name__, exc))
+            return events
+
+        pygame.event.get = get_with_capture
+
     install_keyboard_bridge()
     install_fbdisplay_bypass()
     install_guards()
+    install_visual_capture()
 
     try:
         import importlib
