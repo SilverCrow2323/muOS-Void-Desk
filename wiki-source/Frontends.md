@@ -34,7 +34,7 @@ Some screens exist, but several actions are placeholders or do not yet have a wo
 
 ## Known current limitations
 
-- Toolbox utilities such as Notes, RSS and Weather are not all implemented in LÖVE.
+- LÖVE Toolbox now links Calculator and Clock to their existing scenes; Notes, RSS and Weather remain incomplete.
 - Workshop diagnostics, live monitor, logs and cleanup are incomplete.
 - Media Library and Radio flows need parity work.
 - Desktop repair is a placeholder.
