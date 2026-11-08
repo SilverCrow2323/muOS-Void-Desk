@@ -19,8 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -115,6 +113,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Fetch the pinned Rt:Tailscale-M source
+        run: |
+          git clone https://github.com/SilverCrow2323/muOS-Rt-Tailscale.git external/rt-tailscale-m
+          git -C external/rt-tailscale-m checkout d6aa05363cd5d56b07e63e2261c960a26d73cd9c
       - name: Install Tailscale test dependencies
         run: |
           sudo apt-get update -qq
