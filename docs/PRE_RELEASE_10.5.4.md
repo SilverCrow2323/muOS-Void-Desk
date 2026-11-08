@@ -18,13 +18,14 @@ Deliver VoidDesk as a self-contained, controller-first control centre for Mustar
 
 | Area | Verified evidence | What it does not prove |
 |---|---|---|
-| Pygame visual capture | CI renders 103/103 declared render states | Navigation reachability, correct actions, controller edge cases or device compatibility |
-| LÖVE visual capture | CI captures 20/20 registered scenes | Feature parity, service correctness or hardware operation |
+| Pygame visual capture | CI renders 103/103 declared render states, including native Syncthing management | Navigation reachability, correct actions, controller edge cases or device compatibility |
+| LÖVE visual capture | CI captures 23/23 registered scenes, including native Tailscale, Syncthing, diagnostics and monitor screens | Feature parity, service correctness or hardware operation |
 | LÖVE Shell | Local service PTY endpoints and tests exist on the PR branch | Real muOS terminal usability, keyboard layout and lifecycle on handheld |
 | External tools | Registry-based discovery/launch and missing-tool reporting | Bundled submodule content is present in the final .muxapp |
 | APT | Native LÖVE APT Manager now provides Search, Installed, Jobs and System operations through a safe XFCE-image manager; CI baseline passed | Real muOS chroot search/install/remove/update/clean validation and failure recovery on hardware |
-| Tailscale | Native LÖVE and Pygame panels now use the pinned Rt:Tailscale-M service manager; QR encoder, peer/exit-node controls, Taildrop inventory and autostart are implemented; first-run install is delegated to rt install/start | Post-change CI, reproducible package test, identity migration and physical muOS lifecycle validation |
+| Tailscale | Native LÖVE and Pygame panels use the pinned Rt:Tailscale-M manager; QR login, peer/exit-node controls, Taildrop inventory, autostart and localhost-only optional panel are implemented; CI passes the upstream 21/21 QEMU service checks and real package build | Identity migration and physical muOS lifecycle validation |
 | Syncthing | Native Pygame and LÖVE Uplink panels list folders/devices, connection and completion state, and support folder pause/resume, scan, confirmed override and device pause/resume; API keys stay in the service bridge and Andromeda discovery/no-duplicate-daemon safeguards are retained | Add/remove flows, disabled-service UX refinements and real-device API tests |
+| NEXUS actions | Route/placeholder audit now covers Session, Forge, Workshop and Toolbox; Workshop actions connect to diagnostics, monitor, APT System and Jobs; Python acceptance tests pass | Full machine-readable registry, action-driven navigation for every hub and physical controller QA |
 | PC link | BaseStation/PcClient already exchange telemetry, notifications and screenshots | Remote keyboard/mouse, virtual display, secure pairing lifecycle and latency budgets |
 
 ## Workstream 1 — NEXUS node and action audit
@@ -47,7 +48,7 @@ Release gate:
 4. Back navigation, focus restoration, controller repeat/edge behaviour and small-screen text clipping are tested.
 5. Pygame and LÖVE feature matrices agree on the declared supported scope.
 
-Visual state enumeration remains a smoke test; add action-driven navigation tests for the critical paths.
+Visual state enumeration remains a smoke test. The new static route audit covers the Session, Forge, Workshop and Toolbox hubs, but action-driven navigation tests for every node and child view are still required. Notes, text editor, RSS and Weather were removed from the visible Toolbox rather than left as nonfunctional placeholders.
 
 ## Workstream 2 — LÖVE completion
 
@@ -56,7 +57,7 @@ Prioritise parity by user journey, not by adding isolated screens:
 1. NEXUS → every hub → every child view → return path.
 2. THE FORGE: searchable APT catalogue, package details, installed state, install/remove queue, update/clean, progress/logs and confirmation for destructive actions.
 3. UPLINK: Wi-Fi, Bluetooth, hotspot, PC link, Tailscale and Syncthing.
-4. RT:TOOLBOX: Shell, Calculator, Clock, Calendar, Notes, RSS, Weather, file manager, FTP and sync.
+4. RT:TOOLBOX: Shell, Calculator, Clock, Calendar, Monitor, Diagnostics, file manager, FTP and sync. Notes, text editor, RSS and Weather remain deferred until their service/UI implementations are real.
 5. WORKSHOP: diagnostics, storage, logs, monitoring, backup/restore and maintenance actions.
 6. MEDIA VAULT, MUOS APPS, SETTINGS, INFO and END SESSION.
 7. Controller mapping, analog input, on-screen keyboard, focus and accessibility pass.
