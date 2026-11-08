@@ -4,6 +4,8 @@ local sm = require("core.scene_manager")
 local nodes = require("core.nodes")
 local widgets = require("core.widgets")
 
+local items_for
+
 local state = {
     available = false,
     state = "Checking",
@@ -59,7 +61,7 @@ local function run_action(scene, action, folder, device, label)
     return label or "Working..."
 end
 
-function items_for()
+items_for = function()
     local items = {
         {
             icon = "refresh", label = "Refresh Syncthing",
