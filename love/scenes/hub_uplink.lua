@@ -105,6 +105,9 @@ return dashboard.new({
         { icon = "uplink", label = "Tailscale", value = "NATIVE",
           desc = "Service, QR login, peers, exit nodes and Taildrop",
           action = function() sm.push("hub_tailscale", {}) end },
+        { icon = "refresh-cw", label = "Syncthing", value = "NATIVE",
+          desc = "Folders, devices, pause/resume, rescan and sync status",
+          action = function() sm.push("hub_syncthing", {}) end },
         { icon = "globe", label = "Network Probe", desc = "Diagnostics: IP, gateway, latency",
           action = function(scene)
               bridge.call("system_info", {}, function(resp)
