@@ -58,3 +58,5 @@ Thumbs.db
 data/.love_request.json
 data/.love_response.json
 *.pyc
+fix_*.log
+*.bak.b7*

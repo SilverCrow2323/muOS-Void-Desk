@@ -89,23 +89,7 @@ function M.new(config)
     function scene.get_data(k) return scene._data[k] end
 
     function scene.draw()
-        local L = (function()
-            if type(layout) ~= 'table' then layout = {} end
-            for _, fn in ipairs({'get','compute','build','current','for_screen','make','new','resolve'}) do
-                if type(layout[fn]) == 'function' then
-                    local ok, res = pcall(layout[fn])
-                    if ok and type(res) == 'table' then return res end
-                end
-            end
-            local W, H = love.graphics.getDimensions()
-            return {
-                W = W, H = H, margin = 12,
-                header_h = 56, footer_h = 44, row_h = 38,
-                content_x = 12, content_y = 56,
-                content_w = W - 24, content_h = H - 100,
-                content = { x = 12, y = 56, w = W - 24, h = H - 100 },
-            }
-        end)()
+        local L = layout
         local W, H = love.graphics.getWidth(), love.graphics.getHeight()
         local th = theme.get()
 
