@@ -14,14 +14,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP_DIRS = (
-    "assets", "bin", "desk", "external", "lib", "love", "outdesk",
-    "resources", "service", "voidcast_addons",
-)
-APP_FILES = (
-    "BUILDCHECK.py", "LICENSE", "README.md", "THIRD-PARTY.md",
-    "mux_launch.sh", "voiddesk.py", "voiddesk.sh",
-)
+SKIP_ROOT_FILES = {
+    ".gitignore", ".gitattributes", ".gitmodules", ".editorconfig",
+    ".DS_Store", "Thumbs.db",
+}
 SKIP_DIRS = {
     ".git", ".github", ".pytest_cache", ".ruff_cache", "__pycache__",
     ".venv", ".venv_desktop", "node_modules", "tests", "docs",
@@ -118,21 +114,21 @@ def build_archive(repo_root: Path, output: Path):
     with tempfile.TemporaryDirectory(prefix="voiddesk-muxapp-") as temp:
         package_root = Path(temp) / "Void-Desk"
         package_root.mkdir()
-        for name in APP_DIRS:
-            source = repo_root / name
-            if not source.exists():
+        for source in sorted(repo_root.iterdir()):
+            name = source.name
+            if name in SKIP_DIRS or name in SKIP_FILES or name in SKIP_ROOT_FILES:
                 continue
-            if name == "external":
-                _copy_tree(source, package_root / name,
-                           skip_dirs={"rt-tailscale-m"})
-            else:
-                _copy_tree(source, package_root / name)
-        for name in APP_FILES:
-            source = repo_root / name
-            if source.is_file():
-                if source.is_symlink():
-                    raise RuntimeError(f"symbolic link is not packageable: {source}")
-                shutil.copy2(source, package_root / name)
+            if name.startswith(".venv") or name.startswith(".cache"):
+                continue
+            if source.is_symlink():
+                raise RuntimeError(f"symbolic link is not packageable: {source}")
+            target = package_root / name
+            if name == "external" and source.is_dir():
+                _copy_tree(source, target, skip_dirs={"rt-tailscale-m"})
+            elif source.is_dir():
+                _copy_tree(source, target)
+            elif source.is_file() and not name.endswith((".pyc", ".pyo")):
+                shutil.copy2(source, target)
 
         _copy_tailscale_service(repo_root, package_root)
 
