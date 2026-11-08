@@ -30,7 +30,7 @@ class FakeProcess:
 def test_apt_catalog_search_runs_only_chroot_manager(tmp_path, monkeypatch):
     service = load_service()
     monkeypatch.setattr(service, "APP_DIR", tmp_path)
-    script = tmp_path / "bin" / "vd_apt_manage.sh"
+    script = tmp_path / "bin" / "vd_apt_manage.py"
     script.parent.mkdir()
     script.write_text("#!/bin/sh\n")
     calls = []
@@ -51,8 +51,8 @@ def test_apt_catalog_search_runs_only_chroot_manager(tmp_path, monkeypatch):
         {"name": "htop", "description": "interactive process viewer"},
         {"name": "curl", "description": "transfer tool"},
     ]
-    assert calls[0][0] == "sh"
-    assert calls[0][1].endswith("vd_apt_manage.sh")
+    assert calls[0][0] == service.sys.executable
+    assert calls[0][1].endswith("vd_apt_manage.py")
     assert calls[0][2:] == ["catalog", "search", "htop"]
 
 
@@ -86,7 +86,7 @@ def test_apt_job_accepts_valid_package_list(tmp_path, monkeypatch):
         "name": "Install selected packages", "hub": "forge",
     })
     assert result["ok"] is True
-    assert commands[0] == ["sh", str(script), "install", "htop", "ncdu"]
+    assert commands[0] == [service.sys.executable, str(script), "install", "htop", "ncdu"]
 
 
 def test_apt_job_rejects_shell_metacharacters_and_unknown_actions(monkeypatch):
