@@ -148,7 +148,13 @@ def find_system_sdl():
 
 def replace_runtime(staging):
     """Install a validated runtime while preserving the previous directory."""
-    shutil.rmtree(BACKUP, ignore_errors=True)
+    # Recover a swap interrupted after moving runtime/ to runtime.previous/.
+    if os.path.exists(BACKUP):
+        if not os.path.exists(RUNTIME):
+            os.replace(BACKUP, RUNTIME)
+        else:
+            shutil.rmtree(BACKUP, ignore_errors=True)
+
     had_runtime = os.path.exists(RUNTIME)
     if had_runtime:
         os.replace(RUNTIME, BACKUP)
