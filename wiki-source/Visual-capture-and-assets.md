@@ -1,24 +1,37 @@
 # Visual capture and asset catalogue
 
-## Capture
+## Capture every LÖVE scene
 
-Both graphical frontends support F12.
+On a Linux development PC with LÖVE 11.5 installed:
 
-- Pygame: F12 via Linux evdev key code 88.
-- LÖVE: F12 queues a frame capture after the current frame is drawn.
+~~~bash
+python3 tools/capture_love_screenshots.py
+~~~
 
-PNG files and JSON metadata sidecars are written under data/visual-captures/.
+The script starts the Python companion service, runs the LÖVE frontend, switches through its scene catalogue and captures each rendered screen. When no display is available it uses Xvfb. The capture summary is saved as data/visual-captures/love-batch-manifest.json.
 
-## Generate the catalogue
+This pass verifies that scenes can be opened and rendered in the desktop runtime. It is not hardware validation for muOS or a claim that all LÖVE actions are complete.
+
+## Capture one current screen
+
+Both frontends support F12. PNG screenshots and JSON metadata sidecars are saved under data/visual-captures/.
+
+## Generate the asset catalogue and galleries
 
 ~~~bash
 python3 tools/visual_capture.py
 python3 tools/visual_capture.py --check
 ~~~
 
-The dependency-free script scans images and fonts in assets/, resources/, love/assets/ and glyph/. It records size, dimensions where available and SHA-256, verifies images referenced by active LÖVE NEXUS nodes and indexes screenshots.
+The standard-library script scans images and fonts in assets/, resources/, love/assets/ and glyph/. It records size, dimensions where available and SHA-256, verifies active LÖVE NEXUS node textures and indexes screenshots.
 
-Generated reports: docs/visual/ASSET_CATALOG.md, docs/visual/SCREENSHOT_CHECKLIST.md and docs/visual/visual-inventory.json.
+Generated reports:
+
+- docs/visual/ASSET_CATALOG.md
+- docs/visual/SCREENSHOT_CHECKLIST.md
+- docs/visual/visual-inventory.json
+- docs/visual/ASSET_GALLERY.html
+- docs/visual/SCREENSHOT_GALLERY.html
 
 ## Publish selected images
 
@@ -28,4 +41,4 @@ Captures are ignored by Git by default. They may reveal SSIDs, IP addresses, hos
 python3 tools/visual_capture.py --export-public
 ~~~
 
-This copies reviewed screenshots into docs/visual/captures/.
+This copies reviewed screenshots into docs/visual/captures/. Do not publish raw captures until they have been reviewed.
