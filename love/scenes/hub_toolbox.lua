@@ -3,11 +3,10 @@ local bridge    = require("core.bridge")
 local sm        = require("core.scene_manager")
 local nodes     = require("core.nodes")
 local widgets   = require("core.widgets")
-local ext       = require("core.external")
 local jobs      = require("core.jobs")
 local L         = require("core.layout")
 
-local state = { uptime_s = 0, ram_pct = 0, notes_count = 0, text_files = 0 }
+local state = { uptime_s = 0, ram_pct = 0 }
 
 local function refresh(scene, silent)
     bridge.call("system_status", {}, function(resp)
@@ -15,12 +14,6 @@ local function refresh(scene, silent)
             state.uptime_s = resp.system.uptime_s or 0
             state.ram_pct = (resp.system.ram or {}).pct or 0
             if not silent then scene.set_status("Ready") end
-        end
-    end)
-    bridge.call("toolbox_stats", {}, function(resp)
-        if resp.ok then
-            state.notes_count = resp.notes_count or 0
-            state.text_files = resp.text_files or 0
         end
     end)
 end
@@ -53,15 +46,11 @@ return dashboard.new({
         local nc = nodes.color_for(4)
         local cy = 62
         local ch = 66
-        widgets.status_card(12, cy, (W-40)/2, ch, "text",
-            "Notes", string.format("%d saved", state.notes_count), nc, "TXT", alpha)
-        widgets.status_card(12 + (W-40)/2 + 8, cy, (W-40)/2, ch, "folder",
-            "Text files", string.format("%d files", state.text_files),
-            {0.4,0.85,0.9}, "DATA", alpha)
-        widgets.info_row(20, 144, W-40, "Uptime", fmt_uptime(state.uptime_s),
-                         {0.75,0.80,0.85}, alpha)
-        widgets.info_row(20, 168, W-40, "RAM",
-                         string.format("%d%%", state.ram_pct), nc, alpha)
+        widgets.status_card(12, cy, (W-40)/2, ch, "clock",
+            "Uptime", fmt_uptime(state.uptime_s), nc, "LIVE", alpha)
+        widgets.status_card(12 + (W-40)/2 + 8, cy, (W-40)/2, ch, "memory",
+            "RAM", string.format("%d%%", state.ram_pct),
+            {0.4,0.85,0.9}, "SYSTEM", alpha)
     end,
 
     items = {
@@ -89,16 +78,14 @@ return dashboard.new({
           action = function() sm.push("tool_calc", {}) end },
         { icon = "clock", label = "Clock", desc = "Animated analog clock",
           action = function() sm.push("tool_clock", {}) end },
-        { icon = "text", label = "Notes", desc = "Coming soon: quick notes board",
-          action = function(scene) scene.set_status("Notes: soon"); return "Notes" end },
-        { icon = "terminal", label = "Text editor", desc = "Coming soon: VOID EDIT",
-          action = function(scene) scene.set_status("Editor: soon"); return "Editor" end },
-        { icon = "globe", label = "RSS reader", desc = "Coming soon: news, tech, anime",
-          action = function(scene) scene.set_status("RSS: soon"); return "RSS" end },
-        { icon = "sun", label = "Weather", desc = "Coming soon: multi-city forecast",
-          action = function(scene) scene.set_status("Weather: soon"); return "Weather" end },
+        { icon = "monitor", label = "System Monitor",
+          desc = "Live CPU and RAM graphs",
+          action = function() sm.push("hub_monitor", {}) end },
+        { icon = "info", label = "Diagnostics",
+          desc = "Read-only system, network and service checks",
+          action = function() sm.push("hub_diagnostics", {}) end },
         { icon = "uplink", label = "External tools", value = ">",
-          desc = "VoidCast, BGM Normalizer, Tailscale, prototypes",
+          desc = "VoidCast, BGM Normalizer and available optional tools",
           action = function() sm.push("hub_external", {}) end },
         { icon = "back", label = "Back", desc = "Return to previous scene",
           action = function() sm.back() end },
