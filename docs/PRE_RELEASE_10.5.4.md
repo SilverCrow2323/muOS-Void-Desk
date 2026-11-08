@@ -22,9 +22,9 @@ Deliver VoidDesk as a self-contained, controller-first control centre for Mustar
 | LÖVE visual capture | CI captures 20/20 registered scenes | Feature parity, service correctness or hardware operation |
 | LÖVE Shell | Local service PTY endpoints and tests exist on the PR branch | Real muOS terminal usability, keyboard layout and lifecycle on handheld |
 | External tools | Registry-based discovery/launch and missing-tool reporting | Bundled submodule content is present in the final .muxapp |
-| APT | Existing installer/update paths target the XFCE image | Searchable catalogue, package detail, arbitrary safe package selection or no-XFCE install |
-| Tailscale | Rt:Tailscale-M source is pinned; its static/UI suite and 21 QEMU service-integration checks pass in CI | Native VoidDesk management, packaging, upgrade/migration and first-run installation |
-| Syncthing | Pygame REST panel exists; Andromeda config discovery, port 7070 default and no-duplicate-daemon behaviour have unit coverage on the PR branch | Complete folder/device management, service-disabled UX and real-device tests |
+| APT | Native LÖVE APT Manager now provides Search, Installed, Jobs and System operations through a safe XFCE-image manager; CI baseline passed | Real muOS chroot search/install/remove/update/clean validation and failure recovery on hardware |
+| Tailscale | Native LÖVE and Pygame panels now use the pinned Rt:Tailscale-M service manager; QR encoder, peer/exit-node controls, Taildrop inventory and autostart are implemented; first-run install is delegated to rt install/start | Post-change CI, reproducible package test, identity migration and physical muOS lifecycle validation |
+| Syncthing | Native Pygame REST panel now lists folders/devices, connection and completion state, and supports folder pause/resume, scan, override and device pause/resume; Andromeda discovery and no-duplicate-daemon safeguards are retained | Add/remove flows, disabled-service UX refinements and real-device tests |
 | PC link | BaseStation/PcClient already exchange telemetry, notifications and screenshots | Remote keyboard/mouse, virtual display, secure pairing lifecycle and latency budgets |
 
 ## Workstream 1 — NEXUS node and action audit
@@ -119,7 +119,7 @@ Integration requirements:
 - include MIT/BSD third-party notices and upstream attribution;
 - show a clear distinction between daemon installed, daemon running, logged in, connected and tailnet reachable.
 
-Packaging blocker to resolve: the Rt:Tailscale-M gitlink is now declared in .gitmodules and pinned to upstream commit d6aa05363cd5d56b07e63e2261c960a26d73cd9c. CI fetches that exact source revision and validates its service under QEMU. A normal source archive still does not include gitlink contents, so the .muxapp builder must explicitly materialise this pinned source and vendor the required service files under Void-Desk. The separate muos-prototypes gitlink had no .gitmodules URL and its commit could not be resolved; its pointer was removed from this PR branch. File-GD X remains unavailable until its source is recovered or replaced. Do not silently ship either integration as installed.
+The reproducible builder is now implemented as tools/build_muxapp.py. It refuses to build when the pinned Rt:Tailscale-M submodule is missing, then vendors only the upstream service manager, watchdog, CLI wrapper, web-panel assets, version and license notices under Void-Desk/external/rt-tailscale-m/app/RtTailscale. It does not include the standalone upstream LÖVE UI or any state/identity files; official arm64 binaries are installed on first service start through the upstream checksum-verifying installer. The builder still needs its new CI tests and a real muOS package install/upgrade test. The separate muos-prototypes gitlink had no .gitmodules URL and its commit could not be resolved; its pointer was removed from this PR branch. File-GD X remains unavailable until its source is recovered or replaced.
 
 ## Workstream 5 — Syncthing as a native UPLINK service
 
