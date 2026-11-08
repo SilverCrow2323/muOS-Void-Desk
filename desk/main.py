@@ -8599,9 +8599,23 @@ class App(object):
                "cremisi": (220, 70, 90)}.get(
             self.cfg.get("ts_theme", "ciano"), (90, 200, 220))
 
+    def ts_manager(self):
+        service_dir = os.path.join(APP_DIR, "service")
+        if service_dir not in sys.path:
+            sys.path.insert(0, service_dir)
+        import tailscale_manager
+        return tailscale_manager
+
+    def ts_root(self):
+        return self.ts_manager().find_install(APP_DIR)
+
     def ts_cli(self, *args, timeout=10):
-        return subprocess.run([TS_BIN, "--socket=" + TS_SOCK]
-                              + list(args), capture_output=True,
+        root = self.ts_root()
+        if root is None:
+            return subprocess.CompletedProcess(
+                list(args), 127, "", "Rt:Tailscale-M service files not found")
+        return subprocess.run([str(root / "ts")] + list(args),
+                              cwd=str(root), capture_output=True,
                               text=True, timeout=timeout)
 
     def ts_netcheck(self):
@@ -8613,35 +8627,39 @@ class App(object):
             return {}
 
     def ts_status(self):
-        import json as _j
-        r = self.ts_cli("status", "--json")
-        st = _j.loads(r.stdout or "{}")
-        me = st.get("Self") or {}
+        snapshot = self.ts_manager().status(APP_DIR)
+        if not snapshot.get("installed"):
+            return {"state": "Not installed", "ip": "", "host": "",
+                    "ssh": False, "peers": [], "service": False,
+                    "autostart": False}
+        me = snapshot.get("self") or {}
         peers = []
-        for p in (st.get("Peer") or {}).values():
+        for peer in snapshot.get("peers") or []:
             peers.append({
-                "name": p.get("HostName", "?"),
-                "ip": (p.get("TailscaleIPs") or ["?"])[0],
-                "on": bool(p.get("Online")),
-                "os": p.get("OS", ""),
-                "exit": bool(p.get("ExitNodeOption")),
-                "using": bool(p.get("ExitNode"))})
-        peers.sort(key=lambda p: (not p["on"], p["name"].lower()))
-        return {"state": st.get("BackendState", "?"),
-                "ip": (me.get("TailscaleIPs") or [""])[0],
-                "host": me.get("HostName", ""),
-                "ssh": bool((st.get("Self") or {}).get("SSH_HostKeys")),
-                "peers": peers}
+                "name": peer.get("name", "?"),
+                "ip": peer.get("ip") or "?",
+                "on": bool(peer.get("online")),
+                "os": peer.get("os", ""),
+                "exit": bool(peer.get("exit_node")),
+                "using": bool(peer.get("using"))})
+        return {"state": snapshot.get("backend", "?"),
+                "ip": (me.get("ips") or [""])[0],
+                "host": me.get("name", ""),
+                "ssh": False,
+                "peers": peers,
+                "service": bool(snapshot.get("daemon")),
+                "autostart": bool(snapshot.get("autostart")),
+                "auth_url": snapshot.get("auth_url", "")}
 
     def ts_open(self):
         it = (self.lang == "it")
-        if not os.path.exists(TS_BIN):
+        if self.ts_root() is None:
             self.info_lines = self.stub_lines(
                 "TAILSCALE",
-                ["tailscale not found in /opt/muos/bin: update muOS "
-                 "o install Rt-Tailscale." if it else
-                 "tailscale not found in /opt/muos/bin: update muOS or "
-                 "install Rt-Tailscale."])
+                ["Rt:Tailscale-M non e' incluso nel pacchetto / submodule "
+                 "non inizializzato." if it else
+                 "Rt:Tailscale-M service bundle is missing; initialize the "
+                 "project submodule and rebuild VoidDesk."])
             self.scroll = 0
             self.info_title = "TAILSCALE"
             self.push("info")
@@ -8700,16 +8718,28 @@ class App(object):
                   else "Network diagnostics"))
         A.append(("recv", "Receive files (Taildrop)" if it
                   else "Receive files (Taildrop)"))
+        A.append(("start_service", "Avvia servizio" if it
+                  else "Start service"))
+        A.append(("autostart", "Avvio automatico: %s" %
+                  ("ON" if (self.ts or {}).get("autostart") else "OFF")))
         A.append(("tstheme", "Tema Tailscale: %s" %
                   self.cfg.get("ts_theme", "ciano").upper()))
-        A.append(("rtapp", "Open Rt-Tailscale" if it
-                  else "Open Rt-Tailscale"))
         A.append(("logout", "Logout"))
         return A
 
     def ts_menu_do(self, key):
         it = (self.lang == "it")
-        if key == "up":
+        if key == "start_service":
+            result = self.run_busy(
+                "avvio servizio..." if it else "starting service...",
+                lambda: self.ts_manager().action(APP_DIR, "start"))
+            self.ts_refresh()
+        elif key == "autostart":
+            action = ("autostart_off" if (self.ts or {}).get("autostart")
+                      else "autostart_on")
+            self.run_busy("...", lambda: self.ts_manager().action(APP_DIR, action))
+            self.ts_refresh()
+        elif key == "up":
             self.run_busy("tailscale up...",
                           lambda: self.ts_cli("up", "--accept-dns=true",
                                               "--accept-routes=true",
@@ -8750,11 +8780,6 @@ class App(object):
             self.scroll = 0
             self.info_title = "TAILDROP"
             self.push("info")
-        elif key == "rtapp":
-            hit = [a for a in self.scan_muos()
-                   if "tailscale" in a["name"].lower()]
-            if hit:
-                self.launch_muos(hit[0])
         elif key == "logout":
             def go():
                 self.run_busy("...", lambda: self.ts_cli("logout"))
@@ -8764,11 +8789,14 @@ class App(object):
         elif key == "login":
             def job():
                 import re as _re
+                root = self.ts_root()
+                if root is None:
+                    return ""
                 proc = subprocess.Popen(
-                    [TS_BIN, "--socket=" + TS_SOCK, "up",
-                     "--accept-dns=true", "--accept-routes=true"],
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True)
+                    [str(root / "ts"), "up", "--accept-dns=true",
+                     "--accept-routes=true"],
+                    cwd=str(root), stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True)
                 url = ""
                 t0 = time.time()
                 for ln in proc.stdout:
