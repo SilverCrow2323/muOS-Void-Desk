@@ -68,11 +68,23 @@ local function _enter(name, args, restore_state)
         print("[scene] not found: " .. tostring(name))
         return false
     end
+
+    local previous, previous_name = current, current_name
     current_name = name
     current = scenes[name]
+
     local a = _copy(args)
     if restore_state then a.restore_state = restore_state end
-    if current.enter then current.enter(a) end
+    if current.enter then
+        local ok, err = pcall(current.enter, a)
+        if not ok then
+            last_error = tostring(err)
+            print("[scene] enter failed " .. name .. ": " .. last_error)
+            current, current_name = previous, previous_name
+            return false
+        end
+    end
+    last_error = nil
     return true
 end
 
@@ -104,13 +116,17 @@ function sm.back()
     stack[#stack].state = state
     table.remove(stack)
     local prev = stack[#stack]
-    if current and current.leave then current.leave() end
+    if current and current.leave then
+        pcall(current.leave)
+    end
     return _enter(prev.name, prev.args, prev.state)
 end
 
 -- Switch = reset stack to this single scene. Use for boot, intro→nexus, etc.
 function sm.switch(name, args)
-    if current and current.leave then current.leave() end
+    if current and current.leave then
+        pcall(current.leave)
+    end
     stack = {}
     if _enter(name, args) then
         stack = { { name = name, args = _copy(args) } }
@@ -125,7 +141,13 @@ function sm.current_name() return current_name end
 function sm.can_back() return #stack > 1 end
 
 function sm.update(dt)
-    if current and current.update then current.update(dt) end
+    if current and current.update then
+        local ok, err = pcall(current.update, dt)
+        if not ok then
+            last_error = tostring(err)
+            print("[scene] update failed " .. current_name .. ": " .. last_error)
+        end
+    end
 end
 
 function sm.draw()
