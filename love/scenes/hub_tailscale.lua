@@ -8,6 +8,9 @@ local qr = require("lib.qr")
 local state = {
     installed = false,
     backend = "Checking",
+    daemon = false,
+    panel = false,
+    watchdog = false,
     peers = {},
     taildrop = {},
     urls = {},
@@ -28,6 +31,9 @@ local function refresh(scene, silent)
             return
         end
         state.installed = resp.installed == true
+        state.daemon = resp.daemon == true
+        state.panel = resp.panel == true
+        state.watchdog = resp.watchdog == true
         state.backend = resp.backend or (state.installed and "Stopped" or "Not installed")
         state.peers = resp.peers or {}
         state.taildrop = resp.taildrop or {}
@@ -142,6 +148,16 @@ local function items_for()
         action = function(scene)
             local action = state.autostart and "autostart_off" or "autostart_on"
             return run_action(scene, action, "", "Updating boot startup...")
+        end,
+    })
+    table.insert(items, {
+        icon = "globe",
+        label = state.panel and "Disable local web panel" or "Enable local web panel",
+        value = "127.0.0.1",
+        desc = "PIN-protected panel, bound to localhost only",
+        action = function(scene)
+            local action = state.panel and "panel_off" or "panel_on"
+            return run_action(scene, action, "", "Updating local web panel...")
         end,
     })
     table.insert(items, {
