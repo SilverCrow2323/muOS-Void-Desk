@@ -167,6 +167,7 @@ def status(app_dir: Path, extra_roots=(), runner=subprocess.run):
     if root is None:
         return {
             "ok": True, "installed": False, "available": False,
+            "setup_running": _setup_job_active(Path(app_dir) / "data" / ".tailscale_setup.pid"),
             "message": "Rt:Tailscale-M service files not found",
             "peers": [], "taildrop": [],
         }
@@ -210,6 +211,7 @@ def status(app_dir: Path, extra_roots=(), runner=subprocess.run):
         "ok": True,
         "installed": True,
         "available": bool(summary_result.get("ok")),
+        "setup_running": _setup_job_active(Path(app_dir) / "data" / ".tailscale_setup.pid"),
         "root": str(root),
         "backend": backend,
         "daemon": summary.get("daemon") == "1",
