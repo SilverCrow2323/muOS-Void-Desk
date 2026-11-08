@@ -33,6 +33,8 @@ end
 -- Every release-critical subscene must exist on disk.
 assert(file_exists("love/scenes/hub_apt.lua"),
        "missing native APT manager scene")
+assert(file_exists("love/scenes/hub_tailscale.lua"),
+       "missing native Tailscale scene")
 
 -- A child scene should load on demand even when main.lua did not register it.
 local sm = require("core.scene_manager")
