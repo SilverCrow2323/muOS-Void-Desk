@@ -19,4 +19,6 @@ After the Home page has been created, clone the source repository on your PC and
 sh tools/publish_wiki.sh
 ~~~
 
-The script clones the .wiki.git repository, copies the prepared Markdown pages, commits and pushes them using the Git credentials already configured on your machine. It does not modify the source repository.
+The script clones the .wiki.git repository, copies the prepared Markdown pages (including the sidebar), commits and pushes them using the Git credentials already configured on your machine. It does not modify the source repository.
+
+**Current limitation:** the GitHub Wiki itself is not initialized until the first page is saved in the GitHub UI. The source pages and publisher are prepared here, but the one-time creation of the first Home page still needs that browser action.
