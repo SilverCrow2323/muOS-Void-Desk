@@ -24,14 +24,14 @@ VoidDesk turns a Linux handheld into a controller-first workstation. It combines
 | Primary target | Anbernic RG35XX-H / Allwinner H700 |
 | Primary firmware path | muOS application launcher |
 | Native UI | Python + Pygame framebuffer frontend |
-| Alternative UI | LÖVE 2D frontend |
+| Experimental UI | LÖVE 2D prototype; incomplete and not feature-equivalent to Pygame |
 | Desktop session | XFCE in an Ubuntu image; optional tooling is device-dependent |
 | Configuration | data/desk_config.json |
 | Device entry point | mux_launch.sh |
 | PC/development launcher | voiddesk.py |
 | License | Not declared in this repository; see note below |
 
-> **Compatibility:** The documented installation target is the RG35XX-H running muOS (the original installation guide names muOS 2601 JACARANDA). Other H700 devices and firmware distributions may work, but are not claimed as officially validated. The device launcher sources muOS functions directly; ROCKNIX and Knulli should not be assumed to be drop-in supported environments.
+> **Compatibility:** The current packaging target is MustardOS / muOS 2606.0 Andromeda on compatible Allwinner H700 handhelds. Hardware-specific behaviour still requires device-level verification on each model. Older firmware releases and other distributions are not claimed as supported.
 
 ## What VoidDesk includes
 
@@ -71,7 +71,7 @@ The interface uses a dark industrial aesthetic, custom artwork, planet-like hub 
 ## Components and entry points
 
 - **Python frontend:** main implementation in desk/; entry point is desk/main.py.
-- **LÖVE frontend:** alternate implementation in love/; love/main.lua loads scenes.
+- **LÖVE frontend (experimental):** incomplete prototype in love/; it is not feature-equivalent to Pygame and is not the recommended daily-use engine.
 - **Local service:** service/voiddesk_service.py provides the backend used by frontend panels and session actions.
 - **VoidCast:** standalone IPTV/media application under outdesk/VoidCast/voidcast/.
 - **External tools:** optional applications and integrations under outdesk/.
@@ -85,9 +85,9 @@ See [Architecture](docs/ARCHITECTURE.md) for execution flow.
 > **Release status (2026-11-08):** the latest published handheld package is `VoidDesk_v10.2.0.muxapp` (release `v10.2.0`, published 2026-08-11). The `main` branch has advanced to the `v10.5.4-NEXUS` release candidate, but that candidate has **not** been published as a `.muxapp` package yet. The v10.2.0 download therefore does not include the v10.5.4 changes listed in the changelog.
 
 1. Open [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) and download the latest **published `.muxapp` asset**. Check the release tag before installing; the source-code ZIP is not a replacement for the muOS application package.
-2. Copy the `.muxapp` file to the muOS application directory: `mnt/mmc/MUOS/application/`.
-3. Launch VoidDesk from the muOS Apps menu.
-4. Open **START SESSION** and follow the on-screen setup/repair flow for the optional desktop image.
+2. Copy the `.muxapp` file to the SD1 `ARCHIVE/` folder.
+3. On the handheld, open **Applications → Archive Manager** and install the package.
+4. Launch VoidDesk from Applications and follow the on-screen setup/repair flow for the optional desktop image.
 
 ### First-run checklist
 
@@ -97,7 +97,7 @@ See [Architecture](docs/ARCHITECTURE.md) for execution flow.
 - Back up important saves and configuration before updating firmware or replacing the package.
 - If setup is interrupted, inspect the log before repeating storage-intensive operations.
 
-The Pygame frontend can bootstrap its runtime on demand. The improved bootstrap validates HTTPS certificates, verifies the published PyPI SHA-256 digest, checks archive paths and tests the import before replacing the active runtime. The desktop image bootstrap is separate.
+**Pygame is the recommended frontend.** LÖVE is included for ongoing development and testing only; several hubs and actions remain incomplete in that engine. The Pygame frontend can bootstrap its runtime on demand. The improved bootstrap validates HTTPS certificates, verifies the published PyPI SHA-256 digest, checks archive paths and tests the import before replacing the active runtime. The desktop image bootstrap is separate.
 
 ## Web browsers on muOS
 
@@ -157,6 +157,8 @@ python3 voiddesk.py --help
 
 The bundled LÖVE binary is architecture-specific; on a PC the launcher prefers the system installation.
 
+See the [visual capture workflow](docs/visual/README.md) for the F12 screenshot shortcut, asset inventory and screenshot checklist.
+
 ## Configuration and generated data
 
 | Path | Role |
@@ -166,6 +168,7 @@ The bundled LÖVE binary is architecture-specific; on a PC the launcher prefers 
 | data/voiddesk.log | Device launcher and session log |
 | data/logs/ | Additional runtime logs |
 | data/.pygame_ready | Pygame bootstrap completion marker |
+| data/visual-captures/ | Local F12 screenshots and JSON metadata; ignored by Git |
 | data/sdl_path.txt | Detected SDL library path |
 | runtime/ | Downloaded Pygame runtime; ignored by Git |
 | data/xfce.img | Optional desktop image |
@@ -189,6 +192,8 @@ Back up personal configuration and media/list files before reinstalling. Generat
 ├── resources/           # Artwork and screenshots
 ├── service/             # Local backend service
 ├── tests/               # Focused automated tests
+├── tools/               # Visual asset and screenshot inventory tools
+├── wiki-source/         # Source pages for the GitHub Wiki
 ├── voidcast_addons/     # VoidCast add-ons
 ├── BUILDCHECK.py        # Repository integrity checks
 ├── mux_launch.sh        # muOS device entry point
