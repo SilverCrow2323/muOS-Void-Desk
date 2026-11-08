@@ -70,6 +70,36 @@ jobs:
           VOIDDESK_APP_DIR="$RUNNER_TEMP/voiddesk" luajit tests/test_love_core.lua
 
 
+  pygame-visual-capture:
+    name: Pygame visual capture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: "1"
+      VOIDDESK_NOINTRO: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Pygame runtime
+        run: python -m pip install --disable-pip-version-check pygame==2.6.1
+      - name: Capture supported Pygame home styles
+        run: python tools/capture_pygame_screenshots.py
+      - name: Upload Pygame visual captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voiddesk-pygame-visual-captures
+          path: |
+            data/visual-captures/pygame__*.png
+            data/visual-captures/pygame__*.json
+            data/visual-captures/pygame-home-manifest.json
+          if-no-files-found: warn
+          retention-days: 30
+
   love-visual-capture:
     name: LÖVE visual capture
     runs-on: ubuntu-24.04
