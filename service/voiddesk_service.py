@@ -4,14 +4,20 @@ VoidDesk background service — reads .love_request.json,
 writes .love_response.json. Minimal, no external deps.
 Runs on both muOS (aarch64) and desktop x86_64.
 """
+import errno
+import fcntl
 import json
 import os
 import platform
+import pty
+import select
 import shlex
+import struct
 import signal
 import shutil
 import subprocess
 import sys
+import termios
 import time
 import traceback
 from pathlib import Path
@@ -397,6 +403,119 @@ def h_calendar_events(args):
     for day_events in events.values():
         day_events.sort(key=lambda event: (event["hour"], event["minute"]))
     return {"ok": True, "events": events}
+
+
+# One interactive PTY is shared by the LÖVE terminal scene.
+_SHELL_MASTER = None
+_SHELL_PROC = None
+
+
+def h_shell_start(args):
+    global _SHELL_MASTER, _SHELL_PROC
+    if _SHELL_PROC is not None and _SHELL_PROC.poll() is None:
+        return {"ok": True, "already_running": True}
+    if _SHELL_MASTER is not None:
+        try:
+            os.close(_SHELL_MASTER)
+        except OSError:
+            pass
+        _SHELL_MASTER = None
+    master = slave = None
+    try:
+        master, slave = pty.openpty()
+        fcntl.ioctl(slave, termios.TIOCSWINSZ,
+                    struct.pack("HHHH", 24, 80, 0, 0))
+        shell = os.environ.get("SHELL") or "/bin/sh"
+        if not os.path.isfile(shell):
+            shell = "/bin/sh"
+        env = os.environ.copy()
+        env.setdefault("TERM", "xterm-256color")
+        process = subprocess.Popen(
+            [shell], stdin=slave, stdout=slave, stderr=slave,
+            cwd=str(APP_DIR), env=env, close_fds=True,
+            start_new_session=True,
+        )
+        os.close(slave)
+        slave = None
+        flags = fcntl.fcntl(master, fcntl.F_GETFL)
+        fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        _SHELL_MASTER = master
+        _SHELL_PROC = process
+        return {"ok": True, "pid": process.pid}
+    except (OSError, ValueError) as exc:
+        for fd in (master, slave):
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        return {"ok": False, "error": "cannot start shell: " + str(exc)}
+
+
+def h_shell_poll(args):
+    if _SHELL_MASTER is None or _SHELL_PROC is None:
+        return {"ok": False, "error": "shell is not running"}
+    chunks = []
+    total = 0
+    try:
+        readable, _, _ = select.select([_SHELL_MASTER], [], [], 0)
+        if readable:
+            while total < 32768:
+                try:
+                    chunk = os.read(_SHELL_MASTER, min(8192, 32768 - total))
+                except BlockingIOError:
+                    break
+                except OSError as exc:
+                    if exc.errno == errno.EIO:
+                        break
+                    raise
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": "shell poll failed: " + str(exc)}
+    return {
+        "ok": True,
+        "output": b"".join(chunks).decode("utf-8", errors="replace"),
+        "running": _SHELL_PROC.poll() is None,
+    }
+
+
+def h_shell_send(args):
+    if _SHELL_MASTER is None or _SHELL_PROC is None:
+        return {"ok": False, "error": "shell is not running"}
+    if _SHELL_PROC.poll() is not None:
+        return {"ok": False, "error": "shell process has exited"}
+    payload = str(args.get("text") or "")[:8192].encode(
+        "utf-8", errors="replace"
+    )
+    try:
+        sent = os.write(_SHELL_MASTER, payload)
+        return {"ok": True, "bytes_written": sent}
+    except OSError as exc:
+        return {"ok": False, "error": "shell write failed: " + str(exc)}
+
+
+def h_shell_kill(args):
+    global _SHELL_MASTER, _SHELL_PROC
+    process = _SHELL_PROC
+    if process is not None and process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except (AttributeError, ProcessLookupError, PermissionError, OSError):
+            try:
+                process.terminate()
+            except OSError:
+                pass
+    if _SHELL_MASTER is not None:
+        try:
+            os.close(_SHELL_MASTER)
+        except OSError:
+            pass
+    _SHELL_MASTER = None
+    _SHELL_PROC = None
+    return {"ok": True}
 
 
 # Background jobs are process-local: a service restart clears the live
@@ -1018,6 +1137,10 @@ HANDLERS = {
     "system_info": h_system_info,
     "network_status": h_network_status,
     "system_status": h_system_status,
+    "shell_start": h_shell_start,
+    "shell_poll": h_shell_poll,
+    "shell_send": h_shell_send,
+    "shell_kill": h_shell_kill,
     "job_start": h_job_start,
     "job_list": h_job_list,
     "job_cancel": h_job_cancel,
