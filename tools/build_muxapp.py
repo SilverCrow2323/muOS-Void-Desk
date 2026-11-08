@@ -202,7 +202,7 @@ def build_archive(repo_root: Path, output: Path):
         raise RuntimeError("built archive failed validation: " + "; ".join(errors))
     digest = sha256_file(output)
     output.with_suffix(output.suffix + ".sha256").write_text(
-        digest + "  " + output.name + "\\n", encoding="ascii"
+        digest + "  " + output.name + "\n", encoding="ascii"
     )
     return output
 
