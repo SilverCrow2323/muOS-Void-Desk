@@ -34,7 +34,8 @@ Some screens exist, but several actions are placeholders or do not yet have a wo
 
 ## Known current limitations
 
-- LÖVE Toolbox now links Calculator and Clock to their existing scenes; Notes, RSS and Weather remain incomplete.
+- LÖVE Toolbox links Calculator and Clock to existing scenes, reads Calendar events from the shared `data/calendar.json` store, and displays live note/text counts from the service. Notes, RSS and Weather remain incomplete.
+- THE FORGE uses a process-backed job queue for package installation; arbitrary shell commands are rejected by the service allowlist.
 - Workshop diagnostics, live monitor, logs and cleanup are incomplete.
 - Media Library and Radio flows need parity work.
 - Desktop repair is a placeholder.
