@@ -41,7 +41,7 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
     monkeypatch.setattr(
         builder.subprocess, "run",
         lambda *args, **kwargs: SimpleNamespace(
-            returncode=0, stdout=builder.TAILSCALE_COMMIT + "\\n", stderr=""
+            returncode=0, stdout=builder.TAILSCALE_COMMIT, stderr=""
         ),
     )
     project = tmp_path / "project"
