@@ -14,6 +14,7 @@
 - [Development and architecture](Development)
 - [Visual capture and asset catalogue](Visual-capture-and-assets)
 - [Release testing and bug reports](Release-testing)
+- [v10.5.4 pre-release plan](Pre-release-10.5.4)
 
 ## Project links
 
