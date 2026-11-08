@@ -85,10 +85,10 @@ return dashboard.new({
                   end)
               return "Starting..."
           end },
-        { icon = "calc", label = "Calculator", desc = "Coming soon: scientific + RPN",
-          action = function(scene) scene.set_status("Calculator: soon"); return "Calculator" end },
-        { icon = "clock", label = "Clock", desc = "Coming soon: digital + analog",
-          action = function(scene) scene.set_status("Clock: soon"); return "Clock" end },
+        { icon = "calc", label = "Calculator", desc = "Scientific calculator",
+          action = function() sm.push("tool_calc", {}) end },
+        { icon = "clock", label = "Clock", desc = "Animated analog clock",
+          action = function() sm.push("tool_clock", {}) end },
         { icon = "text", label = "Notes", desc = "Coming soon: quick notes board",
           action = function(scene) scene.set_status("Notes: soon"); return "Notes" end },
         { icon = "terminal", label = "Text editor", desc = "Coming soon: VOID EDIT",
