@@ -1,6 +1,6 @@
 # CHANGELOG — VoidDesk
 
-> **Release candidate:** \`v10.5.4-NEXUS\`  
+> **Release candidate:** `v10.5.4-NEXUS`  
 > **Status:** prepared for review; not yet published as a GitHub Release  
 > **Date:** 2026-11-08
 
@@ -14,16 +14,16 @@ This file records user-visible changes by release. The next candidate is documen
 
 | Reference | Reported problem | Change in this candidate | Verification status |
 |---|---|---|---|
-| [#2](https://github.com/SilverCrow2323/Void-Desk-Project/issues/2) | Bluetooth activity could stall the NEXUS animation and delay controller input | Host status collection now runs in a single background worker. The render path reads a cached snapshot and never waits for \`hciconfig\` or \`bluetoothctl\` to respond. | Automated regression tests added; RG35XXSP confirmation still required |
-| [#2](https://github.com/SilverCrow2323/Void-Desk-Project/issues/2) | Device power-off could leave the RG35XXSP powered with its LED off | The muOS shutdown path now hands the request back to \`mux_launch.sh\`; the launcher stops the local service, runs \`sync\`, then tries forced power-off and device power-off fallbacks. | Shell and Python checks can validate the hand-off; physical RG35XXSP test still required |
+| [#2](https://github.com/SilverCrow2323/Void-Desk-Project/issues/2) | Bluetooth activity could stall the NEXUS animation and delay controller input | Host status collection now runs in a single background worker. The render path reads a cached snapshot and never waits for `hciconfig` or `bluetoothctl` to respond. | Automated regression tests added; RG35XXSP confirmation still required |
+| [#2](https://github.com/SilverCrow2323/Void-Desk-Project/issues/2) | Device power-off could leave the RG35XXSP powered with its LED off | The muOS shutdown path now hands the request back to `mux_launch.sh`; the launcher stops the local service, runs `sync`, then tries forced power-off and device power-off fallbacks. | Shell and Python checks can validate the hand-off; physical RG35XXSP test still required |
 
 ### Documentation and maintenance
 
-- Clarified that NetSurf, Falkon and Dillo are optional browsers inside the XFCE desktop image, while \`qtWebBrowser\` is a separate third-party muOS application.
+- Clarified that NetSurf, Falkon and Dillo are optional browsers inside the XFCE desktop image, while `qtWebBrowser` is a separate third-party muOS application.
 - Added a browser error-reporting checklist and the relevant VoidDesk/XFCE log paths.
 - Expanded the architecture notes for the asynchronous status cache and device power-off hand-off.
 - Added regression tests for non-blocking status reads, cached snapshots and recovery after a failed probe.
-- Aligned the Python application and launcher version metadata on the 10.5.4 release line and extended \`BUILDCHECK.py\` to inspect the PC launcher too.
+- Aligned the Python application and launcher version metadata on the 10.5.4 release line and extended `BUILDCHECK.py` to inspect the PC launcher too.
 
 ### Validation
 
@@ -36,7 +36,7 @@ The automated CI run for this candidate is the source of truth for compilation, 
 
 ### Remaining project work
 
-- Several optional applications under \`outdesk/\` are still prototypes/placeholders and are not part of this release's completion claim.
+- Several optional applications under `outdesk/` are still prototypes/placeholders and are not part of this release's completion claim.
 - IceWM/LXDE availability depends on the optional desktop image and installed packages; XFCE remains the documented baseline.
 - Device-only operations such as package installation, desktop-image repair, session hand-off and power management still require physical hardware validation.
 

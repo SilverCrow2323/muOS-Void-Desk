@@ -67,11 +67,11 @@ The handheld package includes lib/love and the project under love/. The PC launc
 
 ## Non-blocking host status
 
-The Pygame frontend reads header indicators through \`App.status_snapshot()\`. This method is a cache read only. A \`StatusPoller\` worker refreshes battery, Wi-Fi, Bluetooth, volume, USB and hotspot state at a bounded interval. Slow commands such as \`hciconfig\` and \`bluetoothctl show\` therefore cannot suspend the NEXUS render/input loop. Only one refresh is allowed at a time; a failed probe leaves the last known snapshot available and permits a later retry.
+The Pygame frontend reads header indicators through `App.status_snapshot()`. This method is a cache read only. A `StatusPoller` worker refreshes battery, Wi-Fi, Bluetooth, volume, USB and hotspot state at a bounded interval. Slow commands such as `hciconfig` and `bluetoothctl show` therefore cannot suspend the NEXUS render/input loop. Only one refresh is allowed at a time; a failed probe leaves the last known snapshot available and permits a later retry.
 
 ## Device power-off sequence
 
-For the muOS package launcher, the Pygame frontend writes \`data/.pending_poweroff\` and exits normally. The shell launcher detects the marker, stops and waits for \`service/voiddesk_service.py\`, synchronizes filesystem writes, and invokes the forced power-off command with fallbacks. This avoids leaving the VoidDesk companion service running while the system is asked to power down.
+For the muOS package launcher, the Pygame frontend writes `data/.pending_poweroff` and exits normally. The shell launcher detects the marker, stops and waits for `service/voiddesk_service.py`, synchronizes filesystem writes, and invokes the forced power-off command with fallbacks. This avoids leaving the VoidDesk companion service running while the system is asked to power down.
 
 The direct power-off fallback in the standalone/PC path is separate from the device hand-off. Neither path can be certified by headless CI; final behaviour must be checked on the target hardware.
 

@@ -7,7 +7,10 @@ import re
 import subprocess
 import time
 import collections
-import pygame
+try:
+    import pygame
+except ImportError:
+    pygame = None
 
 from desk.const import (
     FONT_PATH, FONT_BOLD_PATH, FONT_MONO_PATH, FONT_MONO_BOLD_PATH,
@@ -15,16 +18,24 @@ from desk.const import (
 )
 
 
+def _pygame():
+    if pygame is None:
+        raise RuntimeError("Pygame is required for graphical font rendering")
+    return pygame
+
+
 def font(size):
+    pg = _pygame()
     try:
-        return pygame.font.Font(FONT_PATH, size)
+        return pg.font.Font(FONT_PATH, size)
     except Exception:
-        return pygame.font.Font(None, size)
+        return pg.font.Font(None, size)
 
 
 def font_bold(size):
+    pg = _pygame()
     try:
-        return pygame.font.Font(FONT_BOLD_PATH, size)
+        return pg.font.Font(FONT_BOLD_PATH, size)
     except Exception:
         f = font(size)
         f.set_bold(True)
@@ -32,16 +43,18 @@ def font_bold(size):
 
 
 def font_mono(size, bold=False):
+    pg = _pygame()
     path = FONT_MONO_BOLD_PATH if bold else FONT_MONO_PATH
     try:
-        return pygame.font.Font(path, size)
+        return pg.font.Font(path, size)
     except Exception:
         return font_bold(size) if bold else font(size)
 
 
 def font_display(size):
+    pg = _pygame()
     try:
-        return pygame.font.Font(FONT_DISPLAY_PATH, size)
+        return pg.font.Font(FONT_DISPLAY_PATH, size)
     except Exception:
         return font_bold(size)
 
