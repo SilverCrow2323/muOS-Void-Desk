@@ -35,6 +35,8 @@ assert(file_exists("love/scenes/hub_apt.lua"),
        "missing native APT manager scene")
 assert(file_exists("love/scenes/hub_tailscale.lua"),
        "missing native Tailscale scene")
+assert(file_exists("love/scenes/hub_syncthing.lua"),
+       "missing native Syncthing scene")
 
 -- The integrated login screen must be able to generate a real QR matrix.
 local qr = require("lib.qr")
