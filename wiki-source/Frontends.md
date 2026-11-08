@@ -49,6 +49,8 @@ A screen can render in CI while its service action remains unavailable. Keep the
 - THE FORGE uses a process-backed job queue for package installation; arbitrary shell commands are rejected by the service allowlist.
 - Shell uses a real nonblocking PTY through the local service (`shell_start`, `shell_poll`, `shell_send`, `shell_kill`).
 - External Tools reads the shared `external/tools.json` registry, reports whether each launcher is actually present, and starts only registered launchers. Missing optional submodules are shown as not installed rather than being treated as successful launches.
+- Pygame Syncthing discovery now checks the Andromeda storage configuration, defaults to the documented local API port 7070, and never spawns a second daemon on muOS. The service must be enabled in Configuration → Connectivity → Web Services → Syncthing. The panel still needs full device/folder management and hardware validation.
+- Rt:Tailscale-M is pinned as a source submodule and its upstream static/UI tests plus 21 QEMU service checks run in CI. Its service is not yet embedded as a native VoidDesk feature; the final .muxapp builder must vendor the pinned service files rather than rely on a gitlink.
 - Workshop diagnostics, live monitor, logs and cleanup are incomplete.
 - Media Library and Radio flows need parity work.
 - Desktop repair is a placeholder.
