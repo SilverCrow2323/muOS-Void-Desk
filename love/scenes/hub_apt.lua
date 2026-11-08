@@ -9,7 +9,7 @@ local input = require("core.input")
 local bridge = require("core.bridge")
 
 local scene = {}
-local tabs = {"SEARCH", "INSTALLED", "JOBS"}
+local tabs = {"SEARCH", "INSTALLED", "JOBS", "SYSTEM"}
 local tab = 1
 local query = "htop"
 local results, installed, jobs, job_log = {}, {}, {}, {}
@@ -18,6 +18,12 @@ local mode = "results"
 local status = "Reading package catalogue..."
 local busy = false
 local refresh_t = 0
+
+local system_actions = {
+    {name="APT UPDATE", action="update", desc="Refresh package indexes"},
+    {name="UPGRADE", action="upgrade", desc="Upgrade installed packages"},
+    {name="CLEAN CACHE", action="clean", desc="Remove downloaded package archives"},
+}
 
 local keys = {
     "a","b","c","d","e","f","g","h","i","j",
@@ -102,7 +108,8 @@ end
 local function selected_items()
     if tab == 1 then return results end
     if tab == 2 then return installed end
-    return jobs
+    if tab == 3 then return jobs end
+    return system_actions
 end
 
 local function move_selection(delta)
@@ -138,6 +145,17 @@ local function activate_selected()
                 set_status("Job log: " .. tostring(item.name or item.id))
             end)
         end
+    elseif tab == 4 then
+        if busy then return end
+        busy = true
+        set_status(item.name .. "...")
+        bridge.call("job_start", {apt_action=item.action, packages={},
+            name=item.name, hub="forge"}, function(resp)
+            busy = false
+            set_status(resp.ok and ("Job #" .. tostring(resp.job.id) .. " started")
+                or ("Cannot start: " .. (resp.error or "unknown error")))
+            refresh_jobs()
+        end)
     end
 end
 
@@ -242,7 +260,8 @@ function scene.draw()
     if tab == 1 then
         love.graphics.print("SEARCH  >  " .. query .. (mode == "keyboard" and "_" or ""), 26, 120)
     elseif tab == 2 then love.graphics.print("INSTALLED PACKAGES", 26, 120)
-    else love.graphics.print("BACKGROUND JOBS", 26, 120) end
+    elseif tab == 3 then love.graphics.print("BACKGROUND JOBS", 26, 120)
+    else love.graphics.print("SYSTEM MAINTENANCE", 26, 120) end
 
     local items = selected_items()
     love.graphics.setFont(f)
@@ -266,19 +285,19 @@ function scene.draw()
     end
 
     if mode == "keyboard" then
-        local kx, ky = 22, 304
+        local kx, ky = 22, 270
         love.graphics.setFont(font.bold(13) or love.graphics.newFont(13))
         for i, key in ipairs(keys) do
             local col, row = (i - 1) % 10, math.floor((i - 1) / 10)
-            local x, y = kx + col * 59, ky + row * 31
+            local x, y = kx + col * 59, ky + row * 27
             if i == key_selected then
                 love.graphics.setColor(accent[1], accent[2], accent[3], 0.55)
             else
                 love.graphics.setColor(0.13,0.16,0.20,0.95)
             end
-            love.graphics.rectangle("fill", x, y, 54, 26, 4)
+            love.graphics.rectangle("fill", x, y, 54, 23, 4)
             love.graphics.setColor(0.92,0.94,0.98)
-            love.graphics.printf(key, x, y + 6, 54, "center")
+            love.graphics.printf(key, x, y + 4, 54, "center")
         end
     elseif tab == 3 and #job_log > 0 then
         love.graphics.setFont(font.mono(11) or love.graphics.newFont(11))
@@ -290,8 +309,8 @@ function scene.draw()
     love.graphics.setColor(0.72,0.78,0.85)
     love.graphics.printf(status, 18, H - 66, W - 36, "center")
     chrome.draw_footer({theme=th, hints={
-        {icon="dpad",label="Navigate"}, {icon="a",label=tab == 3 and "Cancel / Log" or "Install / Remove"},
-        {icon="y",label="Search keys"}, {icon="l1",label="Tabs"}, {icon="b",label="Back"},
+        {icon="dpad",label="Navigate"}, {icon="a",label=tab == 3 and "Cancel / Log" or (tab == 4 and "Run" or "Install / Remove")},
+        {icon="y",label=tab == 1 and "Search keys" or "Actions"}, {icon="l1",label="Tabs"}, {icon="b",label="Back"},
     }, right_text=busy and "WORKING" or "SELECT refresh"})
 end
 
