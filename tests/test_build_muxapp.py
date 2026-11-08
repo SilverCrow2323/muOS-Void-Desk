@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 from pathlib import Path
 import zipfile
@@ -55,6 +56,9 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
     result = builder.build_archive(project, output)
 
     assert result == output
+    expected_hash = hashlib.sha256(output.read_bytes()).hexdigest()
+    sidecar = output.with_suffix(output.suffix + ".sha256")
+    assert sidecar.read_text(encoding="ascii").startswith(expected_hash + "  ")
     with zipfile.ZipFile(output) as archive:
         names = archive.namelist()
         tailscale_config = archive.read(
