@@ -10,6 +10,7 @@ local state = {
     backend = "Checking",
     peers = {},
     taildrop = {},
+    urls = {},
     auth_url = "",
     qr_matrix = nil,
     tailnet = "",
@@ -30,6 +31,7 @@ local function refresh(scene, silent)
         state.backend = resp.backend or (state.installed and "Stopped" or "Not installed")
         state.peers = resp.peers or {}
         state.taildrop = resp.taildrop or {}
+        state.urls = resp.urls or {}
         state.auth_url = resp.auth_url or ""
         state.qr_matrix = nil
         if state.auth_url ~= "" then
@@ -86,12 +88,24 @@ local function items_for()
         },
     }
     for _, peer in ipairs(state.peers) do
+        table.insert(items, {
+            icon = "laptop",
+            label = tostring(peer.name or "Tailnet device"),
+            value = peer.online and "ONLINE" or "OFFLINE",
+            desc = tostring(peer.ip or "no IP") .. " · " .. tostring(peer.os or "device"),
+            action = function(scene)
+                scene.set_status(tostring(peer.name or "Peer") .. " · " ..
+                    tostring(peer.user or "tailnet device") .. " · " ..
+                    tostring(peer.ip or "no IP"))
+                return "Peer details"
+            end,
+        })
         if peer.exit_node and peer.ip and peer.ip ~= "" then
             table.insert(items, {
                 icon = "route",
-                label = "Exit node: " .. tostring(peer.name or "Device"),
+                label = "Use exit node: " .. tostring(peer.name or "Device"),
                 value = peer.online and "ONLINE" or "OFFLINE",
-                desc = tostring(peer.ip) .. " · " .. tostring(peer.os or "peer"),
+                desc = tostring(peer.ip) .. " · route traffic through this peer",
                 action = function(scene)
                     if not peer.online then
                         scene.set_status("This exit node is offline")
@@ -102,6 +116,20 @@ local function items_for()
             })
         end
     end
+    table.insert(items, {
+        icon = "download",
+        label = "Taildrop inbox",
+        value = tostring(#state.taildrop) .. " FILES",
+        desc = "Show the latest received filenames",
+        action = function(scene)
+            local names = {}
+            for i = 1, math.min(3, #state.taildrop) do
+                names[#names + 1] = state.taildrop[i].name
+            end
+            scene.set_status(#names > 0 and table.concat(names, ", ") or "Taildrop inbox is empty")
+            return "Taildrop inbox"
+        end,
+    })
     table.insert(items, {
         icon = "x-circle", label = "Clear exit node",
         desc = "Return to the normal network route",
