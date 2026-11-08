@@ -42,7 +42,11 @@ local function run_action(scene, action, value, label)
     scene.set_status(label or "Working...")
     bridge.call("tailscale_action", { action = action, value = value or "" }, function(resp)
         if resp.ok then
-            scene.set_status(resp.message or resp.output or "Done")
+            if resp.job then
+                scene.set_status("Setup job #" .. tostring(resp.job.id) .. " started")
+            else
+                scene.set_status(resp.message or resp.output or "Done")
+            end
             refresh(scene, true)
         else
             scene.set_status(resp.error or resp.output or "Tailscale action failed")
