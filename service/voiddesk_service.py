@@ -412,6 +412,8 @@ _SHELL_PROC = None
 
 def h_shell_start(args):
     global _SHELL_MASTER, _SHELL_PROC
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "interactive shell disabled during visual capture"}
     if _SHELL_PROC is not None and _SHELL_PROC.poll() is None:
         return {"ok": True, "already_running": True}
     if _SHELL_MASTER is not None:
