@@ -7,6 +7,8 @@ Runs on both muOS (aarch64) and desktop x86_64.
 import json
 import os
 import platform
+import shlex
+import signal
 import shutil
 import subprocess
 import sys
@@ -329,6 +331,169 @@ def h_calendar_events(args):
     for day_events in events.values():
         day_events.sort(key=lambda event: (event["hour"], event["minute"]))
     return {"ok": True, "events": events}
+
+
+# Background jobs are process-local: a service restart clears the live
+# process table, while each job's log remains available under data/.
+_JOBS = {}
+_JOB_SEQ = 0
+_ALLOWED_JOB_PACKAGES = {"htop", "ncdu", "ffmpeg", "curl"}
+
+
+def _job_refresh(job):
+    process = job.get("process")
+    if job["status"] == "running" and process is not None:
+        code = process.poll()
+        if code is not None:
+            job["status"] = "done" if code == 0 else "error"
+            job["progress"] = 100 if code == 0 else 0
+            job["exit_code"] = code
+    return job
+
+
+def _job_public(job):
+    _job_refresh(job)
+    return {
+        "id": job["id"],
+        "name": job["name"],
+        "hub": job["hub"],
+        "status": job["status"],
+        "started": job["started"],
+        "progress": job["progress"],
+        "color": [0.45, 0.72, 0.95],
+    }
+
+
+def h_job_start(args):
+    """Start only allowlisted package jobs or registered external tools."""
+    global _JOB_SEQ
+    command = None
+    cwd = APP_DIR
+    cmd_text = args.get("cmd")
+    tool_id = args.get("tool_id")
+
+    if cmd_text:
+        try:
+            tokens = shlex.split(str(cmd_text))
+        except ValueError as exc:
+            return {"ok": False, "error": "invalid command: " + str(exc)}
+        if (len(tokens) != 3 or tokens[:2] !=
+                ["sh", "bin/vd_apt_install.sh"] or
+                tokens[2] not in _ALLOWED_JOB_PACKAGES):
+            return {"ok": False, "error": "command is not allowlisted"}
+        script = APP_DIR / "bin" / "vd_apt_install.sh"
+        if not script.is_file():
+            return {"ok": False, "error": "package installer is missing"}
+        command = ["sh", str(script), tokens[2]]
+    elif tool_id:
+        try:
+            registry = json.loads(
+                (APP_DIR / "external" / "tools.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            tool = next(
+                (item for item in registry.get("tools", [])
+                 if item.get("id") == str(tool_id)),
+                None,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            return {"ok": False, "error": "cannot read external tools: " + str(exc)}
+        if not tool:
+            return {"ok": False, "error": "unknown external tool"}
+        launcher_type = tool.get("launcher_type")
+        launcher = tool.get("launcher", "")
+        target = (APP_DIR / launcher).resolve()
+        try:
+            target.relative_to(APP_DIR.resolve())
+        except ValueError:
+            return {"ok": False, "error": "external tool path escapes app directory"}
+        if launcher_type == "love":
+            if not target.exists():
+                return {"ok": False, "error": "external tool is not installed"}
+            love_bin = APP_DIR / "lib" / "love"
+            love_exec = str(love_bin) if love_bin.is_file() else shutil.which("love")
+            if not love_exec:
+                return {"ok": False, "error": "LÖVE runtime is not installed"}
+            command = [love_exec, str(target)]
+            cwd = target if target.is_dir() else target.parent
+        elif launcher_type == "sh":
+            if not target.is_file():
+                return {"ok": False, "error": "external launcher is not installed"}
+            command = ["sh", str(target)]
+            cwd = target.parent
+        else:
+            return {"ok": False, "error": "unsupported external launcher type"}
+    else:
+        return {"ok": False, "error": "job requires cmd or tool_id"}
+
+    _JOB_SEQ += 1
+    job_id = str(_JOB_SEQ)
+    name = str(args.get("name") or tool_id or "Background job")[:80]
+    hub = str(args.get("hub") or "system")[:32]
+    log_path = DATA / ("love_job_%s.log" % job_id)
+    try:
+        DATA.mkdir(parents=True, exist_ok=True)
+        with log_path.open("ab") as log_file:
+            process = subprocess.Popen(
+                command, cwd=str(cwd), stdin=subprocess.DEVNULL,
+                stdout=log_file, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+    except OSError as exc:
+        return {"ok": False, "error": "cannot start job: " + str(exc)}
+
+    job = {
+        "id": job_id,
+        "name": name,
+        "hub": hub,
+        "status": "running",
+        "started": time.time(),
+        "progress": 0,
+        "process": process,
+        "log_path": log_path,
+    }
+    _JOBS[job_id] = job
+    return {"ok": True, "job": _job_public(job)}
+
+
+def h_job_list(args):
+    jobs = [_job_public(job) for job in _JOBS.values()]
+    jobs.sort(key=lambda job: job["started"], reverse=True)
+    return {"ok": True, "jobs": jobs}
+
+
+def h_job_cancel(args):
+    job = _JOBS.get(str(args.get("job_id", "")))
+    if not job:
+        return {"ok": False, "error": "unknown job"}
+    _job_refresh(job)
+    if job["status"] != "running":
+        return {"ok": True, "status": job["status"]}
+    process = job.get("process")
+    if process is not None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except (AttributeError, ProcessLookupError, PermissionError, OSError):
+            try:
+                process.terminate()
+            except OSError:
+                pass
+    job["status"] = "cancelled"
+    return {"ok": True, "status": "cancelled"}
+
+
+def h_job_log(args):
+    job = _JOBS.get(str(args.get("job_id", "")))
+    if not job:
+        return {"ok": False, "error": "unknown job"}
+    try:
+        lines = job["log_path"].read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()[-160:]
+    except OSError:
+        lines = []
+    return {"ok": True, "lines": lines}
 
 
 def h_media_status(args):
@@ -769,6 +934,10 @@ HANDLERS = {
     "system_info": h_system_info,
     "network_status": h_network_status,
     "system_status": h_system_status,
+    "job_start": h_job_start,
+    "job_list": h_job_list,
+    "job_cancel": h_job_cancel,
+    "job_log": h_job_log,
     "media_status": h_media_status,
     "toolbox_stats": h_toolbox_stats,
     "calendar_events": h_calendar_events,
