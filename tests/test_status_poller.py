@@ -40,11 +40,20 @@ def test_snapshot_does_not_wait_for_slow_system_probe():
 
 
 def test_snapshot_returns_a_copy_of_cached_state():
-    poller = StatusPoller(lambda: {"wifi": 3}, interval=60,
-                          initial={"wifi": 2})
+    started = threading.Event()
+    release = threading.Event()
+
+    def read_status():
+        started.set()
+        release.wait(1.0)
+        return {"wifi": 3}
+
+    poller = StatusPoller(read_status, interval=60, initial={"wifi": 2})
     first = poller.snapshot()
+    assert started.wait(0.5)
     first["wifi"] = 99
     assert poller.snapshot()["wifi"] == 2
+    release.set()
 
 
 def test_failed_probe_does_not_leave_poller_stuck():

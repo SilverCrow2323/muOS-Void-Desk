@@ -35,7 +35,8 @@ class CommunityHub(HubMixin):
                 ("sec", "globe", "COMMUNITY FORUM"),
                 ("kv", "", "Apri il link sul PC o sul telefono:", app.accent),
                 ("kv", "", url, app.accent),
-                ("kv", "", "Oppure installa un browser (NetSurf) da FORGE.", app.accent),
+                ("kv", "", "I browser di FORGE si installano dentro XFCE.", app.accent),
+                ("kv", "", "Avvia XFCE e apri il browser da li'.", app.accent),
             ]
             app.scroll = 0
             app.push("info")
@@ -61,6 +62,7 @@ class CommunityHub(HubMixin):
                 ("sec", "book", "MUOS WIKI"),
                 ("kv", "", "https://muos.dev", app.accent),
                 ("kv", "", "Documentazione ufficiale, guide e FAQ.", app.accent),
+                ("kv", "", "I browser di FORGE si usano dentro XFCE, non dal sistema muOS.", app.accent),
             ]
             app.scroll = 0
             app.push("info")
