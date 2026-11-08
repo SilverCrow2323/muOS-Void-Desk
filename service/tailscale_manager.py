@@ -155,6 +155,7 @@ def status(app_dir: Path, extra_roots=(), runner=subprocess.run):
             "ips": ips,
             "online": bool(peer.get("Online")),
             "exit_node": bool(peer.get("ExitNodeOption")),
+            "using": bool(peer.get("ExitNode")),
             "os": peer.get("OS") or "",
             "user": user_name(peer.get("UserID")),
         })
