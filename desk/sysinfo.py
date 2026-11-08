@@ -15,7 +15,9 @@ class StatusPoller:
         self._reader = reader
         self._interval = max(0.1, float(interval))
         self._snapshot = dict(initial or {})
-        self._last_refresh = 0.0
+        # First snapshot must schedule a probe immediately, even when the
+        # monotonic clock has been running for less than one interval.
+        self._last_refresh = time.monotonic() - self._interval
         self._refreshing = False
         self._lock = threading.Lock()
 
