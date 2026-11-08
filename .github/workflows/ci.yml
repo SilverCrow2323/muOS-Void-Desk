@@ -124,8 +124,8 @@ jobs:
         with:
           name: voiddesk-muxapp-10.5.4
           path: |
-            \${{ runner.temp }}/Void-Desk-10.5.4.muxapp
-            \${{ runner.temp }}/Void-Desk-10.5.4.muxapp.sha256
+            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp
+            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp.sha256
           retention-days: 30
 
   tailscale-integration:
