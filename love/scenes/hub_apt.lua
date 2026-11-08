@@ -174,13 +174,17 @@ local function key_activate()
     end
 end
 
-function scene.enter()
-    tab, selected, offset, key_selected = 1, 1, 1, 1
+function scene.enter(args)
+    local requested = args and args.tab or ""
+    tab = requested == "SYSTEM" and 4 or requested == "JOBS" and 3 or 1
+    selected, offset, key_selected = 1, 1, 1
     mode, busy = "results", false
-    status = "Search APT packages in the XFCE image"
+    status = tab == 4 and "APT maintenance in the XFCE image" or
+        tab == 3 and "Background package jobs" or
+        "Search APT packages in the XFCE image"
     results, installed, jobs, job_log = {}, {}, {}, {}
     refresh_installed()
-    refresh_search()
+    if tab == 1 then refresh_search() else refresh_jobs() end
     input.clear()
     input.on("press", function(action)
         if action == "b" then
