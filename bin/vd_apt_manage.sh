@@ -72,4 +72,10 @@ case "$MODE" in
   install) set -- apt-get install -y --no-install-recommends "$@" ;;
   remove) set -- apt-get remove -y "$@" ;;
 esac
-"$CHROOT" "$MNT" "$ENV" DEBIAN_FRONTEND=noninteractive PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin "$@" 2>&1 | tee -a "$LOG"
+if "$CHROOT" "$MNT" "$ENV" DEBIAN_FRONTEND=noninteractive PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin "$@" > "$LOG" 2>&1; then
+  cat "$LOG"
+else
+  RC=$?
+  cat "$LOG"
+  exit "$RC"
+fi
