@@ -95,6 +95,25 @@ def _copy_tailscale_service(repo_root: Path, package_root: Path):
     # The upstream manager creates config, bin, state and taildrop at first use.
     for name in ("config", "bin", "state", "taildrop"):
         (target / name).mkdir(exist_ok=True)
+    # Native Void Desk controls do not need a LAN-exposed web panel.
+    # Keep it disabled by default and bind localhost if explicitly enabled.
+    config = target / "config" / "rt.conf"
+    config.write_text(
+        "PANEL=0\\n"
+        "PANEL_PORT=8077\\n"
+        "PANEL_BIND=127.0.0.1\\n"
+        "WATCHDOG=1\\n"
+        "TAILDROP=1\\n"
+        "TAILDROP_DIR=\\n"
+        "TS_MODE=auto\\n"
+        "LOGIN_SERVER=\\n"
+        "SOCKS5=\\n"
+        "HTTP_PROXY=\\n"
+        "TS_EXTRA=\\n"
+        "WIFI_WAIT=120\\n",
+        encoding="utf-8",
+    )
+    config.chmod(0o600)
 
 
 def _zip_datetime():
