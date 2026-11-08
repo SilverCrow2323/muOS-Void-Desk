@@ -6,7 +6,6 @@ claim that every interactive hub or hardware-dependent workflow is covered.
 """
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import sys
@@ -28,11 +27,6 @@ class _NullPoller:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path,
-                        default=ROOT / "data" / "visual-captures")
-    args = parser.parse_args()
-
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
@@ -81,7 +75,7 @@ def main() -> int:
         app.sel = 0
         app.trans = None
         app.prev_frame = None
-        args.output.mkdir(parents=True, exist_ok=True)
+        (ROOT / "data" / "visual-captures").mkdir(parents=True, exist_ok=True)
 
         for style in styles:
             try:
@@ -126,7 +120,7 @@ def main() -> int:
         "complete": len(results) == len(styles) and not errors,
         "note": "Home-style smoke coverage only; not full hub or hardware validation.",
     }
-    manifest_path = args.output / "pygame-home-manifest.json"
+    manifest_path = ROOT / "data" / "visual-captures" / "pygame-home-manifest.json"
     temporary = manifest_path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(manifest, indent=2) + "\n",
                          encoding="utf-8")
