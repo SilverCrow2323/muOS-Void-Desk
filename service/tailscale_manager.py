@@ -199,7 +199,12 @@ def action(app_dir: Path, name: str, value="", extra_roots=(), runner=subprocess
     root = find_install(app_dir, extra_roots)
     if root is None:
         return {"ok": False, "error": "Rt:Tailscale-M service files not found"}
+    if name == "install":
+        return _run(root, "rt", ("install",), timeout=120, runner=runner)
     if name == "start":
+        setup = _run(root, "rt", ("install",), timeout=120, runner=runner)
+        if not setup.get("ok"):
+            return setup
         return _run(root, "rt", ("start",), timeout=20, runner=runner)
     if name == "stop":
         return _run(root, "rt", ("stop",), timeout=20, runner=runner)
