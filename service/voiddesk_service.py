@@ -576,7 +576,7 @@ def h_apt_catalog(args):
                     packages.append({"name": name.strip(),
                                      "description": description.strip()[:240]})
             elif mode == "installed":
-                name, sep, version = line.partition("\\t")
+                name, sep, version = line.partition("\t")
                 if sep and _APT_PACKAGE_RE.fullmatch(name.strip().split(":", 1)[0]):
                     packages.append({"name": name.strip(), "version": version.strip()})
         return {"ok": True, "mode": mode, "packages": packages[:100],
