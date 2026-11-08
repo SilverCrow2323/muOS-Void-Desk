@@ -22,7 +22,11 @@ EOF
     exit 2
 fi
 
-find "$SOURCE_DIR" -maxdepth 1 -type f -name '*.md' -exec cp {} "$WIKI_DIR/" \;
+for page in "$SOURCE_DIR"/*.md; do
+    [ -f "$page" ] || continue
+    [ "$(basename "$page")" = "README.md" ] && continue
+    cp "$page" "$WIKI_DIR/"
+done
 cd "$WIKI_DIR"
 git add -- *.md
 if git diff --cached --quiet; then
