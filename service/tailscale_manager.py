@@ -130,9 +130,9 @@ def status(app_dir: Path, extra_roots=(), runner=subprocess.run):
             "message": "Rt:Tailscale-M service files not found",
             "peers": [], "taildrop": [],
         }
-    summary_result = _run(root, "rt", ("summary",), runner=runner)
+    summary_result = _run(root, "rt", ("summary",), timeout=5, runner=runner)
     summary = _summary(summary_result.get("output", ""))
-    status_result = _run(root, "ts", ("status", "--json"), runner=runner)
+    status_result = _run(root, "ts", ("status", "--json"), timeout=6, runner=runner)
     raw = {}
     if status_result.get("ok"):
         try:
@@ -161,7 +161,7 @@ def status(app_dir: Path, extra_roots=(), runner=subprocess.run):
         })
     peers.sort(key=lambda item: (not item["online"], item["name"].lower()))
 
-    urls_result = _run(root, "rt", ("urls",), runner=runner)
+    urls_result = _run(root, "rt", ("urls",), timeout=4, runner=runner)
     urls = [line.strip() for line in urls_result.get("output", "").splitlines()
             if line.strip().startswith(("LAN http://", "TS  http://"))]
     auth_url = str(raw.get("AuthURL") or "")
@@ -209,7 +209,7 @@ def action(app_dir: Path, name: str, value="", extra_roots=(), runner=subprocess
     if name == "stop":
         return _run(root, "rt", ("stop",), timeout=20, runner=runner)
     if name == "restart":
-        return _run(root, "rt", ("restart",), timeout=30, runner=runner)
+        return _run(root, "rt", ("restart",), timeout=20, runner=runner)
     if name == "daemon_start":
         return _run(root, "rt", ("daemon", "start"), timeout=20, runner=runner)
     if name == "daemon_stop":
