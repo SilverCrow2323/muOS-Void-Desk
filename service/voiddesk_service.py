@@ -655,6 +655,11 @@ def h_job_start(args):
         if not script.is_file():
             return {"ok": False, "error": "package installer is missing"}
         command = ["sh", str(script), tokens[2]]
+    elif args.get("service_task") == "tailscale_start":
+        script = APP_DIR / "service" / "tailscale_job.py"
+        if not script.is_file():
+            return {"ok": False, "error": "Tailscale service job is missing"}
+        command = [sys.executable, str(script)]
     elif tool_id:
         try:
             registry = json.loads(
@@ -1228,6 +1233,12 @@ def h_tailscale_action(args):
         return {"ok": False, "error": "Tailscale service adapter unavailable"}
     action = str(args.get("action") or "")
     value = str(args.get("value") or "")
+    if action == "start":
+        return h_job_start({
+            "service_task": "tailscale_start",
+            "name": "Rt:Tailscale-M setup and start",
+            "hub": "uplink",
+        })
     return tailscale_manager.action(APP_DIR, action, value)
 
 
