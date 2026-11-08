@@ -46,6 +46,12 @@ try:
 except Exception:
     deskinfo = None
 
+sys.path.insert(0, str(APP_DIR / "service"))
+try:
+    import tailscale_manager
+except Exception:
+    tailscale_manager = None
+
 def log(msg):
     print(f"[service] {msg}", file=sys.stderr, flush=True)
 
@@ -1209,6 +1215,22 @@ def h_xfce_launch(args):
     return {"ok": False, "error": "XFCE never started — log: " + _tail_log(log_path, 12)}
 
 
+def h_tailscale_status(args):
+    """Read-only status from the bundled Rt:Tailscale-M service manager."""
+    if tailscale_manager is None:
+        return {"ok": False, "error": "Tailscale service adapter unavailable"}
+    return tailscale_manager.status(APP_DIR)
+
+
+def h_tailscale_action(args):
+    """Allowlisted operations delegated to Rt:Tailscale-M's own manager."""
+    if tailscale_manager is None:
+        return {"ok": False, "error": "Tailscale service adapter unavailable"}
+    action = str(args.get("action") or "")
+    value = str(args.get("value") or "")
+    return tailscale_manager.action(APP_DIR, action, value)
+
+
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
@@ -1231,6 +1253,8 @@ HANDLERS = {
     "toolbox_stats": h_toolbox_stats,
     "calendar_events": h_calendar_events,
     "hotspot_toggle": h_hotspot_toggle,
+    "tailscale_status": h_tailscale_status,
+    "tailscale_action": h_tailscale_action,
 
     "session_list": h_session_list,
     "session_launch": h_session_launch,
