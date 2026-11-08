@@ -9012,7 +9012,59 @@ class App(object):
             self.info_title = "SYNCTHING"
             self.push("info")
         else:
+            self.sync_mode = getattr(self, "sync_mode", "folders")
+            count = (len(self.sync.get("devices", []))
+                     if self.sync_mode == "devices"
+                     else len(self.sync.get("folders", [])))
+            self.sync_sel = min(getattr(self, "sync_sel", 0),
+                                max(0, count - 1))
             self.push("syncpanel")
+
+    def sync_action(self, action):
+        """Pause/resume, rescan or override the selected Syncthing item."""
+        from desk.syncthing_api import perform_action
+
+        if not self.sync:
+            return
+        mode = getattr(self, "sync_mode", "folders")
+        items = (self.sync.get("devices", []) if mode == "devices"
+                 else self.sync.get("folders", []))
+        if not items:
+            return
+        selected = items[min(getattr(self, "sync_sel", 0), len(items) - 1)]
+        url, key = self.sync["url"], self.sync["key"]
+
+        def job():
+            try:
+                if mode == "devices":
+                    operation = "toggle_device"
+                    return perform_action(
+                        self.sync_rest, url, key, operation,
+                        device=selected.get("id"))
+                operation = {
+                    "toggle": "toggle_folder",
+                    "scan": "scan",
+                    "override": "override",
+                }.get(action)
+                if not operation:
+                    return {"ok": False, "error": "unsupported folder action"}
+                return perform_action(
+                    self.sync_rest, url, key, operation,
+                    folder=selected.get("id"))
+            except Exception as exc:
+                return {"ok": False, "error": str(exc)}
+
+        result = self.run_busy(
+            "Syncthing..." if self.lang != "it" else "Syncthing...",
+            job)
+        if not result or not result.get("ok"):
+            error = (result or {}).get("error", "Syncthing request failed")
+            self.info_lines = self.stub_lines("SYNCTHING", [error[:120]])
+            self.scroll = 0
+            self.info_title = "SYNCTHING"
+            self.push("info")
+            return
+        self.sync_open_refresh()
 
     # ================== VOID EDIT: editor di testo ==================
     def ed_load(self, path):
