@@ -120,8 +120,8 @@ return dashboard.new({
               return "Updating..."
           end },
         { icon = "trash", label = "Clean apt cache",
-          desc = "Reclaim disk space",
-          action = function(scene) scene.set_status("Clean: coming soon"); return "Clean: coming soon" end },
+          desc = "Run safe APT cache cleanup inside the XFCE image",
+          action = function() sm.push("hub_apt", {tab = "SYSTEM"}) end },
         { icon = "terminal", label = "Shell terminal",
           desc = "Open a terminal with on-screen keyboard",
           action = function() sm.push("hub_shell", {}) end },
