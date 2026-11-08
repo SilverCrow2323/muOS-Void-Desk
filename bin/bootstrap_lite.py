@@ -1,39 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# VOIDDESK bootstrap-lite v1.5
-# Downloads a compatible Pygame wheel, verifies its PyPI SHA-256 digest,
-# validates ZIP members, tests the staged import, then swaps the runtime.
-# No chroot is used; the runtime is stored below <app>/runtime (exFAT-safe).
+# VOIDDESK bootstrap-lite v1.4
+# Niente chroot: scarica il wheel pygame precompilato adatto a questo
+# python/arch e lo scompatta in <app>/runtime. Funziona anche su exFAT.
 
 import glob
-import hashlib
 import json
 import os
 import platform
-import re
 import shutil
 import ssl
 import subprocess
 import sys
-import urllib.parse
 import urllib.request
 import zipfile
 
-APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, APP)
-from desk.utils.safe_extract import safe_zip_extractall  # noqa: E402
-
-sys.path.insert(0, os.path.join(APP, "lib"))
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib"))
 try:
     import fbtext
-    SCREEN = fbtext.Screen(title="VOIDDESK - Pygame runtime setup")
+    SCREEN = fbtext.Screen(title="VOIDDESK - installazione runtime pygame")
 except Exception:
     SCREEN = None
 
+APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(APP, "data")
 RUNTIME = os.path.join(APP, "runtime")
-STAGING = RUNTIME + ".staging"
-BACKUP = RUNTIME + ".previous"
 WHL = os.path.join(DATA, "pygame.whl")
 MARKER = os.path.join(DATA, ".pygame_ready")
 SDL_TXT = os.path.join(DATA, "sdl_path.txt")
@@ -41,241 +33,163 @@ SDL_TXT = os.path.join(DATA, "sdl_path.txt")
 os.makedirs(DATA, exist_ok=True)
 
 
-def log(message):
-    print(message, flush=True)
+def log(msg):
+    print(msg, flush=True)
     if SCREEN:
         try:
-            SCREEN.log(message)
+            SCREEN.log(msg)
         except Exception:
             pass
 
 
 def opener():
-    """Use the operating system trust store; never disable HTTPS verification."""
-    context = ssl.create_default_context()
-    result = urllib.request.build_opener(
-        urllib.request.HTTPSHandler(context=context)
-    )
-    result.addheaders = [("User-Agent", "VoidDesk/1.5")]
-    return result
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False          # CA bundle vecchi sui firmware
+    ctx.verify_mode = ssl.CERT_NONE
+    op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx))
+    op.addheaders = [("User-Agent", "VoidDesk/1.4")]
+    return op
 
 
-def pick_wheel(op, package, python_tag, machine):
-    metadata_url = "https://pypi.org/pypi/%s/json" % package
-    with op.open(metadata_url, timeout=30) as response:
-        metadata = json.load(response)
-
-    for item in metadata.get("urls", []):
-        filename = item.get("filename", "")
-        digest = str(item.get("digests", {}).get("sha256", "")).lower()
-        package_url = item.get("url", "")
-        host = urllib.parse.urlparse(package_url)
-        if (
-            filename.endswith(".whl")
-            and python_tag in filename
-            and machine in filename
-            and "manylinux" in filename
-            and re.fullmatch(r"[0-9a-f]{64}", digest)
-            and host.scheme == "https"
-            and host.hostname == "files.pythonhosted.org"
-        ):
-            return package_url, filename, metadata["info"]["version"], digest
-
-    return None, None, None, None
+def pick_wheel(op, pkg, tag, mach):
+    url = "https://pypi.org/pypi/%s/json" % pkg
+    with op.open(url, timeout=30) as r:
+        d = json.load(r)
+    for f in d.get("urls", []):
+        n = f.get("filename", "")
+        if (n.endswith(".whl") and tag in n and mach in n
+                and "manylinux" in n):
+            return f["url"], n, d["info"]["version"]
+    return None, None, None
 
 
-def download(op, url, destination, expected_sha256):
-    """Download to a partial file and publish it only after hash verification."""
-    partial = destination + ".part"
-    digest = hashlib.sha256()
-    next_report = 0
-
-    try:
-        with op.open(url, timeout=60) as response, open(partial, "wb") as output:
-            total = int(response.headers.get("Content-Length") or 0)
-            done = 0
-            while True:
-                chunk = response.read(262144)
-                if not chunk:
-                    break
-                output.write(chunk)
-                digest.update(chunk)
-                done += len(chunk)
-                if total:
-                    percent = done * 100 // total
-                    if percent >= next_report:
-                        next_report = percent + 20
-                        log("   %d%% (%0.1f/%0.1f MB)" %
-                            (percent, done / 1e6, total / 1e6))
-
-            output.flush()
-            try:
-                os.fsync(output.fileno())
-            except OSError:
-                pass
-
-        actual = digest.hexdigest().lower()
-        if actual != expected_sha256.lower():
-            raise ValueError(
-                "SHA-256 mismatch (expected %s, received %s)" %
-                (expected_sha256, actual)
-            )
-        os.replace(partial, destination)
-    except Exception:
-        try:
-            os.remove(partial)
-        except OSError:
-            pass
-        raise
+def download(op, url, dest):
+    download.next_pct = 0
+    with op.open(url, timeout=60) as r, open(dest, "wb") as f:
+        total = int(r.headers.get("Content-Length") or 0)
+        done = 0
+        while True:
+            chunk = r.read(262144)
+            if not chunk:
+                break
+            f.write(chunk)
+            done += len(chunk)
+            if total:
+                pct = done * 100 // total
+                if pct >= download.next_pct or done == total:
+                    download.next_pct = pct + 20
+                    log("   %d%% (%0.1f/%0.1fMB)" %
+                        (pct, done / 1e6, total / 1e6))
 
 
 def find_system_sdl():
-    patterns = [
+    pats = [
         "/usr/lib/libSDL2-2.0.so*", "/usr/lib/libSDL2*.so*",
         "/usr/lib64/libSDL2*.so*", "/lib/libSDL2*.so*",
         "/usr/lib/aarch64-linux-gnu/libSDL2*.so*",
     ]
     hits = []
-    for pattern in patterns:
-        hits.extend(glob.glob(pattern))
-    for base, _dirs, filenames in os.walk("/opt/muos"):
-        for filename in filenames:
-            if filename.startswith("libSDL2-2.0.so"):
-                hits.append(os.path.join(base, filename))
-    hits.sort(key=lambda path: (0 if ".so.0" in path else 1, len(path)))
+    for p in pats:
+        hits.extend(glob.glob(p))
+    for base, _dirs, files in os.walk("/opt/muos"):
+        for fn in files:
+            if fn.startswith("libSDL2-2.0.so"):
+                hits.append(os.path.join(base, fn))
+    # preferisce il .so.0 "vero"
+    hits.sort(key=lambda h: (0 if ".so.0" in h else 1, len(h)))
     return hits
 
 
-def replace_runtime(staging):
-    """Install a validated runtime while preserving the previous directory."""
-    # Recover a swap interrupted after moving runtime/ to runtime.previous/.
-    if os.path.exists(BACKUP):
-        if not os.path.exists(RUNTIME):
-            os.replace(BACKUP, RUNTIME)
-        else:
-            shutil.rmtree(BACKUP, ignore_errors=True)
-
-    had_runtime = os.path.exists(RUNTIME)
-    if had_runtime:
-        os.replace(RUNTIME, BACKUP)
-
-    try:
-        os.replace(staging, RUNTIME)
-    except Exception:
-        if had_runtime and os.path.exists(BACKUP):
-            os.replace(BACKUP, RUNTIME)
-        raise
-    else:
-        shutil.rmtree(BACKUP, ignore_errors=True)
-
-
 def main():
-    log("==== VOIDDESK PYGAME BOOTSTRAP start ====")
-    python_tag = "cp%d%d" % sys.version_info[:2]
-    machine = platform.machine()
-    log("python: %s (%s) - architecture: %s" %
-        (platform.python_version(), python_tag, machine))
+    log("==== VOIDDESK BOOTSTRAP-LITE start ====")
+    tag = "cp%d%d" % sys.version_info[:2]
+    mach = platform.machine()
+    log("python: %s (%s) - arch: %s" % (
+        platform.python_version(), tag, mach))
 
-    # Clear abandoned staging data, never the active runtime.
-    shutil.rmtree(STAGING, ignore_errors=True)
-    for obsolete in (os.path.join(DATA, "rootfs"),
-                     os.path.join(DATA, "rootfs.tar.gz")):
-        if os.path.isdir(obsolete):
-            log("removing obsolete bootstrap data: %s" % obsolete)
-            shutil.rmtree(obsolete, ignore_errors=True)
-        elif os.path.isfile(obsolete):
-            os.remove(obsolete)
+    # pulizia dei resti del vecchio approccio chroot (inutilizzabile su exFAT)
+    for junk in (os.path.join(DATA, "rootfs"),
+                 os.path.join(DATA, "rootfs.tar.gz")):
+        if os.path.isdir(junk):
+            log("pulizia residui chroot: %s" % junk)
+            shutil.rmtree(junk, ignore_errors=True)
+        elif os.path.isfile(junk):
+            os.remove(junk)
 
-    try:
-        op = opener()
-        log("1/4 searching PyPI for a compatible Pygame wheel...")
-        url = filename = version = expected_sha256 = None
-        for package in ("pygame", "pygame-ce"):
-            url, filename, version, expected_sha256 = pick_wheel(
-                op, package, python_tag, machine
-            )
-            if url:
-                break
-    except Exception as exc:
-        log("FATAL: secure package discovery failed: %s" % exc)
-        log("Check the device clock, network connection and CA certificates.")
-        return 1
-
+    op = opener()
+    log("1/4 cerco il wheel pygame per %s/%s su PyPI..." % (tag, mach))
+    url = name = ver = None
+    for pkg in ("pygame", "pygame-ce"):
+        url, name, ver = pick_wheel(op, pkg, tag, mach)
+        if url:
+            log("   found: %s (v%s)" % (name, ver))
+            break
     if not url:
-        log("FATAL: no verified manylinux wheel found for %s/%s" %
-            (python_tag, machine))
+        log("FATAL: nessun wheel pygame per %s/%s" % (tag, mach))
         return 1
 
-    log("   found %s (v%s)" % (filename, version))
-    log("2/4 downloading and verifying SHA-256...")
+    log("2/4 scarico %s ..." % name)
     try:
-        download(op, url, WHL, expected_sha256)
-    except Exception as exc:
-        log("FATAL: verified download failed: %s" % exc)
+        download(op, url, WHL)
+    except Exception as e:
+        log("FATAL: download failed: %s" % e)
         return 1
 
-    log("3/4 validating and extracting into a staging directory...")
-    os.makedirs(STAGING, exist_ok=True)
+    log("3/4 scompatto in %s ..." % RUNTIME)
+    shutil.rmtree(RUNTIME, ignore_errors=True)
+    os.makedirs(RUNTIME, exist_ok=True)
     try:
-        with zipfile.ZipFile(WHL) as archive:
-            safe_zip_extractall(archive, STAGING)
+        with zipfile.ZipFile(WHL) as z:
+            z.extractall(RUNTIME)
+    except Exception as e:
+        log("FATAL: estrazione wheel failed: %s" % e)
+        return 1
+    for base, _d, files in os.walk(RUNTIME):
+        for fn in files:
+            if fn.endswith(".so") or ".so." in fn:
+                try:
+                    os.chmod(os.path.join(base, fn), 0o755)
+                except OSError:
+                    pass
 
-        for base, _dirs, filenames in os.walk(STAGING):
-            for filename in filenames:
-                if filename.endswith(".so") or ".so." in filename:
-                    try:
-                        os.chmod(os.path.join(base, filename), 0o755)
-                    except OSError:
-                        pass
-
-        log("4/4 verifying staged Pygame import...")
-        env = dict(os.environ)
-        env["PYTHONPATH"] = STAGING
-        env["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-        env.pop("SDL_VIDEODRIVER", None)
-        result = subprocess.run(
+    log("4/4 verify import pygame...")
+    env = dict(os.environ)
+    env["PYTHONPATH"] = RUNTIME
+    env["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+    env.pop("SDL_VIDEODRIVER", None)
+    try:
+        out = subprocess.run(
             [sys.executable, "-c",
              "import pygame,sys;sys.stdout.write(pygame.version.ver)"],
-            env=env, capture_output=True, text=True, timeout=60
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                result.stderr.strip()[-800:] or
-                "Pygame import returned a non-zero status"
-            )
-
-        log("   Pygame %s import OK" % result.stdout.strip())
-        replace_runtime(STAGING)
-    except Exception as exc:
-        shutil.rmtree(STAGING, ignore_errors=True)
-        log("FATAL: runtime validation failed; previous runtime was preserved: %s" %
-            exc)
+            env=env, capture_output=True, text=True, timeout=60)
+    except Exception as e:
+        log("FATAL: verify non eseguibile: %s" % e)
         return 1
+    if out.returncode != 0:
+        log("FATAL: import pygame failed:")
+        log(out.stderr.strip()[-800:])
+        return 1
+    log("   pygame %s OK" % out.stdout.strip())
 
     sdl = find_system_sdl()
     if sdl:
-        log("system SDL2 library: %s" % sdl[0])
-        with open(SDL_TXT + ".tmp", "w", encoding="utf-8") as output:
-            output.write(sdl[0] + "\n")
-        os.replace(SDL_TXT + ".tmp", SDL_TXT)
+        log("libSDL2 di sistema: %s" % sdl[0])
+        with open(SDL_TXT, "w") as f:
+            f.write(sdl[0] + "\n")
     else:
-        log("system SDL2 library not found; using the wheel-provided library")
+        log("libSDL2 di sistema: not found (si usera' quella del wheel)")
         try:
             os.remove(SDL_TXT)
         except OSError:
             pass
 
-    with open(MARKER + ".tmp", "w", encoding="utf-8") as output:
-        output.write("pygame %s (%s %s)\n" %
-                     (result.stdout.strip(), python_tag, machine))
-    os.replace(MARKER + ".tmp", MARKER)
-
+    with open(MARKER, "w") as f:
+        f.write("pygame %s (%s %s)\n" % (out.stdout.strip(), tag, mach))
     try:
         os.remove(WHL)
     except OSError:
         pass
-
-    log("==== VOIDDESK PYGAME BOOTSTRAP completed ====")
+    log("==== VOIDDESK BOOTSTRAP-LITE completed ====")
     return 0
 
 

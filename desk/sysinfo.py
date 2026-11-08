@@ -4,6 +4,53 @@
 
 import os
 import subprocess
+import threading
+import time
+
+
+class StatusPoller:
+    """Refresh host status away from the render thread."""
+
+    def __init__(self, reader, interval=8.0, initial=None):
+        self._reader = reader
+        self._interval = max(0.1, float(interval))
+        self._snapshot = dict(initial or {})
+        self._last_refresh = 0.0
+        self._refreshing = False
+        self._lock = threading.Lock()
+
+    def snapshot(self):
+        now = time.monotonic()
+        with self._lock:
+            if (not self._refreshing and
+                    now - self._last_refresh >= self._interval):
+                self._last_refresh = now
+                self._refreshing = True
+                worker = threading.Thread(
+                    target=self._refresh,
+                    name="VoidDeskStatusPoller",
+                    daemon=True,
+                )
+                try:
+                    worker.start()
+                except RuntimeError:
+                    self._refreshing = False
+            return dict(self._snapshot)
+
+    def _refresh(self):
+        result = None
+        try:
+            result = self._reader()
+            if not isinstance(result, dict):
+                result = None
+        except Exception:
+            result = None
+        finally:
+            with self._lock:
+                if result is not None:
+                    self._snapshot = dict(result)
+                self._refreshing = False
+
 
 
 def _read(p, d=""):

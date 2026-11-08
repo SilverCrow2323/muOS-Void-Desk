@@ -1,5 +1,4 @@
-import math
-import pytest
+import math, pytest
 from desk.utils.safe_calc import calc_safe_eval
 
 NS = {"factorial": math.factorial}
