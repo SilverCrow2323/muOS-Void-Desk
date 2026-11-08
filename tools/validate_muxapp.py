@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Validate the VoidDesk handheld .muxapp archive layout."""
+from __future__ import annotations
+
+import argparse
+import stat
+import sys
+import zipfile
+from pathlib import Path, PurePosixPath
+
+
+REQUIRED_FILES = (
+    "Void-Desk/mux_launch.sh",
+    "Void-Desk/voiddesk.py",
+    "Void-Desk/love/main.lua",
+)
+
+
+def validate_archive(archive: str | Path) -> list[str]:
+    """Return validation errors; an empty list means the package is valid."""
+    path = Path(archive)
+    errors: list[str] = []
+    if not path.is_file():
+        return ["archive does not exist or is not a regular file"]
+
+    try:
+        with zipfile.ZipFile(path) as package:
+            infos = package.infolist()
+            if not infos:
+                return ["archive is empty"]
+
+            seen: set[str] = set()
+            files: set[str] = set()
+            top_levels: set[str] = set()
+
+            for info in infos:
+                name = info.filename
+                if not name or "\\" in name:
+                    errors.append("invalid archive member path: %r" % name)
+                    continue
+                member = PurePosixPath(name)
+                if member.is_absolute() or ".." in member.parts:
+                    errors.append("unsafe archive member path: %s" % name)
+                    continue
+                normalized = str(member)
+                if normalized in seen:
+                    errors.append("duplicate archive member: %s" % normalized)
+                    continue
+                seen.add(normalized)
+
+                if not member.parts:
+                    errors.append("empty archive member path")
+                    continue
+                top_levels.add(member.parts[0])
+                if member.parts[0] != "Void-Desk":
+                    errors.append(
+                        "unexpected top-level entry: %s (only Void-Desk/ is allowed)"
+                        % member.parts[0]
+                    )
+                if len(member.parts) == 1 and not info.is_dir():
+                    errors.append("top-level files are not allowed: %s" % name)
+
+                mode = (info.external_attr >> 16) & 0xFFFF
+                if stat.S_ISLNK(mode):
+                    errors.append("symbolic links are not allowed: %s" % name)
+                if not info.is_dir():
+                    files.add(normalized)
+
+            if top_levels != {"Void-Desk"}:
+                errors.append(
+                    "archive must contain exactly one top-level directory "
+                    "named Void-Desk/"
+                )
+            for required in REQUIRED_FILES:
+                if required not in files:
+                    errors.append("required file missing: %s" % required)
+    except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
+        errors.append("cannot read archive: %s" % exc)
+
+    return errors
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("archive", type=Path, help="path to the .muxapp ZIP archive")
+    args = parser.parse_args()
+
+    errors = validate_archive(args.archive)
+    if errors:
+        for error in errors:
+            print("[muxapp] ERROR: " + error, file=sys.stderr)
+        return 1
+
+    with zipfile.ZipFile(args.archive) as package:
+        files = sum(not item.is_dir() for item in package.infolist())
+    print("[muxapp] OK: one Void-Desk/ root, %d files, required launchers present"
+          % files)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
