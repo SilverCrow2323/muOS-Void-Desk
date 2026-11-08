@@ -10,13 +10,13 @@ See the source-controlled [v10.5.4 completion and acceptance plan](../docs/PRE_R
 - Evolve Pygame while keeping it the reference frontend.
 - Verify every NEXUS node and selectable action end to end.
 - Add a searchable APT catalogue to THE FORGE, usable from VoidDesk without launching XFCE. APT operations remain inside the existing Debian/Ubuntu chroot; muOS itself is Buildroot-based.
-- Integrate Rt:Tailscale-M as a native managed service, including install, login, peers, exit nodes, Taildrop, boot lifecycle and diagnostics.
-- Give Syncthing a complete native panel using the Andromeda Web Service.
+- Integrate Rt:Tailscale-M as a native managed service, including install, login, peers, exit nodes, Taildrop, boot lifecycle and diagnostics. Its pinned upstream source now passes the upstream static/UI suite and 21 QEMU service checks in CI; the VoidDesk-native UI and package embedding are still pending.
+- Give Syncthing a complete native panel using the Andromeda Web Service. The Pygame client now discovers the Andromeda configuration and port 7070 and avoids starting a duplicate daemon; physical-device validation and the complete management actions remain pending.
 - Extend PC Uplink with secure pairing, remote input and remote display.
 
 ## Validation policy
 
-Visual capture is a smoke test. A release claim also needs action-driven tests and physical-device verification on the supported muOS firmware and hardware. Experimental features must be labelled as such until tested.
+Visual capture is a smoke test. A release claim also needs action-driven tests and physical-device verification on the supported muOS firmware and hardware. Experimental features must be labelled as such until tested. File-GD X remains unavailable because its former prototype source reference had no resolvable repository URL.
 
 ## Wiki bootstrap status
 
