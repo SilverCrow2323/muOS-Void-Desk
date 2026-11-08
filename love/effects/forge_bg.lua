@@ -1,11 +1,12 @@
 -- love/effects/forge_bg.lua -- procedural forge background
-local SFX = require("core.audio")
+local ok_sfx, SFX = pcall(require, "core.audio")
+if not ok_sfx then SFX = nil end
 local M = { sparks = {}, arcs = {}, sfx = {}, t_sfx = 0 }
 local function rnd(a, b) return a + math.random() * (b - a) end
 
 function M._gen_sfx()
     local sr = 22050
-    local vol = (SFX.get_volume and SFX.get_volume() or 0.7)
+    local vol = (SFX and SFX.get_volume and SFX.get_volume() or 0.7)
     local function mk(dur, fn)
         local n = math.floor(dur * sr)
         local sd = love.sound.newSoundData(n, sr, 16, 1)
