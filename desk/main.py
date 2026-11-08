@@ -8880,6 +8880,7 @@ class App(object):
             return
 
         def job():
+            import urllib.parse
             try:
                 self.sync_rest(url, key, "/rest/system/ping")
             except Exception:
