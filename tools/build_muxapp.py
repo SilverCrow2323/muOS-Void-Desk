@@ -6,6 +6,7 @@ import argparse
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -14,6 +15,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TAILSCALE_COMMIT = "d6aa05363cd5d56b07e63e2261c960a26d73cd9c"
 SKIP_ROOT_FILES = {
     ".gitignore", ".gitattributes", ".gitmodules", ".editorconfig",
     ".DS_Store", "Thumbs.db",
@@ -83,6 +85,19 @@ def _copy_tailscale_service(repo_root: Path, package_root: Path):
             "pinned Rt:Tailscale-M submodule is not ready; missing "
             + ", ".join(missing)
             + ". Run: git submodule update --init --recursive"
+        )
+    try:
+        pin = subprocess.run(
+            ["git", "-C", str(upstream), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("cannot verify Rt:Tailscale-M submodule pin: " + str(exc))
+    if pin.returncode != 0 or pin.stdout.strip() != TAILSCALE_COMMIT:
+        actual = pin.stdout.strip() if pin.returncode == 0 else "unavailable"
+        raise RuntimeError(
+            "Rt:Tailscale-M submodule must be pinned at "
+            + TAILSCALE_COMMIT + " (found " + actual + ")"
         )
 
     target = package_root / "external" / "rt-tailscale-m" / "app" / "RtTailscale"
