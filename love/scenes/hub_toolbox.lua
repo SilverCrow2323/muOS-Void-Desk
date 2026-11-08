@@ -48,7 +48,7 @@ return dashboard.new({
         local ch = 66
         widgets.status_card(12, cy, (W-40)/2, ch, "clock",
             "Uptime", fmt_uptime(state.uptime_s), nc, "LIVE", alpha)
-        widgets.status_card(12 + (W-40)/2 + 8, cy, (W-40)/2, ch, "memory",
+        widgets.status_card(12 + (W-40)/2 + 8, cy, (W-40)/2, ch, "cpu",
             "RAM", string.format("%d%%", state.ram_pct),
             {0.4,0.85,0.9}, "SYSTEM", alpha)
     end,
