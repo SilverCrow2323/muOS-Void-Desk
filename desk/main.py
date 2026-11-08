@@ -8842,60 +8842,38 @@ class App(object):
             return _j.loads(r.read().decode() or "{}")
 
     def sync_open(self):
+        """Open the native Syncthing REST panel.
+
+        On MustardOS Andromeda, attach to the optional built-in Web Service
+        (127.0.0.1:7070). Never spawn a duplicate host daemon on the handheld.
+        """
+        from desk.syncthing import discover_connection, is_muos_host
+
         it = (self.lang == "it")
         url = os.environ.get("VD_SYNC_URL")
         key = os.environ.get("VD_SYNC_KEY")
-        if not url:
-            cand = ["/mnt/mmc/MUOS/syncthing/config.xml",
-                    "/mnt/sdcard/MUOS/syncthing/config.xml",
-                    "/root/.local/state/syncthing/config.xml",
-                    "/root/.config/syncthing/config.xml",
-                    os.path.expanduser("~/.config/syncthing/config.xml")]
-            for r_ in MUOS_APP_ROOTS:
-                try:
-                    for d in os.listdir(r_):
-                        if "syncthing" in d.lower():
-                            for sub in ("config.xml",
-                                        "config/config.xml",
-                                        "state/config.xml"):
-                                cand.append(os.path.join(r_, d, sub))
-                except OSError:
-                    pass
-            root = os.path.join(DATA, "xfce_mnt")
-            cand += [os.path.join(root, c) for c in
-                     ("root/.local/state/syncthing/config.xml",
-                      "root/.config/syncthing/config.xml")]
-            for p in cand:
-                if os.path.exists(p):
-                    txt = open(p, errors="ignore").read()
-                    m = re.search(r"<apikey>([^<]+)</apikey>", txt)
-                    a = re.search(r"<address>([0-9.:]+)</address>", txt)
-                    if not m:
-                        apitxt = os.path.join(os.path.dirname(p),
-                                              "api.txt")
-                        if os.path.exists(apitxt):
-                            k2 = open(apitxt, errors="ignore"
-                                     ).read().strip()
-                            if k2:
-                                key = k2
-                                url = "http://" + (a.group(1) if a
-                                                   else "127.0.0.1:8384")
-                                self._sync_home = os.path.dirname(p)
-                                break
-                    if m:
-                        key = m.group(1)
-                        url = "http://" + (a.group(1) if a
-                                           else "127.0.0.1:8384")
-                        self._sync_home = os.path.dirname(
-                            os.path.dirname(p))
-                    break
+        connection = discover_connection(data_dir=DATA)
+        if connection:
+            url = url or connection["url"]
+            key = key or connection["key"]
+            self._sync_home = connection["home"]
+
         if not (url and key):
-            self.info_lines = self.stub_lines(
-                "SYNCTHING",
-                ["Syncthing not configured in image: install it "
-                 "from FORGE and run it once on the desktop." if it else
-                 "Syncthing not configured in the image: install it "
-                 "from FORGE and run it once in the desktop."])
+            if is_muos_host():
+                message = (
+                    "Attiva Syncthing in muOS: Configuration > Connectivity > "
+                    "Web Services > Syncthing. API locale: 127.0.0.1:7070."
+                    if it else
+                    "Enable Syncthing in muOS: Configuration > Connectivity > "
+                    "Web Services > Syncthing. Local API: 127.0.0.1:7070."
+                )
+            else:
+                message = (
+                    "Configura Syncthing e la sua API key prima di aprire il pannello."
+                    if it else
+                    "Configure Syncthing and its API key before opening the panel."
+                )
+            self.info_lines = self.stub_lines("SYNCTHING", [message])
             self.scroll = 0
             self.info_title = "SYNCTHING"
             self.push("info")
@@ -8905,33 +8883,27 @@ class App(object):
             try:
                 self.sync_rest(url, key, "/rest/system/ping")
             except Exception:
-                if os.environ.get("VD_SYNC_NOSTART"):
+                # Andromeda owns the host service lifecycle. Starting another
+                # daemon here risks a second database and conflicting ports.
+                if is_muos_host() or os.environ.get("VD_SYNC_NOSTART"):
                     return None
                 import shutil as _sh2
-                host_bin = _sh2.which("syncthing") or \
-                    ("/opt/muos/bin/syncthing"
-                     if os.path.exists("/opt/muos/bin/syncthing")
-                     else None)
+                host_bin = _sh2.which("syncthing")
                 if host_bin:
                     subprocess.Popen(
-                        [host_bin, "serve", "--no-browser",
-                         "--no-restart"],
-                        env=dict(os.environ,
-                                 HOME=getattr(self, "_sync_home",
-                                              "/root")),
-                        stdout=open(os.path.join(DATA,
-                                                 "syncthing.log"),
-                                    "ab"),
+                        [host_bin, "serve", "--no-browser", "--no-restart"],
+                        env=dict(os.environ, HOME=getattr(
+                            self, "_sync_home", "/root")),
+                        stdout=open(os.path.join(DATA, "syncthing.log"), "ab"),
                         stderr=subprocess.STDOUT)
                 else:
                     mnt = os.path.join(DATA, "xfce_mnt")
+                    if not os.path.isfile(os.path.join(mnt, "usr/bin/syncthing")):
+                        return None
                     subprocess.Popen(
                         ["chroot", mnt, "/usr/bin/env", "HOME=/root",
-                         "syncthing", "serve", "--no-browser",
-                         "--no-restart"],
-                        stdout=open(os.path.join(DATA,
-                                                 "syncthing.log"),
-                                    "ab"),
+                         "syncthing", "serve", "--no-browser", "--no-restart"],
+                        stdout=open(os.path.join(DATA, "syncthing.log"), "ab"),
                         stderr=subprocess.STDOUT)
                 for _ in range(16):
                     time.sleep(0.5)
@@ -8944,30 +8916,43 @@ class App(object):
                 st = self.sync_rest(url, key, "/rest/system/status")
                 cfg = self.sync_rest(url, key, "/rest/config")
                 folders = []
-                for f in cfg.get("folders", []):
+                for folder in cfg.get("folders", []):
                     pct = -1
                     try:
-                        c = self.sync_rest(
+                        completion = self.sync_rest(
                             url, key,
-                            "/rest/db/completion?folder=" + f["id"])
-                        pct = int(c.get("completion", 0))
+                            "/rest/db/completion?folder=" + urllib.parse.quote(
+                                folder["id"], safe=""))
+                        pct = int(completion.get("completion", 0))
                     except Exception:
                         pass
-                    folders.append((f.get("label") or f["id"],
-                                    f.get("path", ""), pct))
-                return {"id": st.get("myID", "?")[:14],
-                        "url": url, "key": key, "folders": folders}
+                    folders.append((
+                        folder.get("label") or folder["id"],
+                        folder.get("path", ""), pct))
+                return {
+                    "id": st.get("myID", "?")[:14],
+                    "url": url,
+                    "key": key,
+                    "folders": folders,
+                }
             except Exception:
                 return None
+
         self.sync = self.run_busy(
-            "interrogo syncthing..." if it else "querying syncthing...",
+            "interrogo Syncthing..." if it else "querying Syncthing...",
             job)
         if not self.sync:
-            self.info_lines = self.stub_lines(
-                "SYNCTHING",
-                ["demone unreachable: avvialo nel desktop o "
-                 "riprova" if it else
-                 "daemon unreachable: start it in the desktop and retry"])
+            message = (
+                "Servizio muOS non raggiungibile. Controlla Web Services > "
+                "Syncthing e la connessione di rete."
+                if it else
+                "muOS service is unreachable. Check Web Services > "
+                "Syncthing and the network connection."
+            ) if is_muos_host() else (
+                "Demone non raggiungibile: avvialo e riprova."
+                if it else "Daemon unreachable: start it and retry."
+            )
+            self.info_lines = self.stub_lines("SYNCTHING", [message])
             self.scroll = 0
             self.info_title = "SYNCTHING"
             self.push("info")
