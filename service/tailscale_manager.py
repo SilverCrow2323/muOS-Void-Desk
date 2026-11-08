@@ -103,6 +103,25 @@ def _taildrop(root: Path):
     return items[:100]
 
 
+def cli(app_dir: Path, *args, timeout=10):
+    """Run the upstream CLI wrapper and return a CompletedProcess-like result."""
+    root = find_install(app_dir)
+    if root is None:
+        return subprocess.CompletedProcess(
+            args, 127, "", "Rt:Tailscale-M service files not found"
+        )
+    try:
+        return subprocess.run(
+            [str(root / "ts"), *[str(value) for value in args]],
+            cwd=str(root), capture_output=True, text=True,
+            timeout=timeout, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(args, 124, "", "Tailscale command timed out")
+    except OSError as exc:
+        return subprocess.CompletedProcess(args, 127, "", str(exc))
+
+
 def status(app_dir: Path, extra_roots=(), runner=subprocess.run):
     root = find_install(app_dir, extra_roots)
     if root is None:
