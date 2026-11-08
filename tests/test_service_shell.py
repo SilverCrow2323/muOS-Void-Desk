@@ -44,7 +44,15 @@ def test_shell_pty_start_poll_send_and_stop(monkeypatch, tmp_path):
                         lambda *args, **kwargs: process)
     monkeypatch.setattr(service.select, "select",
                         lambda *args: ([11], [], []))
-    monkeypatch.setattr(service.os, "read", lambda _fd, _size: b"hello\r\n")
+    read_once = {"done": False}
+
+    def fake_read(_fd, _size):
+        if not read_once["done"]:
+            read_once["done"] = True
+            return b"hello\\r\\n"
+        raise BlockingIOError()
+
+    monkeypatch.setattr(service.os, "read", fake_read)
     monkeypatch.setattr(
         service.os, "write",
         lambda _fd, payload: written.append(payload) or len(payload),
