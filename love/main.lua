@@ -5,13 +5,14 @@ local theme      = require("theme.loader")
 local input      = require("core.input")
 local inputdbg   = require("core.input_debug")
 local notifications = require("core.notifications")
-local crt = (function() local ok, m = pcall(require, "core.crt_shader"); return ok and m or nil end)()
+local crt        = require("core.crt_shader")
+local crt_on     = true
 
 function love.load()
     config.load()
     theme.apply(config.get("theme", "cyberpunk"))
     bridge.init()
-    if crt and (crt.init or crt.load) then (crt.init or crt.load)() end
+    crt.init()
 
     -- joystick discovery (log only if VOIDDESK_DEBUG_INPUT=1)
     if os.getenv("VOIDDESK_DEBUG_INPUT") == "1" then
@@ -23,14 +24,12 @@ function love.load()
     sm.register("nexus",     require("scenes.nexus"))
     sm.register("hub_forge", require("scenes.hub_forge"))
     sm.register("hub_stub",  require("scenes.hub_stub"))
-    sm.register("tool_calc", require("scenes.tool_calc"))
-    sm.register("tool_editor", require("scenes.tool_editor"))
-    sm.register("tool_clock", require("scenes.tool_clock"))
     sm.register("hub_session", require("scenes.hub_session"))
     sm.register("hub_uplink", require("scenes.hub_uplink"))
     sm.register("hub_media", require("scenes.hub_media"))
     sm.register("hub_workshop", require("scenes.hub_workshop"))
     sm.register("hub_settings", require("scenes.hub_settings"))
+    sm.register("hub_display_fx", require("scenes.hub_display_fx"))
     sm.register("hub_info", require("scenes.hub_info"))
 
     sm.switch("intro", { duration = 2.0 })
@@ -43,7 +42,9 @@ function love.update(dt)
 end
 
 function love.draw()
-    sm.draw()
+    crt.frame(love.timer.getDelta(), function()
+        sm.draw()
+    end)
     local chrome = require("core.chrome")
     local theme = require("theme.loader")
     notifications.draw(theme.get(), chrome.HEADER_H)
@@ -58,6 +59,11 @@ function love.keypressed(key, sc, isrepeat)
     end
     if key == "m" then
         notifications.toggle()
+        return
+    end
+    if key == "c" then
+        crt.set_enabled(not crt_on)
+        crt_on = not crt_on
         return
     end
     if key == "escape" then

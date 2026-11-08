@@ -38,6 +38,20 @@ local function play_bootanim_and_launch(scene, sess_id, sess_name)
         bridge.call("session_launch", { id = sess_id }, function(resp)
             if resp.ok then
                 scene.set_status(sess_name .. ": " .. (resp.note or "running"))
+                -- Device hand-off: the service dropped a pending-session
+                -- marker and is waiting for US to get out of the way.
+                -- mux_launch.sh picks it up once this process has fully
+                -- exited (framebuffer/audio released) and runs the real
+                -- session, then relaunches the engine on logout — see
+                -- mux_launch.sh and service/voiddesk_service.py
+                -- (h_session_launch) for the other two legs of this.
+                if resp.handoff then
+                    -- love.event.quit() just posts the quit event; LÖVE's
+                    -- own main loop still runs one more update/draw pass
+                    -- before actually exiting, so the status line above
+                    -- is already visible when it does
+                    love.event.quit()
+                end
             else
                 scene.set_status(sess_name .. ": " .. (resp.error or "failed"))
             end
@@ -94,7 +108,7 @@ return dashboard.new({
     end,
 
     items = {
-        { icon = "start", label = "Launch XFCE Desktop",
+        { badge = "X", label = "Launch XFCE Desktop",
           desc = "Full desktop environment (with boot animation)",
           action = function(scene)
               if not installed("xfce") then
@@ -103,7 +117,7 @@ return dashboard.new({
               end
               return play_bootanim_and_launch(scene, "xfce", "XFCE")
           end },
-        { icon = "plus", label = "Install XFCE Desktop",
+        { badge = "+", label = "Install XFCE Desktop",
           desc = "Auto-install on PC via pkexec (sudo prompt)",
           action = function(scene)
               scene.set_status("Installing XFCE (may prompt sudo)...")
@@ -117,17 +131,17 @@ return dashboard.new({
               end)
               return "Installing XFCE..."
           end },
-        { icon = "window", label = "IceWM session",
+        { badge = "I", label = "IceWM session",
           desc = "Light window manager (~10MB RAM)",
           action = function(scene) scene.set_status("IceWM: coming soon"); return "IceWM: coming soon" end },
-        { icon = "desktop", label = "LXDE session",
+        { badge = "L", label = "LXDE session",
           desc = "Lightweight full desktop",
           action = function(scene) scene.set_status("LXDE: coming soon"); return "LXDE: coming soon" end },
-        { icon = "refresh", label = "Repair desktop image",
+        { badge = "R", label = "Repair desktop image",
           desc = "Verify and repair the chroot",
           action = function(scene) scene.set_status("Repair: coming soon"); return "Repair: coming soon" end },
-        { icon = "back", label = "Back",
+        { badge = "<", label = "Back",
           desc = "Return to Nexus",
-          action = function() sm.back() end },
+          action = function() sm.switch("nexus", {}) end },
     },
 })

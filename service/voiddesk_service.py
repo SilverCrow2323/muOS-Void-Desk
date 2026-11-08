@@ -324,15 +324,27 @@ def h_session_launch(args):
     sess_id = args.get("id")
     if sess_id != "xfce":
         return {"ok": False, "error": f"unknown session: {sess_id}"}
+    if not (DATA / ".xfce_ready").exists():
+        return {"ok": False, "error": "XFCE not installed"}
     if IS_DEVICE:
-        # Taking over the screen from a running LÖVE process (handing the
-        # framebuffer/X to xfce_launch.sh, then returning to VoidDesk on
-        # logout) is a real session hand-off, not a background bridge
-        # call — the original code left this stubbed ("Sprint 2") rather
-        # than guess at it. Flagging clearly instead of faking success.
-        return {"ok": False,
-                "error": "device session hand-off not wired yet (needs "
-                         "mux_launch.sh integration, see bin/xfce_launch.sh)"}
+        # The service process can't itself hand over the framebuffer/X
+        # session — it's a background helper, not the thing holding the
+        # screen. The actual hand-off has to happen at the level that
+        # DOES own the screen: mux_launch.sh, which starts the LÖVE
+        # process in the first place. So instead of trying (and failing)
+        # to take the display from here, drop a "pending session"
+        # marker and ask LÖVE to quit cleanly; mux_launch.sh notices the
+        # marker after LÖVE exits, runs bin/xfce_launch.sh to completion
+        # (full screen, no conflict with LÖVE since LÖVE is gone by
+        # then), and relaunches the engine afterwards. See mux_launch.sh
+        # for the other half of this.
+        try:
+            (DATA / ".pending_session").write_text(sess_id)
+            return {"ok": True, "handoff": True,
+                    "note": "handing off to XFCE — VoidDesk will restart "
+                            "automatically when you log out"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
     return h_xfce_launch(args)
 
 def h_apt_update(args):
@@ -551,142 +563,11 @@ def h_xfce_launch(args):
     return {"ok": False, "error": "XFCE never started — log: " + _tail_log(log_path, 12)}
 
 
-# ── Calendar ─────────────────────────────────────────────────────
-def h_calendar_events(args):
-    import json as _j
-    year = args.get("year", 2026)
-    month = args.get("month", 1)
-    path = APP_DIR / "data" / "calendar.json"
-    # Seed if missing
-    if not path.exists():
-        try:
-            sample = {
-                "events": [
-                    {"date": "2026-11-07", "title": "VoidDesk v10.5.1",
-                     "category": "release"},
-                    {"date": "2026-11-12", "title": "Team sync",
-                     "category": "meeting"},
-                    {"date": "2026-11-20", "title": "SD backup",
-                     "category": "reminder"},
-                    {"date": "2026-11-25", "title": "Aoi's birthday",
-                     "category": "personal"},
-                ]
-            }
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(_j.dumps(sample, indent=2))
-        except Exception:
-            pass
-    try:
-        data = _j.loads(path.read_text())
-        prefix = "%04d-%02d-" % (year, month)
-        events = {}
-        for ev in data.get("events", []):
-            d = ev.get("date", "")
-            if d.startswith(prefix):
-                events.setdefault(d, []).append(ev)
-        return {"ok": True, "events": events}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200], "events": {}}
-
-def h_calendar_add(args):
-    import json as _j
-    path = APP_DIR / "data" / "calendar.json"
-    try:
-        data = {"events": []}
-        if path.exists():
-            data = _j.loads(path.read_text())
-        data.setdefault("events", []).append({
-            "date": args.get("date", ""),
-            "title": args.get("title", ""),
-            "category": args.get("category", "personal"),
-        })
-        path.write_text(_j.dumps(data, indent=2))
-        return {"ok": True}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-
-# ── Shell (real PTY) ─────────────────────────────────────────────
-_SHELL = {"pid": None, "fd": None, "ready": False}
-
-def _shell_ensure():
-    if _SHELL["fd"] is not None:
-        return True
-    import pty, os as _os
-    try:
-        pid, fd = pty.fork()
-        if pid == 0:
-            # Child
-            _os.environ["TERM"] = "dumb"
-            _os.environ["PS1"] = "void$ "
-            _os.execvp("/bin/bash", ["bash", "--norc", "-i"])
-            _os._exit(1)
-        # Parent
-        import fcntl
-        fcntl.fcntl(fd, fcntl.F_SETFL,
-                    fcntl.fcntl(fd, fcntl.F_GETFL) | _os.O_NONBLOCK)
-        _SHELL["pid"] = pid
-        _SHELL["fd"] = fd
-        _SHELL["ready"] = True
-        return True
-    except Exception as e:
-        return False
-
-def h_shell_start(args):
-    ok = _shell_ensure()
-    return {"ok": ok, "pid": _SHELL.get("pid")}
-
-def h_shell_poll(args):
-    if not _SHELL["ready"]:
-        return {"ok": False, "output": ""}
-    import os as _os, select
-    out = b""
-    try:
-        while True:
-            r, _, _ = select.select([_SHELL["fd"]], [], [], 0)
-            if not r:
-                break
-            chunk = _os.read(_SHELL["fd"], 4096)
-            if not chunk:
-                break
-            out += chunk
-    except Exception:
-        pass
-    return {"ok": True, "output": out.decode("utf-8", "replace")}
-
-def h_shell_send(args):
-    if not _SHELL["ready"]:
-        return {"ok": False}
-    import os as _os
-    text = args.get("text", "")
-    try:
-        _os.write(_SHELL["fd"], text.encode("utf-8"))
-        return {"ok": True}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:100]}
-
-def h_shell_kill(args):
-    if _SHELL["fd"] is not None:
-        import os as _os, signal
-        try: _os.kill(_SHELL["pid"], signal.SIGKILL)
-        except Exception: pass
-        try: _os.close(_SHELL["fd"])
-        except Exception: pass
-    _SHELL.update({"pid": None, "fd": None, "ready": False})
-    return {"ok": True}
-
-
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
     "set_config": h_set_config,
     "system_info": h_system_info,
-    "calendar_events": h_calendar_events,
-    "calendar_add": h_calendar_add,
-    "shell_start": h_shell_start,
-    "shell_poll": h_shell_poll,
-    "shell_send": h_shell_send,
-    "shell_kill": h_shell_kill,
-
     "network_status": h_network_status,
     "system_status": h_system_status,
     "media_status": h_media_status,
