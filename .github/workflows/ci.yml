@@ -28,21 +28,24 @@ jobs:
         run: |
           python -m compileall -q \
             BUILDCHECK.py voiddesk.py bin desk service outdesk \
-            voidcast_addons assets
+            voidcast_addons assets tools
       - name: Run unit tests
         run: python -m pytest -q
       - name: Run repository integrity audit
         run: python BUILDCHECK.py
+      - name: Validate graphical assets and generate visual index
+        run: python tools/visual_capture.py --check
       - name: Lint critical diagnostics in maintained utility code
         run: |
           ruff check --select E4,E7,E9,F63,F7,F82 \
-            bin/bootstrap_lite.py desk/sysinfo.py desk/utils tests
+            bin/bootstrap_lite.py desk/sysinfo.py desk/utils tests \
+            tools/visual_capture.py tools/capture_love_screenshots.py
       - name: Validate POSIX shell entry points
         shell: bash
         run: |
           set -euo pipefail
           for file in mux_launch.sh voiddesk.sh bin/*.sh lib/*.sh \
-                      outdesk/*/*.sh assets/*/*.sh; do
+                      outdesk/*/*.sh assets/*/*.sh tools/*.sh; do
             [[ -f "$file" ]] || continue
             echo "Checking $file"
             sh -n "$file"
@@ -65,3 +68,44 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/voiddesk/data/visual-captures"
           VOIDDESK_APP_DIR="$RUNNER_TEMP/voiddesk" luajit tests/test_love_core.lua
+
+
+  love-visual-capture:
+    name: LÖVE visual capture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LÖVE 11.5 and virtual display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y love xvfb libgl1-mesa-dri
+      - name: Verify LÖVE runtime version
+        run: |
+          version="$(dpkg-query -W -f='${Version}' love)"
+          echo "Installed LÖVE package: ${version}"
+          [[ "${version}" == 11.5* ]]
+      - name: Capture every registered LÖVE screen
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          SDL_AUDIODRIVER: "dummy"
+        run: |
+          python3 tools/capture_love_screenshots.py \
+            --timeout 300 \
+            --settle 0.85
+      - name: Upload screenshot set and capture diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voiddesk-love-visual-captures
+          path: |
+            data/visual-captures/*.png
+            data/visual-captures/*.json
+            data/visual-captures/*.log
+            docs/visual/ASSET_CATALOG.md
+            docs/visual/SCREENSHOT_CHECKLIST.md
+            docs/visual/visual-inventory.json
+            docs/visual/ASSET_GALLERY.html
+            docs/visual/SCREENSHOT_GALLERY.html
+          if-no-files-found: warn
+          retention-days: 30

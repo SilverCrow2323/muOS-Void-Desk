@@ -10,6 +10,8 @@ Only the Python standard library is required. Captures stay local until reviewed
 """
 from __future__ import annotations
 import argparse
+import html
+import os
 import hashlib
 import json
 import re
@@ -25,10 +27,11 @@ ASSET_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",
 REQUIRED = {
     "pygame": ["home", "session", "forge", "uplink", "mediahub",
                "workshop", "toolbox", "mapps", "settings", "info"],
-    "love": ["nexus", "hub_session", "hub_forge", "hub_uplink",
-             "hub_media", "hub_workshop", "hub_toolbox", "hub_settings",
-             "hub_info", "hub_iptv", "hub_shell", "hub_calendar",
-             "tool_calc", "tool_clock", "tool_editor", "hub_display_fx"],
+    "love": ["bootanim", "intro", "nexus", "hub_session", "hub_forge",
+             "hub_uplink", "hub_media", "hub_workshop", "hub_toolbox",
+             "hub_mapps", "hub_external", "hub_settings", "hub_display_fx",
+             "hub_info", "hub_iptv", "hub_calendar", "hub_shell",
+             "tool_calc", "tool_clock", "tool_editor"],
 }
 
 
@@ -162,6 +165,102 @@ def scan_screenshots(root: Path) -> list[dict]:
     return out
 
 
+def write_galleries(root: Path, outdir: Path,
+                   assets: list[dict], screenshots: list[dict],
+                   public_captures: bool = False) -> None:
+    """Create local HTML galleries without external libraries or network access."""
+    image_items = [item for item in assets if item["kind"] == "image"]
+    asset_cards = []
+    for item in image_items:
+        src = os.path.relpath(root / item["path"], outdir).replace(os.sep, "/")
+        label = html.escape(item["path"])
+        dimensions_text = (
+            f"{item['width']} × {item['height']}"
+            if item["width"] and item["height"] else "dimensions unavailable"
+        )
+        asset_cards.append(
+            '<article class="asset">'
+            f'<a href="{html.escape(src, quote=True)}" target="_blank" rel="noreferrer">'
+            f'<img loading="lazy" src="{html.escape(src, quote=True)}" alt="{label}"></a>'
+            f'<h2>{label}</h2>'
+            f'<p>{dimensions_text} · {item["bytes"]:,} bytes</p>'
+            f'<code>SHA-256 {item["sha256"][:16]}…</code>'
+            '</article>'
+        )
+
+    font_cards = []
+    for item in (item for item in assets if item["kind"] == "font"):
+        label = html.escape(item["path"])
+        font_cards.append(
+            '<article class="font">'
+            f'<h2>{label}</h2><p>{item["bytes"]:,} bytes</p>'
+            '<p class="sample">VoidDesk NEXUS · 0123456789</p>'
+            '</article>'
+        )
+
+    asset_html = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoidDesk — Visual Asset Gallery</title>
+<style>
+:root{color-scheme:dark}body{margin:0;padding:28px;background:#090c12;color:#e7edf4;
+font:15px/1.5 system-ui,sans-serif}h1{margin:0 0 8px;font-size:28px}
+p.lead{color:#aab7c6;margin:0 0 24px}.grid{display:grid;
+grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+article{min-width:0;background:#141c28;border:1px solid #29364a;border-radius:10px;
+padding:12px;overflow:hidden}.asset img{display:block;width:100%;height:150px;
+object-fit:contain;background:#080b10;border-radius:6px}.asset h2,.font h2{
+font:600 12px/1.4 ui-monospace,monospace;overflow-wrap:anywhere;margin:10px 0 4px}
+article p,code{font-size:11px;color:#aebac8}.font .sample{font-size:22px;padding:18px 0}
+</style></head><body>
+<h1>VoidDesk — Visual Asset Gallery</h1>
+<p class="lead">Local review gallery generated from the tracked project assets. Images are linked to their original files.</p>
+<h2>Images and graphics</h2><div class="grid">""" + "\n".join(asset_cards) + """</div>
+<h2>Fonts</h2><div class="grid">""" + "\n".join(font_cards) + """</div>
+</body></html>
+"""
+    (outdir / "ASSET_GALLERY.html").write_text(asset_html, encoding="utf-8")
+
+    screenshot_cards = []
+    for item in screenshots:
+        if public_captures:
+            src = "captures/" + Path(item["path"]).name
+        else:
+            src = os.path.relpath(root / item["path"], outdir).replace(os.sep, "/")
+        label = html.escape(f"{item['engine']} / {item['screen'] or 'unknown screen'}")
+        dims = (
+            f"{item['width']} × {item['height']}"
+            if item["width"] and item["height"] else "dimensions unavailable"
+        )
+        screenshot_cards.append(
+            '<article class="shot">'
+            f'<a href="{html.escape(src, quote=True)}" target="_blank" rel="noreferrer">'
+            f'<img loading="lazy" src="{html.escape(src, quote=True)}" alt="{label}"></a>'
+            f'<h2>{label}</h2><p>{dims} · {item["bytes"]:,} bytes</p>'
+            f'<code>{html.escape(item["path"])}</code></article>'
+        )
+    screenshot_html = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoidDesk — Screenshot Gallery</title>
+<style>
+:root{color-scheme:dark}body{margin:0;padding:28px;background:#090c12;color:#e7edf4;
+font:15px/1.5 system-ui,sans-serif}h1{font-size:28px;margin:0 0 8px}
+p.lead{color:#aab7c6;margin:0 0 24px}.grid{display:grid;
+grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+article{background:#141c28;border:1px solid #29364a;border-radius:10px;padding:12px}
+img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#080b10;border-radius:6px}
+h2{font:600 13px ui-monospace,monospace;overflow-wrap:anywhere;margin:10px 0 4px}
+p,code{font-size:11px;color:#aebac8;overflow-wrap:anywhere}
+</style></head><body>
+<h1>VoidDesk — Screenshot Gallery</h1>
+<p class="lead">Local PNG captures from the Pygame and LÖVE frontends. Review these for private information before sharing.</p>
+<div class="grid">""" + "\n".join(screenshot_cards) + """</div>
+</body></html>
+"""
+    (outdir / "SCREENSHOT_GALLERY.html").write_text(screenshot_html, encoding="utf-8")
+
+
 def generate(root: Path, export_public: bool = False) -> dict:
     assets = scan_assets(root)
     screenshots = scan_screenshots(root)
@@ -230,6 +329,7 @@ def generate(root: Path, export_public: bool = False) -> dict:
                 meta = root / x["metadata"]
                 shutil.copy2(meta, target / meta.name)
 
+    write_galleries(root, outdir, assets, screenshots, export_public)
     payload = {
         "asset_count": len(assets), "assets": assets,
         "active_love_textures": active, "missing_love_textures": missing,
@@ -246,7 +346,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true",
                         help="return non-zero if an active LÖVE texture is missing")
     parser.add_argument("--export-public", action="store_true",
-                        help="copy reviewed screenshots into docs/visual/captures/")
+                        help="copy reviewed screenshots into docs/visual/captures/ and link the gallery there")
     args = parser.parse_args()
     result = generate(args.root.resolve(), args.export_public)
     print("Visual inventory: %d assets, %d screenshots" %

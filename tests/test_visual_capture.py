@@ -55,6 +55,10 @@ def test_visual_inventory_tracks_assets_active_planets_and_screenshots(tmp_path)
     assert report["screenshots"][0]["screen"] == "nexus"
     assert (tmp_path / "docs/visual/ASSET_CATALOG.md").is_file()
     assert (tmp_path / "docs/visual/SCREENSHOT_CHECKLIST.md").is_file()
+    assert (tmp_path / "docs/visual/ASSET_GALLERY.html").is_file()
+    assert (tmp_path / "docs/visual/SCREENSHOT_GALLERY.html").is_file()
+    gallery = (tmp_path / "docs/visual/ASSET_GALLERY.html").read_text()
+    assert "assets/nexus_planets/start.png" in gallery
     payload = json.loads(
         (tmp_path / "docs/visual/visual-inventory.json").read_text()
     )

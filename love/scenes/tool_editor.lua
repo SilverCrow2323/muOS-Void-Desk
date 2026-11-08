@@ -22,9 +22,52 @@ local reveal_chars = 0
 local total_chars = 0
 local char_pop = {}    -- animated chars [line] = {[col] = t}
 
+-- The reveal counter is measured in Unicode code points, not bytes.
+-- LÖVE's text renderer requires valid UTF-8; slicing a multibyte character
+-- with string.sub can otherwise produce a transient invalid sequence.
+local function utf8_length(text)
+    if utf8 and utf8.len then
+        local ok, count = pcall(utf8.len, text)
+        if ok and count then return count end
+    end
+    local index, count = 1, 0
+    while index <= #text do
+        local byte = text:byte(index)
+        local width = (byte < 0x80 and 1)
+            or (byte < 0xE0 and 2)
+            or (byte < 0xF0 and 3) or 4
+        index = index + width
+        count = count + 1
+    end
+    return count
+end
+
+local function utf8_prefix(text, count)
+    if count <= 0 then return "" end
+    if utf8 and utf8.offset then
+        local ok, index = pcall(utf8.offset, text, count + 1)
+        if ok then
+            if index then return text:sub(1, index - 1) end
+            return text
+        end
+    end
+    local index, chars = 1, 0
+    while index <= #text and chars < count do
+        local byte = text:byte(index)
+        local width = (byte < 0x80 and 1)
+            or (byte < 0xE0 and 2)
+            or (byte < 0xF0 and 3) or 4
+        index = index + width
+        chars = chars + 1
+    end
+    return text:sub(1, index - 1)
+end
+
 local function calc_total()
     local n = 0
-    for _, l in ipairs(lines) do n = n + #l + 1 end
+    for _, line in ipairs(lines) do
+        n = n + utf8_length(line) + 1
+    end
     return n
 end
 
@@ -171,13 +214,14 @@ function scene.draw()
 
         -- Text with typewriter reveal
         love.graphics.setFont(f_mono)
+        local line_chars = utf8_length(line)
         if chars_shown > 0 then
-            local n = math.min(#line, chars_shown)
-            local text = line:sub(1, n)
+            local n = math.min(line_chars, chars_shown)
+            local visible_text = utf8_prefix(line, n)
             -- Char pop scale: animated by char_pop
             love.graphics.setColor(0.90, 0.95, 1.0, 1)
-            love.graphics.print(text, 8 + gutter_w + 6, yy)
-            chars_shown = chars_shown - (#line + 1)
+            love.graphics.print(visible_text, 8 + gutter_w + 6, yy)
+            chars_shown = chars_shown - (line_chars + 1)
         end
         yy = yy + line_h
     end

@@ -34,13 +34,19 @@ function love.load()
     sm.register("hub_display_fx", require("scenes.hub_display_fx"))
     sm.register("hub_info", require("scenes.hub_info"))
 
-    sm.switch("intro", { duration = 2.0 })
+    if os.getenv("VOIDDESK_CAPTURE_ALL") == "1" then
+        local ok, err = visual_capture.start_batch(sm)
+        if not ok then error(err or "unable to start visual capture batch") end
+    else
+        sm.switch("intro", { duration = 2.0 })
+    end
 end
 
 function love.update(dt)
     sm.update(dt)
     bridge.poll()
     notifications.update()
+    visual_capture.update(dt)
 end
 
 function love.draw()

@@ -157,7 +157,7 @@ python3 voiddesk.py --help
 
 The bundled LÖVE binary is architecture-specific; on a PC the launcher prefers the system installation.
 
-See the [visual capture workflow](docs/visual/README.md) for the F12 screenshot shortcut, asset inventory and screenshot checklist.
+See the [visual capture workflow](docs/visual/README.md) to capture every LÖVE scene automatically, take F12 screenshots in either frontend, and generate the asset catalogue and visual galleries.
 
 ## Configuration and generated data
 

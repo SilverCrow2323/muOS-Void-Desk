@@ -1,8 +1,11 @@
 function love.conf(t)
     -- Detect device: the muOS launcher sets VOIDDESK_FULLSCREEN=1
+    local capture_mode = (os.getenv("VOIDDESK_CAPTURE_ALL") == "1")
     local fs = (os.getenv("VOIDDESK_FULLSCREEN") == "1")
-    -- Fallback: if love binary lives in ./lib/ we are on device
-    if not fs then
+    -- Fallback: if love binary lives in ./lib/ we are on device.
+    -- Automated captures must stay windowed under Xvfb even when the
+    -- source checkout also contains the handheld ARM binary.
+    if not fs and not capture_mode then
         local f = io.open("lib/love", "r")
         if f then f:close(); fs = true end
     end
