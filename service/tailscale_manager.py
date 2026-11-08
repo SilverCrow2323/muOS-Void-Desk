@@ -264,6 +264,21 @@ def action(app_dir: Path, name: str, value="", extra_roots=(), runner=subprocess
         return _run(root, "rt", ("autostart", "on"), timeout=12, runner=runner)
     if name == "autostart_off":
         return _run(root, "rt", ("autostart", "off"), timeout=12, runner=runner)
+    if name == "panel_on":
+        bind = _run(root, "rt", ("conf", "set", "PANEL_BIND", "127.0.0.1"),
+                    timeout=10, runner=runner)
+        if not bind.get("ok"):
+            return bind
+        enabled = _run(root, "rt", ("conf", "set", "PANEL", "1"),
+                       timeout=10, runner=runner)
+        if not enabled.get("ok"):
+            return enabled
+        return _run(root, "rt", ("panel", "start"), timeout=15, runner=runner)
+    if name == "panel_off":
+        stopped = _run(root, "rt", ("panel", "stop"), timeout=10, runner=runner)
+        disabled = _run(root, "rt", ("conf", "set", "PANEL", "0"),
+                        timeout=10, runner=runner)
+        return disabled if disabled.get("ok") else stopped
     if name == "exit_node":
         target = str(value or "").strip()
         if target and not EXIT_NODE_RE.fullmatch(target):
