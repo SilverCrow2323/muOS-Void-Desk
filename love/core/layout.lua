@@ -31,4 +31,14 @@ local L = {
     PAD = 8,
 }
 
+-- Backwards-compat lowercase aliases for scenes that use L.header_h etc.
+L.header_h    = L.HEADER_H
+L.footer_h    = L.FOOTER_H
+L.status_h    = L.STATUS_H
+L.strip_h     = L.STATUS_H
+L.row_h       = L.MENU_ROW_H
+L.widget_h    = L.WIDGET_H
+L.scale       = 1
+L.font_status = L.FONT.status
+
 return L
