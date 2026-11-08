@@ -9,7 +9,7 @@ VoidDesk uses the NEXUS home interface to route into feature hubs. Feature avail
 | UPLINK | Wi-Fi, Bluetooth, hotspot and network integrations | Adapter and firmware support matter |
 | MEDIA VAULT | Radio, IPTV, local media and audio tools | VoidCast is a bundled standalone application; some LÖVE media routes are prototypes |
 | WORKSHOP | System status, storage and maintenance | Pygame is fuller; LÖVE diagnostics/monitor/log flows need work |
-| RT:TOOLBOX | Everyday utilities | Calendar, terminal and utility scenes exist in LÖVE; Notes/RSS/Weather are not complete |
+| RT:TOOLBOX | Everyday utilities | Calendar, terminal, Calculator and Clock scenes exist in LÖVE; Notes/RSS/Weather remain incomplete |
 | MUOS APPS | Discover and launch other muOS applications | Requires host application layout and permissions |
 | SETTINGS | Themes, language, UI and engine settings | LÖVE settings are a smaller experimental subset |
 | INFO & ABOUT | Project information and update details | Some actions display status text rather than a full manual |
