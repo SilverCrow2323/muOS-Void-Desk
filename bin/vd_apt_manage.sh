@@ -37,11 +37,17 @@ case "$MODE" in
   update|upgrade|clean) [ $# -eq 0 ] || { echo "$MODE takes no package arguments"; exit 2; } ;;
 esac
 mkdir -p "$DATA" "$MNT"
+LOCK="$DATA/.apt-manager.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "another APT operation is already using the XFCE image"
+  exit 75
+fi
 : > "$LOG"
 printf '%s === %s %s ===\n' "$(date)" "$ACTION" "$*" >> "$LOG"
 mounted() { grep -Fq " $1 " /proc/mounts 2>/dev/null; }
 WE_MOUNTED=0 DEV_MOUNTED=0 PROC_MOUNTED=0 SYS_MOUNTED=0
 cleanup() {
+  rmdir "$LOCK" 2>/dev/null || true
   [ "$SYS_MOUNTED" = 1 ] && umount "$MNT/sys" 2>/dev/null || true
   [ "$PROC_MOUNTED" = 1 ] && umount "$MNT/proc" 2>/dev/null || true
   [ "$DEV_MOUNTED" = 1 ] && umount "$MNT/dev" 2>/dev/null || true
