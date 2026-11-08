@@ -24,6 +24,10 @@ CFG     = DATA / "desk_config.json"
 DATA.mkdir(parents=True, exist_ok=True)
 
 IS_DEVICE = platform.machine().lower() in ("aarch64", "armv7l", "arm64")
+# Deterministic, privacy-safe values for the automated LÖVE screenshot pass.
+# These values are only used when tools/capture_love_screenshots.py launches
+# the service; normal device and desktop sessions keep real system probes.
+IS_VISUAL_CAPTURE = os.environ.get("VOIDDESK_VISUAL_CAPTURE") == "1"
 
 # Reuse the existing, already-battle-tested device probing code from the
 # pygame engine instead of duplicating wifi/bt detection logic here.
@@ -56,6 +60,15 @@ def h_set_config(args):
 
 def h_system_info(args):
     try:
+        if IS_VISUAL_CAPTURE:
+            return {"ok": True, "info": {
+                "os": "Linux visual capture",
+                "machine": "CI",
+                "hostname": "VISUAL-CAPTURE",
+                "is_device": False,
+                "ip": "—",
+                "disk_free_gb": 0.0,
+            }}
         du = shutil.disk_usage("/")
         import socket
         try:
@@ -168,6 +181,16 @@ def _temp_c():
 
 def h_system_status(args):
     try:
+        if IS_VISUAL_CAPTURE:
+            return {"ok": True, "system": {
+                "cpu": 12,
+                "ram": {"used_mb": 256, "total_mb": 1024, "pct": 25},
+                "disk": [{"mount": "/", "free_gb": 12.0, "pct": 50}],
+                "uptime_s": 3600,
+                "temp_c": None,
+                "kernel": "visual-capture",
+                "xfce_installed": False,
+            }}
         return {"ok": True, "system": {
             "cpu": _cpu_pct(),
             "ram": _ram_info(),
@@ -195,6 +218,14 @@ def _gateway_ip():
 
 def h_network_status(args):
     try:
+        if IS_VISUAL_CAPTURE:
+            return {"ok": True, "network": {
+                "wifi": {"connected": False, "ssid": "OFFLINE",
+                         "signal": 0, "ip": "—"},
+                "bt": {"on": False, "count": 0},
+                "hotspot": {"on": False, "ssid": "—"},
+                "info": {"hostname": "VISUAL-CAPTURE", "gateway": "—"},
+            }}
         if deskinfo is not None:
             connected, ssid, lvl, _iface, ip = deskinfo.wifi_status()
             bt_on = deskinfo.bt_status()
@@ -223,6 +254,13 @@ def h_network_status(args):
 
 def h_media_status(args):
     try:
+        if IS_VISUAL_CAPTURE:
+            return {"ok": True, "media": {
+                "volume": 40,
+                "now_playing": None,
+                "library_count": 0,
+                "recordings": 0,
+            }}
         vol = deskinfo.volume() if deskinfo is not None else None
         return {"ok": True, "media": {
             "volume": vol if vol is not None else 0,
