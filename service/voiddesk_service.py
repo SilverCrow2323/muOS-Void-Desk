@@ -46,6 +46,13 @@ try:
 except Exception:
     deskinfo = None
 
+try:
+    import syncthing as syncthing_discovery
+    import syncthing_api
+except Exception:
+    syncthing_discovery = None
+    syncthing_api = None
+
 sys.path.insert(0, str(APP_DIR / "service"))
 try:
     import tailscale_manager
@@ -1264,6 +1271,144 @@ def h_tailscale_action(args):
     return tailscale_manager.action(APP_DIR, action, value)
 
 
+def _syncthing_rest(url, key, path, method="GET", payload=None):
+    import urllib.request
+    headers = {"X-API-Key": key}
+    data = None
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(payload).encode("utf-8")
+    elif method != "GET":
+        data = b""
+    request = urllib.request.Request(
+        url + path, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(request, timeout=2) as response:
+        body = response.read().decode("utf-8")
+        return json.loads(body) if body else {}
+
+
+def _syncthing_connection():
+    if syncthing_discovery is None:
+        return None
+    return syncthing_discovery.discover_connection(data_dir=DATA)
+
+
+def h_syncthing_status(args):
+    """Read-only status for the existing muOS Syncthing Web Service."""
+    if IS_VISUAL_CAPTURE:
+        return {
+            "ok": True, "available": True, "state": "Running",
+            "url": "http://127.0.0.1:7070", "id": "VOIDDESK-SYNC-CI",
+            "connected": 1,
+            "folders": [
+                {"id": "roms", "label": "ROMs", "path": "/mnt/mmc/ROMS",
+                 "pct": 84, "paused": False},
+                {"id": "saves", "label": "Save files", "path": "/mnt/mmc/SAVES",
+                 "pct": 100, "paused": True},
+            ],
+            "devices": [
+                {"id": "VOIDDESK-DESKTOP-CI", "name": "Desktop PC",
+                 "connected": True, "paused": False,
+                 "address": "192.168.1.20:22000"},
+            ],
+        }
+    connection = _syncthing_connection()
+    if not connection:
+        return {
+            "ok": True, "available": False, "state": "Not configured",
+            "message": "Enable Syncthing in muOS: Configuration > Connectivity > Web Services",
+            "folders": [], "devices": [], "connected": 0,
+        }
+    try:
+        url, key = connection["url"], connection["key"]
+        system = _syncthing_rest(url, key, "/rest/system/status")
+        config = _syncthing_rest(url, key, "/rest/config")
+        connections = _syncthing_rest(
+            url, key, "/rest/system/connections").get("connections", {})
+        folders = []
+        for folder in config.get("folders", [])[:8]:
+            folder_id = str(folder.get("id") or "")
+            pct = -1
+            if folder_id:
+                try:
+                    completion = _syncthing_rest(
+                        url, key, "/rest/db/completion?folder=" +
+                        __import__("urllib.parse", fromlist=["quote"]).quote(
+                            folder_id, safe=""))
+                    pct = int(completion.get("completion", 0))
+                except Exception:
+                    pass
+            folders.append({
+                "id": folder_id,
+                "label": folder.get("label") or folder_id,
+                "path": folder.get("path", ""),
+                "pct": pct,
+                "paused": bool(folder.get("paused")),
+            })
+        devices = []
+        for device in config.get("devices", []):
+            device_id = str(device.get("deviceID") or "")
+            link = connections.get(device_id, {})
+            devices.append({
+                "id": device_id,
+                "name": device.get("name") or device_id[:12],
+                "connected": bool(link.get("connected")),
+                "paused": bool(link.get("paused")),
+                "address": link.get("address", ""),
+            })
+        return {
+            "ok": True, "available": True,
+            "state": "Running", "url": connection["url"],
+            "id": str(system.get("myID") or "?")[:18],
+            "connected": sum(1 for device in devices if device["connected"]),
+            "folders": folders, "devices": devices,
+        }
+    except Exception as exc:
+        return {
+            "ok": True, "available": False, "state": "Unavailable",
+            "message": "Syncthing API unavailable: " + str(exc)[:120],
+            "folders": [], "devices": [], "connected": 0,
+        }
+
+
+def h_syncthing_action(args):
+    """Perform only allowlisted operations on configured folders/devices."""
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "Syncthing actions are disabled in visual capture"}
+    if syncthing_api is None:
+        return {"ok": False, "error": "Syncthing adapter unavailable"}
+    connection = _syncthing_connection()
+    if not connection:
+        return {"ok": False, "error": "muOS Syncthing Web Service is not enabled"}
+    action = str(args.get("action") or "")
+    folder_id = str(args.get("folder") or "")
+    device_id = str(args.get("device") or "")
+    try:
+        config = _syncthing_rest(
+            connection["url"], connection["key"], "/rest/config")
+        if action in ("toggle_folder", "pause_folder", "resume_folder",
+                      "scan", "override"):
+            if not folder_id or not any(
+                str(item.get("id") or "") == folder_id
+                for item in config.get("folders", [])
+            ):
+                return {"ok": False, "error": "unknown Syncthing folder"}
+        elif action in ("toggle_device", "pause_device", "resume_device"):
+            if not device_id or not any(
+                str(item.get("deviceID") or "") == device_id
+                for item in config.get("devices", [])
+            ):
+                return {"ok": False, "error": "unknown Syncthing device"}
+        else:
+            return {"ok": False, "error": "unsupported Syncthing action"}
+        return syncthing_api.perform_action(
+            _syncthing_rest, connection["url"], connection["key"], action,
+            folder=folder_id, device=device_id,
+        )
+    except Exception as exc:
+        return {"ok": False, "error": "Syncthing action failed: " + str(exc)[:120]}
+
+
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
@@ -1288,6 +1433,8 @@ HANDLERS = {
     "hotspot_toggle": h_hotspot_toggle,
     "tailscale_status": h_tailscale_status,
     "tailscale_action": h_tailscale_action,
+    "syncthing_status": h_syncthing_status,
+    "syncthing_action": h_syncthing_action,
 
     "session_list": h_session_list,
     "session_launch": h_session_launch,
