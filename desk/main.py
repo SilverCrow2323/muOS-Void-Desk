@@ -8859,13 +8859,21 @@ class App(object):
             self.push("info")
 
     # ================== SYNCTHING: pannello nativo ==================
-    def sync_rest(self, url, key, path):
+    def sync_rest(self, url, key, path, method="GET", payload=None):
         import urllib.request
         import json as _j
-        req = urllib.request.Request(url + path,
-                                     headers={"X-API-Key": key})
+        headers = {"X-API-Key": key}
+        data = None
+        if payload is not None:
+            headers["Content-Type"] = "application/json"
+            data = _j.dumps(payload).encode("utf-8")
+        elif method != "GET":
+            data = b""
+        req = urllib.request.Request(
+            url + path, data=data, headers=headers, method=method)
         with urllib.request.urlopen(req, timeout=4) as r:
-            return _j.loads(r.read().decode() or "{}")
+            body = r.read().decode()
+            return _j.loads(body) if body else {}
 
     def sync_open(self):
         """Open the native Syncthing REST panel.
@@ -8942,25 +8950,45 @@ class App(object):
             try:
                 st = self.sync_rest(url, key, "/rest/system/status")
                 cfg = self.sync_rest(url, key, "/rest/config")
+                connections = self.sync_rest(
+                    url, key, "/rest/system/connections").get("connections", {})
                 folders = []
                 for folder in cfg.get("folders", []):
+                    folder_id = folder.get("id", "")
                     pct = -1
                     try:
                         completion = self.sync_rest(
                             url, key,
                             "/rest/db/completion?folder=" + urllib.parse.quote(
-                                folder["id"], safe=""))
+                                folder_id, safe=""))
                         pct = int(completion.get("completion", 0))
                     except Exception:
                         pass
-                    folders.append((
-                        folder.get("label") or folder["id"],
-                        folder.get("path", ""), pct))
+                    folders.append({
+                        "id": folder_id,
+                        "label": folder.get("label") or folder_id,
+                        "path": folder.get("path", ""),
+                        "pct": pct,
+                        "paused": bool(folder.get("paused")),
+                    })
+                devices = []
+                for device in cfg.get("devices", []):
+                    device_id = device.get("deviceID", "")
+                    connection = connections.get(device_id, {})
+                    devices.append({
+                        "id": device_id,
+                        "name": device.get("name") or device_id[:12],
+                        "connected": bool(connection.get("connected")),
+                        "paused": bool(connection.get("paused")),
+                        "address": connection.get("address", ""),
+                    })
                 return {
                     "id": st.get("myID", "?")[:14],
                     "url": url,
                     "key": key,
                     "folders": folders,
+                    "devices": devices,
+                    "connected": sum(1 for d in devices if d["connected"]),
                 }
             except Exception:
                 return None
