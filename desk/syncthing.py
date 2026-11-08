@@ -16,13 +16,15 @@ DEFAULT_MUOS_URL = "http://127.0.0.1:7070"
 
 def config_candidates(storage_roots=None, app_roots=None, home=None,
                       data_dir=None):
-    storage_roots = storage_roots or os.environ.get(
-        "VD_MUOS_STORAGE_ROOTS",
-        "/mnt/mmc/MUOS:/mnt/sdcard/MUOS").split(":")
-    app_roots = app_roots or os.environ.get(
-        "VD_MUOS_ROOTS",
-        "/mnt/mmc/MUOS/application:/mnt/sdcard/MUOS/application"
-    ).split(":")
+    if storage_roots is None:
+        storage_roots = os.environ.get(
+            "VD_MUOS_STORAGE_ROOTS",
+            "/mnt/mmc/MUOS:/mnt/sdcard/MUOS").split(":")
+    if app_roots is None:
+        app_roots = os.environ.get(
+            "VD_MUOS_ROOTS",
+            "/mnt/mmc/MUOS/application:/mnt/sdcard/MUOS/application"
+        ).split(":")
     home = Path(home or Path.home())
     paths = [
         home / ".local/state/syncthing/config.xml",
