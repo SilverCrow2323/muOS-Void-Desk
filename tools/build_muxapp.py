@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shutil
 import stat
@@ -137,6 +138,14 @@ def _zip_datetime():
     return datetime.fromtimestamp(epoch, tz=timezone.utc).timetuple()[:6]
 
 
+def sha256_file(path: Path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def build_archive(repo_root: Path, output: Path):
     repo_root = Path(repo_root).resolve()
     output = Path(output).resolve()
@@ -191,6 +200,10 @@ def build_archive(repo_root: Path, output: Path):
     if errors:
         output.unlink(missing_ok=True)
         raise RuntimeError("built archive failed validation: " + "; ".join(errors))
+    digest = sha256_file(output)
+    output.with_suffix(output.suffix + ".sha256").write_text(
+        digest + "  " + output.name + "\\n", encoding="ascii"
+    )
     return output
 
 
@@ -208,7 +221,9 @@ def main():
         print("[muxapp] ERROR: " + str(exc), file=sys.stderr)
         return 1
     size_mb = output.stat().st_size / (1024 * 1024)
+    digest = sha256_file(output)
     print(f"[muxapp] OK: {output} ({size_mb:.1f} MiB)")
+    print(f"[muxapp] SHA-256: {digest}")
     return 0
 
 
