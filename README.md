@@ -143,7 +143,7 @@ The root-level voiddesk.py is a convenience launcher for a Linux PC. It is not t
 Prerequisites: Linux, Python 3 and a terminal. The LÖVE frontend needs a system love executable (Debian/Ubuntu: sudo apt install love). The Pygame launcher creates .venv_desktop and installs pygame and psutil on first use.
 
 ~~~bash
-git clone https://github.com/SilverCrow2323/Void-Desk-Project.git
+git clone --recurse-submodules https://github.com/SilverCrow2323/Void-Desk-Project.git
 cd Void-Desk-Project
 
 python3 voiddesk.py
@@ -156,6 +156,8 @@ python3 voiddesk.py --help
 ~~~
 
 The bundled LÖVE binary is architecture-specific; on a PC the launcher prefers the system installation.
+
+The Rt:Tailscale-M service is included as a pinned Git submodule. If you cloned without `--recurse-submodules`, run `git submodule update --init --recursive` before building or packaging Void Desk.
 
 See the [visual capture workflow](docs/visual/README.md) to capture every LÖVE scene automatically, take F12 screenshots in either frontend, and generate the asset catalogue and visual galleries.
 
