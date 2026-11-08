@@ -22115,8 +22115,11 @@ class App(object):
                          "No shared folders")
                 self.text(empty, (40, 150), self.f_med, DIM)
             y = 102
-            for j, item in enumerate(active[:5]):
-                selected = j == getattr(self, "sync_sel", 0)
+            selected_index = getattr(self, "sync_sel", 0)
+            start_index = max(0, min(selected_index - 4, len(active) - 5))
+            for j in range(start_index, min(start_index + 5, len(active))):
+                item = active[j]
+                selected = j == selected_index
                 self.npanel(8, y, W - 16, 58,
                             border=self.accent if selected else LINE,
                             fill=INK, cut=7)
