@@ -8647,6 +8647,7 @@ class App(object):
                 "peers": peers,
                 "service": bool(snapshot.get("daemon")),
                 "autostart": bool(snapshot.get("autostart")),
+                "panel": bool(snapshot.get("panel")),
                 "auth_url": snapshot.get("auth_url", "")}
 
     def ts_open(self):
@@ -8720,6 +8721,8 @@ class App(object):
                   else "Start service"))
         A.append(("autostart", "Avvio automatico: %s" %
                   ("ON" if (self.ts or {}).get("autostart") else "OFF")))
+        A.append(("panel", "Pannello web locale: %s" %
+                  ("ON" if (self.ts or {}).get("panel") else "OFF")))
         A.append(("tstheme", "Tema Tailscale: %s" %
                   self.cfg.get("ts_theme", "ciano").upper()))
         A.append(("logout", "Logout"))
@@ -8735,6 +8738,11 @@ class App(object):
         elif key == "autostart":
             action = ("autostart_off" if (self.ts or {}).get("autostart")
                       else "autostart_on")
+            self.run_busy("...", lambda: self.ts_manager().action(APP_DIR, action))
+            self.ts_refresh()
+        elif key == "panel":
+            action = ("panel_off" if (self.ts or {}).get("panel")
+                      else "panel_on")
             self.run_busy("...", lambda: self.ts_manager().action(APP_DIR, action))
             self.ts_refresh()
         elif key == "up":
