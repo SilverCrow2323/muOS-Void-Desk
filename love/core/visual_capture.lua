@@ -90,7 +90,7 @@ local function save_frame(image, screen_name, mode)
     local meta_ok, meta_err = write_atomic(
         metadata_path, json.encode(payload) .. "\n")
     if not meta_ok then error(meta_err or "cannot save metadata") end
-    return image_path, payload
+    return "data/visual-captures/" .. stem .. ".png", payload
 end
 
 local function queue_capture(screen_name, mode, callback)
