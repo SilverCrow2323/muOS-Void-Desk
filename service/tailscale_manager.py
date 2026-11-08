@@ -255,7 +255,7 @@ def action(app_dir: Path, name: str, value="", extra_roots=(), runner=subprocess
     if name == "daemon_stop":
         return _run(root, "rt", ("daemon", "stop"), timeout=20, runner=runner)
     if name == "login":
-        return _start_login(root)
+        return _start_login(root, Path(app_dir))
     if name == "disconnect":
         return _run(root, "ts", ("down",), timeout=20, runner=runner)
     if name == "logout":
@@ -278,7 +278,7 @@ def action(app_dir: Path, name: str, value="", extra_roots=(), runner=subprocess
 _LOGIN_PROCESS = None
 
 
-def _start_login(root: Path):
+def _start_login(root: Path, app_dir: Path):
     global _LOGIN_PROCESS
     if _LOGIN_PROCESS is not None and _LOGIN_PROCESS.poll() is None:
         return {"ok": True, "already_running": True}
@@ -286,7 +286,7 @@ def _start_login(root: Path):
     if not cli.is_file():
         return {"ok": False, "error": "Tailscale CLI wrapper missing"}
     try:
-        log_path = Path(os.environ.get("VOIDDESK_DATA_DIR", str(root / "data"))) / "tailscale_login.log"
+        log_path = Path(os.environ.get("VOIDDESK_DATA_DIR", str(app_dir / "data"))) / "tailscale_login.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_file = log_path.open("ab")
         _LOGIN_PROCESS = subprocess.Popen(
