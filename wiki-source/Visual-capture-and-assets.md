@@ -10,7 +10,7 @@ python3 tools/capture_love_screenshots.py
 
 The script starts the Python companion service, runs the LÖVE frontend, switches through its scene catalogue and captures each rendered screen. When no display is available it uses Xvfb. The capture summary is saved as data/visual-captures/love-batch-manifest.json.
 
-This pass verifies that scenes can be opened and rendered in the desktop runtime. It is not hardware validation for muOS or a claim that all LÖVE actions are complete.
+This pass verifies that scenes can be opened and rendered in the desktop runtime. GitHub Actions uploads a `voiddesk-love-visual-captures` artifact from each run (screenshots, JSON sidecars, manifest and logs; 30-day retention). Open the workflow run and download it from **Artifacts**. Synthetic system/network status is used for this test, not live host data. It is not hardware validation for muOS or a claim that all LÖVE actions are complete.
 
 ## Capture one current screen
 
