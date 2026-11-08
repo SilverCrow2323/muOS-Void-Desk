@@ -1222,6 +1222,28 @@ def h_xfce_launch(args):
 
 def h_tailscale_status(args):
     """Read-only status from the bundled Rt:Tailscale-M service manager."""
+    if IS_VISUAL_CAPTURE:
+        return {
+            "ok": True, "installed": True, "available": True,
+            "backend": "Running", "daemon": True, "panel": False,
+            "watchdog": True, "taildrop_enabled": True, "autostart": True,
+            "version": "3.0.6", "tailscale_version": "1.80.0",
+            "auth_url": "https://login.tailscale.com/a/voiddesk-visual-fixture",
+            "tailnet": "visual-fixture.ts.net",
+            "self": {"name": "voiddesk-handheld", "ips": ["100.64.0.10"],
+                     "online": True, "user": "fixture@example.test"},
+            "peers": [
+                {"name": "desktop-pc", "ip": "100.64.0.20",
+                 "online": True, "exit_node": True, "using": False,
+                 "os": "linux", "user": "fixture@example.test"},
+                {"name": "home-server", "ip": "100.64.0.30",
+                 "online": False, "exit_node": False, "using": False,
+                 "os": "linux", "user": "fixture@example.test"},
+            ],
+            "taildrop": [{"name": "save-backup.zip", "size": 4096,
+                          "mtime": 0}],
+            "urls": [],
+        }
     if tailscale_manager is None:
         return {"ok": False, "error": "Tailscale service adapter unavailable"}
     return tailscale_manager.status(APP_DIR)
