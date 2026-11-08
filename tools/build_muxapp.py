@@ -32,6 +32,8 @@ SKIP_FILES = {".DS_Store", "Thumbs.db", ".git", ".gitmodules"}
 
 def _copy_tree(source: Path, destination: Path, *, skip_dirs=()):
     source = Path(source)
+    if source.is_symlink():
+        raise RuntimeError(f"symbolic link is not packageable: {source}")
     if not source.is_dir():
         return
     destination.mkdir(parents=True, exist_ok=True)
@@ -76,6 +78,9 @@ def _copy_tailscale_service(repo_root: Path, package_root: Path):
         upstream / "LICENSE",
         upstream / "THIRD-PARTY.md",
     )
+    symlinks = [str(path.relative_to(repo_root)) for path in required if path.is_symlink()]
+    if symlinks:
+        raise RuntimeError("symbolic links are not packageable: " + ", ".join(symlinks))
     missing = [str(path.relative_to(repo_root)) for path in required if not path.is_file()]
     if missing:
         raise RuntimeError(
