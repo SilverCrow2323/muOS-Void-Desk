@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import zipfile
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,8 +36,14 @@ def make_project(root: Path):
     (upstream / "THIRD-PARTY.md").write_text("notices\n")
 
 
-def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path):
+def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monkeypatch):
     builder = load_builder()
+    monkeypatch.setattr(
+        builder.subprocess, "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0, stdout=builder.TAILSCALE_COMMIT + "\\n", stderr=""
+        ),
+    )
     project = tmp_path / "project"
     project.mkdir()
     make_project(project)
