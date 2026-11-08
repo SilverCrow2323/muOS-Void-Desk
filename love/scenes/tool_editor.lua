@@ -30,7 +30,15 @@ local function utf8_length(text)
         local ok, count = pcall(utf8.len, text)
         if ok and count then return count end
     end
-    local _, count = text:gsub("[^\\128-\\191]", "")
+    local index, count = 1, 0
+    while index <= #text do
+        local byte = text:byte(index)
+        local width = (byte < 0x80 and 1)
+            or (byte < 0xE0 and 2)
+            or (byte < 0xF0 and 3) or 4
+        index = index + width
+        count = count + 1
+    end
     return count
 end
 
