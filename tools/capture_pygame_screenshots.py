@@ -20,7 +20,10 @@ sys.path[:0] = [str(ROOT), str(ROOT / "desk")]
 
 class _NullPoller:
     def __init__(self, *args, **kwargs):
-        pass
+        self._initial = dict(kwargs.get("initial") or {})
+
+    def snapshot(self):
+        return dict(self._initial)
 
     def stop(self):
         pass
