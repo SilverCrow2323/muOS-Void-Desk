@@ -24,7 +24,7 @@ python3 tools/capture_love_screenshots.py --settle 1.2 --timeout 300
 python3 tools/capture_love_screenshots.py --no-service
 ~~~
 
-This is a software-rendered desktop capture pass, not a substitute for screenshots from a physical handheld.
+This is a software-rendered desktop capture pass, not a substitute for screenshots from a physical handheld. The same batch pass runs in GitHub Actions and uploads a `voiddesk-love-visual-captures` artifact (screenshots, JSON sidecars, manifest and logs) with 30-day retention. Download it from the successful or failed workflow run under **Artifacts**. Capture mode uses fixed demonstration status values so the screenshots do not expose real hostnames, network identifiers or IP addresses.
 
 ## Capture a single screen on-device
 
