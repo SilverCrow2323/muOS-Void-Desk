@@ -119,18 +119,18 @@ jobs:
       - name: Run Rt:Tailscale-M static, model, QR and UI tests
         run: |
           cd external/rt-tailscale-m
-          tests/run_all.sh
+          bash tests/run_all.sh
       - name: Build verified arm64 Tailscale binaries
         run: |
           cd external/rt-tailscale-m
-          ./build.sh --no-love
+          bash build.sh --no-love
           mkdir -p "$RUNNER_TEMP/rt-tailscale"
           unzip -q dist/RtTailscale-M-*.muxapp -d "$RUNNER_TEMP/rt-tailscale"
       - name: Exercise daemon, watchdog, boot and web-panel integration under QEMU
         run: |
           cd external/rt-tailscale-m
           sudo env RT_BIN_DIR="$RUNNER_TEMP/rt-tailscale/RtTailscale/bin" \
-            tests/run_integration.sh
+            bash tests/run_integration.sh
 
 
   love-visual-capture:
