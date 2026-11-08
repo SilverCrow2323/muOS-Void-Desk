@@ -15,6 +15,7 @@ local state = {
     folders = {},
     devices = {},
     mode = "folders",
+    pending_override = nil,
     message = "",
 }
 
@@ -82,6 +83,36 @@ items_for = function()
         },
     }
 
+    if state.pending_override then
+        local pending = state.pending_override
+        table.insert(items, {
+            icon = "alert-triangle",
+            label = "CONFIRM override: " .. pending.label,
+            desc = "This can overwrite remote files with the handheld copy",
+            action = function(scene)
+                state.pending_override = nil
+                scene._items = items_for()
+                return run_action(scene, "override", pending.id, "",
+                    "Overriding local folder...")
+            end,
+        })
+        table.insert(items, {
+            icon = "x", label = "Cancel override",
+            desc = "Keep all remote files unchanged",
+            action = function(scene)
+                state.pending_override = nil
+                scene._items = items_for()
+                scene.set_status("Override cancelled")
+                return "Cancelled"
+            end,
+        })
+        table.insert(items, {
+            icon = "back", label = "Back",
+            action = function() sm.back() end,
+        })
+        return items
+    end
+
     if state.mode == "folders" then
         for _, folder in ipairs(state.folders) do
             local label = tostring(folder.label or folder.id or "Folder")
@@ -109,7 +140,10 @@ items_for = function()
                 icon = "refresh-cw", label = "Override: " .. label,
                 desc = "Publish local changes to connected devices",
                 action = function(scene)
-                    return run_action(scene, "override", folder_id, "", "Overriding folder...")
+                    state.pending_override = {id = folder_id, label = label}
+                    scene._items = items_for()
+                    scene.set_status("Confirm local override for " .. label)
+                    return "Confirmation required"
                 end,
             })
         end
