@@ -22069,37 +22069,76 @@ class App(object):
         elif top == "syncpanel":
             it = (self.lang == "it")
             self.header("SYNCTHING", icon="remote")
-            sy = self.sync or {"id": "?", "folders": []}
+            sy = self.sync or {"id": "?", "folders": [], "devices": []}
+            mode = getattr(self, "sync_mode", "folders")
+            folders = sy.get("folders", [])
+            devices = sy.get("devices", [])
+            active = devices if mode == "devices" else folders
+            connected = sy.get("connected", 0)
+            summary = ("ID: %s  ·  %d/%d dispositivi connessi" %
+                       (sy.get("id", "?"), connected, len(devices)) if it else
+                       "ID: %s  ·  %d/%d devices connected" %
+                       (sy.get("id", "?"), connected, len(devices)))
             self.npanel(8, 48, W - 16, 30, border=LINE, fill=INK, cut=8)
-            self.text("ID: " + sy["id"], (20, 54), self.f_small, DIM)
-            ok = "demone on" if it else "daemon up"
-            self.text(ok, (W - 24 - self.f_small.size(ok)[0], 54),
-                      self.f_small, OK_G)
-            y = 92
-            if not sy["folders"]:
-                self.text("nessuna folder condivisa" if it
-                          else "no shared folders", (40, 140),
-                          self.f_med, DIM)
-            for lbl, path, pct in sy["folders"][:6]:
-                self.npanel(8, y, W - 16, 52, border=LINE, fill=INK)
-                self.text(lbl, (22, y + 6), self.f_med, FG,
-                          maxw=W - 160)
-                self.text(path, (22, y + 28), self.f_tiny, FAINT,
-                          maxw=W - 200)
-                if pct >= 0:
-                    ps = "%d%%" % pct
-                    self.text(ps, (W - 30 - self.f_med.size(ps)[0],
-                                   y + 6), self.f_med,
-                              OK_G if pct >= 100 else self.accent)
-                    bw = W - 190
-                    pygame.draw.rect(self.surface, (14, 15, 19),
-                                     (22, y + 44, bw, 5))
-                    pygame.draw.rect(self.surface,
-                                     OK_G if pct >= 100 else self.accent,
-                                     (22, y + 44, bw * pct // 100, 5))
-                y += 58
-            self.footer([("A", "update" if it else "refresh"),
-                         ("B", self.t("back"))])
+            self.text(summary, (20, 54), self.f_small, DIM, maxw=W - 40)
+            page = ("DISPOSITIVI" if it else "DEVICES") if mode == "devices" else "CARTELLE" if it else "FOLDERS"
+            self.text(page, (20, 84), self.f_tiny, self.accent)
+            if not active:
+                empty = ("Nessun dispositivo configurato" if it else
+                         "No configured devices") if mode == "devices" else (
+                         "Nessuna cartella condivisa" if it else
+                         "No shared folders")
+                self.text(empty, (40, 150), self.f_med, DIM)
+            y = 102
+            for j, item in enumerate(active[:5]):
+                selected = j == getattr(self, "sync_sel", 0)
+                self.npanel(8, y, W - 16, 58,
+                            border=self.accent if selected else LINE,
+                            fill=INK, cut=7)
+                if mode == "devices":
+                    name = item.get("name") or item.get("id", "?")[:14]
+                    state = ("CONNESSO" if item.get("connected") else "OFFLINE") if it else (
+                        "CONNECTED" if item.get("connected") else "OFFLINE")
+                    if item.get("paused"):
+                        state = "IN PAUSA" if it else "PAUSED"
+                    self.text(name, (22, y + 6), self.f_med, FG,
+                              maxw=W - 170)
+                    self.text((item.get("address") or item.get("id", ""))[:62],
+                              (22, y + 30), self.f_tiny, FAINT,
+                              maxw=W - 190)
+                    color = OK_G if item.get("connected") and not item.get("paused") else self.accent
+                    self.text(state, (W - 24 - self.f_tiny.size(state)[0],
+                                      y + 8), self.f_tiny, color)
+                else:
+                    label = item.get("label") or item.get("id", "?")
+                    path = item.get("path", "")
+                    pct = item.get("pct", -1)
+                    self.text(label, (22, y + 5), self.f_med, FG,
+                              maxw=W - 160)
+                    self.text(path, (22, y + 27), self.f_tiny, FAINT,
+                              maxw=W - 190)
+                    state = ("IN PAUSA" if it else "PAUSED") if item.get("paused") else (
+                        "ATTIVA" if it else "ACTIVE")
+                    if pct >= 0:
+                        state += " · %d%%" % pct
+                    self.text(state, (W - 24 - self.f_tiny.size(state)[0],
+                                      y + 7), self.f_tiny,
+                              self.accent if item.get("paused") else OK_G)
+                    if pct >= 0:
+                        bw = W - 190
+                        pygame.draw.rect(self.surface, (14, 15, 19),
+                                         (22, y + 47, bw, 4))
+                        pygame.draw.rect(self.surface,
+                                         OK_G if pct >= 100 else self.accent,
+                                         (22, y + 47, int(bw * max(0, min(100, pct)) / 100), 4))
+                y += 64
+            if mode == "devices":
+                self.footer([("A", "pause/resume"), ("L1/R1", "folders"),
+                             ("SELECT", "refresh"), ("B", self.t("back"))])
+            else:
+                self.footer([("A", "pause/resume"), ("X", "scan"),
+                             ("Y", "override"), ("L1/R1", "devices"),
+                             ("SELECT", "refresh"), ("B", self.t("back"))])
         elif top == "osk":
             self.header(self.osk_title[:26], icon="keyboard")
             self.npanel(10, 52, W - 20, 50, border=self.accent, fill=INK)
