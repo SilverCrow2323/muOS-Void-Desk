@@ -545,10 +545,10 @@ def h_apt_catalog(args):
     mode = str(args.get("mode") or "search")
     if mode not in _APT_CATALOG_MODES:
         return {"ok": False, "error": "unsupported catalog mode"}
-    script = APP_DIR / "bin" / "vd_apt_manage.sh"
+    script = APP_DIR / "bin" / "vd_apt_manage.py"
     if not script.is_file():
         return {"ok": False, "error": "APT manager is missing"}
-    command = ["sh", str(script), "catalog", mode]
+    command = [sys.executable, str(script), "catalog", mode]
     if mode == "search":
         query = str(args.get("query") or "").strip()[:80]
         if not query or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 +_.-]*", query):
@@ -632,10 +632,10 @@ def h_job_start(args):
                 return {"ok": False, "error": "one to twenty valid package names are required"}
         elif packages:
             return {"ok": False, "error": "this APT action takes no package arguments"}
-        script = APP_DIR / "bin" / "vd_apt_manage.sh"
+        script = APP_DIR / "bin" / "vd_apt_manage.py"
         if not script.is_file():
             return {"ok": False, "error": "APT manager is missing"}
-        command = ["sh", str(script), action] + list(packages)
+        command = [sys.executable, str(script), action] + list(packages)
     elif cmd_text:
         try:
             tokens = shlex.split(str(cmd_text))
