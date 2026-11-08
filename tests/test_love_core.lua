@@ -36,6 +36,13 @@ assert(file_exists("love/scenes/hub_apt.lua"),
 assert(file_exists("love/scenes/hub_tailscale.lua"),
        "missing native Tailscale scene")
 
+-- The integrated login screen must be able to generate a real QR matrix.
+local qr = require("lib.qr")
+local qr_ok, qr_matrix, qr_size = qr.encode(
+    "https://login.tailscale.com/a/voiddesk-regression-check")
+equal(qr_ok, true, "Tailscale login QR should encode")
+equal(qr_size, #qr_matrix, "QR matrix size should match its row count")
+
 -- A child scene should load on demand even when main.lua did not register it.
 local sm = require("core.scene_manager")
 local entered_value = nil
