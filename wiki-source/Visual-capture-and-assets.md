@@ -17,12 +17,12 @@ This pass verifies that scenes can be opened and rendered in the desktop runtime
 On Linux/CI, run:
 
 ~~~bash
-python3 tools/capture_pygame_screenshots.py
+python3 tools/capture_pygame_screenshots.py --all-states
 ~~~
 
-The harness boots the real Pygame application with an isolated temporary config and SDL's dummy video/audio drivers, then renders the five supported home styles: BLAME, HUD, Terminal, Orbit and NEXUS. It writes PNGs with JSON sidecars plus `data/visual-captures/pygame-home-manifest.json`.
+The harness boots the real Pygame application with an isolated temporary config and SDL's dummy video/audio drivers, renders the five supported home styles (BLAME, HUD, Terminal, Orbit and NEXUS), then smoke-renders every state branch declared in `App.render_state()`. Each direct state render produces a PNG and JSON sidecar; the manifest is `data/visual-captures/pygame-home-manifest.json`.
 
-GitHub Actions uploads these files as `voiddesk-pygame-visual-captures` (30-day retention). A failed style makes the command fail and is recorded in the manifest. This is a home-screen rendering smoke test, not automated traversal of every hub, action, controller path or handheld hardware workflow.
+GitHub Actions uploads these files as `voiddesk-pygame-visual-captures` (30-day retention). A failed style makes the command fail and is recorded in the manifest. Direct state rendering does not prove that a screen is reachable through normal navigation, that its actions work, or that controller/hardware flows are valid. Treat this as broad renderer coverage, not end-to-end feature validation.
 
 ## Capture one current screen
 
