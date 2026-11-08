@@ -68,8 +68,8 @@ class UplinkHub(HubMixin):
         app.sync_open()
 
     def rt_tailscale(self):
-        """Launch Rt:Tailscale-M (external LÖVE tool)."""
-        self.app.launch_external_tool("rt_tailscale_m")
+        """Open the native Tailscale panel inside Void Desk."""
+        self.tsgui()
 
     def tsgui(self):
         """Tailnet GUI management."""
