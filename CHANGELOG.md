@@ -24,6 +24,12 @@ This file records user-visible changes by release. The next candidate is documen
 - Expanded the architecture notes for the asynchronous status cache and device power-off hand-off.
 - Added regression tests for non-blocking status reads, cached snapshots and recovery after a failed probe.
 - Aligned the Python application and launcher version metadata on the 10.5.4 release line and extended `BUILDCHECK.py` to inspect the PC launcher too.
+- Added a repeatable LÖVE visual pass covering 20 scenes, with PNGs, JSON sidecars and a batch manifest; failed scenes are reported rather than silently omitted.
+- Added F12 capture support, a 171-item visual asset inventory, and generated HTML galleries for artwork and captured screens.
+- Added a GitHub Actions job that runs the real LÖVE 11.5 runtime under Xvfb and uploads the screenshot set, manifest, logs and catalog as a 30-day artifact.
+- Made automated screenshots deterministic and privacy-safe by substituting synthetic system, network and media status values.
+- Fixed the VOID EDIT typewriter reveal to count Unicode code points, preventing partial UTF-8 characters from crashing the renderer.
+- Prepared multi-page GitHub Wiki source content and a publisher script; the one-time creation of the initial Wiki Home page remains a GitHub UI step.
 - Added F12 screenshot capture in both Pygame and LÖVE, with PNG output and JSON metadata under `data/visual-captures/`.
 - Added a dependency-free visual inventory tool for asset sizes, image dimensions, SHA-256 hashes, active NEXUS texture references and screenshot coverage.
 - Documented the experimental/incomplete status of LÖVE; Pygame remains the recommended frontend.
