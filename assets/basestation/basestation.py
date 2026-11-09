@@ -3804,6 +3804,12 @@ Tabs are selectable via click or shortcut."""
     def action_send_uplink_message(self):
         if not self._ensure_uplink_daemon():
             return
+        devices = self.daemon.store.devices_read()
+        if not devices:
+            messagebox.showinfo(
+                "Send to Handheld",
+                "No handheld has paired with this PC yet. Open PC Link on a device first.")
+            return
         title = simpledialog.askstring("Send to Handheld", "Notification title:",
                                        initialvalue="VOID BaseStation", parent=self)
         if title is None or not title.strip():
@@ -3811,8 +3817,10 @@ Tabs are selectable via click or shortcut."""
         body = simpledialog.askstring("Send to Handheld", "Message:", parent=self)
         if body is None:
             return
-        self.daemon.store.outbox_push(title.strip(), body)
-        self.log("Queued message for linked handheld(s): {}".format(title.strip()), "ok")
+        for device_id in devices:
+            self.daemon.store.device_outbox_push(device_id, title.strip(), body)
+        self.log("Queued '{}' for {} paired handheld(s).".format(
+            title.strip(), len(devices)), "ok")
 
     def action_open_received_files(self):
         INCOMING_DIR.mkdir(parents=True, exist_ok=True)
