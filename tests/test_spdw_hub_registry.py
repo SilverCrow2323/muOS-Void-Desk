@@ -160,3 +160,50 @@ def test_registry_rejects_duplicate_socket_ownership():
 
     assert any("listener collision" in error for error in errors)
 
+
+
+def test_registry_rejects_protocol_family_member_collision_with_listener():
+    registry = load_registry_module()
+    data = registry.load_registry(DATA)
+    family = next(x for x in data["services"]
+                  if x["id"] == "sunshine-stream-transport")
+    family["members"].append({
+        "name": "duplicate-web-ui",
+        "port": 47990,
+        "protocol": "tcp",
+        "required": True,
+    })
+
+    errors = registry.validate_registry(data)
+
+    assert any("listener collision" in error and "47990" in error
+               for error in errors)
+
+
+def test_registry_rejects_duplicate_sockets_inside_protocol_family():
+    registry = load_registry_module()
+    data = registry.load_registry(DATA)
+    family = next(x for x in data["services"]
+                  if x["id"] == "sunshine-stream-transport")
+    family["members"].append({
+        "name": "duplicate-video",
+        "port": 47998,
+        "protocol": "udp",
+        "required": True,
+    })
+
+    errors = registry.validate_registry(data)
+
+    assert any("listener collision" in error and "47998" in error
+               for error in errors)
+
+
+def test_sunshine_web_ui_socket_is_declared_once():
+    registry = load_registry_module()
+    data = registry.load_registry(DATA)
+    audit = registry.port_audit(data)["pc"]
+    matches = [item for item in audit
+               if item.get("port") == 47990 and item.get("protocol") == "tcp"]
+
+    assert len(matches) == 1
+    assert matches[0]["id"] == "sunshine-web-ui"
