@@ -69,6 +69,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/voiddesk/data/visual-captures"
           VOIDDESK_APP_DIR="$RUNNER_TEMP/voiddesk" luajit tests/test_love_core.lua
+          luajit tests/test_love_voidcast_handoff.lua
 
 
   pygame-visual-capture:
