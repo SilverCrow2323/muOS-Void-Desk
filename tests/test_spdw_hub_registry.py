@@ -222,9 +222,20 @@ def test_registry_reports_malformed_field_types_without_crashing():
             "protocol": [],
             "port": True,
             "bind": {},
-            "exposure": [],
+            "exposure": "lan",
             "auth": {},
             "owner": "",
+            "management": True,
+        }, {
+            "id": "malformed-exposure",
+            "type": "listener",
+            "host": "pc",
+            "protocol": "tcp",
+            "port": 9134,
+            "bind": "all",
+            "exposure": [],
+            "auth": "none",
+            "owner": "test",
         }, {
             "id": "malformed-family",
             "type": "protocol-family",
@@ -245,7 +256,7 @@ def test_registry_reports_malformed_field_types_without_crashing():
     assert any("malformed has invalid protocol" in error for error in errors)
     assert any("malformed has invalid port" in error for error in errors)
     assert any("malformed has invalid bind policy" in error for error in errors)
-    assert any("malformed has invalid exposure policy" in error for error in errors)
+    assert any("malformed-exposure has invalid exposure policy" in error for error in errors)
     assert any("malformed has invalid auth model" in error for error in errors)
     assert any("malformed-family has invalid host role" in error for error in errors)
     assert any("malformed-family has invalid base_port" in error for error in errors)
