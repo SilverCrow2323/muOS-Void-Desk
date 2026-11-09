@@ -206,3 +206,29 @@ def test_device_ids_are_safe_single_path_components():
     assert core.safe_device_id("..") == "unknown"
     assert core.safe_device_id("../outside") == "outside"
     assert core.safe_device_id("handheld-01") == "handheld-01"
+
+def test_device_message_queues_are_isolated_and_drain_independently():
+    core = load_core()
+    queues = {}
+    core.enqueue_device_message(queues, "handheld-a", {"title": "A"})
+    core.enqueue_device_message(queues, "handheld-b", {"title": "B"})
+
+    received_a = core.drain_device_messages(queues, "handheld-a")
+
+    assert received_a == [{"title": "A"}]
+    assert "handheld-a" not in queues
+    assert queues["handheld-b"] == [{"title": "B"}]
+    assert core.drain_device_messages(queues, "handheld-b") == [{"title": "B"}]
+    assert queues == {}
+
+
+def test_device_message_queue_is_bounded():
+    core = load_core()
+    queues = {}
+    for index in range(60):
+        core.enqueue_device_message(queues, "handheld-a", {"index": index}, limit=50)
+
+    assert len(queues["handheld-a"]) == 50
+    assert queues["handheld-a"][0]["index"] == 10
+    assert queues["handheld-a"][-1]["index"] == 59
+
