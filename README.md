@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="resources/vdlogo.png" alt="VoidDesk" width="170">
+<img src="resources/vdlogo.png" alt="VoidDesk" width="550">
 
 # VOIDDESK — NEXUS
 
