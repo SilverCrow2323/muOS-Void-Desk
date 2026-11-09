@@ -15260,10 +15260,67 @@ class App(object):
             elif btn == "B":
                 self.pop_state()
         elif top == "bstationsend":
-            if btn in ("A", "SELECT", "Y"):
-                self.basestation_serve_start()
-            elif btn == "B":
-                self.pop_state()
+            it = (self.lang == "it")
+            bs_col = (90, 200, 220)
+            self.header("SPDW HUB // DEVICE AGENT", icon="monitor")
+            self.npanel(8, 46, W - 16, 30, border=LINE, fill=INK, cut=6)
+            self.text("GATEWAY GESTITO DAL SERVIZIO VOID DESK" if it else
+                      "GATEWAY MANAGED BY VOID DESK SERVICE",
+                      (16, 53), self.f_tiny, self.accent)
+            self.content_panel(80, H - 40)
+            running = self.bstation_srv is not None
+            self.npanel(30, 92, W - 60, 208, border=bs_col,
+                       fill=(8, 14, 16), cut=12)
+            icons.draw(self.surface, "monitor", 46, 108, 26,
+                       OK_G if running else DIM)
+            status_s = (("gateway attivo" if it else "gateway online")
+                        if running else
+                        ("gateway non disponibile" if it else "gateway unavailable"))
+            self.text(status_s, (84, 110), self.f_med,
+                      OK_G if running else NO_R)
+            if running:
+                ip = self.own_ip() or "?"
+                url = "http://%s:8765/" % ip
+                self.text(("apri dal PC questo indirizzo:" if it
+                           else "open this address from the PC:"), (46, 144),
+                          self.f_tiny, DIM)
+                self.text(url, (46, 164), self.f_small, bs_col,
+                          maxw=W - 92)
+                pin = self.bstation_pairing_pin or "--------"
+                self.text(("PIN di pairing:" if it else "Pairing PIN:"),
+                          (46, 194), self.f_tiny, DIM)
+                self.text(pin, (162, 190), self.f_med, OK_G)
+                self.text(("Accesso protetto · file in entrata e uscita" if it
+                           else "Authenticated access · incoming and outgoing files"),
+                          (46, 222), self.f_tiny, FAINT, maxw=W - 92)
+                incoming_dir = os.path.join(DATA, "incoming")
+                outgoing_dir = os.path.join(DATA, "outgoing")
+                try:
+                    n_in = len(os.listdir(incoming_dir))
+                except OSError:
+                    n_in = 0
+                try:
+                    n_out = len(os.listdir(outgoing_dir))
+                except OSError:
+                    n_out = 0
+                self.text(("ricevuti: %d elementi" % n_in) if it else
+                          ("received: %d items" % n_in),
+                          (46, 250), self.f_small, FG)
+                self.text(("condivisi: %d elementi" % n_out) if it else
+                          ("shared: %d items" % n_out),
+                          (46, 272), self.f_small, FG)
+            else:
+                for j, line in enumerate(self.note_wrap(
+                        "il servizio SPDW Hub non risponde sulla porta 8765. "
+                        "Riavvia Void Desk e controlla il log del servizio." if it
+                        else "the SPDW Hub service is not responding on port 8765. "
+                        "Restart Void Desk and inspect the service log.",
+                        W - 92, self.f_small, 4)):
+                    self.text(line, (46, 148 + j * 20), self.f_small, DIM,
+                              maxw=W - 92)
+            self.footer([("A", "aggiorna" if it else "refresh"),
+                         ("Y", "aggiorna PIN" if it else "rotate PIN"),
+                         ("B", self.t("back"))])
         elif top == "ctrldevices":
             n = len(self.ctrl_devices)
             if btn == "UP" and n:
