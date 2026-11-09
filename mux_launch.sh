@@ -146,7 +146,8 @@ while true; do
                     fi
                 fi
                 echo "$(date) launching VoidCast" >>"$LOG"
-                PYTHONPATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" \
+                VOIDCAST_FB=1 \
+                    PYTHONPATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" \
                     PYGAME_HIDE_SUPPORT_PROMPT=1 \
                     python3 "$APP_DIR/outdesk/VoidCast/voidcast/main.py" >>"$LOG" 2>&1
                 VOIDCAST_RC=$?
