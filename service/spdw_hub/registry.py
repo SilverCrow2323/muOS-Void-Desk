@@ -160,6 +160,7 @@ def validate_registry(data):
                 listener_keys[key] = service_id
 
         if (item.get("management") is True
+                and isinstance(host, str) and host in VALID_HOSTS
                 and exposure in ("lan", "tailnet", "lan-or-tailnet")):
             external_management[host] = external_management.get(host, 0) + 1
             if external_management[host] > management_limit:
