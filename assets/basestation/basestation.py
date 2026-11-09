@@ -396,6 +396,14 @@ class ConfigManager:
         up = self.data.setdefault("uplink", {})
         for k, v in DEFAULT_UPLINK.items():
             up.setdefault(k, json.loads(json.dumps(v)))
+        # v3 used port 31337, while Void Desk PC Link discovers BaseStation
+        # on 8420. Migrate only the known legacy default automatically.
+        try:
+            if int(up.get("daemon_port", 8420)) == 31337:
+                up["daemon_port"] = 8420
+                self.save()
+        except (TypeError, ValueError):
+            up["daemon_port"] = 8420
 
     def uplink(self):
         return self.data["uplink"]
@@ -892,7 +900,7 @@ class EmbeddedDaemon:
         url = "http://127.0.0.1:{}{}".format(self.port, path)
         req = urllib.request.Request(url, headers={
             "User-Agent": "{}/{}".format(APP_TAG, APP_VERSION),
-            "X-SPDW-Token": self.store.cfg.get("token", ""),
+            "X-VOID-Token": self.store.cfg.get("token", ""),
         })
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", errors="replace"))
@@ -902,7 +910,7 @@ class EmbeddedDaemon:
         req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
                                      headers={"Content-Type": "application/json",
                                               "User-Agent": "{}/{}".format(APP_TAG, APP_VERSION),
-                                              "X-SPDW-Token": self.store.cfg.get("token", "")})
+                                              "X-VOID-Token": self.store.cfg.get("token", "")})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", errors="replace"))
 
