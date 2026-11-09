@@ -20,8 +20,8 @@ def load_builder():
 
 def make_source(root):
     root.mkdir(parents=True, exist_ok=True)
-    for name in ("basestation.py", "basestation_core.py", "requirements.txt",
-                 "README.md", "run_basestation.sh", "LICENSE"):
+    for name in ("basestation.py", "basestation_core.py", "pc_hub.html",
+                 "requirements.txt", "README.md", "run_basestation.sh", "LICENSE"):
         (root / name).write_text("# {}\\n".format(name), encoding="utf-8")
 
 
@@ -41,6 +41,8 @@ def test_pc_companion_archive_has_expected_root_and_executable_launcher(tmp_path
         assert all(name.startswith("VOID-BaseStation-4.0.0/") for name in names)
         assert "VOID-BaseStation-4.0.0/basestation.py" in names
         assert "VOID-BaseStation-4.0.0/basestation_core.py" in names
+        assert "VOID-BaseStation-4.0.0/pc_hub.html" in names
+        assert "VOID-BaseStation-4.0.0/services.json" in names
         launcher = package.getinfo("VOID-BaseStation-4.0.0/run_basestation.sh")
         assert stat.S_IMODE(launcher.external_attr >> 16) == 0o755
 
