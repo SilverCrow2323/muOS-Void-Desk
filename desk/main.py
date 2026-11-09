@@ -6329,6 +6329,12 @@ class App(object):
         if not tool:
             self.notify(f"Unknown tool: {tool_id}", "warning")
             return
+        if tool.get("launcher_type") == "portable-voidcast":
+            # VoidCast is a full-screen app and must use the same mux session
+            # hand-off as the dedicated Media -> VoidCast IPTV menu action.
+            from desk.hubs.media import MediaHub
+            MediaHub(self).voidcast()
+            return
         base = APP_DIR
         path = tool.get("path", "")
         if path.startswith("../"):
