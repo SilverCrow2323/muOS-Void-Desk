@@ -782,7 +782,36 @@ def make_daemon_handler(store):
                 return None
 
         def do_GET(self):
-            path = urllib.parse.urlparse(self.path).path
+            parsed = urllib.parse.urlparse(self.path)
+            path = parsed.path
+            query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+            first = lambda key, default="": query.get(key, [default])[0]
+
+            # Browser dashboard shares the existing PC Link listener and
+            # never starts a second HTTP server or port.
+            if path == "/":
+                page = Path(__file__).resolve().parent / "pc_hub.html"
+                try:
+                    payload = page.read_bytes()
+                except OSError:
+                    return self._json({"error": "SPDW Hub PC web UI is missing"}, 500)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("X-Frame-Options", "DENY")
+                self.send_header(
+                    "Content-Security-Policy",
+                    "default-src 'self'; img-src 'self' data:; "
+                    "style-src 'self' 'unsafe-inline'; "
+                    "script-src 'self' 'unsafe-inline'; "
+                    "connect-src 'self'; frame-ancestors 'none'; "
+                    "base-uri 'self'; form-action 'self'")
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+
             # Discovery is intentionally public and returns only a name/version.
             if path == "/ping":
                 return self._json({
@@ -791,13 +820,103 @@ def make_daemon_handler(store):
                     "version": APP_VERSION,
                     "ts": datetime.now().isoformat(timespec="seconds"),
                 })
-            # Read-only, low-sensitivity metrics let Void Desk show a PC as
-            # online after discovery. Process names and all write/control
-            # endpoints remain protected by the pairing token.
+            # Low-sensitivity metrics allow the handheld discovery list to
+            # show the PC as online. Detailed process data is token-protected.
             if path == "/stats":
                 return self._json(collect_host_stats(include_processes=self._auth_ok()))
             if not self._auth_ok():
                 return self._json({"error": "unauthorized"}, 401)
+
+            if path == "/api/hub/stats":
+                result = collect_host_stats(include_processes=True)
+                result.update({
+                    "name": store.cfg.get("pc_name") or socket.gethostname(),
+                    "platform": platform.platform(),
+                    "application": APP_NAME,
+                    "version": APP_VERSION,
+                })
+                return self._json(result)
+            if path == "/api/hub/devices":
+                return self._json({"devices": store.devices_read()})
+            if path == "/api/hub/registry":
+                candidates = [
+                    Path(__file__).resolve().parent / "services.json",
+                    Path(__file__).resolve().parents[2] / "service" / "spdw_hub" / "services.json",
+                ]
+                registry_path = next((candidate for candidate in candidates
+                                      if candidate.is_file()), None)
+                if registry_path is None:
+                    return self._json({"error": "service registry is not bundled"}, 404)
+                try:
+                    return self._json(json.loads(registry_path.read_text(encoding="utf-8")))
+                except (OSError, ValueError) as exc:
+                    return self._json({"error": str(exc)}, 500)
+            if path == "/api/hub/files":
+                files = []
+                try:
+                    INCOMING_DIR.mkdir(parents=True, exist_ok=True)
+                    for device_dir in sorted(INCOMING_DIR.iterdir(),
+                                              key=lambda entry: entry.name.lower()):
+                        if device_dir.is_symlink() or not device_dir.is_dir():
+                            continue
+                        device_id = safe_device_id(device_dir.name)
+                        for entry in sorted(device_dir.iterdir(),
+                                            key=lambda item: item.name.lower()):
+                            if entry.is_symlink() or not entry.is_file():
+                                continue
+                            info = entry.stat(follow_symlinks=False)
+                            files.append({
+                                "device": device_id,
+                                "name": entry.name,
+                                "size": int(info.st_size),
+                                "mtime": datetime.fromtimestamp(
+                                    info.st_mtime).astimezone().isoformat(
+                                        timespec="seconds"),
+                            })
+                            if len(files) >= 1000:
+                                break
+                        if len(files) >= 1000:
+                            break
+                except OSError as exc:
+                    return self._json({"error": str(exc)}, 500)
+                return self._json({"files": files})
+            if path == "/api/hub/files/download":
+                device_id = safe_device_id(first("device"))
+                name = first("name")
+                if (not name or name in (".", "..")
+                        or os.path.basename(name) != name
+                        or "/" in name or "\\" in name):
+                    return self._json({"error": "invalid file name"}, 400)
+                root = (INCOMING_DIR / device_id).resolve()
+                target = INCOMING_DIR / device_id / name
+                try:
+                    if target.is_symlink():
+                        return self._json({"error": "symbolic links are not downloadable"}, 400)
+                    target = target.resolve(strict=True)
+                    target.relative_to(root)
+                    if not target.is_file():
+                        return self._json({"error": "file not found"}, 404)
+                    size = target.stat().st_size
+                    filename = safe_device_id(name) if name != os.path.basename(name) else name
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Length", str(size))
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.send_header("Content-Disposition",
+                                     'attachment; filename="{}"'.format(
+                                         filename.replace('"', "_").replace("\r", "_").replace("\n", "_")))
+                    self.end_headers()
+                    with target.open("rb") as stream:
+                        while True:
+                            chunk = stream.read(64 * 1024)
+                            if not chunk:
+                                break
+                            self.wfile.write(chunk)
+                    return
+                except (OSError, ValueError):
+                    return self._json({"error": "file not found"}, 404)
+
             if path == "/outbox":
                 return self._json({"messages": store.outbox_read(drain=True)})
             if path == "/devices":
@@ -822,6 +941,25 @@ def make_daemon_handler(store):
             data = self._body()
             if data is None:
                 return self._json({"error": "invalid or oversized JSON body"}, 400)
+
+            match = re.fullmatch(
+                r"/api/hub/device/([A-Za-z0-9_.-]{1,80})/(notify|screenshot)", path)
+            if match:
+                device_id, action = match.groups()
+                if action == "screenshot":
+                    try:
+                        store.command_push(device_id, "screenshot")
+                    except ValueError as exc:
+                        return self._json({"error": str(exc)}, 400)
+                    return self._json({"ok": True, "queued": "screenshot"})
+                title = data.get("title", "SPDW Hub")
+                body = data.get("body", "")
+                if not isinstance(title, str) or not title.strip():
+                    return self._json({"error": "title required"}, 400)
+                store.device_outbox_push(
+                    device_id, title.strip(), body if isinstance(body, str) else "")
+                return self._json({"ok": True, "queued": "notification"})
+
             if path == "/notify":
                 title = data.get("title", "Console")
                 body = data.get("body", "")
