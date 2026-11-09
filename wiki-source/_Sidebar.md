@@ -2,6 +2,7 @@
 
 - [Home](Home)
 - [Installation — Andromeda](Installation-muOS-Andromeda)
+- [Compatibility list](Compatibility-list)
 - [Controls and navigation](Controls-and-navigation)
 - [Hubs and features](Hubs-and-features)
 - [Frontends](Frontends)
