@@ -104,3 +104,18 @@ def test_discovery_never_enables_or_executes_addon(tmp_path):
     assert len(discovered) == 1
     assert discovered[0]["valid"] is True
     assert discovered[0]["enabled"] is False
+
+def test_addon_entrypoint_symlink_cannot_escape_addon_directory(tmp_path):
+    module = load_addons_module()
+    addon_dir = tmp_path / "addons" / "sample"
+    addon_dir.mkdir(parents=True)
+    outside = tmp_path / "outside.py"
+    outside.write_text("# outside\n", encoding="utf-8")
+    (addon_dir / "entry.py").symlink_to(outside)
+    manifest = valid_manifest()
+    manifest["entrypoint"] = "entry.py"
+
+    errors = module.validate_addon_manifest(manifest, addon_dir)
+
+    assert any("resolves outside" in error for error in errors)
+
