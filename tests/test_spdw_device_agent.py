@@ -174,7 +174,7 @@ def test_multipart_parser_preserves_binary_trailing_newlines(tmp_path):
             b"--" + boundary + b"\r\n"
             b'Content-Disposition: form-data; name="file"; filename="capture.bin"\r\n'
             b"Content-Type: application/octet-stream\r\n\r\n"
-            b"\x00\x01payload\r\n"
+            b"\x00\x01payload\r\n\r\n"
             b"--" + boundary + b"--\r\n"
         )
         filename, data = handler._parse_multipart(payload, boundary)
