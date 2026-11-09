@@ -132,6 +132,10 @@ while true; do
                 continue
                 ;;
             voidcast)
+                if [ ! -f "$APP_DIR/outdesk/VoidCast/voidcast/main.py" ] || [ ! -f "$APP_DIR/outdesk/VoidCast/presets/config.default.json" ]; then
+                    echo "$(date) VoidCast entrypoint or default config missing; returning to VoidDesk" >>"$LOG"
+                    continue
+                fi
                 # VoidCast is a standalone Pygame app. The LOVE frontend
                 # does not need the Pygame runtime, so prepare it here too
                 # instead of assuming the "py" engine already bootstrapped it.
