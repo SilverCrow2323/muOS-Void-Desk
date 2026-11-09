@@ -124,7 +124,7 @@ def test_device_agent_uploads_without_overwriting_existing_files(tmp_path):
     try:
         cookie, csrf = login(base, agent.pairing_pin)
         boundary = "spdw-test-boundary"
-        content = b"hello handheld"
+        content = b"hello handheld\\r\\n"
         payload = (
             b"--" + boundary.encode() + b"\r\n"
             b'Content-Disposition: form-data; name="file"; filename="notes.txt"\r\n'
@@ -164,3 +164,22 @@ def test_device_agent_health_page_is_public_but_file_content_is_not(tmp_path):
         expect_http_error(base + "/api/read?area=in&path=anything")
     finally:
         agent.stop()
+
+def test_multipart_parser_preserves_binary_trailing_newlines(tmp_path):
+    _module, agent, _base = start_agent(tmp_path)
+    try:
+        handler = agent.make_handler()
+        boundary = b"spdw-binary-boundary"
+        payload = (
+            b"--" + boundary + b"\\r\\n"
+            b'Content-Disposition: form-data; name="file"; filename="capture.bin"\\r\\n'
+            b"Content-Type: application/octet-stream\\r\\n\\r\\n"
+            b"\\x00\\x01payload\\r\\n"
+            b"--" + boundary + b"--\\r\\n"
+        )
+        filename, data = handler._parse_multipart(payload, boundary)
+        assert filename == "capture.bin"
+        assert data == b"\\x00\\x01payload\\r\\n"
+    finally:
+        agent.stop()
+
