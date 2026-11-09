@@ -15,6 +15,7 @@ def load_evinput():
 
 
 def test_evinput_is_used_when_sdl_has_no_joystick(monkeypatch):
+    monkeypatch.setenv("VOIDCAST_FB", "1")
     evinput = load_evinput()
     calls = []
     monkeypatch.setattr(evinput, "start", lambda: calls.append("start") or True)
@@ -25,10 +26,21 @@ def test_evinput_is_used_when_sdl_has_no_joystick(monkeypatch):
 
 
 def test_evinput_is_disabled_when_sdl_joystick_is_available(monkeypatch):
+    monkeypatch.setenv("VOIDCAST_FB", "1")
     evinput = load_evinput()
     calls = []
     monkeypatch.setattr(evinput, "start", lambda: calls.append("start") or True)
     monkeypatch.setattr(evinput, "stop", lambda: calls.append("stop"))
 
     assert evinput.sync_with_joystick(True) is False
+    assert calls == ["stop"]
+
+def test_evinput_is_not_used_on_desktop_without_framebuffer(monkeypatch):
+    monkeypatch.delenv("VOIDCAST_FB", raising=False)
+    evinput = load_evinput()
+    calls = []
+    monkeypatch.setattr(evinput, "start", lambda: calls.append("start") or True)
+    monkeypatch.setattr(evinput, "stop", lambda: calls.append("stop"))
+
+    assert evinput.sync_with_joystick(False) is False
     assert calls == ["stop"]
