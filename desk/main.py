@@ -15319,7 +15319,7 @@ class App(object):
                     self.text(line, (46, 148 + j * 20), self.f_small, DIM,
                               maxw=W - 92)
             self.footer([("A", "aggiorna" if it else "refresh"),
-                         ("Y", "aggiorna PIN" if it else "rotate PIN"),
+                         ("Y", "aggiorna dettagli" if it else "refresh details"),
                          ("B", self.t("back"))])
         elif top == "ctrldevices":
             n = len(self.ctrl_devices)
