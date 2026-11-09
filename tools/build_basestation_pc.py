@@ -16,6 +16,7 @@ SOURCE_DIR = ROOT / "assets" / "basestation"
 REQUIRED_FILES = (
     "basestation.py",
     "basestation_core.py",
+    "basestation_web.py",
     "pc_hub.html",
     "requirements.txt",
     "README.md",
