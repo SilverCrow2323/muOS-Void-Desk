@@ -187,6 +187,9 @@ activation and UI mounting are still future phases; discovery is not activation.
 - One-time pairing code establishes a per-device credential.
 - Store only hashed/rotatable credentials where possible; protect local secret
   files with owner-only permissions.
+- The legacy PC Link API on TCP 8420 currently uses plain HTTP bearer-token
+  authentication. Until TLS or a trusted encrypted tunnel is enforced, restrict
+  it to a trusted LAN or Tailscale and never expose it through WAN port forwarding.
 - Use short-lived authenticated sessions, CSRF protection and origin checks
   for browser actions.
 - Apply per-route capabilities: status, files-read, files-write, terminal,
