@@ -1,4 +1,5 @@
 import hashlib
+import json
 import importlib.util
 import os
 import stat
@@ -20,8 +21,9 @@ def load_builder():
 
 def make_source(root):
     root.mkdir(parents=True, exist_ok=True)
-    for name in ("basestation.py", "basestation_core.py", "pc_hub.html",
-                 "requirements.txt", "README.md", "run_basestation.sh", "LICENSE"):
+    for name in ("basestation.py", "basestation_core.py", "basestation_web.py",
+                 "pc_hub.html", "requirements.txt", "README.md",
+                 "run_basestation.sh", "LICENSE"):
         (root / name).write_text("# {}\\n".format(name), encoding="utf-8")
 
 
@@ -43,6 +45,9 @@ def test_pc_companion_archive_has_expected_root_and_executable_launcher(tmp_path
         assert "VOID-BaseStation-4.0.0/basestation_core.py" in names
         assert "VOID-BaseStation-4.0.0/pc_hub.html" in names
         assert "VOID-BaseStation-4.0.0/services.json" in names
+        assert "VOID-BaseStation-4.0.0/basestation_web.py" in names
+        registry = json.loads(package.read("VOID-BaseStation-4.0.0/services.json"))
+        assert registry["schema"] == "spdw-service-registry"
         launcher = package.getinfo("VOID-BaseStation-4.0.0/run_basestation.sh")
         assert stat.S_IMODE(launcher.external_attr >> 16) == 0o755
 
