@@ -200,3 +200,26 @@ jobs:
             docs/visual/SCREENSHOT_GALLERY.html
           if-no-files-found: warn
           retention-days: 30
+
+  basestation-pc:
+    name: Reproducible SPDW Hub PC companion
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build standalone BaseStation PC archive
+        run: |
+          python tools/build_basestation_pc.py \\
+            --output "$RUNNER_TEMP/VOID-BaseStation-4.0.0.zip"
+          cd "$RUNNER_TEMP"
+          sha256sum -c VOID-BaseStation-4.0.0.zip.sha256
+      - name: Upload PC companion archive and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: void-basestation-pc-4.0.0
+          path: |
+            ${{ runner.temp }}/VOID-BaseStation-4.0.0.zip
+            ${{ runner.temp }}/VOID-BaseStation-4.0.0.zip.sha256
+          retention-days: 30
