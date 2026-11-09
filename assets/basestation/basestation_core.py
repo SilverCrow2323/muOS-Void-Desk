@@ -116,6 +116,8 @@ def create_remote_backup(sftp, roots, archive_path, metadata=None,
     roots = list(roots or [])
     if not roots:
         raise ValueError("at least one remote folder is required")
+    if type(chunk_size) is not int or chunk_size < 1:
+        raise ValueError("chunk_size must be a positive integer")
     for root in roots:
         if not isinstance(root, dict) or not root.get("name") or not root.get("path"):
             raise ValueError("each backup root needs a name and path")
