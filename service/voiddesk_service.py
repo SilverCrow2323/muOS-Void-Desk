@@ -278,11 +278,6 @@ def _external_tool_target(tool):
     """Resolve a registry launcher without permitting arbitrary path escape."""
     launcher = str(tool.get("launcher") or "")
     kind = tool.get("launcher_type")
-    if kind == "portable-voidcast" and launcher == "../VoidCast":
-        target = (APP_DIR.parent / "VoidCast").resolve()
-        if target.parent == APP_DIR.parent.resolve():
-            return target
-        return None
     target = (APP_DIR / launcher).resolve()
     try:
         target.relative_to(APP_DIR.resolve())
@@ -313,8 +308,8 @@ def h_list_external(args):
             exists = target.is_file()
         elif kind == "portable-voidcast":
             exists = target.is_dir() and (
-                (target / "mux_launch.sh").is_file()
-                or (target / "voidcast.py").is_file()
+                (target / "voidcast" / "main.py").is_file()
+                and (target / "presets" / "config.default.json").is_file()
             )
         else:
             exists = False
@@ -333,6 +328,10 @@ def h_list_external(args):
 
 def h_launch_external(args):
     tool_id = str(args.get("id") or "")
+    # VoidCast is a full-screen Outdesk application. It must use the
+    # mux_launch session hand-off, not the generic background job runner.
+    if tool_id == "voidcast":
+        return h_voidcast_launch(args)
     return h_job_start({
         "tool_id": tool_id,
         "name": "External: " + tool_id,
