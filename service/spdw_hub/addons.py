@@ -109,7 +109,7 @@ def validate_addon_manifest(manifest, addon_dir=None):
     unknown = sorted(valid_capabilities - CAPABILITIES)
     if unknown:
         errors.append("unknown capabilities: {}".format(", ".join(unknown)))
-    if len(valid_capabilities) != len(capabilities):
+    if any(not isinstance(x, str) for x in capabilities):
         errors.append("capabilities must contain only strings")
 
     confirmation = manifest.get("confirmation_actions", [])
@@ -117,7 +117,7 @@ def validate_addon_manifest(manifest, addon_dir=None):
         errors.append("confirmation_actions must be a list")
         confirmation = []
     valid_confirmation = {x for x in confirmation if isinstance(x, str)}
-    if len(valid_confirmation) != len(confirmation):
+    if any(not isinstance(x, str) for x in confirmation):
         errors.append("confirmation_actions must contain only strings")
     missing_confirm = sorted(
         (valid_capabilities & DESTRUCTIVE_CAPABILITIES) - valid_confirmation)
