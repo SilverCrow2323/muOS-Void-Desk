@@ -2998,6 +2998,7 @@ class VOIDBaseStation(tk.Tk):
         tools_menu = tk.Menu(menubar, tearoff=0, bg=BG1, fg=TEXT,
                              activebackground=CYAN, activeforeground=BG0)
         menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="Open SPDW Hub Web Dashboard...", command=self.action_open_web_hub)
         tools_menu.add_command(label="SPDW Service Registry...", command=self.action_show_hub_registry)
         tools_menu.add_command(label="PC Link Pairing...", command=self.action_show_pairing)
         tools_menu.add_command(label="Linked Handhelds...", command=self.action_show_linked_devices)
@@ -3644,6 +3645,24 @@ Tabs are selectable via click or shortcut."""
         self.terminal_panel.refresh_devices(select=self.selected_device)
         if not self.terminal_panel.connected:
             self.terminal_panel.connect()
+
+    def action_open_web_hub(self):
+        if not self._ensure_uplink_daemon():
+            return
+        host = NetworkUtils.get_local_ip()
+        url = "http://{}:{}/".format(host, self.daemon.port)
+        try:
+            opened = webbrowser.open(url)
+            if not opened:
+                raise RuntimeError("the default browser did not open")
+            self.log("SPDW Hub web dashboard opened: {}".format(url), "ok")
+        except Exception as exc:
+            self.clipboard_clear()
+            self.clipboard_append(url)
+            messagebox.showinfo(
+                "SPDW Hub Web Dashboard",
+                "Open this URL in your browser (it has been copied):\\n\\n{}".format(url))
+            self.log("Could not auto-open browser: {}".format(exc), "warn")
 
     def action_show_hub_registry(self):
         """Display declared service ownership; this is not a live socket scan."""
