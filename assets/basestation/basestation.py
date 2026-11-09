@@ -56,7 +56,7 @@ from pathlib import Path
 
 from basestation_core import (
     atomic_write_json, collect_host_stats, collect_listener_snapshot,
-    create_remote_backup, generate_auth_token, token_matches,
+    create_remote_backup, generate_auth_token, safe_device_id, token_matches,
 )
 
 try:
@@ -616,7 +616,7 @@ class DaemonStore:
 
     @staticmethod
     def _safe_device_id(device_id):
-        return re.sub(r"[^A-Za-z0-9_.-]", "_", str(device_id or ""))[:80] or "unknown"
+        return safe_device_id(device_id)
 
     def devices_read(self):
         with self._lock:
