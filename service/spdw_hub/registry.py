@@ -60,7 +60,7 @@ def validate_registry(data):
     external_management = {}
     policy = data.get("policy", {}) if isinstance(data.get("policy", {}), dict) else {}
     management_limit = policy.get("management_listener_limit_per_host", 1)
-    if not isinstance(management_limit, int) or management_limit < 1:
+    if type(management_limit) is not int or management_limit < 1:
         errors.append("policy.management_listener_limit_per_host must be a positive integer")
         management_limit = 1
     for index, item in enumerate(services):
@@ -79,10 +79,11 @@ def validate_registry(data):
 
         item_type = item.get("type")
         if item_type == "protocol-family":
-            if item.get("host") not in VALID_HOSTS:
+            family_host = item.get("host")
+            if not isinstance(family_host, str) or family_host not in VALID_HOSTS:
                 errors.append("{} has invalid host role".format(service_id))
             base = item.get("base_port")
-            if not isinstance(base, int) or not 1 <= base <= 65535:
+            if type(base) is not int or not 1 <= base <= 65535:
                 errors.append("{} has invalid base_port".format(service_id))
             members = item.get("members")
             if not isinstance(members, list) or not members:
@@ -94,14 +95,14 @@ def validate_registry(data):
                         continue
                     port = member.get("port")
                     proto = member.get("protocol")
-                    if not isinstance(port, int) or not 1 <= port <= 65535:
+                    if type(port) is not int or not 1 <= port <= 65535:
                         errors.append("{} has an invalid member port".format(service_id))
-                    if proto not in VALID_PROTOCOLS:
+                    if not isinstance(proto, str) or proto not in VALID_PROTOCOLS:
                         errors.append("{} has an invalid member protocol".format(service_id))
-                    if (item.get("host") in VALID_HOSTS
-                            and proto in VALID_PROTOCOLS
-                            and isinstance(port, int) and 1 <= port <= 65535):
-                        key = (item["host"], proto, port)
+                    if (isinstance(family_host, str) and family_host in VALID_HOSTS
+                            and isinstance(proto, str) and proto in VALID_PROTOCOLS
+                            and type(port) is int and 1 <= port <= 65535):
+                        key = (family_host, proto, port)
                         if key in listener_keys:
                             errors.append("listener collision {}: {} and {}:{}".format(
                                 key, listener_keys[key], service_id,
@@ -129,17 +130,17 @@ def validate_registry(data):
         exposure = item.get("exposure")
         auth = item.get("auth")
         owner = item.get("owner")
-        if host not in VALID_HOSTS:
+        if not isinstance(host, str) or host not in VALID_HOSTS:
             errors.append("{} has invalid host role".format(service_id))
-        if protocol not in VALID_PROTOCOLS:
+        if not isinstance(protocol, str) or protocol not in VALID_PROTOCOLS:
             errors.append("{} has invalid protocol".format(service_id))
-        if not isinstance(port, int) or not 1 <= port <= 65535:
+        if type(port) is not int or not 1 <= port <= 65535:
             errors.append("{} has invalid port".format(service_id))
-        if bind not in VALID_BINDS:
+        if not isinstance(bind, str) or bind not in VALID_BINDS:
             errors.append("{} has invalid bind policy".format(service_id))
-        if exposure not in VALID_EXPOSURES:
+        if not isinstance(exposure, str) or exposure not in VALID_EXPOSURES:
             errors.append("{} has invalid exposure policy".format(service_id))
-        if auth not in VALID_AUTH:
+        if not isinstance(auth, str) or auth not in VALID_AUTH:
             errors.append("{} has invalid auth model".format(service_id))
         if not isinstance(owner, str) or not owner.strip():
             errors.append("{} requires an owning component".format(service_id))
@@ -148,7 +149,9 @@ def validate_registry(data):
                 and auth == "none"):
             errors.append("{} is externally exposed without authentication".format(service_id))
 
-        if host in VALID_HOSTS and protocol in VALID_PROTOCOLS and isinstance(port, int):
+        if (isinstance(host, str) and host in VALID_HOSTS
+                and isinstance(protocol, str) and protocol in VALID_PROTOCOLS
+                and type(port) is int):
             key = (host, protocol, port)
             if key in listener_keys:
                 errors.append("listener collision {}: {} and {}".format(
