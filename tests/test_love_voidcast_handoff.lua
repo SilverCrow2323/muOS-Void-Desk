@@ -71,3 +71,11 @@ equal(quit_count, 0, "rejected hand-off keeps LÖVE open")
 equal(statuses[2], "VoidCast failed: device only", "rejection is visible")
 
 print("LÖVE VoidCast hand-off: all tests passed")
+
+request = nil
+statuses = {}
+quit_count = 0
+item.action(scene)
+request.callback({ ok = false, reason = "device-only" })
+equal(quit_count, 0, "device-only rejection keeps LÖVE open")
+equal(statuses[2], "VoidCast failed: device-only", "device-only reason is visible")
