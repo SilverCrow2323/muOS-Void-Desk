@@ -61,7 +61,7 @@ from basestation_core import (
 
 try:
     import tkinter as tk
-    from tkinter import filedialog, messagebox, font as tkfont
+    from tkinter import filedialog, messagebox, font as tkfont, simpledialog
 except ImportError:
     print("[FATAL] tkinter is required but not installed.")
     sys.exit(1)
@@ -2818,6 +2818,11 @@ class VOIDBaseStation(tk.Tk):
         tools_menu = tk.Menu(menubar, tearoff=0, bg=BG1, fg=TEXT,
                              activebackground=CYAN, activeforeground=BG0)
         menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="PC Link Pairing...", command=self.action_show_pairing)
+        tools_menu.add_command(label="Linked Handhelds...", command=self.action_show_linked_devices)
+        tools_menu.add_command(label="Send Message to Handheld...", command=self.action_send_uplink_message)
+        tools_menu.add_command(label="Open Received Files", command=self.action_open_received_files)
+        tools_menu.add_separator()
         tools_menu.add_command(label="Export Diagnostics Report...", command=self.action_export_diagnostics)
         tools_menu.add_command(label="Backup Saves & States...", command=lambda: self._select_tab("media"))
 
@@ -3458,6 +3463,221 @@ Tabs are selectable via click or shortcut."""
         self.terminal_panel.refresh_devices(select=self.selected_device)
         if not self.terminal_panel.connected:
             self.terminal_panel.connect()
+
+    def _ensure_uplink_daemon(self):
+        if self.daemon.is_running():
+            return True
+        if self.daemon.start():
+            self._daemon_started_by_us = True
+            self.log("PC Link daemon started on port {}".format(self.daemon.port), "ok")
+            return True
+        messagebox.showerror(
+            "PC Link",
+            "Could not start the PC Link daemon on port {}.\\n"
+            "Check whether another application is using it.".format(self.daemon.port))
+        return False
+
+    def action_show_pairing(self):
+        if not self._ensure_uplink_daemon():
+            return
+        token = self.daemon.store.cfg.get("token", "")
+        host = NetworkUtils.get_local_ip()
+        top = tk.Toplevel(self)
+        top.title("VOID BaseStation — PC Link Pairing")
+        top.configure(bg=BG0)
+        top.transient(self)
+        top.resizable(False, False)
+        top.geometry("560x310")
+
+        tk.Label(top, text="VOID // PC LINK PAIRING", bg=BG0, fg=CYAN,
+                 font=FONT_TITLE).pack(anchor="w", padx=18, pady=(18, 6))
+        tk.Label(top, text="Add this PC from Void Desk → PC Uplink → Add manually.",
+                 bg=BG0, fg=TEXT_DIM, font=FONT).pack(anchor="w", padx=18, pady=(0, 14))
+
+        fields = (("PC address", "{}:{}".format(host, self.daemon.port)),
+                  ("Authentication token", token))
+        entries = {}
+        for label, value in fields:
+            frame = tk.Frame(top, bg=BG0)
+            frame.pack(fill="x", padx=18, pady=5)
+            tk.Label(frame, text=label, bg=BG0, fg=TEXT_DIM,
+                     font=FONT_SMALL, width=22, anchor="w").pack(side="left")
+            var = tk.StringVar(value=value)
+            ent = tk.Entry(frame, textvariable=var, bg=BG1, fg=CYAN,
+                           insertbackground=CYAN, relief="flat", font=FONT_SMALL,
+                           state="readonly", readonlybackground=BG1)
+            ent.pack(side="left", fill="x", expand=True, ipady=6)
+            entries[label] = var
+
+        actions = tk.Frame(top, bg=BG0)
+        actions.pack(fill="x", padx=18, pady=(16, 10))
+
+        def copy_details():
+            text = "{}\\n{}\\n{}".format(
+                APP_NAME, entries["PC address"].get(),
+                entries["Authentication token"].get())
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self.log("PC Link pairing details copied to clipboard.", "ok")
+
+        def rotate_token():
+            if not messagebox.askyesno(
+                "Rotate pairing token",
+                "This immediately invalidates the current token on all handhelds.\\n"
+                "You will need to pair them again. Continue?", parent=top):
+                return
+            self.daemon.store.cfg["token"] = generate_auth_token()
+            self.daemon.store.save()
+            entries["Authentication token"].set(self.daemon.store.cfg["token"])
+            self.log("PC Link token rotated; existing pairings must be updated.", "warn")
+
+        HudButton(actions, "COPY PAIRING DETAILS", copy_details, accent=CYAN).pack(side="left", padx=(0, 6))
+        HudButton(actions, "ROTATE TOKEN", rotate_token, accent=ORANGE).pack(side="left", padx=6)
+        HudButton(actions, "CLOSE", top.destroy, accent=TEXT_DIM).pack(side="right", padx=(6, 0))
+        tk.Label(top, text="Keep this token private. Anyone holding it can send commands and files to this PC.",
+                 bg=BG0, fg=ORANGE, font=FONT_SMALL, wraplength=520,
+                 justify="left").pack(anchor="w", padx=18, pady=(4, 12))
+
+    def action_show_linked_devices(self):
+        if not self._ensure_uplink_daemon():
+            return
+        top = tk.Toplevel(self)
+        top.title("VOID BaseStation — Linked Handhelds")
+        top.configure(bg=BG0)
+        top.geometry("760x480")
+        top.transient(self)
+
+        tk.Label(top, text="LINKED HANDHELDS", bg=BG0, fg=CYAN,
+                 font=FONT_TITLE).pack(anchor="w", padx=16, pady=(16, 8))
+        body = tk.Frame(top, bg=BG0)
+        body.pack(fill="both", expand=True, padx=16, pady=6)
+        left = tk.Frame(body, bg=BG0)
+        left.pack(side="left", fill="y", padx=(0, 12))
+        right = tk.Frame(body, bg=PANEL_BG, highlightbackground=GRID,
+                         highlightthickness=1)
+        right.pack(side="left", fill="both", expand=True)
+
+        listing = tk.Listbox(left, width=30, height=16, bg=BG1, fg=TEXT,
+                             selectbackground=CYAN, selectforeground=BG0,
+                             font=FONT_SMALL, relief="flat", bd=0)
+        listing.pack(fill="y", expand=True)
+        detail = tk.Text(right, bg=LOG_BG, fg=LOG_FG, font=FONT_SMALL,
+                         relief="flat", wrap="word", height=14, width=60,
+                         state="disabled", padx=12, pady=10)
+        detail.pack(fill="both", expand=True, padx=8, pady=8)
+        index = []
+
+        def selected_record():
+            sel = listing.curselection()
+            if not sel or sel[0] >= len(index):
+                return None
+            return index[sel[0]]
+
+        def refresh():
+            if not top.winfo_exists():
+                return
+            previous = selected_record()
+            devices = self.daemon.store.devices_read()
+            index[:] = sorted(devices.keys(), key=lambda key: (
+                str(devices[key].get("name", key)).lower(), key))
+            listing.delete(0, "end")
+            for device_id in index:
+                item = devices[device_id]
+                stats = item.get("stats") or {}
+                mem = stats.get("memory") or {}
+                label = "{}  [{}]".format(item.get("name", device_id), device_id)
+                listing.insert("end", label)
+            if previous in index:
+                listing.selection_set(index.index(previous))
+            elif index:
+                listing.selection_set(0)
+            show_selected()
+
+        def show_selected(_event=None):
+            device_id = selected_record()
+            devices = self.daemon.store.devices_read()
+            item = devices.get(device_id) if device_id else None
+            detail.config(state="normal")
+            detail.delete("1.0", "end")
+            if not item:
+                detail.insert("end", "No handheld has reported telemetry yet.\\n\\n"
+                              "Open Void Desk → PC Uplink and pair it with the address and token shown in Tools → PC Link Pairing.")
+            else:
+                stats = item.get("stats") or {}
+                mem = stats.get("memory") or {}
+                lines = [
+                    "DEVICE: {}".format(item.get("name", device_id)),
+                    "ID: {}".format(device_id),
+                    "LAST SEEN: {}".format(item.get("last_seen", "unknown")),
+                    "",
+                    "CPU: {}%".format(stats.get("cpu_percent", "—")),
+                    "RAM: {}%  ({:.1f}/{:.1f} MB)".format(
+                        mem.get("percent", 0), mem.get("used_mb", 0),
+                        mem.get("total_mb", 0)),
+                    "UPTIME: {} s".format(stats.get("uptime_s", "—")),
+                    "TEMPERATURES:",
+                ]
+                for temp in (stats.get("temperatures") or [])[:8]:
+                    lines.append("  {}: {} °C".format(
+                        temp.get("label", "TEMP"), temp.get("temp_c", "—")))
+                lines.extend(["", "SCREENSHOTS and received files are saved in:",
+                              str(INCOMING_DIR / str(device_id))])
+                detail.insert("end", "\\n".join(lines))
+            detail.config(state="disabled")
+
+        listing.bind("<<ListboxSelect>>", show_selected)
+
+        buttons = tk.Frame(top, bg=BG0)
+        buttons.pack(fill="x", padx=16, pady=(8, 16))
+
+        def request_screenshot():
+            device_id = selected_record()
+            if not device_id:
+                messagebox.showinfo("Screenshot", "Select a linked handheld first.", parent=top)
+                return
+            try:
+                self.daemon.store.command_push(device_id, "screenshot")
+                self.log("Screenshot requested from handheld {}.".format(device_id), "ok")
+                messagebox.showinfo(
+                    "Screenshot requested",
+                    "The handheld will upload its next screenshot on its next PC Link poll.\\n"
+                    "Check the received-files folder in a few seconds.", parent=top)
+            except Exception as exc:
+                messagebox.showerror("Screenshot", str(exc), parent=top)
+
+        HudButton(buttons, "REFRESH", refresh, accent=CYAN).pack(side="left", padx=3)
+        HudButton(buttons, "REQUEST SCREENSHOT", request_screenshot, accent=MAGENTA).pack(side="left", padx=3)
+        HudButton(buttons, "OPEN RECEIVED FILES", self.action_open_received_files, accent=ORANGE).pack(side="left", padx=3)
+        HudButton(buttons, "CLOSE", top.destroy, accent=TEXT_DIM).pack(side="right", padx=3)
+        refresh()
+
+    def action_send_uplink_message(self):
+        if not self._ensure_uplink_daemon():
+            return
+        title = simpledialog.askstring("Send to Handheld", "Notification title:",
+                                       initialvalue="VOID BaseStation", parent=self)
+        if title is None or not title.strip():
+            return
+        body = simpledialog.askstring("Send to Handheld", "Message:", parent=self)
+        if body is None:
+            return
+        self.daemon.store.outbox_push(title.strip(), body)
+        self.log("Queued message for linked handheld(s): {}".format(title.strip()), "ok")
+
+    def action_open_received_files(self):
+        INCOMING_DIR.mkdir(parents=True, exist_ok=True)
+        path = str(INCOMING_DIR)
+        try:
+            if platform.system() == "Windows":
+                os.startfile(path)
+            elif platform.system() == "Darwin":
+                subprocess.Popen(["open", path])
+            elif shutil.which("xdg-open"):
+                subprocess.Popen(["xdg-open", path])
+            else:
+                raise RuntimeError("No graphical file manager launcher found.")
+        except Exception as exc:
+            messagebox.showerror("Received files", str(exc))
 
     def action_export_diagnostics(self):
         d = self.current_device()
