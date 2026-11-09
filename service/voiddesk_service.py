@@ -1058,12 +1058,18 @@ def h_voidcast_launch(args):
     dcheck = device_only("voidcast_launch")
     if dcheck:
         return dcheck
-    script = APP_DIR / "outdesk" / "VoidCast" / "voidcast" / "main.py"
-    if not script.exists():
-        return {"ok": False, "error": "outdesk/VoidCast/voidcast/main.py missing"}
+    app_root = APP_DIR / "outdesk" / "VoidCast"
+    script = app_root / "voidcast" / "main.py"
+    config = app_root / "presets" / "config.default.json"
+    if not script.is_file() or not config.is_file():
+        return {"ok": False,
+                "error": "VoidCast entrypoint or default configuration missing"}
     try:
         DATA.mkdir(parents=True, exist_ok=True)
-        (DATA / ".pending_session").write_text("voidcast")
+        marker = DATA / ".pending_session"
+        temporary = DATA / ".pending_session.tmp"
+        temporary.write_text("voidcast\\n", encoding="utf-8")
+        os.replace(str(temporary), str(marker))
         return {"ok": True, "handoff": True,
                 "note": "handing off to VoidCast — VoidDesk will restart "
                         "automatically when you quit it"}
