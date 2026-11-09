@@ -199,6 +199,28 @@ function refreshAll(){
   api("/api/hub/devices").then(function(data){devices=data.devices||{};renderDevices();})
  ]);
 }
+function downloadReceivedFile(file){
+ var url="/api/hub/files/download?device="+encodeURIComponent(file.device)+
+   "&name="+encodeURIComponent(file.name);
+ function perform(retried){
+  return fetch(url,{headers:{"X-VOID-Token":token},cache:"no-store"})
+   .then(function(response){
+    if(response.status===401 && !retried){
+     token="";sessionStorage.removeItem("spdw_pc_token");
+     return login().then(function(){return perform(true);});
+    }
+    if(!response.ok) throw new Error("Download failed (HTTP "+response.status+")");
+    return response.blob();
+   }).then(function(blob){
+    var objectUrl=URL.createObjectURL(blob);
+    var anchor=document.createElement("a");
+    anchor.href=objectUrl;anchor.download=file.name;
+    document.body.appendChild(anchor);anchor.click();anchor.remove();
+    setTimeout(function(){URL.revokeObjectURL(objectUrl);},1000);
+   });
+ }
+ perform(false).catch(function(error){setConnection(false,error.message);alert(error.message);});
+}
 function refreshFiles(){
  var target=$("files-list");target.textContent="Loading…";
  api("/api/hub/files").then(function(data){
@@ -210,7 +232,8 @@ function refreshFiles(){
    var info=document.createElement("div");info.textContent=file.name;
    var small=document.createElement("small");small.textContent=file.device+" · "+fmtBytes(file.size)+" · "+file.mtime;
    info.appendChild(small);
-   var link=document.createElement("a");link.className="btn";link.textContent="Download";link.href="/api/hub/files/download?device="+encodeURIComponent(file.device)+"&name="+encodeURIComponent(file.name)+"&token="+encodeURIComponent(token);link.target="_blank";link.rel="noopener";
+   var link=document.createElement("button");link.className="btn";link.textContent="Download";
+   link.onclick=function(){downloadReceivedFile(file);};
    row.appendChild(info);row.appendChild(link);target.appendChild(row);
   });
  }).catch(function(e){target.innerHTML="";var empty=document.createElement("div");empty.className="empty";empty.textContent=e.message;target.appendChild(empty);});
