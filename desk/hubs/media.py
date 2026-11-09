@@ -55,6 +55,7 @@ class MediaHub(HubMixin):
         app.handoff("AVVIO VOIDCAST IPTV...")
         app.exit_code = 0
         app.running = False
+
     def bgm_normalizer(self):
         """Launch BGM Normalizer (external tool)."""
         self.app.launch_external_tool("bgm_normalizer")
