@@ -98,6 +98,17 @@ def validate_registry(data):
                         errors.append("{} has an invalid member port".format(service_id))
                     if proto not in VALID_PROTOCOLS:
                         errors.append("{} has an invalid member protocol".format(service_id))
+                    if (item.get("host") in VALID_HOSTS
+                            and proto in VALID_PROTOCOLS
+                            and isinstance(port, int) and 1 <= port <= 65535):
+                        key = (item["host"], proto, port)
+                        if key in listener_keys:
+                            errors.append("listener collision {}: {} and {}:{}".format(
+                                key, listener_keys[key], service_id,
+                                member.get("name", "port")))
+                        else:
+                            listener_keys[key] = "{}:{}".format(
+                                service_id, member.get("name", "port"))
             continue
 
         if item_type in ("addon", "profile-default", "subsystem"):
