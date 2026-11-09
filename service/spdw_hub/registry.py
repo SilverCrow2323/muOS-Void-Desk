@@ -58,6 +58,11 @@ def validate_registry(data):
     ids = {}
     listener_keys = {}
     external_management = {}
+    policy = data.get("policy", {}) if isinstance(data.get("policy", {}), dict) else {}
+    management_limit = policy.get("management_listener_limit_per_host", 1)
+    if not isinstance(management_limit, int) or management_limit < 1:
+        errors.append("policy.management_listener_limit_per_host must be a positive integer")
+        management_limit = 1
     for index, item in enumerate(services):
         prefix = "services[{}]".format(index)
         if not isinstance(item, dict):
@@ -74,6 +79,8 @@ def validate_registry(data):
 
         item_type = item.get("type")
         if item_type == "protocol-family":
+            if item.get("host") not in VALID_HOSTS:
+                errors.append("{} has invalid host role".format(service_id))
             base = item.get("base_port")
             if not isinstance(base, int) or not 1 <= base <= 65535:
                 errors.append("{} has invalid base_port".format(service_id))
@@ -141,8 +148,8 @@ def validate_registry(data):
         if (item.get("management") is True
                 and exposure in ("lan", "tailnet", "lan-or-tailnet")):
             external_management[host] = external_management.get(host, 0) + 1
-            if external_management[host] > 1:
-                errors.append("{} creates a second externally reachable management listener on {}".format(
+            if external_management[host] > management_limit:
+                errors.append("{} exceeds the externally reachable management-listener limit on {}".format(
                     service_id, host))
 
     for item in services:
@@ -179,21 +186,75 @@ def listeners_for_host(data, host, include_loopback=True):
 
 
 def port_audit(data):
-    """Produce a stable, machine-readable port audit grouped by host role."""
+    """Return all declared sockets and socket-sharing services by host role."""
     result = {}
     for host in sorted(VALID_HOSTS):
-        result[host] = [
-            {
-                "id": item.get("id"),
-                "port": item.get("port"),
-                "protocol": item.get("protocol"),
-                "bind": item.get("bind"),
-                "exposure": item.get("exposure"),
-                "owner": item.get("owner"),
-                "auth": item.get("auth"),
-                "management": bool(item.get("management")),
-                "state": item.get("state", "unknown"),
-            }
-            for item in listeners_for_host(data, host)
-        ]
+        entries = []
+        for item in data.get("services", []):
+            if not isinstance(item, dict) or item.get("host") != host:
+                continue
+            item_type = item.get("type")
+            if item_type == "listener":
+                entries.append({
+                    "id": item.get("id"),
+                    "kind": "listener",
+                    "port": item.get("port"),
+                    "protocol": item.get("protocol"),
+                    "bind": item.get("bind"),
+                    "exposure": item.get("exposure"),
+                    "owner": item.get("owner"),
+                    "auth": item.get("auth"),
+                    "management": bool(item.get("management")),
+                    "state": item.get("state", "unknown"),
+                })
+            elif item_type == "subsystem":
+                entries.append({
+                    "id": item.get("id"),
+                    "kind": "subsystem",
+                    "port": item.get("port"),
+                    "protocol": item.get("protocol"),
+                    "bind": item.get("bind"),
+                    "exposure": item.get("exposure"),
+                    "owner": item.get("owner"),
+                    "auth": item.get("auth"),
+                    "management": False,
+                    "shares_listener_with": item.get("shares_listener_with"),
+                    "fallback_port": item.get("fallback_port"),
+                    "state": item.get("state", "unknown"),
+                })
+            elif item_type == "profile-default":
+                entries.append({
+                    "id": item.get("id"),
+                    "kind": "profile-default",
+                    "port": item.get("port"),
+                    "protocol": item.get("protocol"),
+                    "owner": item.get("owner"),
+                    "management": False,
+                    "configured_default_only": True,
+                    "state": item.get("state", "unknown"),
+                })
+            elif item_type == "protocol-family":
+                for member in item.get("members", []):
+                    entries.append({
+                        "id": "{}:{}".format(item.get("id"), member.get("name", "port")),
+                        "kind": "protocol-transport",
+                        "port": member.get("port"),
+                        "protocol": member.get("protocol"),
+                        "bind": "managed-by-service",
+                        "exposure": "transport",
+                        "owner": item.get("owner"),
+                        "auth": "managed-by-host",
+                        "management": False,
+                        "required": bool(member.get("required", True)),
+                        "state": item.get("state", "unknown"),
+                        "notes": member.get("notes", ""),
+                    })
+        result[host] = sorted(
+            entries,
+            key=lambda item: (
+                item.get("port") if isinstance(item.get("port"), int) else 65536,
+                item.get("kind", ""),
+                item.get("id", ""),
+            ),
+        )
     return result
