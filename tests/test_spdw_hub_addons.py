@@ -177,3 +177,14 @@ def test_discovery_rejects_symlinked_manifest(tmp_path):
     assert len(discovered) == 1
     assert discovered[0]["valid"] is False
     assert any("must not be a symlink" in error for error in discovered[0]["errors"])
+
+
+def test_duplicate_string_capabilities_do_not_masquerade_as_type_errors():
+    module = load_addons_module()
+    manifest = valid_manifest()
+    manifest["capabilities"] = ["device.status.read", "device.status.read"]
+    manifest["confirmation_actions"] = ["status.read", "status.read"]
+
+    errors = module.validate_addon_manifest(manifest)
+
+    assert not any("must contain only strings" in error for error in errors)
