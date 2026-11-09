@@ -232,3 +232,19 @@ def test_device_message_queue_is_bounded():
     assert queues["handheld-a"][0]["index"] == 10
     assert queues["handheld-a"][-1]["index"] == 59
 
+
+
+def test_remote_backup_rejects_invalid_chunk_size(tmp_path):
+    core = load_core()
+    archive_path = tmp_path / "invalid-chunk.zip"
+
+    for chunk_size in (0, -1, True, 1.5):
+        try:
+            core.create_remote_backup(
+                FakeSFTP(), [{"name": "Saves", "path": "/remote/saves"}],
+                archive_path, chunk_size=chunk_size)
+        except ValueError as exc:
+            assert "chunk_size" in str(exc)
+        else:
+            raise AssertionError("invalid chunk size must be rejected")
+    assert not archive_path.exists()
