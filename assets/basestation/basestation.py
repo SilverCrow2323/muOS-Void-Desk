@@ -54,6 +54,10 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from basestation_core import (
+    atomic_write_json, create_remote_backup, generate_auth_token, token_matches,
+)
+
 try:
     import tkinter as tk
     from tkinter import filedialog, messagebox, font as tkfont
@@ -81,7 +85,7 @@ import webbrowser
 # ══════════════════════════════════════════════════════════════════════════════
 
 APP_NAME = "VOID BaseStation"
-APP_VERSION = "3.0.0"
+APP_VERSION = "4.0.0"
 APP_TAG = "VOID-BS"
 
 CONFIG_DIR = Path.home() / ".config" / "void_basestation"
@@ -157,6 +161,7 @@ ANSI_OTHER_RE = re.compile(r'\x1b[()][A-Za-z0-9]|\x1b[=>]')
 
 DEFAULT_UPLINK = {
     "daemon_port": 31337,
+    "daemon_bind": "0.0.0.0",
     "daemon_autostart": True,
     "sync_pairs": [
         {"name": "Saves", "local": "", "remote": "/mnt/mmc/MUOS/save/file", "enabled": True},
@@ -534,13 +539,27 @@ class SSHManager:
 class DaemonStore:
     def __init__(self):
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        self.cfg = {"port": 31337, "pc_name": "", "token": ""}
+        self.cfg = {"port": 31337, "pc_name": socket.gethostname(),
+                    "token": "", "bind_host": "0.0.0.0"}
         self._lock = threading.Lock()
         if DAEMON_CFG.exists():
             try:
-                self.cfg.update(json.loads(DAEMON_CFG.read_text(encoding="utf-8")))
+                loaded = json.loads(DAEMON_CFG.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    self.cfg.update(loaded)
             except Exception:
                 pass
+        # Legacy installations used an empty token, allowing unauthenticated
+        # LAN requests. Migrate them before opening the listening socket.
+        if not isinstance(self.cfg.get("token"), str) or len(self.cfg["token"]) < 32:
+            self.cfg["token"] = generate_auth_token()
+        self.save()
+
+    def save(self):
+        with self._lock:
+            self.cfg["port"] = int(self.cfg.get("port", 31337))
+            self.cfg["bind_host"] = str(self.cfg.get("bind_host") or "0.0.0.0")
+            atomic_write_json(DAEMON_CFG, self.cfg, mode=0o600)
 
     def outbox_read(self, drain=False):
         with self._lock:
@@ -551,7 +570,7 @@ class DaemonStore:
             except Exception:
                 items = []
             if drain:
-                OUTBOX_FILE.write_text("[]", encoding="utf-8")
+                atomic_write_json(OUTBOX_FILE, [])
             return items
 
     def outbox_push(self, title, body=""):
@@ -565,7 +584,7 @@ class DaemonStore:
             items.append({"title": str(title)[:80], "body": str(body)[:300],
                           "ts": datetime.now().isoformat(timespec="seconds")})
             items = items[-50:]
-            OUTBOX_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+            atomic_write_json(OUTBOX_FILE, items)
 
     def inbox_push(self, title, body=""):
         rec = {"title": str(title)[:80], "body": str(body)[:300],
@@ -583,17 +602,18 @@ def make_daemon_handler(store):
             pass
 
         def _auth_ok(self):
-            token = store.cfg.get("token", "")
-            if not token:
-                return True
-            return self.headers.get("X-SPDW-Token", "") == token
+            return token_matches(
+                store.cfg.get("token", ""),
+                self.headers.get("X-SPDW-Token", ""),
+            )
 
         def _json(self, obj, code=200):
             raw = json.dumps(obj, ensure_ascii=False).encode("utf-8")
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(raw)))
-            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(raw)
 
@@ -605,7 +625,8 @@ def make_daemon_handler(store):
             if n <= 0 or n > 65536:
                 return {}
             try:
-                return json.loads(self.rfile.read(n).decode("utf-8", errors="replace"))
+                payload = json.loads(self.rfile.read(n).decode("utf-8", errors="replace"))
+                return payload if isinstance(payload, dict) else {}
             except Exception:
                 return {}
 
@@ -654,7 +675,11 @@ class EmbeddedDaemon:
     def __init__(self, cfg_manager):
         self.cfg_mgr = cfg_manager
         self.port = int(self.cfg_mgr.uplink().get("daemon_port", 31337))
+        self.host = str(self.cfg_mgr.uplink().get("daemon_bind", "0.0.0.0"))
         self.store = DaemonStore()
+        self.store.cfg["port"] = self.port
+        self.store.cfg["bind_host"] = self.host
+        self.store.save()
         self.httpd = None
         self._thread = None
 
@@ -666,9 +691,12 @@ class EmbeddedDaemon:
             return True
         try:
             self.store.cfg["port"] = self.port
+            self.store.cfg["bind_host"] = self.host
+            self.store.save()
             handler = make_daemon_handler(self.store)
             ThreadingHTTPServer.allow_reuse_address = True
-            self.httpd = ThreadingHTTPServer(("0.0.0.0", self.port), handler)
+            self.httpd = ThreadingHTTPServer((self.host, self.port), handler)
+            self.httpd.daemon_threads = True
             self._thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
             self._thread.start()
             return True
@@ -684,7 +712,10 @@ class EmbeddedDaemon:
 
     def api_get(self, path, timeout=4):
         url = "http://127.0.0.1:{}{}".format(self.port, path)
-        req = urllib.request.Request(url, headers={"User-Agent": "{}/{}".format(APP_TAG, APP_VERSION)})
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "{}/{}".format(APP_TAG, APP_VERSION),
+            "X-SPDW-Token": self.store.cfg.get("token", ""),
+        })
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", errors="replace"))
 
@@ -692,7 +723,8 @@ class EmbeddedDaemon:
         url = "http://127.0.0.1:{}{}".format(self.port, path)
         req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
                                      headers={"Content-Type": "application/json",
-                                              "User-Agent": "{}/{}".format(APP_TAG, APP_VERSION)})
+                                              "User-Agent": "{}/{}".format(APP_TAG, APP_VERSION),
+                                              "X-SPDW-Token": self.store.cfg.get("token", "")})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", errors="replace"))
 
@@ -3313,8 +3345,9 @@ Tabs are selectable via click or shortcut."""
                                 self.status_queue.put(("log", ("  → {}".format(rp), "info")))
 
                     send_tree(str(CONSOLE_APP_DIR), remote_root)
+                    token = self.daemon.store.cfg.get("token", "")
                     cfg_txt = ("[link]\npc_ip = {}\npc_port = {}\n"
-                               "token =\npoll_seconds = 3\n".format(pc_ip, port))
+                               "token = {}\npoll_seconds = 3\n".format(pc_ip, port, token))
                     with sftp.open(remote_root + "/config.ini", "w") as f:
                         f.write(cfg_txt)
                     try:
