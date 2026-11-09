@@ -46,6 +46,9 @@ def test_media_voidcast_reports_missing_muos_launcher(tmp_path, monkeypatch):
     script = app_root / "outdesk" / "VoidCast" / "voidcast" / "main.py"
     script.parent.mkdir(parents=True)
     script.write_text("print('VoidCast')")
+    config = app_root / "outdesk" / "VoidCast" / "presets" / "config.default.json"
+    config.parent.mkdir(parents=True)
+    config.write_text("{}")
     data_dir = app_root / "data"
     monkeypatch.setattr(media, "APP_DIR", app_root)
     monkeypatch.setattr(media, "DATA_DIR", data_dir)
@@ -77,3 +80,24 @@ def test_mux_launcher_bootstraps_pygame_runtime_for_voidcast_even_with_love_engi
     assert '[ ! -f "$APP_DIR/outdesk/VoidCast/presets/config.default.json" ]' in branch
     assert branch.index("bootstrap_lite.py") < branch.index('python3 "$APP_DIR/outdesk/VoidCast/voidcast/main.py"')
 
+
+
+def test_media_voidcast_rejects_missing_default_configuration(tmp_path, monkeypatch):
+    app_root = tmp_path / "Void-Desk"
+    script = app_root / "outdesk" / "VoidCast" / "voidcast" / "main.py"
+    script.parent.mkdir(parents=True)
+    script.write_text("print('VoidCast')")
+    muos_bootstrap = tmp_path / "muos" / "script" / "var" / "func.sh"
+    muos_bootstrap.parent.mkdir(parents=True)
+    muos_bootstrap.write_text("# muOS")
+    monkeypatch.setattr(media, "APP_DIR", app_root)
+    monkeypatch.setattr(media, "DATA_DIR", app_root / "data")
+    monkeypatch.setattr(media, "MUOS_BOOTSTRAP", muos_bootstrap)
+    app = FakeApp()
+
+    media.MediaHub(app).voidcast()
+
+    assert app.running is True
+    assert app.exit_code == 99
+    assert not (app_root / "data").exists()
+    assert app.messages and "configurazione mancante" in app.messages[0][1]
