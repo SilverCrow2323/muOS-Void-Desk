@@ -75,7 +75,7 @@ def validate_addon_manifest(manifest, addon_dir=None):
             errors.append("{} is required".format(field))
 
     host = manifest.get("host")
-    if host not in HOSTS:
+    if not isinstance(host, str) or host not in HOSTS:
         errors.append("host must be pc, handheld or both")
 
     entrypoint = manifest.get("entrypoint")
@@ -105,18 +105,22 @@ def validate_addon_manifest(manifest, addon_dir=None):
     if not isinstance(capabilities, list):
         errors.append("capabilities must be a list")
         capabilities = []
-    unknown = sorted(set(x for x in capabilities if isinstance(x, str)) - CAPABILITIES)
+    valid_capabilities = {x for x in capabilities if isinstance(x, str)}
+    unknown = sorted(valid_capabilities - CAPABILITIES)
     if unknown:
         errors.append("unknown capabilities: {}".format(", ".join(unknown)))
-    if any(not isinstance(x, str) for x in capabilities):
+    if len(valid_capabilities) != len(capabilities):
         errors.append("capabilities must contain only strings")
 
     confirmation = manifest.get("confirmation_actions", [])
     if not isinstance(confirmation, list):
         errors.append("confirmation_actions must be a list")
         confirmation = []
+    valid_confirmation = {x for x in confirmation if isinstance(x, str)}
+    if len(valid_confirmation) != len(confirmation):
+        errors.append("confirmation_actions must contain only strings")
     missing_confirm = sorted(
-        (set(capabilities) & DESTRUCTIVE_CAPABILITIES) - set(confirmation))
+        (valid_capabilities & DESTRUCTIVE_CAPABILITIES) - valid_confirmation)
     if missing_confirm:
         errors.append("destructive capabilities need confirmation_actions: {}".format(
             ", ".join(missing_confirm)))
@@ -130,14 +134,17 @@ def validate_addon_manifest(manifest, addon_dir=None):
         if not isinstance(listener, dict):
             errors.append("{} must be an object".format(label))
             continue
-        if listener.get("host") not in HOSTS:
+        listener_host = listener.get("host")
+        if not isinstance(listener_host, str) or listener_host not in HOSTS:
             errors.append("{} has invalid host".format(label))
-        if listener.get("protocol") not in LISTENER_PROTOCOLS:
+        listener_protocol = listener.get("protocol")
+        if not isinstance(listener_protocol, str) or listener_protocol not in LISTENER_PROTOCOLS:
             errors.append("{} has invalid protocol".format(label))
         port = listener.get("port")
-        if not isinstance(port, int) or not 1 <= port <= 65535:
+        if type(port) is not int or not 1 <= port <= 65535:
             errors.append("{} has invalid port".format(label))
-        if listener.get("bind") not in LISTENER_BINDS:
+        listener_bind = listener.get("bind")
+        if not isinstance(listener_bind, str) or listener_bind not in LISTENER_BINDS:
             errors.append("{} bind must be loopback, lan or tailnet".format(label))
         if listener.get("bind") in ("lan", "tailnet"):
             if listener.get("auth") in (None, "", "none"):
@@ -170,12 +177,14 @@ def discover_addons(roots):
         if not base.is_dir():
             continue
         for directory in sorted(base.iterdir(), key=lambda p: p.name.lower()):
-            if not directory.is_dir():
+            if directory.is_symlink() or not directory.is_dir():
                 continue
             manifest_path = directory / "addon.json"
             if not manifest_path.is_file():
                 continue
             try:
+                if manifest_path.is_symlink():
+                    raise ValueError("manifest file must not be a symlink")
                 with manifest_path.open("r", encoding="utf-8") as stream:
                     manifest = json.load(stream)
                 errors = validate_addon_manifest(manifest, directory)
@@ -183,10 +192,11 @@ def discover_addons(roots):
                 manifest = None
                 errors = ["unable to read manifest: {}".format(exc)]
             addon_id = manifest.get("id") if isinstance(manifest, dict) else None
-            if addon_id and addon_id in seen_ids:
-                errors.append("duplicate add-on id: {}".format(addon_id))
-            elif addon_id:
-                seen_ids.add(addon_id)
+            if isinstance(addon_id, str) and addon_id:
+                if addon_id in seen_ids:
+                    errors.append("duplicate add-on id: {}".format(addon_id))
+                else:
+                    seen_ids.add(addon_id)
             found.append({
                 "id": addon_id,
                 "name": manifest.get("name", directory.name) if isinstance(manifest, dict) else directory.name,
