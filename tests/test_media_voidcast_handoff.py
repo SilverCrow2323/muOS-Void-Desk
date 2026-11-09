@@ -55,3 +55,17 @@ def test_media_voidcast_reports_missing_muos_launcher(tmp_path, monkeypatch):
     assert app.exit_code == 99
     assert not data_dir.exists()
     assert app.messages and app.messages[0][0] == "VoidCast IPTV"
+
+def test_mux_launcher_bootstraps_pygame_runtime_for_voidcast_even_with_love_engine():
+    from pathlib import Path
+
+    launcher = Path(__file__).resolve().parents[1] / "mux_launch.sh"
+    source = launcher.read_text(encoding="utf-8")
+    branch = source.split("            voidcast)", 1)[1].split("            *)", 1)[0]
+
+    assert 'MARKER="$DATA/.pygame_ready"' in branch
+    assert 'python3 "$APP_DIR/bin/bootstrap_lite.py"' in branch
+    assert '[ ! -f "$MARKER" ]' in branch
+    assert '[ ! -d "$APP_DIR/runtime" ]' in branch
+    assert branch.index("bootstrap_lite.py") < branch.index('python3 "$APP_DIR/outdesk/VoidCast/voidcast/main.py"')
+
