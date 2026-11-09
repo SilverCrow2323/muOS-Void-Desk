@@ -1,6 +1,6 @@
 # Compatibility and validation matrix
 
-**Evidence snapshot: 2026-11-09**  
+**Evidence snapshot: 2026-11-09 (CI runs #42637030192 and #42637211232)**  
 **Development line:** v10.5.4-NEXUS  
 **Latest published handheld package:** v10.2.0
 
@@ -25,13 +25,13 @@ This page distinguishes a declared target from automated CI coverage and from re
 | H700 handhelds on older muOS releases | Older firmware | **Not claimed** | No release-level compatibility record is maintained here |
 | ROCKNIX | Any build | **Not claimed** | No current end-to-end installation and hardware acceptance record |
 | KNULLI | Any build | **Not claimed** | No current end-to-end installation and hardware acceptance record |
-| Linux desktop PC | Linux distribution with Python 3, Tkinter and a supported GUI session | **Companion target · CI pending for latest fix** | BaseStation has a standalone PC build path; PR [#12](https://github.com/SilverCrow2323/Void-Desk-Project/pull/12) contains CI fixes for Python compilation and archive packaging. Remote input and remote display are not yet implemented |
+| Linux desktop PC | Linux distribution with Python 3, Tkinter and a supported GUI session | **Companion target · CI checked** | BaseStation has a standalone PC build path; PR [#12](https://github.com/SilverCrow2323/Void-Desk-Project/pull/12) passed all 7 CI jobs, including Python checks and reproducible PC archive packaging (run [#42637030192](https://github.com/SilverCrow2323/Void-Desk-Project/actions/runs/42637030192)). Remote input and remote display are not yet implemented |
 
 ## Frontend evidence
 
 | Component | Current evidence | Remaining limitation |
 |---|---|---|
-| Python / Pygame | CI visual capture renders 103/103 declared states (five home styles plus 98 non-home state branches). The capture job passed in [run #42565176588](https://github.com/SilverCrow2323/Void-Desk-Project/actions/runs/42565176588) | State rendering does not prove route reachability, correct actions, controller edge cases or physical display/input behaviour |
+| Python / Pygame | CI visual capture renders 103/103 declared states (five home styles plus 98 non-home state branches). The capture job passed in [run #42637030192](https://github.com/SilverCrow2323/Void-Desk-Project/actions/runs/42637030192) | State rendering does not prove route reachability, correct actions, controller edge cases or physical display/input behaviour |
 | LÖVE | CI visual capture covers 23/23 registered scenes and passed in [run #42565176588](https://github.com/SilverCrow2323/Void-Desk-Project/actions/runs/42565176588) | LÖVE remains experimental and is not feature-equivalent to Pygame; service/action gaps remain |
 | NEXUS navigation | Static route/placeholder checks cover selected hubs, including Session, Forge, Workshop and Toolbox | Full action-driven navigation coverage across every hub and physical controller QA remain release gates |
 
@@ -41,11 +41,11 @@ This page distinguishes a declared target from automated CI coverage and from re
 |---|---|---|
 | .muxapp packaging | The reproducible package and structural validator passed in [run #42565176588](https://github.com/SilverCrow2323/Void-Desk-Project/actions/runs/42565176588); the workflow emitted a package artifact | Install, upgrade, permissions, rollback and uninstall on a physical muOS device |
 | APT manager | Native frontend/service path and an allowlisted job manager exist; unit and packaging coverage was added to the development line | Search/install/remove/update/clean against the actual VoidDesk Debian/Ubuntu image on the handheld, including mount recovery and low-storage behaviour |
-| Rt:Tailscale-M | Native VoidDesk service adapter and Uplink UI delegate to the pinned upstream manager. The upstream static/model/QR/UI suite, arm64 binary build and QEMU daemon/watchdog/boot/web-panel checks passed in run #42565176588 | Physical muOS installation, identity migration, login, reboot, reconnect, exit-node, Taildrop and upgrade/uninstall |
+| Rt:Tailscale-M | Native VoidDesk service adapter and Uplink UI delegate to the pinned upstream manager. The upstream static/model/QR/UI suite, arm64 binary build and QEMU daemon/watchdog/boot/web-panel checks passed in run #42637030192 | Physical muOS installation, identity migration, login, reboot, reconnect, exit-node, Taildrop and upgrade/uninstall |
 | Syncthing | Existing Andromeda Web Service discovery uses local API port 7070. Native panels list folders/devices and support pause/resume, rescan, confirmed override and device pause/resume | Add/remove folder/device flows, conflict/versioning UX and real API validation on the target handheld |
 | VoidCast | Launcher hand-off and configuration preflight are present; LÖVE hand-off and evdev-related checks are in the test suite | Actual IPTV playback, audio/video compatibility, controller operation and long-session testing on target hardware |
 | SPDW Device Agent | Service-owned gateway, pairing and authenticated request flows have dedicated source and test coverage | Live port inventory, pairing/revocation and upload/download testing on physical muOS hardware |
-| BaseStation / PC Link | PC companion source and browser dashboard are present; the package workflow was added. PR #12 is fixing the latest CI blockers | Latest Python and companion-package CI still pending; PC Link uses HTTP and must remain on trusted LAN/Tailscale paths, never directly exposed to the public internet. Remote keyboard/mouse and Remote View remain future work |
+| BaseStation / PC Link | PC companion source and browser dashboard are present; the package workflow was added. PR #12 is fixing the latest CI blockers | Latest Python and companion-package CI passed in run [#42637030192](https://github.com/SilverCrow2323/Void-Desk-Project/actions/runs/42637030192); PC Link uses HTTP and must remain on trusted LAN/Tailscale paths, never directly exposed to the public internet. Remote keyboard/mouse and Remote View remain future work |
 | RT Stream / Sunshine | Port-family registry model and source-audit notes exist | Actual daemon source, lifecycle ownership and current port contract remain source-audit-pending; do not treat streaming as available merely because ports are listed |
 
 ## Network exposure policy

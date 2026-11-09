@@ -82,7 +82,7 @@ See [Architecture](docs/ARCHITECTURE.md) for execution flow.
 
 ## Installation on the handheld
 
-> **Release status (2026-11-09):** the latest published handheld package is `VoidDesk_v10.2.0.muxapp` (release `v10.2.0`, published 2026-08-11). The active `v10.5.4-NEXUS` development line includes work on `work/pygame-f12-capture`; it has **not** been published as a `.muxapp` package. The v10.2.0 download therefore does not include the newer development changes.
+> **Release status (2026-11-09):** the latest published handheld package is `VoidDesk_v10.2.0.muxapp` (release `v10.2.0`, published 2026-08-11). The active `v10.5.4-NEXUS` development line has reproducible CI-built `.muxapp` artifacts, but no public release package has been published. The v10.2.0 download therefore does not include the newer development changes.
 
 1. Open [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) and download the latest **published `.muxapp` asset**. Check the release tag before installing; the source-code ZIP is not a replacement for the muOS application package.
 2. Copy the `.muxapp` file to the SD1 `ARCHIVE/` folder.
