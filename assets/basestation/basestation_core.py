@@ -342,7 +342,7 @@ def enqueue_device_message(queues, device_id, message, limit=50):
     """Append a message to one device's bounded queue without touching others."""
     if not isinstance(queues, dict):
         raise TypeError("queues must be a dictionary")
-    safe_id = _safe_component(device_id)
+    safe_id = safe_device_id(device_id)
     pending = queues.get(safe_id, [])
     if not isinstance(pending, list):
         pending = []
@@ -355,7 +355,7 @@ def drain_device_messages(queues, device_id):
     """Drain and return only the selected device's message queue."""
     if not isinstance(queues, dict):
         raise TypeError("queues must be a dictionary")
-    safe_id = _safe_component(device_id)
+    safe_id = safe_device_id(device_id)
     pending = queues.pop(safe_id, [])
     return pending if isinstance(pending, list) else []
 
