@@ -108,3 +108,55 @@ def test_port_audit_includes_listener_owner_and_auth_model():
     assert pc_gateway["port"] == 8420
     assert pc_gateway["owner"] == "spdw-hub-pc"
     assert pc_gateway["auth"] == "device-token"
+
+def test_port_audit_distinguishes_sunshine_transport_from_management():
+    registry = load_registry_module()
+    data = registry.load_registry(DATA)
+
+    entries = registry.port_audit(data)["pc"]
+    video = next(x for x in entries
+                 if x["id"] == "sunshine-stream-transport:video")
+    web_ui = next(x for x in entries if x["id"] == "sunshine-web-ui")
+
+    assert video["protocol"] == "udp"
+    assert video["port"] == 47998
+    assert video["kind"] == "protocol-transport"
+    assert video["management"] is False
+    assert web_ui["port"] == 47990
+    assert web_ui["exposure"] == "loopback"
+
+
+def test_port_audit_marks_sftp_as_shared_subsystem_not_new_socket():
+    registry = load_registry_module()
+    data = registry.load_registry(DATA)
+
+    sftp = next(x for x in registry.port_audit(data)["handheld"]
+                if x["id"] == "sftp-subsystem")
+
+    assert sftp["kind"] == "subsystem"
+    assert sftp["port"] == 22
+    assert sftp["shares_listener_with"] == "ssh"
+    assert sftp["fallback_port"] == 2022
+
+
+def test_registry_rejects_duplicate_socket_ownership():
+    registry = load_registry_module()
+    data = registry.load_registry(DATA)
+    duplicate = {
+        "id": "second-ssh-owner",
+        "type": "listener",
+        "host": "handheld",
+        "protocol": "tcp",
+        "port": 22,
+        "bind": "system",
+        "exposure": "lan-or-tailnet",
+        "auth": "ssh-host-auth",
+        "owner": "another-daemon",
+        "management": False,
+    }
+    data["services"].append(duplicate)
+
+    errors = registry.validate_registry(data)
+
+    assert any("listener collision" in error for error in errors)
+
