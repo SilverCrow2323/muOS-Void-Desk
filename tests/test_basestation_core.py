@@ -139,3 +139,55 @@ def test_remote_backup_removes_partial_archive_on_transfer_error(tmp_path):
         raise AssertionError("transfer error must propagate")
     assert not archive_path.exists()
     assert not list(tmp_path.glob("*.partial"))
+
+def test_listener_snapshot_prefers_ss_and_returns_raw_socket_inventory(monkeypatch):
+    core = load_core()
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(
+            returncode=0,
+            stdout="tcp LISTEN 0 128 0.0.0.0:8765 0.0.0.0:* users:((\"python\",pid=10,fd=3))\\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(core.subprocess, "run", fake_run)
+    result = core.collect_listener_snapshot()
+
+    assert calls == [["ss", "-lntup"]]
+    assert result["tool"] == "ss"
+    assert "8765" in result["stdout"]
+
+
+def test_listener_snapshot_falls_back_to_netstat(monkeypatch):
+    core = load_core()
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if command[0] == "ss":
+            raise FileNotFoundError("ss not installed")
+        return SimpleNamespace(returncode=0, stdout="tcp 0 0 0.0.0.0:22 LISTEN\\n", stderr="")
+
+    monkeypatch.setattr(core.subprocess, "run", fake_run)
+    result = core.collect_listener_snapshot()
+
+    assert calls == [["ss", "-lntup"], ["netstat", "-lntup"]]
+    assert result["tool"] == "netstat"
+    assert "0.0.0.0:22" in result["stdout"]
+
+
+def test_listener_snapshot_reports_missing_tools_without_raising(monkeypatch):
+    core = load_core()
+    monkeypatch.setattr(
+        core.subprocess, "run",
+        lambda command, **kwargs: (_ for _ in ()).throw(FileNotFoundError(command[0])),
+    )
+
+    result = core.collect_listener_snapshot()
+
+    assert result["tool"] is None
+    assert "ss not installed" in result["stderr"]
+    assert "netstat not installed" in result["stderr"]
+
