@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from desk.hubs import media
 
 
