@@ -48,3 +48,12 @@ def test_uplink_exposes_shared_spdw_device_agent_status_and_pairing():
     assert "state.hub.pairing_pin" in source
     assert "state.hub.port" in source
 
+
+def test_external_tools_status_widget_uses_the_same_status_publisher():
+    source = (LOVE / "scenes" / "hub_external.lua").read_text(encoding="utf-8")
+    assert "local function publish_status(scene, message)" in source
+    assert 'widgets.info_row(20, 148, W-40, "Status", status_msg, nc, alpha)' in source
+    assert "publish_status(scene, \"Loading external tools...\")" in source
+    assert "publish_status(scene, \"Launched: \" .. t.name)" in source
+    assert "publish_status(scene, \"Failed: \" .. (resp.error or \"unknown\"))" in source
+    assert "scene.set_status(\"Loading external tools...\")" not in source
