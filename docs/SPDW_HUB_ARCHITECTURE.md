@@ -171,6 +171,16 @@ second listener by default.
 
 A full inventory is maintained in [SPDW_HUB_PORT_AUDIT.md](SPDW_HUB_PORT_AUDIT.md).
 
+The first passive implementation now lives under `service/spdw_hub/`:
+`services.json` declares ownership and policy, while `registry.py` validates
+listener collisions, management-gateway limits and unauthenticated wildcard
+listeners. It deliberately does not bind or stop anything.
+
+The add-on contract is defined by `service/spdw_hub/manifest.schema.json`.
+`addons.py` discovers manifests without importing or executing entrypoints,
+checks capability grants and rejects unsafe entrypoint paths. Runtime
+activation and UI mounting are still future phases; discovery is not activation.
+
 ## 7. Authentication and security
 
 - One-time pairing code establishes a per-device credential.
