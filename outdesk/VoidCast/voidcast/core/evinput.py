@@ -101,4 +101,4 @@ def sync_with_joystick(joystick_available):
         stop()
         return False
     return start()
-\n
+
