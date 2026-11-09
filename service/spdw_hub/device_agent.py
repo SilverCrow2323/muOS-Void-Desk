@@ -218,8 +218,22 @@ class DeviceAgent:
     def _new_session(self):
         session_id = secrets.token_urlsafe(32)
         csrf_token = secrets.token_urlsafe(24)
-        expires_at = time.time() + SESSION_TTL
+        now = time.time()
+        expires_at = now + SESSION_TTL
         with self._lock:
+            # Opportunistic expiry keeps the in-memory session table bounded
+            # even if clients disappear without logging out.
+            expired = [
+                key for key, value in self._sessions.items()
+                if float(value.get("expires_at", 0)) <= now
+            ]
+            for key in expired:
+                self._sessions.pop(key, None)
+            if len(self._sessions) >= 512:
+                oldest = min(
+                    self._sessions,
+                    key=lambda key: self._sessions[key].get("expires_at", 0))
+                self._sessions.pop(oldest, None)
             self._sessions[session_id] = {
                 "csrf": csrf_token,
                 "expires_at": expires_at,
@@ -371,7 +385,7 @@ class DeviceAgent:
                     return self._json({"error": "not a directory"}, 400)
                 entries = []
                 for entry in sorted(directory.iterdir(),
-                                    key=lambda item: (not item.is_dir(), item.name.lower())):
+                                    key=lambda item: item.name.lower()):
                     try:
                         if entry.is_symlink():
                             continue
@@ -414,9 +428,10 @@ class DeviceAgent:
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("X-Content-Type-Options", "nosniff")
                     self.send_header("X-Frame-Options", "DENY")
+                    safe_download_name = _clean_name(target.name)
                     self.send_header("Content-Disposition",
                                      'attachment; filename="{}"'.format(
-                                         target.name.replace('"', "_")))
+                                         safe_download_name.replace('"', "_")))
                     self.end_headers()
                     with target.open("rb") as stream:
                         while True:
