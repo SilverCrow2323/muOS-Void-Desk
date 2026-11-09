@@ -173,8 +173,9 @@ A full inventory is maintained in [SPDW_HUB_PORT_AUDIT.md](SPDW_HUB_PORT_AUDIT.m
 
 The first passive implementation now lives under `service/spdw_hub/`:
 `services.json` declares ownership and policy, while `registry.py` validates
-listener collisions, management-gateway limits and unauthenticated wildcard
-listeners. It deliberately does not bind or stop anything.
+socket collisions across listeners and protocol-family members,
+management-gateway limits and unauthenticated wildcard listeners. It
+deliberately does not bind or stop anything.
 
 The add-on contract is defined by `service/spdw_hub/manifest.schema.json`.
 `addons.py` discovers manifests without importing or executing entrypoints,
