@@ -24,14 +24,14 @@ jobs:
 
       - name: Build Void Desk muOS package
         run: |
-          python tools/build_muxapp.py \\
+          python tools/build_muxapp.py \
             --output "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
-          python tools/validate_muxapp.py \\
+          python tools/validate_muxapp.py \
             "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
 
       - name: Build SPDW Hub PC companion
         run: |
-          python tools/build_basestation_pc.py \\
+          python tools/build_basestation_pc.py \
             --output "$RUNNER_TEMP/VOID-BaseStation-4.0.0.zip"
 
       - name: Generate and verify checksums
