@@ -191,3 +191,18 @@ def test_listener_snapshot_reports_missing_tools_without_raising(monkeypatch):
     assert "ss not installed" in result["stderr"]
     assert "netstat not installed" in result["stderr"]
 
+
+
+def test_device_ids_are_safe_single_path_components():
+    core = load_core()
+
+    for value in ("", ".", "..", "../outside", "/absolute/path", r"..\\outside"):
+        safe = core.safe_device_id(value)
+        assert safe not in (".", "..")
+        assert "/" not in safe
+        assert "\\\\" not in safe
+        assert len(safe) <= 80
+
+    assert core.safe_device_id("..") == "unknown"
+    assert core.safe_device_id("../outside") == "outside"
+    assert core.safe_device_id("handheld-01") == "handheld-01"
