@@ -706,10 +706,9 @@ def make_daemon_handler(store):
             pass
 
         def _auth_ok(self):
-            return token_matches(
-                store.cfg.get("token", ""),
-                self.headers.get("X-SPDW-Token", ""),
-            )
+            supplied = (self.headers.get("X-VOID-Token", "")
+                        or self.headers.get("X-SPDW-Token", ""))
+            return token_matches(store.cfg.get("token", ""), supplied)
 
         def _json(self, obj, code=200):
             raw = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -724,54 +723,129 @@ def make_daemon_handler(store):
         def _body(self):
             try:
                 n = int(self.headers.get("Content-Length", 0))
-            except ValueError:
-                n = 0
-            if n <= 0 or n > 65536:
-                return {}
+            except (TypeError, ValueError):
+                return None
+            if n <= 0 or n > MAX_JSON_BODY:
+                return None
             try:
-                payload = json.loads(self.rfile.read(n).decode("utf-8", errors="replace"))
-                return payload if isinstance(payload, dict) else {}
-            except Exception:
-                return {}
+                payload = json.loads(self.rfile.read(n).decode("utf-8"))
+                return payload if isinstance(payload, dict) else None
+            except (UnicodeError, ValueError):
+                return None
 
         def do_GET(self):
+            path = urllib.parse.urlparse(self.path).path
+            # Discovery is intentionally public and returns only a name/version.
+            if path == "/ping":
+                return self._json({
+                    "ok": True,
+                    "name": store.cfg.get("pc_name") or socket.gethostname(),
+                    "version": APP_VERSION,
+                    "ts": datetime.now().isoformat(timespec="seconds"),
+                })
+            # Read-only, low-sensitivity metrics let Void Desk show a PC as
+            # online after discovery. Process names and all write/control
+            # endpoints remain protected by the pairing token.
+            if path == "/stats":
+                return self._json(collect_host_stats(include_processes=self._auth_ok()))
             if not self._auth_ok():
                 return self._json({"error": "unauthorized"}, 401)
-            path = urllib.parse.urlparse(self.path).path
-            if path == "/ping":
-                self._json({"ok": True,
-                            "name": store.cfg.get("pc_name") or socket.gethostname(),
-                            "version": APP_VERSION,
-                            "ts": datetime.now().isoformat(timespec="seconds")})
-            elif path == "/outbox":
-                self._json({"messages": store.outbox_read(drain=True)})
-            else:
-                self._json({"error": "not found"}, 404)
+            if path == "/outbox":
+                return self._json({"messages": store.outbox_read(drain=True)})
+            if path == "/devices":
+                return self._json({"devices": store.devices_read()})
+            match = re.fullmatch(r"/device/([A-Za-z0-9_.-]{1,80})/(command|stats)", path)
+            if match:
+                device_id, action = match.groups()
+                if action == "command":
+                    return self._json({"commands": store.command_drain(device_id)})
+                device = store.device_stats_get(device_id)
+                if device is None:
+                    return self._json({"error": "device not found"}, 404)
+                return self._json(device)
+            return self._json({"error": "not found"}, 404)
 
         def do_POST(self):
             if not self._auth_ok():
                 return self._json({"error": "unauthorized"}, 401)
             path = urllib.parse.urlparse(self.path).path
             data = self._body()
+            if data is None:
+                return self._json({"error": "invalid or oversized JSON body"}, 400)
             if path == "/notify":
                 title = data.get("title", "Console")
                 body = data.get("body", "")
-                store.inbox_push(title, body)
+                if not isinstance(title, str) or not title.strip():
+                    return self._json({"error": "title required"}, 400)
+                store.inbox_push(title, body if isinstance(body, str) else "")
                 print("[{}] NOTIFICATION from console -> {}: {}".format(
-                    datetime.now().isoformat(timespec="seconds"), title, body), flush=True)
-                self._json({"ok": True})
-            elif path == "/outbox":
+                    datetime.now().isoformat(timespec="seconds"), title[:80],
+                    str(body)[:300]), flush=True)
+                return self._json({"ok": True})
+            if path == "/outbox":
                 title = data.get("title", "")
                 body = data.get("body", "")
-                if not title:
+                if not isinstance(title, str) or not title.strip():
                     return self._json({"error": "title required"}, 400)
-                store.outbox_push(title, body)
-                self._json({"ok": True})
-            else:
-                self._json({"error": "not found"}, 404)
+                store.outbox_push(title, body if isinstance(body, str) else "")
+                return self._json({"ok": True})
+
+            match = re.fullmatch(
+                r"/device/([A-Za-z0-9_.-]{1,80})/(stats|screenshot|file|command)", path)
+            if not match:
+                return self._json({"error": "not found"}, 404)
+            device_id, action = match.groups()
+            if action == "stats":
+                stats = data.get("stats")
+                if not isinstance(stats, dict):
+                    return self._json({"error": "stats object required"}, 400)
+                store.device_stats_push(device_id, data.get("name", device_id), stats)
+                return self._json({"ok": True})
+            if action == "command":
+                command = data.get("cmd")
+                try:
+                    store.command_push(device_id, command)
+                except ValueError as exc:
+                    return self._json({"error": str(exc)}, 400)
+                return self._json({"ok": True})
+            if action == "screenshot":
+                encoded = data.get("png_base64", "")
+                if not isinstance(encoded, str) or len(encoded) > (MAX_UPLINK_SCREENSHOT * 4 // 3 + 16):
+                    return self._json({"error": "screenshot payload too large"}, 413)
+                try:
+                    payload = base64.b64decode(encoded, validate=True)
+                except (ValueError, TypeError):
+                    return self._json({"error": "invalid base64 screenshot"}, 400)
+                if len(payload) > MAX_UPLINK_SCREENSHOT:
+                    return self._json({"error": "screenshot payload too large"}, 413)
+                if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
+                    return self._json({"error": "screenshot must be a PNG"}, 415)
+                try:
+                    saved = store.save_incoming(
+                        device_id, "screenshot_{}.png".format(
+                            datetime.now().strftime("%Y%m%d_%H%M%S")), payload)
+                except OSError as exc:
+                    return self._json({"error": str(exc)}, 500)
+                return self._json({"ok": True, "saved": str(saved)})
+            if action == "file":
+                encoded = data.get("data_base64", "")
+                filename = data.get("filename", "")
+                if not isinstance(encoded, str) or len(encoded) > (MAX_UPLINK_FILE * 4 // 3 + 16):
+                    return self._json({"error": "file payload too large"}, 413)
+                try:
+                    payload = base64.b64decode(encoded, validate=True)
+                except (ValueError, TypeError):
+                    return self._json({"error": "invalid base64 file"}, 400)
+                if len(payload) > MAX_UPLINK_FILE:
+                    return self._json({"error": "file payload too large"}, 413)
+                try:
+                    saved = store.save_incoming(device_id, filename, payload)
+                except (OSError, ValueError) as exc:
+                    return self._json({"error": str(exc)}, 400)
+                return self._json({"ok": True, "saved": str(saved)})
+            return self._json({"error": "not found"}, 404)
 
     return Handler
-
 
 class EmbeddedDaemon:
     """Runs the HTTP daemon inside the same process (background thread)."""
