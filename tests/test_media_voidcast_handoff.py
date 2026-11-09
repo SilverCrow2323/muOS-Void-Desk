@@ -20,6 +20,9 @@ def test_media_voidcast_writes_mux_handoff_and_exits_cleanly(tmp_path, monkeypat
     script = app_root / "outdesk" / "VoidCast" / "voidcast" / "main.py"
     script.parent.mkdir(parents=True)
     script.write_text("print('VoidCast')")
+    config = app_root / "outdesk" / "VoidCast" / "presets" / "config.default.json"
+    config.parent.mkdir(parents=True)
+    config.write_text("{}")
     data_dir = app_root / "data"
     muos_bootstrap = tmp_path / "muos" / "script" / "var" / "func.sh"
     muos_bootstrap.parent.mkdir(parents=True)
@@ -71,5 +74,6 @@ def test_mux_launcher_bootstraps_pygame_runtime_for_voidcast_even_with_love_engi
     assert '[ ! -f "$MARKER" ]' in branch
     assert '[ ! -d "$APP_DIR/runtime" ]' in branch
     assert "VOIDCAST_FB=1" in branch
+    assert '[ ! -f "$APP_DIR/outdesk/VoidCast/presets/config.default.json" ]' in branch
     assert branch.index("bootstrap_lite.py") < branch.index('python3 "$APP_DIR/outdesk/VoidCast/voidcast/main.py"')
 
