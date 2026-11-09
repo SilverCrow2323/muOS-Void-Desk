@@ -70,5 +70,6 @@ def test_mux_launcher_bootstraps_pygame_runtime_for_voidcast_even_with_love_engi
     assert 'python3 "$APP_DIR/bin/bootstrap_lite.py"' in branch
     assert '[ ! -f "$MARKER" ]' in branch
     assert '[ ! -d "$APP_DIR/runtime" ]' in branch
+    assert "VOIDCAST_FB=1" in branch
     assert branch.index("bootstrap_lite.py") < branch.index('python3 "$APP_DIR/outdesk/VoidCast/voidcast/main.py"')
 
