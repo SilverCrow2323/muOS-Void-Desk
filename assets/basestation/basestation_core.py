@@ -39,6 +39,15 @@ def token_matches(expected, supplied):
         return False
 
 
+def safe_device_id(value):
+    """Return a single safe path component for a paired device identifier."""
+    raw = str(value or "")
+    cleaned = "".join(
+        char if char.isalnum() or char in "-_." else "_" for char in raw)
+    cleaned = cleaned.strip("._")[:80]
+    return cleaned or "unknown"
+
+
 def atomic_write_json(path, payload, mode=0o600):
     """Persist JSON atomically and restrict the resulting file permissions."""
     path = Path(path)
