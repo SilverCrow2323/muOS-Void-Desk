@@ -55,8 +55,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from basestation_core import (
-    atomic_write_json, collect_host_stats, create_remote_backup,
-    generate_auth_token, token_matches,
+    atomic_write_json, collect_host_stats, collect_listener_snapshot,
+    create_remote_backup, generate_auth_token, token_matches,
 )
 
 try:
@@ -3717,6 +3717,10 @@ Tabs are selectable via click or shortcut."""
             "echo '### STORAGE'; df -h / /mnt/mmc /mnt/sdcard 2>&1; "
             "echo '### MEMORY'; free -h 2>&1; "
             "echo '### NETWORK'; ip -brief addr 2>&1; "
+            "echo '### LISTENERS'; "
+            "if command -v ss >/dev/null 2>&1; then ss -lntup 2>&1; "
+            "elif command -v netstat >/dev/null 2>&1; then netstat -lntup 2>&1; "
+            "else echo 'ss/netstat unavailable'; fi; "
             "echo '### PLAYER'; command -v mpv; command -v ffmpeg; command -v love"
         )
         service_specs = {}
@@ -3776,6 +3780,7 @@ Tabs are selectable via click or shortcut."""
                     "platform": platform.platform(),
                     "python": platform.python_version(),
                 },
+                "pc_listener_snapshot": collect_listener_snapshot(),
                 "device": safe_device,
                 "telemetry": self.monitor.last_stats or {},
                 "remote_read_only_snapshot": remote_output,
