@@ -3700,30 +3700,36 @@ Tabs are selectable via click or shortcut."""
             "echo '### NETWORK'; ip -brief addr 2>&1; "
             "echo '### PLAYER'; command -v mpv; command -v ffmpeg; command -v love"
         )
-        services = {}
+        service_specs = {}
         if d:
             for key, svc in d.get("services", {}).items():
-                port = svc.get("port")
-                services[key] = {
+                service_specs[key] = {
                     "label": svc.get("label", key),
                     "kind": svc.get("kind", ""),
-                    "port": port,
-                    "reachable": (NetworkUtils.check_port(
-                        d.get("ip", ""), port, timeout=0.8) if port else None),
+                    "port": svc.get("port"),
                 }
-
-        safe_device = None
-        if d:
-            safe_device = {
-                "name": device_name,
-                "ip": d.get("ip"),
-                "services": services,
-            }
 
         self.log("Collecting read-only diagnostics...", "info")
         self.set_status("Collecting diagnostics...", ORANGE)
 
         def worker():
+            services = {}
+            if d:
+                for key, svc in d.get("services", {}).items():
+                    port = svc.get("port")
+                    services[key] = dict(service_specs[key])
+                    services[key]["reachable"] = (
+                        NetworkUtils.check_port(d.get("ip", ""), port, timeout=0.8)
+                        if port else None)
+
+            safe_device = None
+            if d:
+                safe_device = {
+                    "name": device_name,
+                    "ip": d.get("ip"),
+                    "services": services,
+                }
+
             remote_output = ""
             remote_error = None
             if d:
@@ -3871,88 +3877,14 @@ Tabs are selectable via click or shortcut."""
         QuickCommandDialog(self, d, svc)
 
     def action_install_console_app(self):
-        d = self.current_device()
-        if not d:
-            messagebox.showinfo("Install App", "Select a device first.")
-            return
-        svc = d["services"].get("sftp") or d["services"].get("ssh")
-        if not svc:
-            messagebox.showinfo("Install App", "Enable SFTP or SSH on the profile.")
-            return
-        if not HAS_PARAMIKO:
-            messagebox.showwarning("Install App", "paramiko is required: pip install paramiko")
-            return
-        if not CONSOLE_APP_DIR.exists():
-            messagebox.showerror("Install App",
-                                 "Console app folder not found:\n{}\n"
-                                 "It must be next to this script.".format(CONSOLE_APP_DIR))
-            return
-        port = self.cfg.uplink().get("daemon_port", 31337)
-        pc_ip = NetworkUtils.get_local_ip()
-        if not messagebox.askyesno(
-            "Install Console App",
-            "The 'VOID_Uplink' app will be installed/updated on:\n"
-            "  {} → {}\n\n"
-            "It will be configured to point to this PC:\n"
-            "  {}:{}\n\n"
-            "If the PC IP is incorrect, change it later in the app's config.ini\n"
-            "(via FileBrowser/SFTP).\n\nProceed?".format(d["ip"], CONSOLE_APP_REMOTE, pc_ip, port)):
-            return
+        """Legacy compatibility entry point; the client is built into Void Desk."""
+        messagebox.showinfo(
+            "PC Link",
+            "The PC Link client is already part of Void Desk.\\n\\n"
+            "No separate VOID_Uplink application needs to be installed.\\n"
+            "Use Tools → PC Link Pairing to connect this PC.")
+        self.action_show_pairing()
 
-        self.log("Installing console app on {}...".format(d["ip"]), "info")
-
-        def worker():
-            try:
-                transport = paramiko.Transport((d["ip"], int(svc["port"])))
-                transport.connect(username=svc["user"], password=svc["pass"])
-                sftp = paramiko.SFTPClient.from_transport(transport)
-                try:
-                    remote_root = CONSOLE_APP_REMOTE
-
-                    def rmkdir(path):
-                        parts = path.strip("/").split("/")
-                        cur = ""
-                        for p in parts:
-                            cur += "/" + p
-                            try:
-                                sftp.stat(cur)
-                            except FileNotFoundError:
-                                try:
-                                    sftp.mkdir(cur)
-                                except Exception:
-                                    pass
-
-                    def send_tree(local_dir, remote_dir):
-                        rmkdir(remote_dir)
-                        for item in sorted(os.listdir(local_dir)):
-                            lp = os.path.join(local_dir, item)
-                            rp = remote_dir.rstrip("/") + "/" + item
-                            if os.path.isdir(lp):
-                                send_tree(lp, rp)
-                            else:
-                                sftp.put(lp, rp)
-                                self.status_queue.put(("log", ("  → {}".format(rp), "info")))
-
-                    send_tree(str(CONSOLE_APP_DIR), remote_root)
-                    token = self.daemon.store.cfg.get("token", "")
-                    cfg_txt = ("[link]\npc_ip = {}\npc_port = {}\n"
-                               "token = {}\npoll_seconds = 3\n".format(pc_ip, port, token))
-                    with sftp.open(remote_root + "/config.ini", "w") as f:
-                        f.write(cfg_txt)
-                    try:
-                        sftp.chmod(remote_root + "/mux_launch.sh", 0o755)
-                    except Exception:
-                        pass
-                finally:
-                    sftp.close()
-                    transport.close()
-                self.status_queue.put(("log", (
-                    "Console app installed ✓ — find it in Applications on muOS "
-                    "(refresh content if it does not appear immediately)", "ok")))
-            except Exception as e:
-                self.status_queue.put(("log", ("Console app installation failed: {}".format(e), "err")))
-
-        threading.Thread(target=worker, daemon=True).start()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
