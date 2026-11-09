@@ -2827,6 +2827,7 @@ class VOIDBaseStation(tk.Tk):
         tools_menu = tk.Menu(menubar, tearoff=0, bg=BG1, fg=TEXT,
                              activebackground=CYAN, activeforeground=BG0)
         menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="SPDW Service Registry...", command=self.action_show_hub_registry)
         tools_menu.add_command(label="PC Link Pairing...", command=self.action_show_pairing)
         tools_menu.add_command(label="Linked Handhelds...", command=self.action_show_linked_devices)
         tools_menu.add_command(label="Send Message to Handheld...", command=self.action_send_uplink_message)
@@ -3472,6 +3473,102 @@ Tabs are selectable via click or shortcut."""
         self.terminal_panel.refresh_devices(select=self.selected_device)
         if not self.terminal_panel.connected:
             self.terminal_panel.connect()
+
+    def action_show_hub_registry(self):
+        """Display declared service ownership; this is not a live socket scan."""
+        registry_path = (Path(__file__).resolve().parents[2]
+                         / "service" / "spdw_hub" / "services.json")
+        try:
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("SPDW Hub Registry", str(exc))
+            return
+
+        top = tk.Toplevel(self)
+        top.title("SPDW Hub — Service & Port Registry")
+        top.configure(bg=BG0)
+        top.geometry("1050x620")
+        top.transient(self)
+
+        tk.Label(top, text="SPDW HUB // SERVICE OWNERSHIP",
+                 bg=BG0, fg=CYAN, font=FONT_TITLE).pack(
+                     anchor="w", padx=16, pady=(16, 4))
+        tk.Label(
+            top,
+            text="Declared target/compatibility state — not a live socket scan. "
+                 "Use Tools → Export Diagnostics for active PC and handheld listeners.",
+            bg=BG0, fg=ORANGE, font=FONT_SMALL, wraplength=1000,
+            justify="left").pack(anchor="w", padx=16, pady=(0, 10))
+
+        frame = tk.Frame(top, bg=GRID, highlightbackground=GRID,
+                         highlightthickness=1)
+        frame.pack(fill="both", expand=True, padx=16, pady=6)
+        report = tk.Text(frame, bg=LOG_BG, fg=LOG_FG, font=FONT_SMALL,
+                         wrap="none", state="normal", padx=10, pady=8,
+                         relief="flat")
+        yscroll = tk.Scrollbar(frame, orient="vertical", command=report.yview)
+        xscroll = tk.Scrollbar(frame, orient="horizontal", command=report.xview)
+        report.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+        report.grid(row=0, column=0, sticky="nsew")
+        yscroll.grid(row=0, column=1, sticky="ns")
+        xscroll.grid(row=1, column=0, sticky="ew")
+        frame.grid_rowconfigure(0, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+
+        report.tag_configure("heading", foreground=CYAN, font=FONT_BOLD)
+        report.tag_configure("warning", foreground=ORANGE)
+        report.tag_configure("muted", foreground=TEXT_DIM)
+
+        def emit(line="", tag=None):
+            report.insert("end", line + "\\n", tag)
+
+        emit("SCHEMA: {}  VERSION: {}".format(
+            registry.get("schema", "?"), registry.get("version", "?")), "heading")
+        emit("POLICY: {}".format(json.dumps(
+            registry.get("policy", {}), sort_keys=True)), "muted")
+        emit("")
+        for host in ("handheld", "pc"):
+            emit("[ {} ]".format(host.upper()), "heading")
+            for item in registry.get("services", []):
+                if item.get("host") != host:
+                    continue
+                item_type = item.get("type", "unknown")
+                if item_type == "protocol-family":
+                    for member in item.get("members", []):
+                        port = "{} {}".format(
+                            member.get("protocol", "?").upper(),
+                            member.get("port", "?"))
+                        emit("  {:<34} {:<13} {:<13} {:<22} {}".format(
+                            item.get("id", "?") + ":" + member.get("name", "port"),
+                            port, item_type, item.get("owner", "?"),
+                            item.get("state", "unknown")))
+                    continue
+                if item_type == "subsystem":
+                    port = "{} (shared)".format(item.get("port", "?"))
+                elif item.get("port"):
+                    port = "{} {}".format(item.get("protocol", "?").upper(),
+                                          item.get("port"))
+                else:
+                    port = "—"
+                detail = item.get("bind", "—")
+                exposure = item.get("exposure", "—")
+                emit("  {:<34} {:<13} {:<13} {:<22} {}".format(
+                    item.get("id", "?"), port, item_type,
+                    item.get("owner", "?"),
+                    "{} / {} / {}".format(detail, exposure,
+                                         item.get("state", "unknown"))))
+                if item.get("notes"):
+                    emit("      " + str(item.get("notes")))
+            emit("")
+
+        emit("[ INTERPRETATION ]", "heading")
+        emit("• profile-default = configured profile value, not proof a process is listening", "muted")
+        emit("• subsystem = shares its parent transport; do not count it as another socket", "muted")
+        emit("• protocol-family = protocol-specific transport, not a management HTTP listener", "muted")
+        emit("• source-audit-pending = module source/commands have not been verified", "warning")
+        report.config(state="disabled")
+        HudButton(top, "CLOSE", top.destroy, accent=TEXT_DIM).pack(
+            anchor="e", padx=16, pady=(4, 14))
 
     def _ensure_uplink_daemon(self):
         if self.daemon.is_running():
