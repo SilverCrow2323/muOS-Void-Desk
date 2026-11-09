@@ -11,7 +11,7 @@ currently listening.
 |---|---:|---|---|---|
 | muOS handheld | TCP 8765 | SPDW Device Agent (inside existing Void Desk service process) | Binds `0.0.0.0`; public discovery/health and PIN-paired session + CSRF-protected file APIs | **Implemented on this branch**; single service-owned gateway and legacy-compatible file routes |
 | muOS handheld | TCP 8077 | Rt:Tailscale-M web panel | Config default; bind default `0.0.0.0`; PIN login, HMAC session cookie, CSRF checks and failed-login lockout | Bind to loopback and expose through the Hub module route |
-| PC | TCP 8420 | BaseStation PC Link daemon | Discovery at `/ping`; telemetry at `/stats`; authenticated device, command, inbox and file APIs | Keep during migration as the PC Hub API/listener; add the PC dashboard here, not on a new port |
+| PC | TCP 8420 | BaseStation / SPDW Hub PC daemon | Discovery at `/ping`; telemetry at `/stats`; authenticated device APIs; browser dashboard at `/` | **Implemented on this branch**; the web dashboard shares the existing PC Link listener |
 | PC / handheld | TCP 22 | SSH | SSH transport, commonly also provides SFTP subsystem | Retain where enabled; use the same connection for terminal and file transfer |
 | Handheld profile default | TCP 2022 | SFTP | Separate SFTP profile default in BaseStation, not proof of a live independent listener | Detect whether SFTP is available over SSH first; keep 2022 only where the installed image really requires it |
 
@@ -77,6 +77,12 @@ that all of them run simultaneously:
 
 The Hub should discover and report these services, not start duplicate copies
 or assume every profile is active.
+
+The PC daemon now serves the browser-based SPDW Hub at `http://<PC-IP>:8420/`
+on the same listener used by PC Link. The page authenticates using the existing
+PC Link bearer token and offers host/device telemetry, notifications,
+screenshot requests and downloads from the per-device received-file inbox.
+It does not open an additional HTTP port.
 
 ## 3. Sunshine / Moonlight transport
 
