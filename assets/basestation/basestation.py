@@ -3673,7 +3673,7 @@ Tabs are selectable via click or shortcut."""
         HudButton(actions, "COPY PAIRING DETAILS", copy_details, accent=CYAN).pack(side="left", padx=(0, 6))
         HudButton(actions, "ROTATE TOKEN", rotate_token, accent=ORANGE).pack(side="left", padx=6)
         HudButton(actions, "CLOSE", top.destroy, accent=TEXT_DIM).pack(side="right", padx=(6, 0))
-        tk.Label(top, text="Keep this token private. Anyone holding it can send commands and files to this PC.",
+        tk.Label(top, text="Keep this token private. Anyone holding it can send commands and files to this PC. Use only on a trusted LAN or Tailscale; never expose port 8420 to the public Internet.",
                  bg=BG0, fg=ORANGE, font=FONT_SMALL, wraplength=520,
                  justify="left").pack(anchor="w", padx=18, pady=(4, 12))
 
