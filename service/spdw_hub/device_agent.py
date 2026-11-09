@@ -475,9 +475,16 @@ class DeviceAgent:
             def _parse_multipart(payload, boundary):
                 marker = b"--" + boundary
                 for part in payload.split(marker):
-                    part = part.strip(b"\r\n")
-                    if not part or part == b"--":
+                    if not part:
                         continue
+                    if part.startswith(b"--"):
+                        break
+                    if part.startswith(b"\r\n"):
+                        part = part[2:]
+                    # Remove only the multipart framing CRLF. Preserve any
+                    # CR/LF bytes which belong to the uploaded file itself.
+                    if part.endswith(b"\r\n"):
+                        part = part[:-2]
                     if b"\r\n\r\n" not in part:
                         continue
                     headers, data = part.split(b"\r\n\r\n", 1)
@@ -486,14 +493,12 @@ class DeviceAgent:
                         headers, re.IGNORECASE)
                     if not match:
                         continue
-                    data = data.rstrip(b"\r\n")
                     try:
                         name = match.group(1).decode("utf-8", errors="replace")
                     except Exception:
                         name = "upload.bin"
                     return name, data
                 return None, None
-
             def _handle_write_action(self, path, data):
                 area = data.get("area", "in")
                 relative = data.get("path", "")
