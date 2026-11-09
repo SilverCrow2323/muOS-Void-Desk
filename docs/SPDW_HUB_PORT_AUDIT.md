@@ -28,10 +28,16 @@ before expanding its remote use.
 
 ### Rt:Tailscale-M panel
 
-The current panel config defaults to port `8077` and bind `0.0.0.0`.
-The panel has a PIN, signed session cookie, CSRF checks and IP-based login
-lockout. Its auth should remain effective while it is moved behind the Hub.
-A trusted gateway is not a reason to skip its auth migration tests.
+The current `muOS-Rt-Tailscale` source defaults to port `8077` and bind
+`0.0.0.0`. The panel has a PIN, HMAC-signed session cookie, CSRF checks and
+IP-based login lockout. It still uses plain HTTP: its upstream security notes
+explicitly prohibit Internet exposure and recommend loopback plus SSH tunnel
+or Tailscale Serve for remote access. The Hub migration must preserve its
+authentication and use an encrypted remote path; a trusted gateway is not a
+reason to skip its auth migration tests.
+
+Source checked: `SilverCrow2323/muOS-Rt-Tailscale` at
+`d6aa05363cd5d56b07e63e2261c960a26d73cd9c`.
 
 ### PC Link / BaseStation daemon
 
