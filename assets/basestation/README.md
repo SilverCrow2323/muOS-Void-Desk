@@ -27,7 +27,7 @@ Extract the release ZIP and run:
 
 ```bash
 cd VOID-BaseStation-4.0.0
-./run_basestation.sh
+sh run_basestation.sh
 ```
 
 The launcher creates a local virtual environment, retains access to the system
