@@ -2622,6 +2622,7 @@ class VOIDBaseStation(tk.Tk):
         file_menu.add_command(label="New Device    Ctrl+N", command=self.action_new_device)
         file_menu.add_command(label="Export Profiles", command=self.action_export_profiles)
         file_menu.add_command(label="Import Profiles", command=self.action_import_profiles)
+        file_menu.add_command(label="Export Diagnostics Report...", command=self.action_export_diagnostics)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._on_close)
 
@@ -2632,6 +2633,12 @@ class VOIDBaseStation(tk.Tk):
         view_menu.add_command(label="Terminal    Ctrl+T", command=lambda: self._select_tab("terminal"))
         view_menu.add_separator()
         view_menu.add_command(label="Fullscreen   F11", command=lambda: self.attributes("-fullscreen", True))
+
+        tools_menu = tk.Menu(menubar, tearoff=0, bg=BG1, fg=TEXT,
+                             activebackground=CYAN, activeforeground=BG0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="Export Diagnostics Report...", command=self.action_export_diagnostics)
+        tools_menu.add_command(label="Backup Saves & States...", command=lambda: self._select_tab("media"))
 
         help_menu = tk.Menu(menubar, tearoff=0, bg=BG1, fg=TEXT, activebackground=CYAN, activeforeground=BG0)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -3094,6 +3101,12 @@ class VOIDBaseStation(tk.Tk):
                     self.media_panel.on_backup_complete(payload)
                 elif kind == "backup_error":
                     self.media_panel.on_backup_error(payload)
+                elif kind == "diagnostics_complete":
+                    self.log("Diagnostics report saved: {}".format(payload), "ok")
+                    messagebox.showinfo("Diagnostics", "Report saved successfully:\\n{}".format(payload))
+                elif kind == "diagnostics_error":
+                    self.log("Diagnostics export failed: {}".format(payload), "err")
+                    messagebox.showerror("Diagnostics", str(payload))
                 elif kind == "scan_complete":
                     self._refresh_sidebar()
                     self.log("Network scan complete — {} host(s) found".format(payload), "ok")
@@ -3264,6 +3277,92 @@ Tabs are selectable via click or shortcut."""
         self.terminal_panel.refresh_devices(select=self.selected_device)
         if not self.terminal_panel.connected:
             self.terminal_panel.connect()
+
+    def action_export_diagnostics(self):
+        d = self.current_device()
+        device_name = self.selected_device or "no-device"
+        path = filedialog.asksaveasfilename(
+            title="Export VOID diagnostics", defaultextension=".json",
+            initialfile="void_basestation_diagnostics_{}.json".format(
+                datetime.now().strftime("%Y%m%d_%H%M%S")),
+            filetypes=[("JSON report", "*.json")])
+        if not path:
+            return
+
+        # Keep this command read-only and fixed: no profile values or shell
+        # input are interpolated into the remote command.
+        remote_command = (
+            "echo '### SYSTEM'; uname -a 2>&1; "
+            "echo '### RELEASE'; cat /etc/os-release 2>/dev/null; "
+            "echo '### STORAGE'; df -h / /mnt/mmc /mnt/sdcard 2>&1; "
+            "echo '### MEMORY'; free -h 2>&1; "
+            "echo '### NETWORK'; ip -brief addr 2>&1; "
+            "echo '### PLAYER'; command -v mpv; command -v ffmpeg; command -v love"
+        )
+        services = {}
+        if d:
+            for key, svc in d.get("services", {}).items():
+                port = svc.get("port")
+                services[key] = {
+                    "label": svc.get("label", key),
+                    "kind": svc.get("kind", ""),
+                    "port": port,
+                    "reachable": (NetworkUtils.check_port(
+                        d.get("ip", ""), port, timeout=0.8) if port else None),
+                }
+
+        safe_device = None
+        if d:
+            safe_device = {
+                "name": device_name,
+                "ip": d.get("ip"),
+                "services": services,
+            }
+
+        self.log("Collecting read-only diagnostics...", "info")
+        self.set_status("Collecting diagnostics...", ORANGE)
+
+        def worker():
+            remote_output = ""
+            remote_error = None
+            if d:
+                ssh_svc = d.get("services", {}).get("ssh")
+                if ssh_svc and HAS_PARAMIKO:
+                    try:
+                        remote_output, remote_error = SSHManager.exec_command(
+                            d.get("ip", ""), ssh_svc.get("port", 22),
+                            ssh_svc.get("user", ""), ssh_svc.get("pass", ""),
+                            remote_command, timeout=12)
+                    except Exception as exc:
+                        remote_error = str(exc)
+                elif not HAS_PARAMIKO:
+                    remote_error = "Paramiko is not installed; remote snapshot unavailable."
+                else:
+                    remote_error = "No SSH service configured for this device."
+
+            report = {
+                "format": "void-basestation-diagnostics",
+                "format_version": 1,
+                "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                "application": {"name": APP_NAME, "version": APP_VERSION},
+                "pc": {
+                    "hostname": platform.node(),
+                    "platform": platform.platform(),
+                    "python": platform.python_version(),
+                },
+                "device": safe_device,
+                "telemetry": self.monitor.last_stats or {},
+                "remote_read_only_snapshot": remote_output,
+                "remote_error": remote_error,
+                "security_note": "SSH passwords and daemon pairing tokens are intentionally excluded.",
+            }
+            try:
+                atomic_write_json(path, report, mode=0o600)
+                self.status_queue.put(("diagnostics_complete", path))
+            except Exception as exc:
+                self.status_queue.put(("diagnostics_error", str(exc)))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def action_export_profiles(self):
         path = filedialog.asksaveasfilename(
