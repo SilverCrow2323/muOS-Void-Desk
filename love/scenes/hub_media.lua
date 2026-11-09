@@ -46,9 +46,22 @@ return dashboard.new({
     items = {
         { icon = "music", label = "Void Radio", desc = "Internet radio stations",
           action = function(scene) scene.set_status("Radio: soon"); return "Radio" end },
-        { icon = "video", label = "VoidCast IPTV", value = "LIVE",
-          desc = "TV streams and EPG guide (LÖVE prototype)",
-          action = function() sm.push("hub_iptv", {}) end },
+        { icon = "video", label = "VoidCast IPTV", value = "OUTDESK",
+          desc = "Full IPTV suite: M3U, multi-source EPG, PVR and add-ons",
+          action = function(scene)
+              scene.set_status("Handing off to VoidCast IPTV...")
+              bridge.call("voidcast_launch", {}, function(resp)
+                  if resp.ok and resp.handoff then
+                      scene.set_status("Launching VoidCast...")
+                      -- mux_launch.sh waits for LÖVE to release the display,
+                      -- starts the standalone Outdesk app, then restores Desk.
+                      love.event.quit()
+                  else
+                      scene.set_status("VoidCast failed: " .. (resp.error or "handoff unavailable"))
+                  end
+              end)
+              return "Launching VoidCast..."
+          end },
         { icon = "folder", label = "Media Library", desc = "Browse local audio/video on SD",
           action = function(scene) scene.set_status("Library: soon"); return "Library" end },
         { icon = "music", label = "BGM Normalizer", value = "PY",
