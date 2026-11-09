@@ -533,7 +533,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
         </div>
       </div>
 
-      <h1 class="main-title">VOID <span class="accent">//</span> "Direct Link" <span class="sub-rt">Rt:SERVER</span></h1>
+      <h1 class="main-title">VOID <span class="accent">//</span> SPDW HUB <span class="sub-rt">DEVICE AGENT</span></h1>
 
       <div class="status-indicator">
         <span class="led-dot green" id="ledDot"></span>
@@ -569,13 +569,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
         </div>
       </div>
       <div class="bs-actions">
-        <a class="bs-btn" href="/basestation.py" download>
+        <a class="bs-btn" href="https://github.com/SilverCrow2323/Void-Desk-Project/releases" target="_blank" rel="noopener noreferrer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="7 10 12 15 17 10"></polyline>
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
-          Direct Download (.py)
+          PC Companion ZIP (Release)
         </a>
       </div>
     </div>
@@ -780,14 +780,48 @@ window.addEventListener("unhandledrejection", function(e){
   toast("Error: " + m, true);
 });
 
-function api(method, url, body){
+var hubCsrfToken = "";
+var hubLoginPromise = null;
+
+function hubLogin(){
+  if (hubLoginPromise) return hubLoginPromise;
+  var pin = window.prompt(
+    "SPDW Hub pairing PIN (shown in Void Desk → BaseStation on the handheld):");
+  if (!pin) return Promise.reject(new Error("Pairing cancelled"));
+  var body = new URLSearchParams({pin: pin.trim()});
+  hubLoginPromise = fetch("/api/login", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: body
+  }).then(function(response){
+    return response.json().catch(function(){ return {}; }).then(function(data){
+      if (!response.ok || data.error){
+        throw new Error(data.error || ("Pairing failed: " + response.status));
+      }
+      hubCsrfToken = data.csrf_token || "";
+      return true;
+    });
+  }).finally(function(){ hubLoginPromise = null; });
+  return hubLoginPromise;
+}
+
+function api(method, url, body, retryAuth){
   var startTime = Date.now();
   var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
   var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 12000) : null;
+  var headers = {};
+  if (body && !(body instanceof FormData)){
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+  }
+  if (String(method).toUpperCase() !== "GET" && hubCsrfToken){
+    headers["X-CSRF-Token"] = hubCsrfToken;
+  }
   return fetch(url, {
     method: method,
-    headers: body ? {"Content-Type":"application/x-www-form-urlencoded"} : undefined,
+    headers: headers,
     body: body,
+    credentials: "same-origin",
     signal: ctrl ? ctrl.signal : undefined
   }).catch(function(err){
     updateServerStatus(false);
@@ -795,12 +829,17 @@ function api(method, url, body){
       throw new Error("Device non-responsive (request timed out after 12s)");
     }
     throw new Error("Connection failed: " + err.message);
-  }).then(function(r){
+  }).then(function(response){
     var latency = Date.now() - startTime;
     updateServerStatus(true, latency);
-    return r.json().catch(function(){ return {}; }).then(function(j){
-      if (!r.ok || j.error) throw new Error(j.error || ("Error " + r.status));
-      return j;
+    return response.json().catch(function(){ return {}; }).then(function(data){
+      if (response.status === 401 && retryAuth !== false){
+        return hubLogin().then(function(){ return api(method, url, body, false); });
+      }
+      if (!response.ok || data.error){
+        throw new Error(data.error || ("Error " + response.status));
+      }
+      return data;
     });
   }).finally(function(){ if (timer) clearTimeout(timer); });
 }
@@ -1052,7 +1091,9 @@ function uploadFiles(files){
       var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 20000) : null;
       return fetch("/api/upload?area=" + encodeURIComponent(state.area) +
         "&path=" + encodeURIComponent(state.path),
-        { method:"POST", body:fd, signal: ctrl ? ctrl.signal : undefined })
+        { method:"POST", body:fd, credentials:"same-origin",
+          headers: {"X-CSRF-Token": hubCsrfToken},
+          signal: ctrl ? ctrl.signal : undefined })
         .catch(function(err){
           throw new Error(err.name === "AbortError" ?
             "Upload of \"" + file.name + "\" timed out" : err.message);
