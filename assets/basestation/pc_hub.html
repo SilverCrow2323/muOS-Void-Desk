@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SPDW Hub // PC</title>
+<style>
+:root{color-scheme:dark;--bg:#080b12;--panel:#111827;--panel2:#0c1420;--line:#20344a;--cyan:#00e5c3;--amber:#ffb454;--text:#e8eff5;--muted:#8495a8;--red:#ff657a;--green:#5fe0a0}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 70% 0,#162236 0,#080b12 46%);color:var(--text);font:14px/1.45 system-ui,sans-serif}
+header{border-bottom:1px solid var(--line);background:#090f19e8;position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}
+.wrap{max-width:1180px;margin:auto;padding:18px 20px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.brand{font:700 20px/1.1 ui-monospace,monospace;letter-spacing:.12em;color:var(--cyan)}
+.sub{font-size:11px;color:var(--muted);letter-spacing:.14em;margin-top:5px}
+.status{font:12px ui-monospace,monospace;color:var(--muted)}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+nav button,.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:9px 13px;border-radius:8px;cursor:pointer}
+nav button.active,.btn.primary{border-color:var(--cyan);color:var(--cyan);background:#0b2428}
+button:hover{border-color:var(--cyan)}
+main{max-width:1180px;margin:auto;padding:24px 20px 70px}
+section{display:none}
+section.active{display:block}
+h1{font-size:25px;margin:0 0 5px}
+h2{font-size:16px;margin:0 0 12px}
+p{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:18px 0}
+.card{background:linear-gradient(150deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.metric{font:700 25px ui-monospace,monospace;color:var(--cyan);margin-top:10px}
+.label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em}
+.kicker{font:12px ui-monospace,monospace;color:var(--amber);margin-bottom:10px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn.danger{color:var(--red);border-color:#653042}
+.badge{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:3px 8px;color:var(--muted);font:11px ui-monospace,monospace}
+.badge.ok{color:var(--green);border-color:#2b6b4a}
+.badge.warn{color:var(--amber);border-color:#72522c}
+.list{display:grid;gap:10px;margin-top:16px}
+.device{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:15px}
+.device h3{margin:0 0 5px;font-size:15px}
+.device .meta{font:11px ui-monospace,monospace;color:var(--muted)}
+.device .values{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:12px}
+.file{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding:10px 0}
+.file small{display:block;color:var(--muted);margin-top:3px}
+input,textarea{width:100%;background:#070d15;border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--text);font:inherit}
+textarea{min-height:80px;resize:vertical}
+label{display:block;margin:12px 0 6px;color:var(--muted);font-size:12px}
+.notice{border-left:3px solid var(--amber);padding:10px 13px;background:#201b13;color:#d7c6a6;border-radius:4px;margin-top:16px}
+.empty{padding:28px 16px;text-align:center;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}
+footer{color:var(--muted);font-size:11px;margin-top:30px}
+@media(max-width:600px){.top{align-items:flex-start;flex-direction:column}.wrap{padding:14px}main{padding:20px 14px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+ <div class="top">
+  <div><div class="brand">SPDW // HUB</div><div class="sub">PC COMPANION · VOID DESK 10.5.4</div></div>
+  <div class="status" id="connection">● DISCONNECTED</div>
+ </div>
+ <nav id="nav">
+  <button class="active" data-tab="overview">Overview</button>
+  <button data-tab="devices">Handhelds</button>
+  <button data-tab="files">Received files</button>
+  <button data-tab="addons">Add-ons</button>
+  <button data-tab="streaming">Streaming & network</button>
+  <button data-tab="terminal">Terminal & SFTP</button>
+ </nav>
+</div></header>
+<main>
+<section id="overview" class="active">
+ <div class="kicker">01 / OPERATIONS</div><h1>Hub overview</h1>
+ <p>One PC endpoint for paired handhelds, telemetry, notifications and incoming files.</p>
+ <div class="grid">
+  <div class="card"><div class="label">PC host</div><div class="metric" id="pc-name">—</div><div class="meta" id="pc-platform"></div></div>
+  <div class="card"><div class="label">CPU load</div><div class="metric" id="pc-cpu">—</div><div class="meta">Host telemetry</div></div>
+  <div class="card"><div class="label">Memory</div><div class="metric" id="pc-ram">—</div><div class="meta" id="pc-ram-sub"></div></div>
+  <div class="card"><div class="label">Paired handhelds</div><div class="metric" id="device-count">0</div><div class="meta" id="device-online">Waiting for devices</div></div>
+ </div>
+ <div class="row"><h2>Recent handheld activity</h2><button class="btn" id="refresh-overview">Refresh</button></div>
+ <div id="recent-devices" class="list"><div class="empty">No paired handheld has reported yet.</div></div>
+ <div class="notice">Security: the browser uses your existing PC Link token. Keep it private and use this portal only on a trusted LAN or through Tailscale. The PC API uses HTTP, not end-to-end encryption.</div>
+</section>
+<section id="devices">
+ <div class="kicker">02 / INVENTORY</div><h1>Connected handhelds</h1><p>Telemetry is reported by the PC Uplink client already built into Void Desk.</p>
+ <div class="actions"><button class="btn primary" id="refresh-devices">Refresh devices</button></div>
+ <div id="devices-list" class="list"><div class="empty">No device data.</div></div>
+</section>
+<section id="files">
+ <div class="kicker">03 / TRANSFER INBOX</div><h1>Files received from handhelds</h1><p>Screenshots and files uploaded through PC Link are stored per device on this PC.</p>
+ <div class="actions"><button class="btn primary" id="refresh-files">Refresh files</button></div>
+ <div id="files-list" class="list"><div class="empty">No files received yet.</div></div>
+</section>
+<section id="addons">
+ <div class="kicker">04 / EXTENSIONS</div><h1>Hub add-ons</h1><p>Add-ons will be loaded as modules with explicit permissions, health checks and lifecycle control. They do not open independent management servers by default.</p>
+ <div class="grid">
+  <div class="card"><div class="row"><h2>Rt:Tailscale-M</h2><span class="badge warn">MIGRATION</span></div><p>Existing device-side Tailscale service and web panel. The current panel still needs to be routed through the Hub while preserving its PIN, session and CSRF protections.</p></div>
+  <div class="card"><div class="row"><h2>RT Stream / Sunshine</h2><span class="badge warn">SOURCE AUDIT</span></div><p>Planned streaming module for daemon lifecycle, Sunshine host status, pairing, session state and logs. The real RT Stream source and port contract must be imported before enabling controls.</p></div>
+  <div class="card"><div class="row"><h2>EthoStore / APT</h2><span class="badge warn">INTEGRATION</span></div><p>Planned package catalogue and install jobs reusing the existing muOS catalog and package manager rather than starting another manager.</p></div>
+ </div>
+ <div class="notice">Manifest discovery is implemented; automatic add-on execution and installation are not enabled yet.</div>
+</section>
+<section id="streaming">
+ <div class="kicker">05 / MEDIA TRANSPORT</div><h1>Streaming & network</h1>
+ <div class="grid">
+  <div class="card"><div class="row"><h2>Sunshine</h2><span class="badge warn">ADAPTER PENDING</span></div><p>The Hub will own management UI and daemon lifecycle. Sunshine's actual GameStream TCP/UDP transport remains separate where the protocol requires it.</p></div>
+  <div class="card"><div class="row"><h2>Tailscale</h2><span class="badge warn">ADAPTER PENDING</span></div><p>Reuse the current Rt:Tailscale-M service and peer state. The existing panel should become a Hub route, not another publicly exposed portal.</p></div>
+ </div>
+ <p>No streaming daemon or additional media listener is started by this web page.</p>
+</section>
+<section id="terminal">
+ <div class="kicker">06 / REMOTE OPERATIONS</div><h1>Terminal & SFTP</h1>
+ <div class="card"><h2>Interactive SSH terminal</h2><p>The PC companion's native Terminal tab already provides an SSH PTY, quick commands and device profiles. It remains the supported interactive terminal while the web command-permission model is being designed.</p></div>
+ <div class="card" style="margin-top:12px"><h2>Files and synchronisation</h2><p>The native Media tab provides SFTP folder comparison, non-destructive save/state sync, and verified ZIP backups with manifests and SHA-256 checksums.</p></div>
+ <div class="notice">The web portal does not expose arbitrary shell execution or remote file writes at this stage.</div>
+</section>
+<footer>SPDW Hub PC · BaseStation 4.0 · Uses the existing PC Link listener on TCP 8420.</footer>
+</main>
+<script>
+(function(){
+"use strict";
+var token = sessionStorage.getItem("spdw_pc_token") || "";
+var devices = {};
+var $ = function(id){return document.getElementById(id);};
+function setConnection(ok, msg){
+ $("connection").textContent = ok ? "● CONNECTED" : "● DISCONNECTED";
+ $("connection").style.color = ok ? "var(--green)" : "var(--red)";
+ if(msg) $("connection").title = msg;
+}
+function login(){
+ var supplied = window.prompt("Enter the PC Link authentication token from BaseStation → Tools → PC Link Pairing:");
+ if(!supplied) return Promise.reject(new Error("Pairing cancelled"));
+ token = supplied.trim();
+ sessionStorage.setItem("spdw_pc_token", token);
+ return Promise.resolve();
+}
+function api(path, method, body, retried){
+ var headers = {"X-VOID-Token": token};
+ if(body){ headers["Content-Type"] = "application/json"; }
+ return fetch(path,{method:method||"GET",headers:headers,body:body?JSON.stringify(body):undefined,cache:"no-store"})
+ .then(function(r){return r.json().catch(function(){return {};}).then(function(data){
+   if(r.status===401 && !retried){
+    token="";sessionStorage.removeItem("spdw_pc_token");
+    return login().then(function(){return api(path,method,body,true);});
+   }
+   if(!r.ok || data.error) throw new Error(data.error || ("HTTP "+r.status));
+   setConnection(true);return data;
+ });}).catch(function(e){setConnection(false,e.message);throw e;});
+}
+function fmtBytes(n){
+ n=Number(n||0);if(n<1024)return n+" B";if(n<1048576)return (n/1024).toFixed(1)+" KB";
+ if(n<1073741824)return (n/1048576).toFixed(1)+" MB";return (n/1073741824).toFixed(2)+" GB";
+}
+function isOnline(item){
+ var seen=Date.parse(item.last_seen||"");
+ return isFinite(seen) && Date.now()-seen<30000;
+}
+function deviceCard(id,item){
+ var stats=item.stats||{}, mem=stats.memory||{}, temps=stats.temperatures||[];
+ var div=document.createElement("div");div.className="device";
+ var title=document.createElement("div");title.className="row";
+ var name=document.createElement("h3");name.textContent=item.name||id;
+ var badge=document.createElement("span");badge.className="badge "+(isOnline(item)?"ok":"");badge.textContent=isOnline(item)?"ONLINE":"STALE";
+ title.appendChild(name);title.appendChild(badge);div.appendChild(title);
+ var meta=document.createElement("div");meta.className="meta";meta.textContent=id+" · last seen "+(item.last_seen||"unknown");div.appendChild(meta);
+ var vals=document.createElement("div");vals.className="values";
+ ["Battery "+(stats.battery_pct==null?"—":stats.battery_pct+"%"),
+  "Temp "+(stats.temp_c==null?"—":stats.temp_c+" °C"),
+  "Storage "+(stats.storage_used_pct==null?"—":stats.storage_used_pct+"%"),
+  "Uptime "+(stats.uptime_s==null?"—":Math.floor(stats.uptime_s/3600)+"h")].forEach(function(x){
+    var span=document.createElement("span");span.textContent=x;vals.appendChild(span);
+ });
+ div.appendChild(vals);
+ var actions=document.createElement("div");actions.className="actions";
+ var shot=document.createElement("button");shot.className="btn";shot.textContent="Request screenshot";
+ shot.onclick=function(){api("/api/hub/device/"+encodeURIComponent(id)+"/screenshot","POST",{}).then(function(){alert("Screenshot request queued for "+(item.name||id));}).catch(function(e){alert(e.message);});};
+ var msg=document.createElement("button");msg.className="btn";msg.textContent="Send notification";
+ msg.onclick=function(){var title=prompt("Notification title","SPDW Hub");if(!title)return;var body=prompt("Message");if(body===null)return;api("/api/hub/device/"+encodeURIComponent(id)+"/notify","POST",{title:title,body:body}).then(function(){alert("Notification queued.");}).catch(function(e){alert(e.message);});};
+ actions.appendChild(shot);actions.appendChild(msg);div.appendChild(actions);return div;
+}
+function renderDevices(){
+ var target=$("devices-list"), recent=$("recent-devices");target.textContent="";recent.textContent="";
+ var ids=Object.keys(devices).sort(function(a,b){return (devices[a].name||a).localeCompare(devices[b].name||b);});
+ $("device-count").textContent=ids.length;
+ var online=ids.filter(function(id){return isOnline(devices[id]);}).length;
+ $("device-online").textContent=online+" online · "+(ids.length-online)+" stale";
+ if(!ids.length){target.innerHTML='<div class="empty">No paired handheld has reported yet.</div>';recent.innerHTML='<div class="empty">No recent activity.</div>';return;}
+ ids.forEach(function(id){target.appendChild(deviceCard(id,devices[id]));});
+ ids.slice(0,3).forEach(function(id){recent.appendChild(deviceCard(id,devices[id]));});
+}
+function refreshAll(){
+ return Promise.all([
+  api("/api/hub/stats").then(function(data){
+   $("pc-name").textContent=data.name||"PC";
+   $("pc-platform").textContent=data.platform||"";
+   $("pc-cpu").textContent=data.cpu_percent==null?"—":data.cpu_percent+"%";
+   var mem=data.memory||{};$("pc-ram").textContent=mem.percent==null?"—":mem.percent+"%";
+   $("pc-ram-sub").textContent=mem.used_mb==null?"":mem.used_mb+" / "+mem.total_mb+" MB";
+  }),
+  api("/api/hub/devices").then(function(data){devices=data.devices||{};renderDevices();})
+ ]);
+}
+function refreshFiles(){
+ var target=$("files-list");target.textContent="Loading…";
+ api("/api/hub/files").then(function(data){
+  target.textContent="";
+  var files=data.files||[];
+  if(!files.length){target.innerHTML='<div class="empty">No files received yet.</div>';return;}
+  files.forEach(function(file){
+   var row=document.createElement("div");row.className="file";
+   var info=document.createElement("div");info.textContent=file.name;
+   var small=document.createElement("small");small.textContent=file.device+" · "+fmtBytes(file.size)+" · "+file.mtime;
+   info.appendChild(small);
+   var link=document.createElement("a");link.className="btn";link.textContent="Download";link.href="/api/hub/files/download?device="+encodeURIComponent(file.device)+"&name="+encodeURIComponent(file.name)+"&token="+encodeURIComponent(token);link.target="_blank";link.rel="noopener";
+   row.appendChild(info);row.appendChild(link);target.appendChild(row);
+  });
+ }).catch(function(e){target.innerHTML="";var empty=document.createElement("div");empty.className="empty";empty.textContent=e.message;target.appendChild(empty);});
+}
+function activate(tab){
+ document.querySelectorAll("nav button").forEach(function(btn){btn.classList.toggle("active",btn.dataset.tab===tab);});
+ document.querySelectorAll("main section").forEach(function(section){section.classList.toggle("active",section.id===tab);});
+ if(tab==="overview"||tab==="devices")refreshAll().catch(function(){});
+ if(tab==="files")refreshFiles();
+}
+document.querySelectorAll("nav button").forEach(function(btn){btn.addEventListener("click",function(){activate(btn.dataset.tab);});});
+$("refresh-overview").onclick=function(){refreshAll().catch(function(e){alert(e.message);});};
+$("refresh-devices").onclick=function(){refreshAll().catch(function(e){alert(e.message);});};
+$("refresh-files").onclick=refreshFiles;
+refreshAll().catch(function(){});
+setInterval(function(){if(token)refreshAll().catch(function(){});},10000);
+})();
+</script>
+</body>
+</html>
