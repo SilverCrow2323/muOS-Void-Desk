@@ -84,9 +84,12 @@ device profiles, SSH terminal, framebuffer capture, SFTP sync, backup and
 diagnostics. Add a single web/API surface to the existing PC Link daemon rather
 than introducing another service process or another listener.
 
-The existing PC Link protocol is retained during migration. Clients and
-profiles are upgraded compatibly; a change of port is not required for the
-first phase.
+The existing PC Link protocol is retained during migration. The browser
+dashboard is served from the same BaseStation daemon on TCP `8420`, so clients
+and profiles remain compatible and no additional management listener is
+introduced. The native BaseStation desktop interface continues to provide
+interactive SSH PTY and SFTP sync/backup functions; the first browser phase
+focuses on telemetry, paired-device actions and the received-file inbox.
 
 ### Add-on host
 
