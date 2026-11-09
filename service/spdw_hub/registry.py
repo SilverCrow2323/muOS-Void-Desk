@@ -169,7 +169,11 @@ def validate_registry(data):
     for item in services:
         if not isinstance(item, dict) or item.get("type") != "subsystem":
             continue
-        parent = ids.get(item.get("shares_listener_with"))
+        parent_id = item.get("shares_listener_with")
+        if not isinstance(parent_id, str) or not parent_id:
+            errors.append("{} must name its parent listener".format(item.get("id")))
+            continue
+        parent = ids.get(parent_id)
         if parent is None:
             errors.append("{} references an unknown parent listener".format(item.get("id")))
         elif parent.get("type") != "listener":
