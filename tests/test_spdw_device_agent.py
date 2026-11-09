@@ -171,15 +171,14 @@ def test_multipart_parser_preserves_binary_trailing_newlines(tmp_path):
         handler = agent.make_handler()
         boundary = b"spdw-binary-boundary"
         payload = (
-            b"--" + boundary + b"\\r\\n"
-            b'Content-Disposition: form-data; name="file"; filename="capture.bin"\\r\\n'
-            b"Content-Type: application/octet-stream\\r\\n\\r\\n"
-            b"\\x00\\x01payload\\r\\n"
-            b"--" + boundary + b"--\\r\\n"
+            b"--" + boundary + b"\r\n"
+            b'Content-Disposition: form-data; name="file"; filename="capture.bin"\r\n'
+            b"Content-Type: application/octet-stream\r\n\r\n"
+            b"\x00\x01payload\r\n"
+            b"--" + boundary + b"--\r\n"
         )
         filename, data = handler._parse_multipart(payload, boundary)
         assert filename == "capture.bin"
-        assert data == b"\\x00\\x01payload\\r\\n"
+        assert data == b"\x00\x01payload\r\n"
     finally:
         agent.stop()
-
