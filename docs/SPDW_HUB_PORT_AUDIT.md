@@ -9,22 +9,32 @@ currently listening.
 
 | Host | Port | Component | Current behavior | SPDW Hub target |
 |---|---:|---|---|---|
-| muOS handheld | TCP 8765 | Void Desk BaseStation HTTP portal | Binds `0.0.0.0`; serves file browser and file operations without authentication | Replace with the authenticated Device Agent gateway; retain as the compatibility entry point |
+| muOS handheld | TCP 8765 | SPDW Device Agent (inside existing Void Desk service process) | Binds `0.0.0.0`; public discovery/health and PIN-paired session + CSRF-protected file APIs | **Implemented on this branch**; single service-owned gateway and legacy-compatible file routes |
 | muOS handheld | TCP 8077 | Rt:Tailscale-M web panel | Config default; bind default `0.0.0.0`; PIN login, HMAC session cookie, CSRF checks and failed-login lockout | Bind to loopback and expose through the Hub module route |
 | PC | TCP 8420 | BaseStation PC Link daemon | Discovery at `/ping`; telemetry at `/stats`; authenticated device, command, inbox and file APIs | Keep during migration as the PC Hub API/listener; add the PC dashboard here, not on a new port |
 | PC / handheld | TCP 22 | SSH | SSH transport, commonly also provides SFTP subsystem | Retain where enabled; use the same connection for terminal and file transfer |
 | Handheld profile default | TCP 2022 | SFTP | Separate SFTP profile default in BaseStation, not proof of a live independent listener | Detect whether SFTP is available over SSH first; keep 2022 only where the installed image really requires it |
 
-### Critical finding: handheld BaseStation portal
+### Handheld Device Agent — migration status
 
-The current `desk/main.py::basestation_serve_start` binds
-`ThreadingHTTPServer(("0.0.0.0", 8765), Handler)`. The handler exposes
-`/api/list`, `/api/read`, `/api/download`, `/api/upload`,
-`/api/mkdir`, `/api/newfile`, `/api/write` and `/api/delete`.
-There is no authentication check in the handler before those operations.
-The path helper uses normalized paths, but does not canonicalize through
-symlinks. This endpoint must be secured and placed behind the Hub gateway
-before expanding its remote use.
+The former Pygame-owned `ThreadingHTTPServer` on TCP `8765` has been removed
+from `desk/main.py`. The existing `service/voiddesk_service.py` process now
+starts `service/spdw_hub/device_agent.py` on the same port, so this migration
+does not add a second daemon or a new listener.
+
+The gateway persists a generated pairing PIN and secret under
+`data/spdw_hub/device_agent.json`, protects browser access with a session
+cookie and CSRF token, rate-limits failed PIN attempts, caps request bodies,
+canonicalizes paths through symlinks, and writes uploads atomically without
+overwriting existing files. The existing browser routes
+`/api/list`, `/api/read`, `/api/download`, `/api/upload`, `/api/mkdir`,
+`/api/newfile`, `/api/write` and `/api/delete` are retained behind the
+authenticated gateway for UI compatibility.
+
+This is a source-level implementation and automated-test addition. It still
+requires a real muOS hardware run and a live socket/process audit before the
+port can be marked release-verified. The legacy unauthenticated handler is no
+longer the intended runtime owner.
 
 ### Rt:Tailscale-M panel
 
