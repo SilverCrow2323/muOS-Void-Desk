@@ -127,7 +127,6 @@
       "members": [
         {"name": "https", "port": 47984, "protocol": "tcp", "required": true},
         {"name": "http", "port": 47989, "protocol": "tcp", "required": true},
-        {"name": "web-ui", "port": 47990, "protocol": "tcp", "required": true},
         {"name": "rtsp", "port": 48010, "protocol": "tcp", "required": true},
         {"name": "video", "port": 47998, "protocol": "udp", "required": true},
         {"name": "control", "port": 47999, "protocol": "udp", "required": true},
