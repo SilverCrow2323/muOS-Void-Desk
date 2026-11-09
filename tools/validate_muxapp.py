@@ -13,6 +13,8 @@ REQUIRED_FILES = (
     "Void-Desk/mux_launch.sh",
     "Void-Desk/voiddesk.py",
     "Void-Desk/love/main.lua",
+    "Void-Desk/outdesk/VoidCast/voidcast/main.py",
+    "Void-Desk/outdesk/VoidCast/presets/config.default.json",
 )
 
 
