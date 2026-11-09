@@ -31,7 +31,7 @@ def test_media_voidcast_writes_mux_handoff_and_exits_cleanly(tmp_path, monkeypat
 
     media.MediaHub(app).voidcast()
 
-    assert (data_dir / ".pending_session").read_text() == "voidcast\\n"
+    assert (data_dir / ".pending_session").read_text() == "voidcast\n"
     assert app.handoff_label == "AVVIO VOIDCAST IPTV..."
     assert app.exit_code == 0
     assert app.running is False
