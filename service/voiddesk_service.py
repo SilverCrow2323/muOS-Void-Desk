@@ -1164,6 +1164,7 @@ def _kill_xfce_procs():
                 try: proc.kill()
                 except Exception: pass
 atexit.register(_kill_xfce_procs)
+atexit.register(stop_device_agent)
 
 def _tail_log(path, n=12):
     try:
