@@ -207,3 +207,45 @@ def test_sunshine_web_ui_socket_is_declared_once():
 
     assert len(matches) == 1
     assert matches[0]["id"] == "sunshine-web-ui"
+
+
+def test_registry_reports_malformed_field_types_without_crashing():
+    registry = load_registry_module()
+    data = {
+        "schema": "spdw-service-registry",
+        "version": 1,
+        "policy": {"management_listener_limit_per_host": True},
+        "services": [{
+            "id": "malformed",
+            "type": "listener",
+            "host": {},
+            "protocol": [],
+            "port": True,
+            "bind": {},
+            "exposure": [],
+            "auth": {},
+            "owner": "",
+        }, {
+            "id": "malformed-family",
+            "type": "protocol-family",
+            "host": [],
+            "base_port": True,
+            "members": [{
+                "name": "bad",
+                "port": True,
+                "protocol": {},
+            }],
+        }],
+    }
+
+    errors = registry.validate_registry(data)
+
+    assert any("management_listener_limit_per_host" in error for error in errors)
+    assert any("malformed has invalid host role" in error for error in errors)
+    assert any("malformed has invalid protocol" in error for error in errors)
+    assert any("malformed has invalid port" in error for error in errors)
+    assert any("malformed has invalid bind policy" in error for error in errors)
+    assert any("malformed has invalid exposure policy" in error for error in errors)
+    assert any("malformed has invalid auth model" in error for error in errors)
+    assert any("malformed-family has invalid host role" in error for error in errors)
+    assert any("malformed-family has invalid base_port" in error for error in errors)
