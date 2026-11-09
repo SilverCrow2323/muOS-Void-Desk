@@ -59,6 +59,13 @@ try:
 except Exception:
     tailscale_manager = None
 
+try:
+    from spdw_hub.device_agent import DeviceAgent
+except Exception:
+    DeviceAgent = None
+
+_DEVICE_AGENT = None
+
 def log(msg):
     print(f"[service] {msg}", file=sys.stderr, flush=True)
 
@@ -66,6 +73,58 @@ def log(msg):
 def h_ping(args):
     return {"ok": True, "pong": True, "device": IS_DEVICE,
             "machine": platform.machine()}
+
+
+def h_hub_gateway_status(args):
+    agent = _DEVICE_AGENT
+    if agent is None:
+        return {"ok": False, "running": False,
+                "error": "SPDW Device Agent is unavailable"}
+    return agent.status()
+
+
+def h_hub_gateway_rotate_pin(args):
+    agent = _DEVICE_AGENT
+    if agent is None:
+        return {"ok": False, "error": "SPDW Device Agent is unavailable"}
+    try:
+        return {"ok": True, "pairing_pin": agent.rotate_pairing_pin()}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:160]}
+
+
+def start_device_agent():
+    global _DEVICE_AGENT
+    if not IS_DEVICE or IS_VISUAL_CAPTURE or DeviceAgent is None:
+        return False
+    if _DEVICE_AGENT is not None and _DEVICE_AGENT.is_running:
+        return True
+    try:
+        port = int(os.environ.get("SPDW_HUB_PORT", "8765"))
+        _DEVICE_AGENT = DeviceAgent(
+            DATA,
+            APP_DIR / "assets" / "basestation",
+            host=os.environ.get("SPDW_HUB_BIND", "0.0.0.0"),
+            port=port,
+        )
+        _DEVICE_AGENT.start()
+        log("SPDW Device Agent listening on {}:{}".format(
+            _DEVICE_AGENT.host, _DEVICE_AGENT.port))
+        return True
+    except Exception as exc:
+        log("SPDW Device Agent failed to start: {}".format(exc))
+        _DEVICE_AGENT = None
+        return False
+
+
+def stop_device_agent():
+    global _DEVICE_AGENT
+    if _DEVICE_AGENT is not None:
+        try:
+            _DEVICE_AGENT.stop()
+        finally:
+            _DEVICE_AGENT = None
+
 
 def h_get_config(args):
     try:
@@ -1447,12 +1506,15 @@ HANDLERS = {
     "apt_update": h_apt_update,
     "env_install": h_env_install,
     "voidcast_launch": h_voidcast_launch,
+    "hub_gateway_status": h_hub_gateway_status,
+    "hub_gateway_rotate_pin": h_hub_gateway_rotate_pin,
 }
 
 # ── main loop ────────────────────────────────────────────
 def main():
     log(f"started  machine={platform.machine()}  device={IS_DEVICE}")
     log(f"req={REQ}  resp={RESP}")
+    start_device_agent()
     # A previous service process may have been interrupted mid-request.
     # Its claim file is no longer owned by a live worker.
     try:
