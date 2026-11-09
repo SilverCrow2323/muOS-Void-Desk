@@ -96,6 +96,7 @@ INBOX_FILE = CONFIG_DIR / "inbox.jsonl"
 OUTBOX_FILE = CONFIG_DIR / "outbox.json"
 DEVICE_STATE_FILE = CONFIG_DIR / "uplink_devices.json"
 COMMANDS_FILE = CONFIG_DIR / "uplink_commands.json"
+DEVICE_OUTBOX_FILE = CONFIG_DIR / "uplink_device_outbox.json"
 INCOMING_DIR = CONFIG_DIR / "incoming"
 
 MAX_JSON_BODY = 48 * 1024 * 1024
@@ -677,6 +678,37 @@ class DaemonStore:
             atomic_write_json(COMMANDS_FILE, commands)
             return pending if isinstance(pending, list) else []
 
+    def device_outbox_push(self, device_id, title, body=""):
+        safe_id = self._safe_device_id(device_id)
+        with self._lock:
+            try:
+                boxes = json.loads(DEVICE_OUTBOX_FILE.read_text(encoding="utf-8"))
+                if not isinstance(boxes, dict):
+                    boxes = {}
+            except (OSError, ValueError):
+                boxes = {}
+            items = boxes.setdefault(safe_id, [])
+            items.append({
+                "title": str(title)[:80],
+                "body": str(body)[:300],
+                "ts": datetime.now().isoformat(timespec="seconds"),
+            })
+            boxes[safe_id] = items[-50:]
+            atomic_write_json(DEVICE_OUTBOX_FILE, boxes)
+
+    def device_outbox_drain(self, device_id):
+        safe_id = self._safe_device_id(device_id)
+        with self._lock:
+            try:
+                boxes = json.loads(DEVICE_OUTBOX_FILE.read_text(encoding="utf-8"))
+                if not isinstance(boxes, dict):
+                    boxes = {}
+            except (OSError, ValueError):
+                boxes = {}
+            pending = boxes.pop(safe_id, [])
+            atomic_write_json(DEVICE_OUTBOX_FILE, boxes)
+            return pending if isinstance(pending, list) else []
+
     def save_incoming(self, device_id, filename, payload):
         safe_id = self._safe_device_id(device_id)
         name = os.path.basename(str(filename or "").replace("\\", "/"))
@@ -771,11 +803,13 @@ def make_daemon_handler(store):
                 return self._json({"messages": store.outbox_read(drain=True)})
             if path == "/devices":
                 return self._json({"devices": store.devices_read()})
-            match = re.fullmatch(r"/device/([A-Za-z0-9_.-]{1,80})/(command|stats)", path)
+            match = re.fullmatch(r"/device/([A-Za-z0-9_.-]{1,80})/(command|stats|outbox)", path)
             if match:
                 device_id, action = match.groups()
                 if action == "command":
                     return self._json({"commands": store.command_drain(device_id)})
+                if action == "outbox":
+                    return self._json({"messages": store.device_outbox_drain(device_id)})
                 device = store.device_stats_get(device_id)
                 if device is None:
                     return self._json({"error": "device not found"}, 404)
