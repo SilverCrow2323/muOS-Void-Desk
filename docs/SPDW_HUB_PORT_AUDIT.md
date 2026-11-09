@@ -40,6 +40,12 @@ The PC Link client in `desk/pcuplink.py` discovers BaseStation on port
 The BaseStation PC companion is the natural place for the PC dashboard and
 existing SSH/SFTP tools. Avoid adding a separate dashboard server.
 
+**Transport security limitation:** the current port 8420 compatibility API
+uses plain HTTP with a bearer token in a request header. Authentication is
+not encryption. Until HTTPS or an equivalent authenticated tunnel is enforced,
+use this API only on a trusted LAN or through Tailscale; do not forward it to
+the public Internet or use it on an untrusted network.
+
 ## 2. Configured optional service defaults
 
 These are entries in BaseStation's service profile and scanner, not an assertion
