@@ -243,7 +243,46 @@ activation and UI mounting are still future phases; discovery is not activation.
 - Capture screenshots and update the wiki.
 - Verify the final .muxapp and PC companion artifacts.
 
-## 9. Definition of done
+## 9. Implemented foundations in the 10.5.4 work branch
+
+The following pieces now have code and focused tests on the current work branch:
+
+- The handheld Device Agent is hosted inside the existing
+  `service/voiddesk_service.py` process on compatibility port `8765`.
+- The old Pygame-owned HTTP server has been removed; Python and LÖVE share
+  the already-running service lifecycle.
+- The handheld file portal uses a generated pairing PIN, authenticated
+  session cookie, CSRF checks, login throttling, body limits and canonical
+  path checks. Existing file UI routes are kept for compatibility.
+- The PC companion keeps the existing PC Link listener `8420`, now with
+  generated bearer-token pairing, per-device message queues, handheld
+  telemetry, screenshot requests, file inbox, backups and diagnostics.
+- The source-level service/port registry and non-executing add-on manifest
+  validator are in `service/spdw_hub/`.
+- The .muxapp builder and validator now require the Device Agent package.
+- A separate reproducible BaseStation 4.0 PC ZIP and release workflow are
+  defined alongside the muOS .muxapp artifact.
+
+These are implemented source changes, not claims of a completed release:
+CI for the final head, a real device run and live listener ownership checks
+are still required.
+
+### Remaining integration work
+
+- Rt:Tailscale still has its own legacy panel lifecycle; it must be routed
+  through the Hub or bound to loopback with its existing PIN/session/CSRF
+  protections preserved.
+- The RT Stream/Sunshine daemon source has not yet been found in the
+  inspected Void Desk tree. Its real repository, commands and current
+  listener configuration must be imported and audited before implementing
+  the add-on adapter.
+- App Catalog/APT actions need to be surfaced as Hub jobs; underlying catalog
+  and service capabilities must be reused instead of starting a second
+  package manager.
+- The full PC dashboard tab structure and add-on runtime are still being
+  built on the BaseStation foundation.
+
+## 10. Definition of done
 
 - A single authenticated management dashboard per node.
 - No unauthenticated file-management endpoint on the LAN.
