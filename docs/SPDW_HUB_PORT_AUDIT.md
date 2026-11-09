@@ -86,7 +86,19 @@ Useful upstream references:
 | Sunshine streaming | Sunshine daemon | Only required TCP/UDP media ports |
 | Syncthing/FileBrowser/other web apps | Respective existing services | Prefer API/SSH adapters; no duplicate Hub-managed web listeners |
 
-## 5. Live audit command set
+## 5. Machine-readable registry
+
+The initial source-of-truth inventory is
+`service/spdw_hub/services.json`; its passive validator is
+`service/spdw_hub/registry.py`. It separates listeners from protocol
+subsystems, optional profile defaults and protocol families. This prevents
+an SSH SFTP subsystem from being counted as a second socket and keeps the
+Sunshine media transport distinct from the HTTP management gateway.
+
+The registry describes target/migration policy, not live state. It must be
+compared with the active socket/process scan before a listener is changed.
+
+## 6. Live audit command set
 
 Before changing any bind address or stopping a legacy service, collect this
 from each device:
