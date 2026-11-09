@@ -95,6 +95,11 @@ subsystems, optional profile defaults and protocol families. This prevents
 an SSH SFTP subsystem from being counted as a second socket and keeps the
 Sunshine media transport distinct from the HTTP management gateway.
 
+The registry validates socket collisions across both ordinary listeners and
+protocol-family members. Sunshine's TCP 47990 Web UI is represented once as
+the separately managed, loopback-only listener; the transport family lists
+the remaining TCP/UDP GameStream sockets without duplicating that endpoint.
+
 The registry describes target/migration policy, not live state. It must be
 compared with the active socket/process scan before a listener is changed.
 
