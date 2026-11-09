@@ -16,6 +16,7 @@ SOURCE_DIR = ROOT / "assets" / "basestation"
 REQUIRED_FILES = (
     "basestation.py",
     "basestation_core.py",
+    "pc_hub.html",
     "requirements.txt",
     "README.md",
     "run_basestation.sh",
@@ -49,8 +50,11 @@ def build_archive(source_dir, output_path, version="4.0.0"):
         return candidate
 
     missing = [name for name in REQUIRED_FILES if not source_for(name).is_file()]
+    registry_source = ROOT / "service" / "spdw_hub" / "services.json"
     if missing:
         raise RuntimeError("BaseStation PC source is incomplete: " + ", ".join(missing))
+    if not registry_source.is_file():
+        raise RuntimeError("SPDW service registry is missing: {}".format(registry_source))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     root_name = "VOID-BaseStation-{}".format(version)
@@ -70,6 +74,18 @@ def build_archive(source_dir, output_path, version="4.0.0"):
             info.flag_bits |= 0x800
             archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED,
                              compresslevel=9)
+
+        # Keep the single source-of-truth registry in the PC companion bundle
+        # beside basestation.py so the web dashboard can render service policy.
+        data = registry_source.read_bytes()
+        info = zipfile.ZipInfo("{}/services.json".format(root_name),
+                               date_time=ZIP_EPOCH)
+        info.create_system = 3
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = (stat.S_IFREG | 0o644) << 16
+        info.flag_bits |= 0x800
+        archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED,
+                         compresslevel=9)
 
     checksum = sha256_file(output_path)
     sidecar = output_path.with_name(output_path.name + ".sha256")
