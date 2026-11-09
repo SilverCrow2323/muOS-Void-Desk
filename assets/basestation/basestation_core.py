@@ -338,7 +338,6 @@ def collect_listener_snapshot(timeout=6, max_chars=250000):
         "stdout": "",
         "stderr": "; ".join(failures) or "no listener tool available",
     }
-\n
 
 def enqueue_device_message(queues, device_id, message, limit=50):
     """Append a message to one device's bounded queue without touching others."""

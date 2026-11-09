@@ -93,3 +93,11 @@ The PC companion requires a graphical desktop with Tkinter. SSH/SFTP functions
 require a reachable SSH service and working credentials on the handheld.
 Pillow and psutil are optional enhancements; the app has fallback behavior
 when they are unavailable.
+
+## License
+
+No `LICENSE` file is currently present in this repository checkout. The PC
+companion builder includes a companion-specific or repository-level license
+file when one is supplied, but it does not invent license terms or grant
+redistribution rights. Confirm the project's licensing terms before
+redistributing this archive.

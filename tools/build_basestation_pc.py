@@ -21,7 +21,6 @@ REQUIRED_FILES = (
     "requirements.txt",
     "README.md",
     "run_basestation.sh",
-    "LICENSE",
 )
 ZIP_EPOCH = (2024, 1, 1, 0, 0, 0)
 
@@ -44,8 +43,8 @@ def build_archive(source_dir, output_path, version="4.0.0"):
         candidate = source_dir / name
         if candidate.is_file():
             return candidate
-        # The project has one repository-level license; include that exact
-        # file in the standalone companion rather than maintaining a copy.
+        # Include an exact project or companion license only when supplied;
+        # never invent license terms for this archive.
         if name == "LICENSE" and (ROOT / "LICENSE").is_file():
             return ROOT / "LICENSE"
         return candidate
@@ -56,6 +55,7 @@ def build_archive(source_dir, output_path, version="4.0.0"):
         raise RuntimeError("BaseStation PC source is incomplete: " + ", ".join(missing))
     if not registry_source.is_file():
         raise RuntimeError("SPDW service registry is missing: {}".format(registry_source))
+    package_files = REQUIRED_FILES + (("LICENSE",) if source_for("LICENSE").is_file() else ())
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     root_name = "VOID-BaseStation-{}".format(version)
@@ -63,7 +63,7 @@ def build_archive(source_dir, output_path, version="4.0.0"):
         output_path, "w", compression=zipfile.ZIP_DEFLATED,
         compresslevel=9, allowZip64=True
     ) as archive:
-        for name in REQUIRED_FILES:
+        for name in package_files:
             source = source_for(name)
             data = source.read_bytes()
             info = zipfile.ZipInfo(

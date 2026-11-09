@@ -23,7 +23,7 @@ def make_source(root):
     root.mkdir(parents=True, exist_ok=True)
     for name in ("basestation.py", "basestation_core.py", "basestation_web.py",
                  "pc_hub.html", "requirements.txt", "README.md",
-                 "run_basestation.sh", "LICENSE"):
+                 "run_basestation.sh"):
         (root / name).write_text("# {}\\n".format(name), encoding="utf-8")
 
 
@@ -46,6 +46,7 @@ def test_pc_companion_archive_has_expected_root_and_executable_launcher(tmp_path
         assert "VOID-BaseStation-4.0.0/pc_hub.html" in names
         assert "VOID-BaseStation-4.0.0/services.json" in names
         assert "VOID-BaseStation-4.0.0/basestation_web.py" in names
+        assert "VOID-BaseStation-4.0.0/LICENSE" not in names
         registry = json.loads(package.read("VOID-BaseStation-4.0.0/services.json"))
         assert registry["schema"] == "spdw-service-registry"
         launcher = package.getinfo("VOID-BaseStation-4.0.0/run_basestation.sh")
@@ -77,3 +78,16 @@ def test_pc_companion_builder_rejects_incomplete_source(tmp_path):
         assert "basestation_core.py" in str(exc)
     else:
         raise AssertionError("incomplete PC companion must not be packaged")
+
+
+def test_pc_companion_includes_optional_license_when_supplied(tmp_path):
+    builder = load_builder()
+    source = tmp_path / "source"
+    make_source(source)
+    (source / "LICENSE").write_text("Explicit companion license\\n", encoding="utf-8")
+    output = tmp_path / "licensed.zip"
+
+    builder.build_archive(source, output)
+
+    with zipfile.ZipFile(output) as package:
+        assert package.read("VOID-BaseStation-4.0.0/LICENSE").decode("utf-8") == "Explicit companion license\\n"
