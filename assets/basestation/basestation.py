@@ -184,6 +184,11 @@ def status_color(state):
     }.get(state, TEXT_DIM)
 
 
+def _safe_backup_name(value):
+    cleaned = "".join(c if c.isalnum() or c in "-_." else "_" for c in str(value))
+    return cleaned.strip("._")[:64] or "console"
+
+
 def open_ssh_terminal(ip, port, user):
     ssh_argv = ["ssh", "-p", str(port), "{}@{}".format(user, ip)]
     system = platform.system()
@@ -1824,6 +1829,8 @@ class MediaPanel(tk.Frame):
         btns.pack(fill="x", pady=6)
         HudButton(btns, "+ Add Pair", self._add_pair).pack(side="left", padx=2)
         HudButton(btns, "Analyse Differences", self._analyze, accent=MAGENTA).pack(side="left", padx=2)
+        HudButton(btns, "BACKUP ZIP", self._backup, accent=ORANGE,
+                  tooltip="Create a read-only ZIP snapshot of selected remote folders").pack(side="left", padx=2)
         HudButton(btns, "SYNC NOW", self._sync, accent=CYAN).pack(side="left", padx=2)
         self.status_lbl = tk.Label(btns, text="", fg=TEXT_DIM, bg=BG0, font=FONT_SMALL)
         self.status_lbl.pack(side="right")
@@ -2022,6 +2029,84 @@ class MediaPanel(tk.Frame):
                 self.app.status_queue.put(("sync_status", ("Analysis error", RED)))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _backup(self):
+        self._save_rows()
+        creds = self._ssh_creds()
+        if not creds:
+            messagebox.showinfo("Backup", "A device with SFTP/SSH service is required.")
+            return
+        pairs = [p for p in self.app.cfg.uplink().get("sync_pairs", [])
+                 if p.get("enabled") and p.get("remote")]
+        if not pairs:
+            messagebox.showinfo("Backup", "Configure at least one active remote folder.")
+            return
+        d = self.app.current_device()
+        device_slug = _safe_backup_name(self.app.selected_device or "console")
+        backup_dir = Path.home() / "Videos" / "VOID_Backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        filename = "{}_{}.zip".format(
+            device_slug, datetime.now().strftime("%Y%m%d_%H%M%S"))
+        path = filedialog.asksaveasfilename(
+            title="Create remote backup", initialdir=str(backup_dir),
+            initialfile=filename, defaultextension=".zip",
+            filetypes=[("ZIP backup", "*.zip")])
+        if not path:
+            return
+        if not messagebox.askyesno(
+            "Confirm Backup",
+            "Create a read-only backup of {} remote folder(s)?\\n\\n"
+            "No console files will be modified or deleted.\\n"
+            "SHA-256 checksums and a manifest will be included.".format(len(pairs))
+        ):
+            return
+
+        roots = [{"name": p.get("name", "folder"), "path": p["remote"]}
+                 for p in pairs]
+        metadata = {
+            "application": APP_NAME,
+            "application_version": APP_VERSION,
+            "device_name": self.app.selected_device,
+            "device_ip": d.get("ip") if d else None,
+        }
+        self.status_lbl.config(text="Backing up...", fg=ORANGE)
+        self.sync_progress_lbl.config(text="Starting remote snapshot...", fg=ORANGE)
+        self._log("[{}] Remote backup started".format(
+            datetime.now().strftime("%H:%M:%S")))
+
+        def worker():
+            try:
+                with SFTPSync(*creds) as sync:
+                    manifest = create_remote_backup(
+                        sync.sftp, roots, path, metadata=metadata,
+                        progress_callback=lambda rel, done, total:
+                            self.app.status_queue.put((
+                                "sync_log", "  [{}/{}] {}".format(done, total, rel))))
+                self.app.status_queue.put(("backup_complete", (path, manifest)))
+            except Exception as e:
+                self.app.status_queue.put(("backup_error", str(e)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_backup_complete(self, payload):
+        path, manifest = payload
+        count = len(manifest.get("files", []))
+        total = sum(item.get("size_bytes", 0) for item in manifest.get("files", []))
+        self.status_lbl.config(text="Backup complete", fg=CYAN)
+        self.sync_progress_lbl.config(text="{} files · {:.1f} MiB".format(
+            count, total / (1024.0 * 1024.0)), fg=CYAN)
+        self._log("Backup saved: {}".format(path))
+        messagebox.showinfo(
+            "Backup complete",
+            "{} file(s), {:.1f} MiB\\n\\n{}\\n\\n"
+            "Manifest and SHA-256 checksums included.".format(
+                count, total / (1024.0 * 1024.0), path))
+
+    def on_backup_error(self, message):
+        self.status_lbl.config(text="Backup failed", fg=RED)
+        self.sync_progress_lbl.config(text="Backup failed", fg=RED)
+        self._log("BACKUP ERROR: {}".format(message))
+        messagebox.showerror("Backup failed", message)
 
     def _sync(self):
         self._save_rows()
@@ -3005,6 +3090,10 @@ class VOIDBaseStation(tk.Tk):
                 elif kind == "sync_status":
                     text, color = payload
                     self.media_panel.on_status(text, color)
+                elif kind == "backup_complete":
+                    self.media_panel.on_backup_complete(payload)
+                elif kind == "backup_error":
+                    self.media_panel.on_backup_error(payload)
                 elif kind == "scan_complete":
                     self._refresh_sidebar()
                     self.log("Network scan complete — {} host(s) found".format(payload), "ok")
