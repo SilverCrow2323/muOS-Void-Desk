@@ -55,7 +55,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from basestation_core import (
-    atomic_write_json, create_remote_backup, generate_auth_token, token_matches,
+    atomic_write_json, collect_host_stats, create_remote_backup,
+    generate_auth_token, token_matches,
 )
 
 try:
@@ -93,6 +94,13 @@ CONFIG_FILE = CONFIG_DIR / "profiles.json"
 DAEMON_CFG = CONFIG_DIR / "daemon.json"
 INBOX_FILE = CONFIG_DIR / "inbox.jsonl"
 OUTBOX_FILE = CONFIG_DIR / "outbox.json"
+DEVICE_STATE_FILE = CONFIG_DIR / "uplink_devices.json"
+COMMANDS_FILE = CONFIG_DIR / "uplink_commands.json"
+INCOMING_DIR = CONFIG_DIR / "incoming"
+
+MAX_JSON_BODY = 48 * 1024 * 1024
+MAX_UPLINK_FILE = 32 * 1024 * 1024
+MAX_UPLINK_SCREENSHOT = 12 * 1024 * 1024
 
 CONSOLE_APP_DIR = Path(__file__).resolve().parent / "console_app"
 CONSOLE_APP_REMOTE = "/mnt/mmc/MUOS/application/VOID_Uplink"
@@ -160,7 +168,7 @@ ANSI_OSC_RE = re.compile(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)')
 ANSI_OTHER_RE = re.compile(r'\x1b[()][A-Za-z0-9]|\x1b[=>]')
 
 DEFAULT_UPLINK = {
-    "daemon_port": 31337,
+    "daemon_port": 8420,
     "daemon_bind": "0.0.0.0",
     "daemon_autostart": True,
     "sync_pairs": [
@@ -544,7 +552,7 @@ class SSHManager:
 class DaemonStore:
     def __init__(self):
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        self.cfg = {"port": 31337, "pc_name": socket.gethostname(),
+        self.cfg = {"port": 8420, "pc_name": socket.gethostname(),
                     "token": "", "bind_host": "0.0.0.0"}
         self._lock = threading.Lock()
         if DAEMON_CFG.exists():
@@ -562,7 +570,7 @@ class DaemonStore:
 
     def save(self):
         with self._lock:
-            self.cfg["port"] = int(self.cfg.get("port", 31337))
+            self.cfg["port"] = int(self.cfg.get("port", 8420))
             self.cfg["bind_host"] = str(self.cfg.get("bind_host") or "0.0.0.0")
             atomic_write_json(DAEMON_CFG, self.cfg, mode=0o600)
 
@@ -597,6 +605,97 @@ class DaemonStore:
         with self._lock:
             with open(INBOX_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    @staticmethod
+    def _safe_device_id(device_id):
+        return re.sub(r"[^A-Za-z0-9_.-]", "_", str(device_id or ""))[:80] or "unknown"
+
+    def devices_read(self):
+        with self._lock:
+            try:
+                data = json.loads(DEVICE_STATE_FILE.read_text(encoding="utf-8"))
+                return data if isinstance(data, dict) else {}
+            except (OSError, ValueError):
+                return {}
+
+    def device_stats_push(self, device_id, name, stats):
+        safe_id = self._safe_device_id(device_id)
+        with self._lock:
+            try:
+                devices = json.loads(DEVICE_STATE_FILE.read_text(encoding="utf-8"))
+                if not isinstance(devices, dict):
+                    devices = {}
+            except (OSError, ValueError):
+                devices = {}
+            devices[safe_id] = {
+                "id": safe_id, "name": str(name or safe_id)[:80],
+                "stats": stats if isinstance(stats, dict) else {},
+                "last_seen": datetime.now().isoformat(timespec="seconds"),
+            }
+            atomic_write_json(DEVICE_STATE_FILE, devices)
+
+    def device_stats_get(self, device_id):
+        return self.devices_read().get(self._safe_device_id(device_id))
+
+    def command_push(self, device_id, command):
+        safe_id = self._safe_device_id(device_id)
+        if command not in ("screenshot",):
+            raise ValueError("unsupported Uplink command")
+        with self._lock:
+            try:
+                commands = json.loads(COMMANDS_FILE.read_text(encoding="utf-8"))
+                if not isinstance(commands, dict):
+                    commands = {}
+            except (OSError, ValueError):
+                commands = {}
+            queue_for_device = commands.setdefault(safe_id, [])
+            queue_for_device.append({
+                "cmd": command,
+                "ts": datetime.now().isoformat(timespec="seconds"),
+            })
+            commands[safe_id] = queue_for_device[-20:]
+            atomic_write_json(COMMANDS_FILE, commands)
+
+    def command_drain(self, device_id):
+        safe_id = self._safe_device_id(device_id)
+        with self._lock:
+            try:
+                commands = json.loads(COMMANDS_FILE.read_text(encoding="utf-8"))
+                if not isinstance(commands, dict):
+                    commands = {}
+            except (OSError, ValueError):
+                commands = {}
+            pending = commands.pop(safe_id, [])
+            atomic_write_json(COMMANDS_FILE, commands)
+            return pending if isinstance(pending, list) else []
+
+    def save_incoming(self, device_id, filename, payload):
+        safe_id = self._safe_device_id(device_id)
+        name = os.path.basename(str(filename or "").replace("\\", "/"))
+        name = "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
+        name = name.strip("._")
+        if not name:
+            raise ValueError("a safe filename is required")
+        target_dir = INCOMING_DIR / safe_id
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / name
+        if target.exists():
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            target = target_dir / "{}_{}{}".format(target.stem, stamp, target.suffix)
+        temp = target.with_name(target.name + ".partial")
+        try:
+            with open(temp, "wb") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(str(temp), str(target))
+        except Exception:
+            try:
+                temp.unlink()
+            except OSError:
+                pass
+            raise
+        return target
 
 
 def make_daemon_handler(store):
@@ -679,7 +778,7 @@ class EmbeddedDaemon:
 
     def __init__(self, cfg_manager):
         self.cfg_mgr = cfg_manager
-        self.port = int(self.cfg_mgr.uplink().get("daemon_port", 31337))
+        self.port = int(self.cfg_mgr.uplink().get("daemon_port", 8420))
         self.host = str(self.cfg_mgr.uplink().get("daemon_bind", "0.0.0.0"))
         self.store = DaemonStore()
         self.store.cfg["port"] = self.port
