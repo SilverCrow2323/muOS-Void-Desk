@@ -141,7 +141,7 @@ while true; do
                     python3 "$APP_DIR/bin/bootstrap_lite.py" >>"$LOG" 2>&1
                     BOOT_RC=$?
                     if [ $BOOT_RC -ne 0 ] || [ ! -f "$MARKER" ] || [ ! -d "$APP_DIR/runtime" ]; then
-                        echo "$(date) VoidCast runtime bootstrap FAILED (rc=$_BOOT_RC); returning to VoidDesk" >>"$LOG"
+                        echo "$(date) VoidCast runtime bootstrap FAILED (rc=$BOOT_RC); returning to VoidDesk" >>"$LOG"
                         continue
                     fi
                 fi
