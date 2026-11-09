@@ -38,8 +38,17 @@ def build_archive(source_dir, output_path, version="4.0.0"):
     if not version or any(ch not in "0123456789.-" for ch in version):
         raise ValueError("version must contain only digits, dots and hyphens")
 
-    missing = [name for name in REQUIRED_FILES
-               if not (source_dir / name).is_file()]
+    def source_for(name):
+        candidate = source_dir / name
+        if candidate.is_file():
+            return candidate
+        # The project has one repository-level license; include that exact
+        # file in the standalone companion rather than maintaining a copy.
+        if name == "LICENSE" and (ROOT / "LICENSE").is_file():
+            return ROOT / "LICENSE"
+        return candidate
+
+    missing = [name for name in REQUIRED_FILES if not source_for(name).is_file()]
     if missing:
         raise RuntimeError("BaseStation PC source is incomplete: " + ", ".join(missing))
 
@@ -50,7 +59,7 @@ def build_archive(source_dir, output_path, version="4.0.0"):
         compresslevel=9, allowZip64=True
     ) as archive:
         for name in REQUIRED_FILES:
-            source = source_dir / name
+            source = source_for(name)
             data = source.read_bytes()
             info = zipfile.ZipInfo(
                 "{}/{}".format(root_name, name), date_time=ZIP_EPOCH)
