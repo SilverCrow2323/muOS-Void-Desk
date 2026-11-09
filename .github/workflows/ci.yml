@@ -211,7 +211,7 @@ jobs:
           python-version: "3.11"
       - name: Build standalone BaseStation PC archive
         run: |
-          python tools/build_basestation_pc.py \\
+          python tools/build_basestation_pc.py \
             --output "$RUNNER_TEMP/VOID-BaseStation-4.0.0.zip"
           cd "$RUNNER_TEMP"
           sha256sum -c VOID-BaseStation-4.0.0.zip.sha256
