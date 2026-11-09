@@ -6,6 +6,7 @@
 #  la UI non si blocca mai, nemmeno a PC spento o irraggiungibile.
 # ============================================================================
 import json
+import re
 import threading
 import time
 import urllib.request
@@ -76,7 +77,8 @@ class PcClient:
         self.port = int(port) if port else 8420
         self.token = token
         self.poll_s = poll_s
-        self.device_id = device_id or "unknown"
+        self.device_id = re.sub(
+            r"[^A-Za-z0-9_.-]", "_", str(device_id or "unknown"))[:80] or "unknown"
         self.device_name = device_name
         self.stats_fn = stats_fn
         self.screenshot_fn = screenshot_fn
