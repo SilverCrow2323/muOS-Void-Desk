@@ -1,0 +1,224 @@
+{
+  "schema": "spdw-service-registry",
+  "version": 1,
+  "policy": {
+    "management_listener_limit_per_host": 1,
+    "handheld_management_port": 8765,
+    "pc_management_port": 8420,
+    "no_unregistered_listeners": true,
+    "legacy_services_loopback_only": true,
+    "remote_management_requires_auth": true
+  },
+  "services": [
+    {
+      "id": "spdw-device-gateway",
+      "type": "listener",
+      "host": "handheld",
+      "protocol": "tcp",
+      "port": 8765,
+      "bind": "all",
+      "exposure": "lan-or-tailnet",
+      "auth": "spdw-pairing-session",
+      "owner": "spdw-device-agent",
+      "management": true,
+      "state": "implemented-source-unverified-hardware",
+      "routes": [
+        "/",
+        "/api/v1/",
+        "/files/",
+        "/apps/",
+        "/addons/"
+      ],
+      "notes": "Service-owned authenticated Device Agent on the legacy BaseStation port. Pairing PIN, session cookie, CSRF protection, file-path canonicalization and upload limits are implemented; muOS hardware verification remains."
+    },
+    {
+      "id": "rt-tailscale-panel-legacy",
+      "type": "listener",
+      "host": "handheld",
+      "protocol": "tcp",
+      "port": 8077,
+      "bind": "loopback",
+      "exposure": "loopback",
+      "auth": "rt-pin-session+csrf",
+      "owner": "rt-tailscale-m",
+      "management": false,
+      "state": "migration",
+      "routes": [
+        "/apps/tailscale/"
+      ],
+      "notes": "Standalone upstream panel defaults to this port; the Void Desk package build disables its separate panel and binds it loopback-only where configured. Full in-process Hub route remains planned."
+    },
+    {
+      "id": "spdw-pc-gateway",
+      "type": "listener",
+      "host": "pc",
+      "protocol": "tcp",
+      "port": 8420,
+      "bind": "all",
+      "exposure": "lan-or-tailnet",
+      "auth": "device-token",
+      "owner": "spdw-hub-pc",
+      "management": true,
+      "state": "compatibility",
+      "routes": [
+        "/",
+        "/api/v1/uplink/",
+        "/api/v1/devices/",
+        "/addons/"
+      ],
+      "notes": "Existing PC Link listener and authenticated SPDW Hub browser dashboard at /; serves device inventory, notifications, screenshot requests and received-file inbox on the same port. No additional PC web listener."
+    },
+    {
+      "id": "ssh",
+      "type": "listener",
+      "host": "handheld",
+      "protocol": "tcp",
+      "port": 22,
+      "bind": "system",
+      "exposure": "lan-or-tailnet",
+      "auth": "ssh-host-auth",
+      "owner": "openssh-server",
+      "management": false,
+      "state": "system-optional",
+      "notes": "Retain only when enabled; use for terminal and SFTP subsystem when available."
+    },
+    {
+      "id": "sftp-subsystem",
+      "type": "subsystem",
+      "host": "handheld",
+      "protocol": "tcp",
+      "port": 22,
+      "bind": "system",
+      "exposure": "same-as-parent",
+      "auth": "ssh-host-auth",
+      "owner": "sshd",
+      "shares_listener_with": "ssh",
+      "state": "preferred",
+      "fallback_port": 2022,
+      "notes": "SFTP should reuse SSH transport; port 2022 is a profile fallback only when the image actually runs a separate SFTP service."
+    },
+    {
+      "id": "rt-tailscale-addon",
+      "type": "addon",
+      "host": "handheld",
+      "owner": "rt-tailscale-m",
+      "state": "adapter-planned",
+      "routes": [
+        "/apps/tailscale/"
+      ],
+      "notes": "Reuse the existing CLI, daemon and panel logic; do not start a second externally exposed management server."
+    },
+    {
+      "id": "rt-stream-addon",
+      "type": "addon",
+      "host": "pc",
+      "owner": "rt-stream",
+      "state": "source-audit-pending",
+      "routes": [
+        "/addons/rt-stream/"
+      ],
+      "notes": "The RT Stream daemon source and its existing listener contract must be imported and audited before an adapter is implemented."
+    },
+    {
+      "id": "sunshine-web-ui",
+      "type": "listener",
+      "host": "pc",
+      "protocol": "tcp",
+      "port": 47990,
+      "bind": "loopback",
+      "exposure": "loopback",
+      "auth": "sunshine-native-auth",
+      "owner": "sunshine",
+      "management": false,
+      "state": "target",
+      "routes": [
+        "/addons/rt-stream/sunshine/"
+      ],
+      "notes": "Management UI should be loopback-only and accessed through the PC Hub adapter."
+    },
+    {
+      "id": "sunshine-stream-transport",
+      "type": "protocol-family",
+      "host": "pc",
+      "owner": "sunshine",
+      "state": "protocol-required",
+      "base_port": 47989,
+      "members": [
+        {
+          "name": "https",
+          "port": 47984,
+          "protocol": "tcp",
+          "required": true
+        },
+        {
+          "name": "http",
+          "port": 47989,
+          "protocol": "tcp",
+          "required": true
+        },
+        {
+          "name": "rtsp",
+          "port": 48010,
+          "protocol": "tcp",
+          "required": true
+        },
+        {
+          "name": "video",
+          "port": 47998,
+          "protocol": "udp",
+          "required": true
+        },
+        {
+          "name": "control",
+          "port": 47999,
+          "protocol": "udp",
+          "required": true
+        },
+        {
+          "name": "audio",
+          "port": 48000,
+          "protocol": "udp",
+          "required": true
+        },
+        {
+          "name": "microphone",
+          "port": 48002,
+          "protocol": "udp",
+          "required": false,
+          "notes": "Unused in the documented defaults"
+        }
+      ],
+      "notes": "Protocol transport is not an HTTP management listener and cannot be collapsed into one browser port. Revalidate the installed Sunshine version and settings."
+    },
+    {
+      "id": "vterm-profile-default",
+      "type": "profile-default",
+      "host": "handheld",
+      "port": 8080,
+      "protocol": "tcp",
+      "owner": "external-vterm",
+      "state": "discover-only",
+      "notes": "BaseStation profile default only; not proof of an active listener."
+    },
+    {
+      "id": "filebrowser-profile-default",
+      "type": "profile-default",
+      "host": "handheld",
+      "port": 9090,
+      "protocol": "tcp",
+      "owner": "external-filebrowser",
+      "state": "discover-only",
+      "notes": "BaseStation profile default only; not proof of an active listener."
+    },
+    {
+      "id": "syncthing-profile-default",
+      "type": "profile-default",
+      "host": "handheld",
+      "port": 7070,
+      "protocol": "tcp",
+      "owner": "syncthing",
+      "state": "discover-only",
+      "notes": "BaseStation profile default only; not proof of an active listener."
+    }
+  ]
+}

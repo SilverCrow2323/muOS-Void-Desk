@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spdw.example/schemas/addon-v1.json",
+  "title": "SPDW Hub Add-on Manifest",
+  "type": "object",
+  "required": ["schema", "manifest_version", "id", "name", "version", "description", "author", "host", "entrypoint", "ui", "capabilities", "listeners", "dependencies"],
+  "properties": {
+    "schema": {"const": "spdw-addon"},
+    "manifest_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 80},
+    "version": {"type": "string", "minLength": 1, "maxLength": 40},
+    "description": {"type": "string", "minLength": 1, "maxLength": 500},
+    "author": {"type": "string", "minLength": 1, "maxLength": 80},
+    "host": {"enum": ["pc", "handheld", "both"]},
+    "entrypoint": {"type": "string", "minLength": 1},
+    "ui": {
+      "type": "object",
+      "required": ["label", "route"],
+      "properties": {
+        "label": {"type": "string", "minLength": 1},
+        "route": {"type": "string", "pattern": "^/addons/[a-z0-9._/-]+$"}
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "confirmation_actions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "listeners": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["host", "protocol", "port", "bind"],
+        "properties": {
+          "host": {"enum": ["pc", "handheld", "both"]},
+          "protocol": {"enum": ["tcp", "udp"]},
+          "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+          "bind": {"enum": ["loopback", "lan", "tailnet"]},
+          "auth": {"type": "string"},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "binaries": {"type": "array", "items": {"type": "string"}},
+        "python_modules": {"type": "array", "items": {"type": "string"}},
+        "services": {"type": "array", "items": {"type": "string"}},
+        "addons": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "additionalProperties": false
+}

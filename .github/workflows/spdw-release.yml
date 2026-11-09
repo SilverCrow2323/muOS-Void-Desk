@@ -1,0 +1,67 @@
+name: SPDW Release Assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-assets:
+    name: Build Void Desk and SPDW Hub PC assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build Void Desk muOS package
+        run: |
+          python tools/build_muxapp.py \
+            --output "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
+          python tools/validate_muxapp.py \
+            "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
+
+      - name: Build SPDW Hub PC companion
+        run: |
+          python tools/build_basestation_pc.py \
+            --output "$RUNNER_TEMP/VOID-BaseStation-4.0.0.zip"
+
+      - name: Generate and verify checksums
+        run: |
+          cd "$RUNNER_TEMP"
+          sha256sum Void-Desk-10.5.4.muxapp > Void-Desk-10.5.4.muxapp.sha256
+          sha256sum VOID-BaseStation-4.0.0.zip > VOID-BaseStation-4.0.0.zip.sha256
+          sha256sum -c Void-Desk-10.5.4.muxapp.sha256
+          sha256sum -c VOID-BaseStation-4.0.0.zip.sha256
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp
+            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp.sha256
+            ${{ runner.temp }}/VOID-BaseStation-4.0.0.zip
+            ${{ runner.temp }}/VOID-BaseStation-4.0.0.zip.sha256
+          fail_on_unmatched_files: true
+
+      - name: Upload workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spdw-release-assets
+          path: |
+            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp
+            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp.sha256
+            ${{ runner.temp }}/VOID-BaseStation-4.0.0.zip
+            ${{ runner.temp }}/VOID-BaseStation-4.0.0.zip.sha256
+          if-no-files-found: warn
+          retention-days: 30

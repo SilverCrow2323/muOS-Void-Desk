@@ -94,3 +94,11 @@ def poll():
                     elif code == 17:
                         _state["hy"] = value
     return out
+
+def sync_with_joystick(joystick_available):
+    """Use raw muOS evdev only on framebuffer devices without SDL joystick."""
+    if joystick_available or os.environ.get("VOIDCAST_FB") != "1":
+        stop()
+        return False
+    return start()
+

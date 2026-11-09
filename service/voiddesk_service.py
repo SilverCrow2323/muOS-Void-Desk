@@ -59,6 +59,13 @@ try:
 except Exception:
     tailscale_manager = None
 
+try:
+    from spdw_hub.device_agent import DeviceAgent
+except Exception:
+    DeviceAgent = None
+
+_DEVICE_AGENT = None
+
 def log(msg):
     print(f"[service] {msg}", file=sys.stderr, flush=True)
 
@@ -66,6 +73,58 @@ def log(msg):
 def h_ping(args):
     return {"ok": True, "pong": True, "device": IS_DEVICE,
             "machine": platform.machine()}
+
+
+def h_hub_gateway_status(args):
+    agent = _DEVICE_AGENT
+    if agent is None:
+        return {"ok": False, "running": False,
+                "error": "SPDW Device Agent is unavailable"}
+    return agent.status()
+
+
+def h_hub_gateway_rotate_pin(args):
+    agent = _DEVICE_AGENT
+    if agent is None:
+        return {"ok": False, "error": "SPDW Device Agent is unavailable"}
+    try:
+        return {"ok": True, "pairing_pin": agent.rotate_pairing_pin()}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:160]}
+
+
+def start_device_agent():
+    global _DEVICE_AGENT
+    if not IS_DEVICE or IS_VISUAL_CAPTURE or DeviceAgent is None:
+        return False
+    if _DEVICE_AGENT is not None and _DEVICE_AGENT.is_running:
+        return True
+    try:
+        port = int(os.environ.get("SPDW_HUB_PORT", "8765"))
+        _DEVICE_AGENT = DeviceAgent(
+            DATA,
+            APP_DIR / "assets" / "basestation",
+            host=os.environ.get("SPDW_HUB_BIND", "0.0.0.0"),
+            port=port,
+        )
+        _DEVICE_AGENT.start()
+        log("SPDW Device Agent listening on {}:{}".format(
+            _DEVICE_AGENT.host, _DEVICE_AGENT.port))
+        return True
+    except Exception as exc:
+        log("SPDW Device Agent failed to start: {}".format(exc))
+        _DEVICE_AGENT = None
+        return False
+
+
+def stop_device_agent():
+    global _DEVICE_AGENT
+    if _DEVICE_AGENT is not None:
+        try:
+            _DEVICE_AGENT.stop()
+        finally:
+            _DEVICE_AGENT = None
+
 
 def h_get_config(args):
     try:
@@ -278,11 +337,6 @@ def _external_tool_target(tool):
     """Resolve a registry launcher without permitting arbitrary path escape."""
     launcher = str(tool.get("launcher") or "")
     kind = tool.get("launcher_type")
-    if kind == "portable-voidcast" and launcher == "../VoidCast":
-        target = (APP_DIR.parent / "VoidCast").resolve()
-        if target.parent == APP_DIR.parent.resolve():
-            return target
-        return None
     target = (APP_DIR / launcher).resolve()
     try:
         target.relative_to(APP_DIR.resolve())
@@ -313,8 +367,8 @@ def h_list_external(args):
             exists = target.is_file()
         elif kind == "portable-voidcast":
             exists = target.is_dir() and (
-                (target / "mux_launch.sh").is_file()
-                or (target / "voidcast.py").is_file()
+                (target / "voidcast" / "main.py").is_file()
+                and (target / "presets" / "config.default.json").is_file()
             )
         else:
             exists = False
@@ -333,6 +387,10 @@ def h_list_external(args):
 
 def h_launch_external(args):
     tool_id = str(args.get("id") or "")
+    # VoidCast is a full-screen Outdesk application. It must use the
+    # mux_launch session hand-off, not the generic background job runner.
+    if tool_id == "voidcast":
+        return h_voidcast_launch(args)
     return h_job_start({
         "tool_id": tool_id,
         "name": "External: " + tool_id,
@@ -1000,11 +1058,18 @@ def h_voidcast_launch(args):
     dcheck = device_only("voidcast_launch")
     if dcheck:
         return dcheck
-    script = APP_DIR / "outdesk" / "VoidCast" / "voidcast" / "main.py"
-    if not script.exists():
-        return {"ok": False, "error": "outdesk/VoidCast/voidcast/main.py missing"}
+    app_root = APP_DIR / "outdesk" / "VoidCast"
+    script = app_root / "voidcast" / "main.py"
+    config = app_root / "presets" / "config.default.json"
+    if not script.is_file() or not config.is_file():
+        return {"ok": False,
+                "error": "VoidCast entrypoint or default configuration missing"}
     try:
-        (DATA / ".pending_session").write_text("voidcast")
+        DATA.mkdir(parents=True, exist_ok=True)
+        marker = DATA / ".pending_session"
+        temporary = DATA / ".pending_session.tmp"
+        temporary.write_text("voidcast\\n", encoding="utf-8")
+        os.replace(str(temporary), str(marker))
         return {"ok": True, "handoff": True,
                 "note": "handing off to VoidCast — VoidDesk will restart "
                         "automatically when you quit it"}
@@ -1099,6 +1164,7 @@ def _kill_xfce_procs():
                 try: proc.kill()
                 except Exception: pass
 atexit.register(_kill_xfce_procs)
+atexit.register(stop_device_agent)
 
 def _tail_log(path, n=12):
     try:
@@ -1447,12 +1513,15 @@ HANDLERS = {
     "apt_update": h_apt_update,
     "env_install": h_env_install,
     "voidcast_launch": h_voidcast_launch,
+    "hub_gateway_status": h_hub_gateway_status,
+    "hub_gateway_rotate_pin": h_hub_gateway_rotate_pin,
 }
 
 # ── main loop ────────────────────────────────────────────
 def main():
     log(f"started  machine={platform.machine()}  device={IS_DEVICE}")
     log(f"req={REQ}  resp={RESP}")
+    start_device_agent()
     # A previous service process may have been interrupted mid-request.
     # Its claim file is no longer owned by a live worker.
     try:

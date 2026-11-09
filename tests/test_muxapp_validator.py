@@ -26,6 +26,14 @@ def valid_members():
         "Void-Desk/mux_launch.sh": b"#!/bin/sh\n",
         "Void-Desk/voiddesk.py": b"print('VoidDesk')\n",
         "Void-Desk/love/main.lua": b"function love.load() end\n",
+        "Void-Desk/outdesk/VoidCast/voidcast/main.py": b"print('VoidCast')\n",
+        "Void-Desk/outdesk/VoidCast/presets/config.default.json": b"{}\n",
+        "Void-Desk/service/spdw_hub/__init__.py": b"\\n",
+        "Void-Desk/service/spdw_hub/device_agent.py": b"class DeviceAgent: pass\\n",
+        "Void-Desk/service/spdw_hub/registry.py": b"\\n",
+        "Void-Desk/service/spdw_hub/services.json": b"{}\\n",
+        "Void-Desk/service/spdw_hub/addons.py": b"\\n",
+        "Void-Desk/service/spdw_hub/manifest.schema.json": b"{}\\n",
     }
 
 
@@ -54,3 +62,15 @@ def test_muxapp_rejects_missing_launcher_and_path_traversal(tmp_path):
     errors = load_validator().validate_archive(archive)
     assert any("unsafe archive member path" in e for e in errors)
     assert any("required file missing: Void-Desk/mux_launch.sh" in e for e in errors)
+
+def test_muxapp_rejects_missing_device_agent(tmp_path):
+    archive = tmp_path / "missing-agent.muxapp"
+    members = valid_members()
+    del members["Void-Desk/service/spdw_hub/device_agent.py"]
+    make_archive(archive, members)
+
+    errors = load_validator().validate_archive(archive)
+
+    assert any("required file missing: Void-Desk/service/spdw_hub/device_agent.py" in e
+               for e in errors)
+

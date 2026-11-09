@@ -21,7 +21,15 @@ def make_project(root: Path):
     for path in ("mux_launch.sh", "voiddesk.py", "love/main.lua",
                  "bin/launcher.sh", "service/voiddesk_service.py",
                  "external/tools.json", "LICENSE", "README.md",
-                 "THIRD-PARTY.md"):
+                 "THIRD-PARTY.md",
+                 "outdesk/VoidCast/voidcast/main.py",
+                 "outdesk/VoidCast/presets/config.default.json",
+                 "service/spdw_hub/__init__.py",
+                 "service/spdw_hub/device_agent.py",
+                 "service/spdw_hub/registry.py",
+                 "service/spdw_hub/services.json",
+                 "service/spdw_hub/addons.py",
+                 "service/spdw_hub/manifest.schema.json"):
         target = root / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("test fixture\n")
@@ -68,6 +76,10 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
     assert all(name.startswith("Void-Desk/") for name in names)
     assert "Void-Desk/mux_launch.sh" in names
     assert "Void-Desk/love/main.lua" in names
+    assert "Void-Desk/outdesk/VoidCast/voidcast/main.py" in names
+    assert "Void-Desk/outdesk/VoidCast/presets/config.default.json" in names
+    assert "Void-Desk/service/spdw_hub/device_agent.py" in names
+    assert "Void-Desk/service/spdw_hub/services.json" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf" in names
@@ -91,3 +103,38 @@ def test_builder_fails_if_pinned_submodule_is_not_initialized(tmp_path):
         assert "git submodule update --init --recursive" in str(exc)
     else:
         raise AssertionError("builder must refuse a package without Rt:Tailscale-M")
+
+def test_builder_refuses_package_without_voidcast_entrypoint(tmp_path, monkeypatch):
+    builder = load_builder()
+    project = tmp_path / "project"
+    project.mkdir()
+    make_project(project)
+    (project / "outdesk" / "VoidCast" / "voidcast" / "main.py").unlink()
+
+    try:
+        builder.build_archive(project, tmp_path / "missing-voidcast.muxapp")
+    except RuntimeError as exc:
+        assert "outdesk/VoidCast/voidcast/main.py" in str(exc)
+    else:
+        raise AssertionError("builder must refuse a package without VoidCast")
+
+def test_builder_refuses_package_without_device_agent(tmp_path, monkeypatch):
+    builder = load_builder()
+    monkeypatch.setattr(
+        builder.subprocess, "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0, stdout=builder.TAILSCALE_COMMIT, stderr=""
+        ),
+    )
+    project = tmp_path / "project"
+    project.mkdir()
+    make_project(project)
+    (project / "service" / "spdw_hub" / "device_agent.py").unlink()
+
+    try:
+        builder.build_archive(project, tmp_path / "missing-agent.muxapp")
+    except RuntimeError as exc:
+        assert "service/spdw_hub/device_agent.py" in str(exc)
+    else:
+        raise AssertionError("builder must refuse a package without the Device Agent")
+

@@ -149,7 +149,17 @@ def sha256_file(path: Path):
 def build_archive(repo_root: Path, output: Path):
     repo_root = Path(repo_root).resolve()
     output = Path(output).resolve()
-    required_main = ("mux_launch.sh", "voiddesk.py", "love/main.lua")
+    required_main = (
+        "mux_launch.sh", "voiddesk.py", "love/main.lua",
+        "outdesk/VoidCast/voidcast/main.py",
+        "outdesk/VoidCast/presets/config.default.json",
+        "service/spdw_hub/__init__.py",
+        "service/spdw_hub/device_agent.py",
+        "service/spdw_hub/registry.py",
+        "service/spdw_hub/services.json",
+        "service/spdw_hub/addons.py",
+        "service/spdw_hub/manifest.schema.json",
+    )
     missing = [name for name in required_main if not (repo_root / name).is_file()]
     if missing:
         raise RuntimeError("project root is incomplete: " + ", ".join(missing))

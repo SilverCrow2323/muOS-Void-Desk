@@ -8,7 +8,7 @@
       "native_engine": "py",
       "hub": "media",
       "launcher_type": "portable-voidcast",
-      "launcher": "../VoidCast",
+      "launcher": "outdesk/VoidCast",
       "icon": "video",
       "color": [
         0.9,

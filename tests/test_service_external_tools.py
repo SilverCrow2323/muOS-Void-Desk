@@ -66,3 +66,62 @@ def test_external_registry_rejects_path_escape(tmp_path, monkeypatch):
     result = service.h_list_external({})
     assert result["ok"] is True
     assert result["tools"][0]["exists"] is False
+
+
+def test_voidcast_registry_resolves_bundled_outdesk_application(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "APP_DIR", tmp_path)
+    app = tmp_path / "outdesk" / "VoidCast"
+    (app / "voidcast").mkdir(parents=True)
+    (app / "presets").mkdir()
+    (app / "voidcast" / "main.py").write_text("print('VoidCast')")
+    (app / "presets" / "config.default.json").write_text("{}")
+    registry = {
+        "tools": [{
+            "id": "voidcast", "name": "VoidCast IPTV", "hub": "media",
+            "native_engine": "py", "launcher_type": "portable-voidcast",
+            "launcher": "outdesk/VoidCast",
+        }]
+    }
+    registry_path = tmp_path / "external" / "tools.json"
+    registry_path.parent.mkdir()
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+
+    result = service.h_list_external({})
+    assert result["ok"] is True
+    assert result["tools"][0]["exists"] is True
+
+
+def test_voidcast_external_launch_uses_mux_session_handoff(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "APP_DIR", tmp_path)
+    monkeypatch.setattr(service, "DATA", tmp_path / "data")
+    monkeypatch.setattr(service, "IS_DEVICE", True)
+    script = tmp_path / "outdesk" / "VoidCast" / "voidcast" / "main.py"
+    script.parent.mkdir(parents=True)
+    script.write_text("print('VoidCast')")
+    config = script.parents[1] / "presets" / "config.default.json"
+    config.parent.mkdir(parents=True)
+    config.write_text("{}")
+
+    result = service.h_launch_external({"id": "voidcast"})
+
+    assert result["ok"] is True
+    assert result["handoff"] is True
+    assert (tmp_path / "data" / ".pending_session").read_text() == "voidcast\\n"
+
+
+def test_voidcast_external_launch_rejects_missing_default_configuration(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "APP_DIR", tmp_path)
+    monkeypatch.setattr(service, "DATA", tmp_path / "data")
+    monkeypatch.setattr(service, "IS_DEVICE", True)
+    script = tmp_path / "outdesk" / "VoidCast" / "voidcast" / "main.py"
+    script.parent.mkdir(parents=True)
+    script.write_text("print('VoidCast')")
+
+    result = service.h_launch_external({"id": "voidcast"})
+
+    assert result["ok"] is False
+    assert "default configuration missing" in result["error"]
+    assert not (tmp_path / "data" / ".pending_session").exists()

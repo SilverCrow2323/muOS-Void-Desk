@@ -54,9 +54,18 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from basestation_core import (
+    atomic_write_json, collect_host_stats, collect_listener_snapshot,
+    create_remote_backup, drain_device_messages, enqueue_device_message,
+    generate_auth_token, safe_device_id, token_matches,
+)
+from basestation_web import (
+    list_received_files, load_service_registry, resolve_received_file,
+)
+
 try:
     import tkinter as tk
-    from tkinter import filedialog, messagebox, font as tkfont
+    from tkinter import filedialog, messagebox, font as tkfont, simpledialog
 except ImportError:
     print("[FATAL] tkinter is required but not installed.")
     sys.exit(1)
@@ -81,7 +90,7 @@ import webbrowser
 # ══════════════════════════════════════════════════════════════════════════════
 
 APP_NAME = "VOID BaseStation"
-APP_VERSION = "3.0.0"
+APP_VERSION = "4.0.0"
 APP_TAG = "VOID-BS"
 
 CONFIG_DIR = Path.home() / ".config" / "void_basestation"
@@ -89,6 +98,14 @@ CONFIG_FILE = CONFIG_DIR / "profiles.json"
 DAEMON_CFG = CONFIG_DIR / "daemon.json"
 INBOX_FILE = CONFIG_DIR / "inbox.jsonl"
 OUTBOX_FILE = CONFIG_DIR / "outbox.json"
+DEVICE_STATE_FILE = CONFIG_DIR / "uplink_devices.json"
+COMMANDS_FILE = CONFIG_DIR / "uplink_commands.json"
+DEVICE_OUTBOX_FILE = CONFIG_DIR / "uplink_device_outbox.json"
+INCOMING_DIR = CONFIG_DIR / "incoming"
+
+MAX_JSON_BODY = 48 * 1024 * 1024
+MAX_UPLINK_FILE = 32 * 1024 * 1024
+MAX_UPLINK_SCREENSHOT = 12 * 1024 * 1024
 
 CONSOLE_APP_DIR = Path(__file__).resolve().parent / "console_app"
 CONSOLE_APP_REMOTE = "/mnt/mmc/MUOS/application/VOID_Uplink"
@@ -156,7 +173,8 @@ ANSI_OSC_RE = re.compile(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)')
 ANSI_OTHER_RE = re.compile(r'\x1b[()][A-Za-z0-9]|\x1b[=>]')
 
 DEFAULT_UPLINK = {
-    "daemon_port": 31337,
+    "daemon_port": 8420,
+    "daemon_bind": "0.0.0.0",
     "daemon_autostart": True,
     "sync_pairs": [
         {"name": "Saves", "local": "", "remote": "/mnt/mmc/MUOS/save/file", "enabled": True},
@@ -177,6 +195,11 @@ def status_color(state):
     return {
         "online": CYAN, "offline": RED, "checking": ORANGE, "unknown": TEXT_DIM,
     }.get(state, TEXT_DIM)
+
+
+def _safe_backup_name(value):
+    cleaned = "".join(c if c.isalnum() or c in "-_." else "_" for c in str(value))
+    return cleaned.strip("._")[:64] or "console"
 
 
 def open_ssh_terminal(ip, port, user):
@@ -378,6 +401,14 @@ class ConfigManager:
         up = self.data.setdefault("uplink", {})
         for k, v in DEFAULT_UPLINK.items():
             up.setdefault(k, json.loads(json.dumps(v)))
+        # v3 used port 31337, while Void Desk PC Link discovers BaseStation
+        # on 8420. Migrate only the known legacy default automatically.
+        try:
+            if int(up.get("daemon_port", 8420)) == 31337:
+                up["daemon_port"] = 8420
+                self.save()
+        except (TypeError, ValueError):
+            up["daemon_port"] = 8420
 
     def uplink(self):
         return self.data["uplink"]
@@ -534,13 +565,27 @@ class SSHManager:
 class DaemonStore:
     def __init__(self):
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        self.cfg = {"port": 31337, "pc_name": "", "token": ""}
+        self.cfg = {"port": 8420, "pc_name": socket.gethostname(),
+                    "token": "", "bind_host": "0.0.0.0"}
         self._lock = threading.Lock()
         if DAEMON_CFG.exists():
             try:
-                self.cfg.update(json.loads(DAEMON_CFG.read_text(encoding="utf-8")))
+                loaded = json.loads(DAEMON_CFG.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    self.cfg.update(loaded)
             except Exception:
                 pass
+        # Legacy installations used an empty token, allowing unauthenticated
+        # LAN requests. Migrate them before opening the listening socket.
+        if not isinstance(self.cfg.get("token"), str) or len(self.cfg["token"]) < 32:
+            self.cfg["token"] = generate_auth_token()
+        self.save()
+
+    def save(self):
+        with self._lock:
+            self.cfg["port"] = int(self.cfg.get("port", 8420))
+            self.cfg["bind_host"] = str(self.cfg.get("bind_host") or "0.0.0.0")
+            atomic_write_json(DAEMON_CFG, self.cfg, mode=0o600)
 
     def outbox_read(self, drain=False):
         with self._lock:
@@ -551,7 +596,7 @@ class DaemonStore:
             except Exception:
                 items = []
             if drain:
-                OUTBOX_FILE.write_text("[]", encoding="utf-8")
+                atomic_write_json(OUTBOX_FILE, [])
             return items
 
     def outbox_push(self, title, body=""):
@@ -565,7 +610,7 @@ class DaemonStore:
             items.append({"title": str(title)[:80], "body": str(body)[:300],
                           "ts": datetime.now().isoformat(timespec="seconds")})
             items = items[-50:]
-            OUTBOX_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+            atomic_write_json(OUTBOX_FILE, items)
 
     def inbox_push(self, title, body=""):
         rec = {"title": str(title)[:80], "body": str(body)[:300],
@@ -573,6 +618,135 @@ class DaemonStore:
         with self._lock:
             with open(INBOX_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    @staticmethod
+    def _safe_device_id(device_id):
+        return safe_device_id(device_id)
+
+    def devices_read(self):
+        with self._lock:
+            try:
+                data = json.loads(DEVICE_STATE_FILE.read_text(encoding="utf-8"))
+                return data if isinstance(data, dict) else {}
+            except (OSError, ValueError):
+                return {}
+
+    def device_stats_push(self, device_id, name, stats):
+        safe_id = self._safe_device_id(device_id)
+        with self._lock:
+            try:
+                devices = json.loads(DEVICE_STATE_FILE.read_text(encoding="utf-8"))
+                if not isinstance(devices, dict):
+                    devices = {}
+            except (OSError, ValueError):
+                devices = {}
+            devices[safe_id] = {
+                "id": safe_id, "name": str(name or safe_id)[:80],
+                "stats": stats if isinstance(stats, dict) else {},
+                "last_seen": datetime.now().isoformat(timespec="seconds"),
+            }
+            atomic_write_json(DEVICE_STATE_FILE, devices)
+
+    def device_stats_get(self, device_id):
+        return self.devices_read().get(self._safe_device_id(device_id))
+
+    def command_push(self, device_id, command):
+        safe_id = self._safe_device_id(device_id)
+        if command not in ("screenshot",):
+            raise ValueError("unsupported Uplink command")
+        with self._lock:
+            try:
+                commands = json.loads(COMMANDS_FILE.read_text(encoding="utf-8"))
+                if not isinstance(commands, dict):
+                    commands = {}
+            except (OSError, ValueError):
+                commands = {}
+            queue_for_device = commands.setdefault(safe_id, [])
+            queue_for_device.append({
+                "cmd": command,
+                "ts": datetime.now().isoformat(timespec="seconds"),
+            })
+            commands[safe_id] = queue_for_device[-20:]
+            atomic_write_json(COMMANDS_FILE, commands)
+
+    def command_drain(self, device_id):
+        safe_id = self._safe_device_id(device_id)
+        with self._lock:
+            try:
+                commands = json.loads(COMMANDS_FILE.read_text(encoding="utf-8"))
+                if not isinstance(commands, dict):
+                    commands = {}
+            except (OSError, ValueError):
+                commands = {}
+            pending = commands.pop(safe_id, [])
+            atomic_write_json(COMMANDS_FILE, commands)
+            return pending if isinstance(pending, list) else []
+
+    def device_outbox_push(self, device_id, title, body=""):
+        safe_id = self._safe_device_id(device_id)
+        with self._lock:
+            try:
+                boxes = json.loads(DEVICE_OUTBOX_FILE.read_text(encoding="utf-8"))
+                if not isinstance(boxes, dict):
+                    boxes = {}
+            except (OSError, ValueError):
+                boxes = {}
+            enqueue_device_message(boxes, safe_id, {
+                "title": str(title)[:80],
+                "body": str(body)[:300],
+                "ts": datetime.now().isoformat(timespec="seconds"),
+            }, limit=50)
+            atomic_write_json(DEVICE_OUTBOX_FILE, boxes)
+
+    def device_outbox_drain(self, device_id):
+        safe_id = self._safe_device_id(device_id)
+        with self._lock:
+            try:
+                boxes = json.loads(DEVICE_OUTBOX_FILE.read_text(encoding="utf-8"))
+                if not isinstance(boxes, dict):
+                    boxes = {}
+            except (OSError, ValueError):
+                boxes = {}
+            pending = drain_device_messages(boxes, safe_id)
+            atomic_write_json(DEVICE_OUTBOX_FILE, boxes)
+            return pending
+
+    def save_incoming(self, device_id, filename, payload):
+        safe_id = self._safe_device_id(device_id)
+        name = os.path.basename(str(filename or "").replace("\\", "/"))
+        name = "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
+        name = name.strip("._")
+        if not name:
+            raise ValueError("a safe filename is required")
+        target_dir = INCOMING_DIR / safe_id
+        target_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(str(INCOMING_DIR), 0o700)
+            os.chmod(str(target_dir), 0o700)
+        except OSError:
+            pass
+        target = target_dir / name
+        if target.exists():
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            target = target_dir / "{}_{}{}".format(target.stem, stamp, target.suffix)
+        temp = target.with_name(target.name + ".partial")
+        try:
+            with open(temp, "wb") as stream:
+                try:
+                    os.chmod(str(temp), 0o600)
+                except OSError:
+                    pass
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(str(temp), str(target))
+        except Exception:
+            try:
+                temp.unlink()
+            except OSError:
+                pass
+            raise
+        return target
 
 
 def make_daemon_handler(store):
@@ -583,78 +757,257 @@ def make_daemon_handler(store):
             pass
 
         def _auth_ok(self):
-            token = store.cfg.get("token", "")
-            if not token:
-                return True
-            return self.headers.get("X-SPDW-Token", "") == token
+            supplied = (self.headers.get("X-VOID-Token", "")
+                        or self.headers.get("X-SPDW-Token", ""))
+            return token_matches(store.cfg.get("token", ""), supplied)
 
         def _json(self, obj, code=200):
             raw = json.dumps(obj, ensure_ascii=False).encode("utf-8")
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(raw)))
-            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(raw)
 
         def _body(self):
             try:
                 n = int(self.headers.get("Content-Length", 0))
-            except ValueError:
-                n = 0
-            if n <= 0 or n > 65536:
-                return {}
+            except (TypeError, ValueError):
+                return None
+            if n <= 0 or n > MAX_JSON_BODY:
+                return None
             try:
-                return json.loads(self.rfile.read(n).decode("utf-8", errors="replace"))
-            except Exception:
-                return {}
+                payload = json.loads(self.rfile.read(n).decode("utf-8"))
+                return payload if isinstance(payload, dict) else None
+            except (UnicodeError, ValueError):
+                return None
 
         def do_GET(self):
+            parsed = urllib.parse.urlparse(self.path)
+            path = parsed.path
+            query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+            first = lambda key, default="": query.get(key, [default])[0]
+
+            # Browser dashboard shares the existing PC Link listener and
+            # never starts a second HTTP server or port.
+            if path == "/":
+                page = Path(__file__).resolve().parent / "pc_hub.html"
+                try:
+                    payload = page.read_bytes()
+                except OSError:
+                    return self._json({"error": "SPDW Hub PC web UI is missing"}, 500)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("X-Frame-Options", "DENY")
+                self.send_header(
+                    "Content-Security-Policy",
+                    "default-src 'self'; img-src 'self' data:; "
+                    "style-src 'self' 'unsafe-inline'; "
+                    "script-src 'self' 'unsafe-inline'; "
+                    "connect-src 'self'; frame-ancestors 'none'; "
+                    "base-uri 'self'; form-action 'self'")
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+
+            # Discovery is intentionally public and returns only a name/version.
+            if path == "/ping":
+                return self._json({
+                    "ok": True,
+                    "name": store.cfg.get("pc_name") or socket.gethostname(),
+                    "version": APP_VERSION,
+                    "ts": datetime.now().isoformat(timespec="seconds"),
+                })
+            # Low-sensitivity metrics allow the handheld discovery list to
+            # show the PC as online. Detailed process data is token-protected.
+            if path == "/stats":
+                return self._json(collect_host_stats(include_processes=self._auth_ok()))
             if not self._auth_ok():
                 return self._json({"error": "unauthorized"}, 401)
-            path = urllib.parse.urlparse(self.path).path
-            if path == "/ping":
-                self._json({"ok": True,
-                            "name": store.cfg.get("pc_name") or socket.gethostname(),
-                            "version": APP_VERSION,
-                            "ts": datetime.now().isoformat(timespec="seconds")})
-            elif path == "/outbox":
-                self._json({"messages": store.outbox_read(drain=True)})
-            else:
-                self._json({"error": "not found"}, 404)
+
+            if path == "/api/hub/stats":
+                result = collect_host_stats(include_processes=True)
+                result.update({
+                    "name": store.cfg.get("pc_name") or socket.gethostname(),
+                    "platform": platform.platform(),
+                    "application": APP_NAME,
+                    "version": APP_VERSION,
+                })
+                return self._json(result)
+            if path == "/api/hub/devices":
+                return self._json({"devices": store.devices_read()})
+            if path == "/api/hub/registry":
+                try:
+                    return self._json(load_service_registry(__file__))
+                except (OSError, ValueError) as exc:
+                    return self._json({"error": str(exc)}, 500)
+            if path == "/api/hub/files":
+                try:
+                    files = list_received_files(INCOMING_DIR, limit=1000)
+                except OSError as exc:
+                    return self._json({"error": str(exc)}, 500)
+                return self._json({"files": files})
+            if path == "/api/hub/files/download":
+                try:
+                    target = resolve_received_file(
+                        INCOMING_DIR, first("device"), first("name"))
+                    filename = target.name
+                    size = target.stat().st_size
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Length", str(size))
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.send_header("Content-Disposition",
+                                     'attachment; filename="{}"'.format(
+                                         filename.replace('"', "_").replace("\\r", "_").replace("\\n", "_")))
+                    self.end_headers()
+                    with target.open("rb") as stream:
+                        while True:
+                            chunk = stream.read(64 * 1024)
+                            if not chunk:
+                                break
+                            self.wfile.write(chunk)
+                    return
+                except FileNotFoundError:
+                    return self._json({"error": "file not found"}, 404)
+                except (OSError, ValueError) as exc:
+                    return self._json({"error": str(exc)}, 400)
+
+            if path == "/outbox":
+                return self._json({"messages": store.outbox_read(drain=True)})
+            if path == "/devices":
+                return self._json({"devices": store.devices_read()})
+            match = re.fullmatch(r"/device/([A-Za-z0-9_.-]{1,80})/(command|stats|outbox)", path)
+            if match:
+                device_id, action = match.groups()
+                if action == "command":
+                    return self._json({"commands": store.command_drain(device_id)})
+                if action == "outbox":
+                    return self._json({"messages": store.device_outbox_drain(device_id)})
+                device = store.device_stats_get(device_id)
+                if device is None:
+                    return self._json({"error": "device not found"}, 404)
+                return self._json(device)
+            return self._json({"error": "not found"}, 404)
 
         def do_POST(self):
             if not self._auth_ok():
                 return self._json({"error": "unauthorized"}, 401)
             path = urllib.parse.urlparse(self.path).path
             data = self._body()
+            if data is None:
+                return self._json({"error": "invalid or oversized JSON body"}, 400)
+
+            match = re.fullmatch(
+                r"/api/hub/device/([A-Za-z0-9_.-]{1,80})/(notify|screenshot)", path)
+            if match:
+                device_id, action = match.groups()
+                if action == "screenshot":
+                    try:
+                        store.command_push(device_id, "screenshot")
+                    except ValueError as exc:
+                        return self._json({"error": str(exc)}, 400)
+                    return self._json({"ok": True, "queued": "screenshot"})
+                title = data.get("title", "SPDW Hub")
+                body = data.get("body", "")
+                if not isinstance(title, str) or not title.strip():
+                    return self._json({"error": "title required"}, 400)
+                store.device_outbox_push(
+                    device_id, title.strip(), body if isinstance(body, str) else "")
+                return self._json({"ok": True, "queued": "notification"})
+
             if path == "/notify":
                 title = data.get("title", "Console")
                 body = data.get("body", "")
-                store.inbox_push(title, body)
+                if not isinstance(title, str) or not title.strip():
+                    return self._json({"error": "title required"}, 400)
+                store.inbox_push(title, body if isinstance(body, str) else "")
                 print("[{}] NOTIFICATION from console -> {}: {}".format(
-                    datetime.now().isoformat(timespec="seconds"), title, body), flush=True)
-                self._json({"ok": True})
-            elif path == "/outbox":
+                    datetime.now().isoformat(timespec="seconds"), title[:80],
+                    str(body)[:300]), flush=True)
+                return self._json({"ok": True})
+            if path == "/outbox":
                 title = data.get("title", "")
                 body = data.get("body", "")
-                if not title:
+                if not isinstance(title, str) or not title.strip():
                     return self._json({"error": "title required"}, 400)
-                store.outbox_push(title, body)
-                self._json({"ok": True})
-            else:
-                self._json({"error": "not found"}, 404)
+                store.outbox_push(title, body if isinstance(body, str) else "")
+                return self._json({"ok": True})
+
+            match = re.fullmatch(
+                r"/device/([A-Za-z0-9_.-]{1,80})/(stats|screenshot|file|command)", path)
+            if not match:
+                return self._json({"error": "not found"}, 404)
+            device_id, action = match.groups()
+            if action == "stats":
+                stats = data.get("stats")
+                if not isinstance(stats, dict):
+                    return self._json({"error": "stats object required"}, 400)
+                store.device_stats_push(device_id, data.get("name", device_id), stats)
+                return self._json({"ok": True})
+            if action == "command":
+                command = data.get("cmd")
+                try:
+                    store.command_push(device_id, command)
+                except ValueError as exc:
+                    return self._json({"error": str(exc)}, 400)
+                return self._json({"ok": True})
+            if action == "screenshot":
+                encoded = data.get("png_base64", "")
+                if not isinstance(encoded, str) or len(encoded) > (MAX_UPLINK_SCREENSHOT * 4 // 3 + 16):
+                    return self._json({"error": "screenshot payload too large"}, 413)
+                try:
+                    payload = base64.b64decode(encoded, validate=True)
+                except (ValueError, TypeError):
+                    return self._json({"error": "invalid base64 screenshot"}, 400)
+                if len(payload) > MAX_UPLINK_SCREENSHOT:
+                    return self._json({"error": "screenshot payload too large"}, 413)
+                if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
+                    return self._json({"error": "screenshot must be a PNG"}, 415)
+                try:
+                    saved = store.save_incoming(
+                        device_id, "screenshot_{}.png".format(
+                            datetime.now().strftime("%Y%m%d_%H%M%S")), payload)
+                except OSError as exc:
+                    return self._json({"error": str(exc)}, 500)
+                return self._json({"ok": True, "saved": str(saved)})
+            if action == "file":
+                encoded = data.get("data_base64", "")
+                filename = data.get("filename", "")
+                if not isinstance(encoded, str) or len(encoded) > (MAX_UPLINK_FILE * 4 // 3 + 16):
+                    return self._json({"error": "file payload too large"}, 413)
+                try:
+                    payload = base64.b64decode(encoded, validate=True)
+                except (ValueError, TypeError):
+                    return self._json({"error": "invalid base64 file"}, 400)
+                if len(payload) > MAX_UPLINK_FILE:
+                    return self._json({"error": "file payload too large"}, 413)
+                try:
+                    saved = store.save_incoming(device_id, filename, payload)
+                except (OSError, ValueError) as exc:
+                    return self._json({"error": str(exc)}, 400)
+                return self._json({"ok": True, "saved": str(saved)})
+            return self._json({"error": "not found"}, 404)
 
     return Handler
-
 
 class EmbeddedDaemon:
     """Runs the HTTP daemon inside the same process (background thread)."""
 
     def __init__(self, cfg_manager):
         self.cfg_mgr = cfg_manager
-        self.port = int(self.cfg_mgr.uplink().get("daemon_port", 31337))
+        self.port = int(self.cfg_mgr.uplink().get("daemon_port", 8420))
+        self.host = str(self.cfg_mgr.uplink().get("daemon_bind", "0.0.0.0"))
         self.store = DaemonStore()
+        self.store.cfg["port"] = self.port
+        self.store.cfg["bind_host"] = self.host
+        self.store.save()
         self.httpd = None
         self._thread = None
 
@@ -666,9 +1019,12 @@ class EmbeddedDaemon:
             return True
         try:
             self.store.cfg["port"] = self.port
+            self.store.cfg["bind_host"] = self.host
+            self.store.save()
             handler = make_daemon_handler(self.store)
             ThreadingHTTPServer.allow_reuse_address = True
-            self.httpd = ThreadingHTTPServer(("0.0.0.0", self.port), handler)
+            self.httpd = ThreadingHTTPServer((self.host, self.port), handler)
+            self.httpd.daemon_threads = True
             self._thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
             self._thread.start()
             return True
@@ -684,7 +1040,10 @@ class EmbeddedDaemon:
 
     def api_get(self, path, timeout=4):
         url = "http://127.0.0.1:{}{}".format(self.port, path)
-        req = urllib.request.Request(url, headers={"User-Agent": "{}/{}".format(APP_TAG, APP_VERSION)})
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "{}/{}".format(APP_TAG, APP_VERSION),
+            "X-VOID-Token": self.store.cfg.get("token", ""),
+        })
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", errors="replace"))
 
@@ -692,7 +1051,8 @@ class EmbeddedDaemon:
         url = "http://127.0.0.1:{}{}".format(self.port, path)
         req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
                                      headers={"Content-Type": "application/json",
-                                              "User-Agent": "{}/{}".format(APP_TAG, APP_VERSION)})
+                                              "User-Agent": "{}/{}".format(APP_TAG, APP_VERSION),
+                                              "X-VOID-Token": self.store.cfg.get("token", "")})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", errors="replace"))
 
@@ -1792,6 +2152,8 @@ class MediaPanel(tk.Frame):
         btns.pack(fill="x", pady=6)
         HudButton(btns, "+ Add Pair", self._add_pair).pack(side="left", padx=2)
         HudButton(btns, "Analyse Differences", self._analyze, accent=MAGENTA).pack(side="left", padx=2)
+        HudButton(btns, "BACKUP ZIP", self._backup, accent=ORANGE,
+                  tooltip="Create a read-only ZIP snapshot of selected remote folders").pack(side="left", padx=2)
         HudButton(btns, "SYNC NOW", self._sync, accent=CYAN).pack(side="left", padx=2)
         self.status_lbl = tk.Label(btns, text="", fg=TEXT_DIM, bg=BG0, font=FONT_SMALL)
         self.status_lbl.pack(side="right")
@@ -1990,6 +2352,84 @@ class MediaPanel(tk.Frame):
                 self.app.status_queue.put(("sync_status", ("Analysis error", RED)))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _backup(self):
+        self._save_rows()
+        creds = self._ssh_creds()
+        if not creds:
+            messagebox.showinfo("Backup", "A device with SFTP/SSH service is required.")
+            return
+        pairs = [p for p in self.app.cfg.uplink().get("sync_pairs", [])
+                 if p.get("enabled") and p.get("remote")]
+        if not pairs:
+            messagebox.showinfo("Backup", "Configure at least one active remote folder.")
+            return
+        d = self.app.current_device()
+        device_slug = _safe_backup_name(self.app.selected_device or "console")
+        backup_dir = Path.home() / "Videos" / "VOID_Backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        filename = "{}_{}.zip".format(
+            device_slug, datetime.now().strftime("%Y%m%d_%H%M%S"))
+        path = filedialog.asksaveasfilename(
+            title="Create remote backup", initialdir=str(backup_dir),
+            initialfile=filename, defaultextension=".zip",
+            filetypes=[("ZIP backup", "*.zip")])
+        if not path:
+            return
+        if not messagebox.askyesno(
+            "Confirm Backup",
+            "Create a read-only backup of {} remote folder(s)?\n\n"
+            "No console files will be modified or deleted.\n"
+            "SHA-256 checksums and a manifest will be included.".format(len(pairs))
+        ):
+            return
+
+        roots = [{"name": p.get("name", "folder"), "path": p["remote"]}
+                 for p in pairs]
+        metadata = {
+            "application": APP_NAME,
+            "application_version": APP_VERSION,
+            "device_name": self.app.selected_device,
+            "device_ip": d.get("ip") if d else None,
+        }
+        self.status_lbl.config(text="Backing up...", fg=ORANGE)
+        self.sync_progress_lbl.config(text="Starting remote snapshot...", fg=ORANGE)
+        self._log("[{}] Remote backup started".format(
+            datetime.now().strftime("%H:%M:%S")))
+
+        def worker():
+            try:
+                with SFTPSync(*creds) as sync:
+                    manifest = create_remote_backup(
+                        sync.sftp, roots, path, metadata=metadata,
+                        progress_callback=lambda rel, done, total:
+                            self.app.status_queue.put((
+                                "sync_log", "  [{}/{}] {}".format(done, total, rel))))
+                self.app.status_queue.put(("backup_complete", (path, manifest)))
+            except Exception as e:
+                self.app.status_queue.put(("backup_error", str(e)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_backup_complete(self, payload):
+        path, manifest = payload
+        count = len(manifest.get("files", []))
+        total = sum(item.get("size_bytes", 0) for item in manifest.get("files", []))
+        self.status_lbl.config(text="Backup complete", fg=CYAN)
+        self.sync_progress_lbl.config(text="{} files · {:.1f} MiB".format(
+            count, total / (1024.0 * 1024.0)), fg=CYAN)
+        self._log("Backup saved: {}".format(path))
+        messagebox.showinfo(
+            "Backup complete",
+            "{} file(s), {:.1f} MiB\n\n{}\n\n"
+            "Manifest and SHA-256 checksums included.".format(
+                count, total / (1024.0 * 1024.0), path))
+
+    def on_backup_error(self, message):
+        self.status_lbl.config(text="Backup failed", fg=RED)
+        self.sync_progress_lbl.config(text="Backup failed", fg=RED)
+        self._log("BACKUP ERROR: {}".format(message))
+        messagebox.showerror("Backup failed", message)
 
     def _sync(self):
         self._save_rows()
@@ -2505,6 +2945,7 @@ class VOIDBaseStation(tk.Tk):
         file_menu.add_command(label="New Device    Ctrl+N", command=self.action_new_device)
         file_menu.add_command(label="Export Profiles", command=self.action_export_profiles)
         file_menu.add_command(label="Import Profiles", command=self.action_import_profiles)
+        file_menu.add_command(label="Export Diagnostics Report...", command=self.action_export_diagnostics)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._on_close)
 
@@ -2515,6 +2956,19 @@ class VOIDBaseStation(tk.Tk):
         view_menu.add_command(label="Terminal    Ctrl+T", command=lambda: self._select_tab("terminal"))
         view_menu.add_separator()
         view_menu.add_command(label="Fullscreen   F11", command=lambda: self.attributes("-fullscreen", True))
+
+        tools_menu = tk.Menu(menubar, tearoff=0, bg=BG1, fg=TEXT,
+                             activebackground=CYAN, activeforeground=BG0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="Open SPDW Hub Web Dashboard...", command=self.action_open_web_hub)
+        tools_menu.add_command(label="SPDW Service Registry...", command=self.action_show_hub_registry)
+        tools_menu.add_command(label="PC Link Pairing...", command=self.action_show_pairing)
+        tools_menu.add_command(label="Linked Handhelds...", command=self.action_show_linked_devices)
+        tools_menu.add_command(label="Send Message to Handheld...", command=self.action_send_uplink_message)
+        tools_menu.add_command(label="Open Received Files", command=self.action_open_received_files)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Export Diagnostics Report...", command=self.action_export_diagnostics)
+        tools_menu.add_command(label="Backup Saves & States...", command=lambda: self._select_tab("media"))
 
         help_menu = tk.Menu(menubar, tearoff=0, bg=BG1, fg=TEXT, activebackground=CYAN, activeforeground=BG0)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -2973,6 +3427,16 @@ class VOIDBaseStation(tk.Tk):
                 elif kind == "sync_status":
                     text, color = payload
                     self.media_panel.on_status(text, color)
+                elif kind == "backup_complete":
+                    self.media_panel.on_backup_complete(payload)
+                elif kind == "backup_error":
+                    self.media_panel.on_backup_error(payload)
+                elif kind == "diagnostics_complete":
+                    self.log("Diagnostics report saved: {}".format(payload), "ok")
+                    messagebox.showinfo("Diagnostics", "Report saved successfully:\n{}".format(payload))
+                elif kind == "diagnostics_error":
+                    self.log("Diagnostics export failed: {}".format(payload), "err")
+                    messagebox.showerror("Diagnostics", str(payload))
                 elif kind == "scan_complete":
                     self._refresh_sidebar()
                     self.log("Network scan complete — {} host(s) found".format(payload), "ok")
@@ -3144,6 +3608,450 @@ Tabs are selectable via click or shortcut."""
         if not self.terminal_panel.connected:
             self.terminal_panel.connect()
 
+    def action_open_web_hub(self):
+        if not self._ensure_uplink_daemon():
+            return
+        host = NetworkUtils.get_local_ip()
+        url = "http://{}:{}/".format(host, self.daemon.port)
+        try:
+            opened = webbrowser.open(url)
+            if not opened:
+                raise RuntimeError("the default browser did not open")
+            self.log("SPDW Hub web dashboard opened: {}".format(url), "ok")
+        except Exception as exc:
+            self.clipboard_clear()
+            self.clipboard_append(url)
+            messagebox.showinfo(
+                "SPDW Hub Web Dashboard",
+                "Open this URL in your browser (it has been copied):\\n\\n{}".format(url))
+            self.log("Could not auto-open browser: {}".format(exc), "warn")
+
+    def action_show_hub_registry(self):
+        """Display declared service ownership; this is not a live socket scan."""
+        registry_path = (Path(__file__).resolve().parents[2]
+                         / "service" / "spdw_hub" / "services.json")
+        try:
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("SPDW Hub Registry", str(exc))
+            return
+
+        top = tk.Toplevel(self)
+        top.title("SPDW Hub — Service & Port Registry")
+        top.configure(bg=BG0)
+        top.geometry("1050x620")
+        top.transient(self)
+
+        tk.Label(top, text="SPDW HUB // SERVICE OWNERSHIP",
+                 bg=BG0, fg=CYAN, font=FONT_TITLE).pack(
+                     anchor="w", padx=16, pady=(16, 4))
+        tk.Label(
+            top,
+            text="Declared target/compatibility state — not a live socket scan. "
+                 "Use Tools → Export Diagnostics for active PC and handheld listeners.",
+            bg=BG0, fg=ORANGE, font=FONT_SMALL, wraplength=1000,
+            justify="left").pack(anchor="w", padx=16, pady=(0, 10))
+
+        frame = tk.Frame(top, bg=GRID, highlightbackground=GRID,
+                         highlightthickness=1)
+        frame.pack(fill="both", expand=True, padx=16, pady=6)
+        report = tk.Text(frame, bg=LOG_BG, fg=LOG_FG, font=FONT_SMALL,
+                         wrap="none", state="normal", padx=10, pady=8,
+                         relief="flat")
+        yscroll = tk.Scrollbar(frame, orient="vertical", command=report.yview)
+        xscroll = tk.Scrollbar(frame, orient="horizontal", command=report.xview)
+        report.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+        report.grid(row=0, column=0, sticky="nsew")
+        yscroll.grid(row=0, column=1, sticky="ns")
+        xscroll.grid(row=1, column=0, sticky="ew")
+        frame.grid_rowconfigure(0, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+
+        report.tag_configure("heading", foreground=CYAN, font=FONT_BOLD)
+        report.tag_configure("warning", foreground=ORANGE)
+        report.tag_configure("muted", foreground=TEXT_DIM)
+
+        def emit(line="", tag=None):
+            report.insert("end", line + "\n", tag)
+
+        emit("SCHEMA: {}  VERSION: {}".format(
+            registry.get("schema", "?"), registry.get("version", "?")), "heading")
+        emit("POLICY: {}".format(json.dumps(
+            registry.get("policy", {}), sort_keys=True)), "muted")
+        emit("")
+        for host in ("handheld", "pc"):
+            emit("[ {} ]".format(host.upper()), "heading")
+            for item in registry.get("services", []):
+                if item.get("host") != host:
+                    continue
+                item_type = item.get("type", "unknown")
+                if item_type == "protocol-family":
+                    for member in item.get("members", []):
+                        port = "{} {}".format(
+                            member.get("protocol", "?").upper(),
+                            member.get("port", "?"))
+                        emit("  {:<34} {:<13} {:<13} {:<22} {}".format(
+                            item.get("id", "?") + ":" + member.get("name", "port"),
+                            port, item_type, item.get("owner", "?"),
+                            item.get("state", "unknown")))
+                    continue
+                if item_type == "subsystem":
+                    port = "{} (shared)".format(item.get("port", "?"))
+                elif item.get("port"):
+                    port = "{} {}".format(item.get("protocol", "?").upper(),
+                                          item.get("port"))
+                else:
+                    port = "—"
+                detail = item.get("bind", "—")
+                exposure = item.get("exposure", "—")
+                emit("  {:<34} {:<13} {:<13} {:<22} {}".format(
+                    item.get("id", "?"), port, item_type,
+                    item.get("owner", "?"),
+                    "{} / {} / {}".format(detail, exposure,
+                                         item.get("state", "unknown"))))
+                if item.get("notes"):
+                    emit("      " + str(item.get("notes")))
+            emit("")
+
+        emit("[ INTERPRETATION ]", "heading")
+        emit("• profile-default = configured profile value, not proof a process is listening", "muted")
+        emit("• subsystem = shares its parent transport; do not count it as another socket", "muted")
+        emit("• protocol-family = protocol-specific transport, not a management HTTP listener", "muted")
+        emit("• source-audit-pending = module source/commands have not been verified", "warning")
+        report.config(state="disabled")
+        HudButton(top, "CLOSE", top.destroy, accent=TEXT_DIM).pack(
+            anchor="e", padx=16, pady=(4, 14))
+
+    def _ensure_uplink_daemon(self):
+        if self.daemon.is_running():
+            return True
+        if self.daemon.start():
+            self._daemon_started_by_us = True
+            self.log("PC Link daemon started on port {}".format(self.daemon.port), "ok")
+            return True
+        messagebox.showerror(
+            "PC Link",
+            "Could not start the PC Link daemon on port {}.\n"
+            "Check whether another application is using it.".format(self.daemon.port))
+        return False
+
+    def action_show_pairing(self):
+        if not self._ensure_uplink_daemon():
+            return
+        token = self.daemon.store.cfg.get("token", "")
+        host = NetworkUtils.get_local_ip()
+        top = tk.Toplevel(self)
+        top.title("VOID BaseStation — PC Link Pairing")
+        top.configure(bg=BG0)
+        top.transient(self)
+        top.resizable(False, False)
+        top.geometry("560x310")
+
+        tk.Label(top, text="VOID // PC LINK PAIRING", bg=BG0, fg=CYAN,
+                 font=FONT_TITLE).pack(anchor="w", padx=18, pady=(18, 6))
+        tk.Label(top, text="Add this PC from Void Desk → PC Uplink → Add manually.",
+                 bg=BG0, fg=TEXT_DIM, font=FONT).pack(anchor="w", padx=18, pady=(0, 14))
+
+        fields = (("PC address", "{}:{}".format(host, self.daemon.port)),
+                  ("Authentication token", token))
+        entries = {}
+        for label, value in fields:
+            frame = tk.Frame(top, bg=BG0)
+            frame.pack(fill="x", padx=18, pady=5)
+            tk.Label(frame, text=label, bg=BG0, fg=TEXT_DIM,
+                     font=FONT_SMALL, width=22, anchor="w").pack(side="left")
+            var = tk.StringVar(value=value)
+            ent = tk.Entry(frame, textvariable=var, bg=BG1, fg=CYAN,
+                           insertbackground=CYAN, relief="flat", font=FONT_SMALL,
+                           state="readonly", readonlybackground=BG1)
+            ent.pack(side="left", fill="x", expand=True, ipady=6)
+            entries[label] = var
+
+        actions = tk.Frame(top, bg=BG0)
+        actions.pack(fill="x", padx=18, pady=(16, 10))
+
+        def copy_details():
+            text = "{}\n{}\n{}".format(
+                APP_NAME, entries["PC address"].get(),
+                entries["Authentication token"].get())
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self.log("PC Link pairing details copied to clipboard.", "ok")
+
+        def rotate_token():
+            if not messagebox.askyesno(
+                "Rotate pairing token",
+                "This immediately invalidates the current token on all handhelds.\n"
+                "You will need to pair them again. Continue?", parent=top):
+                return
+            self.daemon.store.cfg["token"] = generate_auth_token()
+            self.daemon.store.save()
+            entries["Authentication token"].set(self.daemon.store.cfg["token"])
+            self.log("PC Link token rotated; existing pairings must be updated.", "warn")
+
+        HudButton(actions, "COPY PAIRING DETAILS", copy_details, accent=CYAN).pack(side="left", padx=(0, 6))
+        HudButton(actions, "ROTATE TOKEN", rotate_token, accent=ORANGE).pack(side="left", padx=6)
+        HudButton(actions, "CLOSE", top.destroy, accent=TEXT_DIM).pack(side="right", padx=(6, 0))
+        tk.Label(top, text="Keep this token private. Anyone holding it can send commands and files to this PC. Use only on a trusted LAN or Tailscale; never expose port 8420 to the public Internet.",
+                 bg=BG0, fg=ORANGE, font=FONT_SMALL, wraplength=520,
+                 justify="left").pack(anchor="w", padx=18, pady=(4, 12))
+
+    def action_show_linked_devices(self):
+        if not self._ensure_uplink_daemon():
+            return
+        top = tk.Toplevel(self)
+        top.title("VOID BaseStation — Linked Handhelds")
+        top.configure(bg=BG0)
+        top.geometry("760x480")
+        top.transient(self)
+
+        tk.Label(top, text="LINKED HANDHELDS", bg=BG0, fg=CYAN,
+                 font=FONT_TITLE).pack(anchor="w", padx=16, pady=(16, 8))
+        body = tk.Frame(top, bg=BG0)
+        body.pack(fill="both", expand=True, padx=16, pady=6)
+        left = tk.Frame(body, bg=BG0)
+        left.pack(side="left", fill="y", padx=(0, 12))
+        right = tk.Frame(body, bg=PANEL_BG, highlightbackground=GRID,
+                         highlightthickness=1)
+        right.pack(side="left", fill="both", expand=True)
+
+        listing = tk.Listbox(left, width=30, height=16, bg=BG1, fg=TEXT,
+                             selectbackground=CYAN, selectforeground=BG0,
+                             font=FONT_SMALL, relief="flat", bd=0)
+        listing.pack(fill="y", expand=True)
+        detail = tk.Text(right, bg=LOG_BG, fg=LOG_FG, font=FONT_SMALL,
+                         relief="flat", wrap="word", height=14, width=60,
+                         state="disabled", padx=12, pady=10)
+        detail.pack(fill="both", expand=True, padx=8, pady=8)
+        index = []
+
+        def selected_record():
+            sel = listing.curselection()
+            if not sel or sel[0] >= len(index):
+                return None
+            return index[sel[0]]
+
+        def refresh():
+            if not top.winfo_exists():
+                return
+            previous = selected_record()
+            devices = self.daemon.store.devices_read()
+            index[:] = sorted(devices.keys(), key=lambda key: (
+                str(devices[key].get("name", key)).lower(), key))
+            listing.delete(0, "end")
+            for device_id in index:
+                item = devices[device_id]
+                stats = item.get("stats") or {}
+                mem = stats.get("memory") or {}
+                label = "{}  [{}]".format(item.get("name", device_id), device_id)
+                listing.insert("end", label)
+            if previous in index:
+                listing.selection_set(index.index(previous))
+            elif index:
+                listing.selection_set(0)
+            show_selected()
+
+        def show_selected(_event=None):
+            device_id = selected_record()
+            devices = self.daemon.store.devices_read()
+            item = devices.get(device_id) if device_id else None
+            detail.config(state="normal")
+            detail.delete("1.0", "end")
+            if not item:
+                detail.insert("end", "No handheld has reported telemetry yet.\n\n"
+                              "Open Void Desk → PC Uplink and pair it with the address and token shown in Tools → PC Link Pairing.")
+            else:
+                stats = item.get("stats") or {}
+                mem = stats.get("memory") or {}
+                lines = [
+                    "DEVICE: {}".format(item.get("name", device_id)),
+                    "ID: {}".format(device_id),
+                    "LAST SEEN: {}".format(item.get("last_seen", "unknown")),
+                    "",
+                    "CPU: {}%".format(stats.get("cpu_percent", "—")),
+                    "RAM: {}%  ({:.1f}/{:.1f} MB)".format(
+                        mem.get("percent", 0), mem.get("used_mb", 0),
+                        mem.get("total_mb", 0)),
+                    "UPTIME: {} s".format(stats.get("uptime_s", "—")),
+                    "TEMPERATURES:",
+                ]
+                for temp in (stats.get("temperatures") or [])[:8]:
+                    lines.append("  {}: {} °C".format(
+                        temp.get("label", "TEMP"), temp.get("temp_c", "—")))
+                lines.extend([
+                    "",
+                    "HANDHELD TELEMETRY:",
+                    "Battery: {}%".format(stats.get("battery_pct", "—")),
+                    "Temperature: {} °C".format(stats.get("temp_c", "—")),
+                    "Storage used: {}%".format(stats.get("storage_used_pct", "—")),
+                    "Void Desk: {}".format(stats.get("voiddesk_version", "—")),
+                    "Frontend: {}".format(stats.get("desk_env", "—")),
+                    "",
+                    "Received screenshots and files are saved in:",
+                    str(INCOMING_DIR / str(device_id)),
+                ])
+                detail.insert("end", "\n".join(lines))
+            detail.config(state="disabled")
+
+        listing.bind("<<ListboxSelect>>", show_selected)
+
+        buttons = tk.Frame(top, bg=BG0)
+        buttons.pack(fill="x", padx=16, pady=(8, 16))
+
+        def request_screenshot():
+            device_id = selected_record()
+            if not device_id:
+                messagebox.showinfo("Screenshot", "Select a linked handheld first.", parent=top)
+                return
+            try:
+                self.daemon.store.command_push(device_id, "screenshot")
+                self.log("Screenshot requested from handheld {}.".format(device_id), "ok")
+                messagebox.showinfo(
+                    "Screenshot requested",
+                    "The handheld will upload its next screenshot on its next PC Link poll.\n"
+                    "Check the received-files folder in a few seconds.", parent=top)
+            except Exception as exc:
+                messagebox.showerror("Screenshot", str(exc), parent=top)
+
+        HudButton(buttons, "REFRESH", refresh, accent=CYAN).pack(side="left", padx=3)
+        HudButton(buttons, "REQUEST SCREENSHOT", request_screenshot, accent=MAGENTA).pack(side="left", padx=3)
+        HudButton(buttons, "OPEN RECEIVED FILES", self.action_open_received_files, accent=ORANGE).pack(side="left", padx=3)
+        HudButton(buttons, "CLOSE", top.destroy, accent=TEXT_DIM).pack(side="right", padx=3)
+        refresh()
+
+    def action_send_uplink_message(self):
+        if not self._ensure_uplink_daemon():
+            return
+        devices = self.daemon.store.devices_read()
+        if not devices:
+            messagebox.showinfo(
+                "Send to Handheld",
+                "No handheld has paired with this PC yet. Open PC Link on a device first.")
+            return
+        title = simpledialog.askstring("Send to Handheld", "Notification title:",
+                                       initialvalue="VOID BaseStation", parent=self)
+        if title is None or not title.strip():
+            return
+        body = simpledialog.askstring("Send to Handheld", "Message:", parent=self)
+        if body is None:
+            return
+        for device_id in devices:
+            self.daemon.store.device_outbox_push(device_id, title.strip(), body)
+        self.log("Queued '{}' for {} paired handheld(s).".format(
+            title.strip(), len(devices)), "ok")
+
+    def action_open_received_files(self):
+        INCOMING_DIR.mkdir(parents=True, exist_ok=True)
+        path = str(INCOMING_DIR)
+        try:
+            if platform.system() == "Windows":
+                os.startfile(path)
+            elif platform.system() == "Darwin":
+                subprocess.Popen(["open", path])
+            elif shutil.which("xdg-open"):
+                subprocess.Popen(["xdg-open", path])
+            else:
+                raise RuntimeError("No graphical file manager launcher found.")
+        except Exception as exc:
+            messagebox.showerror("Received files", str(exc))
+
+    def action_export_diagnostics(self):
+        d = self.current_device()
+        device_name = self.selected_device or "no-device"
+        path = filedialog.asksaveasfilename(
+            title="Export VOID diagnostics", defaultextension=".json",
+            initialfile="void_basestation_diagnostics_{}.json".format(
+                datetime.now().strftime("%Y%m%d_%H%M%S")),
+            filetypes=[("JSON report", "*.json")])
+        if not path:
+            return
+
+        # Keep this command read-only and fixed: no profile values or shell
+        # input are interpolated into the remote command.
+        remote_command = (
+            "echo '### SYSTEM'; uname -a 2>&1; "
+            "echo '### RELEASE'; cat /etc/os-release 2>/dev/null; "
+            "echo '### STORAGE'; df -h / /mnt/mmc /mnt/sdcard 2>&1; "
+            "echo '### MEMORY'; free -h 2>&1; "
+            "echo '### NETWORK'; ip -brief addr 2>&1; "
+            "echo '### LISTENERS'; "
+            "if command -v ss >/dev/null 2>&1; then ss -lntup 2>&1; "
+            "elif command -v netstat >/dev/null 2>&1; then netstat -lntup 2>&1; "
+            "else echo 'ss/netstat unavailable'; fi; "
+            "echo '### PLAYER'; command -v mpv; command -v ffmpeg; command -v love"
+        )
+        service_specs = {}
+        if d:
+            for key, svc in d.get("services", {}).items():
+                service_specs[key] = {
+                    "label": svc.get("label", key),
+                    "kind": svc.get("kind", ""),
+                    "port": svc.get("port"),
+                }
+
+        self.log("Collecting read-only diagnostics...", "info")
+        self.set_status("Collecting diagnostics...", ORANGE)
+
+        def worker():
+            services = {}
+            if d:
+                for key, svc in d.get("services", {}).items():
+                    port = svc.get("port")
+                    services[key] = dict(service_specs[key])
+                    services[key]["reachable"] = (
+                        NetworkUtils.check_port(d.get("ip", ""), port, timeout=0.8)
+                        if port else None)
+
+            safe_device = None
+            if d:
+                safe_device = {
+                    "name": device_name,
+                    "ip": d.get("ip"),
+                    "services": services,
+                }
+
+            remote_output = ""
+            remote_error = None
+            if d:
+                ssh_svc = d.get("services", {}).get("ssh")
+                if ssh_svc and HAS_PARAMIKO:
+                    try:
+                        remote_output, remote_error = SSHManager.exec_command(
+                            d.get("ip", ""), ssh_svc.get("port", 22),
+                            ssh_svc.get("user", ""), ssh_svc.get("pass", ""),
+                            remote_command, timeout=12)
+                    except Exception as exc:
+                        remote_error = str(exc)
+                elif not HAS_PARAMIKO:
+                    remote_error = "Paramiko is not installed; remote snapshot unavailable."
+                else:
+                    remote_error = "No SSH service configured for this device."
+
+            report = {
+                "format": "void-basestation-diagnostics",
+                "format_version": 1,
+                "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                "application": {"name": APP_NAME, "version": APP_VERSION},
+                "pc": {
+                    "hostname": platform.node(),
+                    "platform": platform.platform(),
+                    "python": platform.python_version(),
+                },
+                "pc_listener_snapshot": collect_listener_snapshot(),
+                "device": safe_device,
+                "telemetry": self.monitor.last_stats or {},
+                "remote_read_only_snapshot": remote_output,
+                "remote_error": remote_error,
+                "security_note": "SSH passwords and daemon pairing tokens are intentionally excluded.",
+            }
+            try:
+                atomic_write_json(path, report, mode=0o600)
+                self.status_queue.put(("diagnostics_complete", path))
+            except Exception as exc:
+                self.status_queue.put(("diagnostics_error", str(exc)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def action_export_profiles(self):
         path = filedialog.asksaveasfilename(
             title="Export VOID profiles", defaultextension=".json",
@@ -3250,87 +4158,14 @@ Tabs are selectable via click or shortcut."""
         QuickCommandDialog(self, d, svc)
 
     def action_install_console_app(self):
-        d = self.current_device()
-        if not d:
-            messagebox.showinfo("Install App", "Select a device first.")
-            return
-        svc = d["services"].get("sftp") or d["services"].get("ssh")
-        if not svc:
-            messagebox.showinfo("Install App", "Enable SFTP or SSH on the profile.")
-            return
-        if not HAS_PARAMIKO:
-            messagebox.showwarning("Install App", "paramiko is required: pip install paramiko")
-            return
-        if not CONSOLE_APP_DIR.exists():
-            messagebox.showerror("Install App",
-                                 "Console app folder not found:\n{}\n"
-                                 "It must be next to this script.".format(CONSOLE_APP_DIR))
-            return
-        port = self.cfg.uplink().get("daemon_port", 31337)
-        pc_ip = NetworkUtils.get_local_ip()
-        if not messagebox.askyesno(
-            "Install Console App",
-            "The 'VOID_Uplink' app will be installed/updated on:\n"
-            "  {} → {}\n\n"
-            "It will be configured to point to this PC:\n"
-            "  {}:{}\n\n"
-            "If the PC IP is incorrect, change it later in the app's config.ini\n"
-            "(via FileBrowser/SFTP).\n\nProceed?".format(d["ip"], CONSOLE_APP_REMOTE, pc_ip, port)):
-            return
+        """Legacy compatibility entry point; the client is built into Void Desk."""
+        messagebox.showinfo(
+            "PC Link",
+            "The PC Link client is already part of Void Desk.\n\n"
+            "No separate VOID_Uplink application needs to be installed.\n"
+            "Use Tools → PC Link Pairing to connect this PC.")
+        self.action_show_pairing()
 
-        self.log("Installing console app on {}...".format(d["ip"]), "info")
-
-        def worker():
-            try:
-                transport = paramiko.Transport((d["ip"], int(svc["port"])))
-                transport.connect(username=svc["user"], password=svc["pass"])
-                sftp = paramiko.SFTPClient.from_transport(transport)
-                try:
-                    remote_root = CONSOLE_APP_REMOTE
-
-                    def rmkdir(path):
-                        parts = path.strip("/").split("/")
-                        cur = ""
-                        for p in parts:
-                            cur += "/" + p
-                            try:
-                                sftp.stat(cur)
-                            except FileNotFoundError:
-                                try:
-                                    sftp.mkdir(cur)
-                                except Exception:
-                                    pass
-
-                    def send_tree(local_dir, remote_dir):
-                        rmkdir(remote_dir)
-                        for item in sorted(os.listdir(local_dir)):
-                            lp = os.path.join(local_dir, item)
-                            rp = remote_dir.rstrip("/") + "/" + item
-                            if os.path.isdir(lp):
-                                send_tree(lp, rp)
-                            else:
-                                sftp.put(lp, rp)
-                                self.status_queue.put(("log", ("  → {}".format(rp), "info")))
-
-                    send_tree(str(CONSOLE_APP_DIR), remote_root)
-                    cfg_txt = ("[link]\npc_ip = {}\npc_port = {}\n"
-                               "token =\npoll_seconds = 3\n".format(pc_ip, port))
-                    with sftp.open(remote_root + "/config.ini", "w") as f:
-                        f.write(cfg_txt)
-                    try:
-                        sftp.chmod(remote_root + "/mux_launch.sh", 0o755)
-                    except Exception:
-                        pass
-                finally:
-                    sftp.close()
-                    transport.close()
-                self.status_queue.put(("log", (
-                    "Console app installed ✓ — find it in Applications on muOS "
-                    "(refresh content if it does not appear immediately)", "ok")))
-            except Exception as e:
-                self.status_queue.put(("log", ("Console app installation failed: {}".format(e), "err")))
-
-        threading.Thread(target=worker, daemon=True).start()
 
 
 # ══════════════════════════════════════════════════════════════════════════════

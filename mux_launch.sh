@@ -132,14 +132,30 @@ while true; do
                 continue
                 ;;
             voidcast)
-                # standalone pygame app, same runtime the "py" engine
-                # already uses (built on demand above) — not a chroot
-                # desktop session, so it runs directly, no xfce_launch.sh
+                if [ ! -f "$APP_DIR/outdesk/VoidCast/voidcast/main.py" ] || [ ! -f "$APP_DIR/outdesk/VoidCast/presets/config.default.json" ]; then
+                    echo "$(date) VoidCast entrypoint or default config missing; returning to VoidDesk" >>"$LOG"
+                    continue
+                fi
+                # VoidCast is a standalone Pygame app. The LOVE frontend
+                # does not need the Pygame runtime, so prepare it here too
+                # instead of assuming the "py" engine already bootstrapped it.
+                MARKER="$DATA/.pygame_ready"
+                if [ ! -f "$MARKER" ] || [ ! -d "$APP_DIR/runtime" ]; then
+                    echo "$(date) VoidCast needs Pygame runtime; bootstrapping..." >>"$LOG"
+                    python3 "$APP_DIR/bin/bootstrap_lite.py" >>"$LOG" 2>&1
+                    BOOT_RC=$?
+                    if [ $BOOT_RC -ne 0 ] || [ ! -f "$MARKER" ] || [ ! -d "$APP_DIR/runtime" ]; then
+                        echo "$(date) VoidCast runtime bootstrap FAILED (rc=$BOOT_RC); returning to VoidDesk" >>"$LOG"
+                        continue
+                    fi
+                fi
                 echo "$(date) launching VoidCast" >>"$LOG"
-                PYTHONPATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" \
+                VOIDCAST_FB=1 \
+                    PYTHONPATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" \
                     PYGAME_HIDE_SUPPORT_PROMPT=1 \
                     python3 "$APP_DIR/outdesk/VoidCast/voidcast/main.py" >>"$LOG" 2>&1
-                echo "$(date) VoidCast ended (rc=$?), returning to VoidDesk" >>"$LOG"
+                VOIDCAST_RC=$?
+                echo "$(date) VoidCast ended (rc=$VOIDCAST_RC), returning to VoidDesk" >>"$LOG"
                 continue
                 ;;
             *)

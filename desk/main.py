@@ -2421,6 +2421,7 @@ class App(object):
         self.l2_panel_phase = None
         self.l2_panel_t0 = 0.0
         self.bstation_srv = None
+        self.bstation_pairing_pin = ""
         self.ts_netcheck_data = {}
         self.ts_login_url = ""
         self.ts_qr_matrix = None
@@ -5026,340 +5027,34 @@ class App(object):
 
 # --- [O3] Glyph Manager & Archiver // HUB: MUOS APPS ---
     def basestation_serve_start(self):
-        import http.server
-        import threading
+        """Refresh status from the shared Device Agent owned by the service.
+
+        The frontend no longer creates its own HTTP server. Port 8765 is
+        opened once by service/voiddesk_service.py and shared by all frontends.
+        """
         import json
-        import mimetypes
-        import urllib.parse
-        bpath = os.path.join(APP_DIR, "assets", "basestation",
-                             "basestation.py")
-        if not os.path.exists(bpath):
-            return False
-        with open(bpath, "rb") as f:
-            bdata = f.read()
-        page_path = os.path.join(APP_DIR, "assets", "basestation",
-                                 "index.html")
+        import socket
+
+        self.bstation_srv = None
+        self.bstation_pairing_pin = ""
         try:
-            with open(page_path, "rb") as f:
-                page_data = f.read()
-        except OSError:
-            page_data = (b"<html><body style='background:#0a0b0e;"
-                        b"color:#e7ecef;font-family:monospace;"
-                        b"padding:2em'>index.html mancante in "
-                        b"assets/basestation/</body></html>")
-
-        # due aree separate e indipendenti: "in" = quello che PC o
-        # altri device caricano verso la console, "out" = quello che
-        # la console mette a disposizione per chi si collega.
-        areas = {
-            "in": os.path.join(DATA, "incoming"),
-            "out": os.path.join(DATA, "outgoing"),
-        }
-        for d in areas.values():
-            os.makedirs(d, exist_ok=True)
-
-        TEXT_EXTS = {".txt", ".md", ".py", ".json", ".cfg", ".ini",
-                    ".sh", ".csv", ".log", ".yaml", ".yml", ".conf",
-                    ".xml", ".js", ".css", ".html"}
-        BAD_CHARS = '<>:"/\\|?*'
-
-        def clean_name(name):
-            """Nome sicuro sia per attraversamento path sia per
-            exFAT (niente due punti, niente separatori, niente
-            spazi/punti finali)."""
-            name = os.path.basename((name or "").strip())
-            for ch in BAD_CHARS:
-                name = name.replace(ch, "_")
-            name = name.strip(" .")
-            if name in ("", ".", ".."):
-                return ""
-            return name[:120]
-
-        def safe_dir(root, rel):
-            """Risolve rel dentro root e rifiuta qualunque cosa che
-            scappi fuori (../../ ecc). root/rel possono anche NON
-            esistere ancora (mkdir); qui si valida solo il percorso,
-            non la sua esistenza."""
-            rel = (rel or "").replace("\\", "/").strip("/")
-            parts = [p for p in rel.split("/")
-                    if p not in ("", ".", "..")]
-            cand = os.path.normpath(os.path.join(root, *parts))
-            rroot = os.path.normpath(root)
-            if cand != rroot and not cand.startswith(
-                    rroot + os.sep):
-                return None
-            return cand
-
-        def parse_multipart(body, boundary):
-            """Analisi minima e vera di multipart/form-data per un
-            singolo file -- niente modulo cgi (deprecato/removed
-            nelle versioni Python più recenti, non affidabile a
-            lungo termine)."""
-            marker = b"--" + boundary
-            parts = body.split(marker)
-            for part in parts:
-                part = part.strip(b"\r\n")
-                if not part or part == b"--":
-                    continue
-                if b"\r\n\r\n" not in part:
-                    continue
-                headers_raw, content = part.split(b"\r\n\r\n", 1)
-                headers_txt = headers_raw.decode("utf-8",
-                                                 errors="replace")
-                if "filename=" not in headers_txt:
-                    continue
-                fn = headers_txt.split("filename=")[1].split(
-                    '"')[1]
-                content = content.rstrip(b"\r\n")
-                return fn, content
-            return None, None
-
-        class Handler(http.server.BaseHTTPRequestHandler):
-            def _send(self, code, ctype, body, extra=None):
-                self.send_response(code)
-                self.send_header("Content-Type", ctype)
-                self.send_header("Content-Length", str(len(body)))
-                for k, v in (extra or {}).items():
-                    self.send_header(k, v)
-                self.end_headers()
-                self.wfile.write(body)
-
-            def _json(self, obj, code=200):
-                self._send(code, "application/json",
-                          json.dumps(obj).encode("utf-8"))
-
-            def _qs(self):
-                p = urllib.parse.urlparse(self.path)
-                return p.path, urllib.parse.parse_qs(
-                    p.query, keep_blank_values=True)
-
-            def _post_form(self):
-                length = int(self.headers.get(
-                    "Content-Length", 0) or 0)
-                raw = self.rfile.read(length) if length else b""
-                data = urllib.parse.parse_qs(
-                    raw.decode("utf-8", errors="replace"),
-                    keep_blank_values=True)
-                return dict((k, v[0]) for k, v in data.items())
-
-            def _resolve(self, area, relpath):
-                root = areas.get(area)
-                if not root:
-                    return None, None
-                return root, safe_dir(root, relpath)
-
-            def do_GET(self):
-                path, q = self._qs()
-                g1 = (lambda k, d="": q.get(k, [d])[0])
-                if path == "/":
-                    self._send(200, "text/html; charset=utf-8",
-                              page_data)
-                elif path == "/basestation.py":
-                    self._send(200, "text/x-python", bdata, {
-                        "Content-Disposition":
-                            "attachment; filename=basestation.py"})
-                elif path == "/api/list":
-                    root, sub = self._resolve(g1("area", "in"),
-                                              g1("path"))
-                    if sub is None or not os.path.isdir(sub):
-                        self._json({"error": "percorso non "
-                                   "valido"}, 400)
-                        return
-                    entries = []
-                    try:
-                        for nm in sorted(os.listdir(sub),
-                                        key=str.lower):
-                            full = os.path.join(sub, nm)
-                            try:
-                                st = os.stat(full)
-                            except OSError:
-                                continue
-                            is_dir = os.path.isdir(full)
-                            ext = os.path.splitext(nm)[1].lower()
-                            entries.append({
-                                "name": nm,
-                                "type": "dir" if is_dir else "file",
-                                "size": 0 if is_dir else st.st_size,
-                                "mtime": int(st.st_mtime),
-                                "editable": (not is_dir) and
-                                    ext in TEXT_EXTS,
-                            })
-                    except OSError:
-                        pass
-                    entries.sort(key=lambda e: (e["type"] != "dir",
-                                                e["name"].lower()))
-                    self._json({"entries": entries})
-                elif path == "/api/read":
-                    root, sub = self._resolve(g1("area", "in"),
-                                              g1("path"))
-                    if sub is None or not os.path.isfile(sub):
-                        self._json({"error": "file non "
-                                   "found"}, 404)
-                        return
-                    if os.path.getsize(sub) > 2 * 1024 * 1024:
-                        self._json({"error": "file troppo grande "
-                                   "per l'editor (oltre 2MB)"}, 400)
-                        return
-                    try:
-                        with open(sub, "r", encoding="utf-8",
-                                 errors="replace") as f:
-                            content = f.read()
-                    except OSError as e:
-                        self._json({"error": str(e)}, 500)
-                        return
-                    self._json({"content": content})
-                elif path == "/api/download":
-                    root, sub = self._resolve(g1("area", "in"),
-                                              g1("path"))
-                    if sub is None or not os.path.isfile(sub):
-                        self._send(404, "text/plain",
-                                  b"not found")
-                        return
-                    ctype = mimetypes.guess_type(sub)[0] or \
-                        "application/octet-stream"
-                    try:
-                        with open(sub, "rb") as f:
-                            data = f.read()
-                    except OSError:
-                        self._send(500, "text/plain",
-                                  b"error di lettura")
-                        return
-                    self._send(200, ctype, data, {
-                        "Content-Disposition":
-                            "attachment; filename=\"%s\"" %
-                            os.path.basename(sub)})
-                else:
-                    self._send(404, "text/plain", b"not found")
-
-            def do_POST(self):
-                path, _ = self._qs()
-                if path == "/api/upload":
-                    _, q = self._qs()
-                    g1 = (lambda k, d="": q.get(k, [d])[0])
-                    root, sub = self._resolve(g1("area", "in"),
-                                              g1("path"))
-                    if sub is None or not os.path.isdir(sub):
-                        self._json({"error": "percorso non "
-                                   "valido"}, 400)
-                        return
-                    ctype = self.headers.get("Content-Type", "")
-                    if "boundary=" not in ctype:
-                        self._json({"error": "richiesta non "
-                                   "valida"}, 400)
-                        return
-                    boundary = ctype.split(
-                        "boundary=")[1].strip('"').encode("utf-8")
-                    length = int(self.headers.get(
-                        "Content-Length", 0) or 0)
-                    body = self.rfile.read(length)
-                    fn, content = parse_multipart(body, boundary)
-                    safe_fn = clean_name(fn) if fn else ""
-                    if not safe_fn or content is None:
-                        self._json({"error": "nessun file"}, 400)
-                        return
-                    try:
-                        with open(os.path.join(sub, safe_fn),
-                                 "wb") as f:
-                            f.write(content)
-                    except OSError as e:
-                        self._json({"error": str(e)}, 500)
-                        return
-                    self._json({"ok": True, "name": safe_fn})
-                    return
-                data = self._post_form()
-                area = data.get("area", "in")
-                root, sub = self._resolve(area, data.get("path", ""))
-                if path == "/api/mkdir":
-                    name = clean_name(data.get("name", ""))
-                    if sub is None or not os.path.isdir(sub) or \
-                            not name:
-                        self._json({"error": "dati non validi"},
-                                  400)
-                        return
-                    target = os.path.join(sub, name)
-                    if os.path.exists(target):
-                        self._json({"error": "esiste gia'"}, 409)
-                        return
-                    try:
-                        os.makedirs(target)
-                    except OSError as e:
-                        self._json({"error": str(e)}, 500)
-                        return
-                    self._json({"ok": True, "name": name})
-                elif path == "/api/newfile":
-                    name = clean_name(data.get("name", ""))
-                    content = data.get("content", "")
-                    if sub is None or not os.path.isdir(sub) or \
-                            not name:
-                        self._json({"error": "dati non validi"},
-                                  400)
-                        return
-                    target = os.path.join(sub, name)
-                    if os.path.exists(target):
-                        self._json({"error": "esiste gia'"}, 409)
-                        return
-                    try:
-                        with open(target, "w", encoding="utf-8") \
-                                as f:
-                            f.write(content)
-                    except OSError as e:
-                        self._json({"error": str(e)}, 500)
-                        return
-                    self._json({"ok": True, "name": name})
-                elif path == "/api/write":
-                    content = data.get("content", "")
-                    if sub is None or not os.path.isfile(sub):
-                        self._json({"error": "file non "
-                                   "found"}, 404)
-                        return
-                    try:
-                        with open(sub, "w", encoding="utf-8") as f:
-                            f.write(content)
-                    except OSError as e:
-                        self._json({"error": str(e)}, 500)
-                        return
-                    self._json({"ok": True})
-                elif path == "/api/delete":
-                    if sub is None or not os.path.exists(sub) or \
-                            sub == os.path.normpath(root):
-                        self._json({"error": "not found"}, 404)
-                        return
-                    try:
-                        if os.path.isdir(sub):
-                            if os.listdir(sub):
-                                self._json({"error": "folder "
-                                           "non vuota"}, 400)
-                                return
-                            os.rmdir(sub)
-                        else:
-                            os.remove(sub)
-                    except OSError as e:
-                        self._json({"error": str(e)}, 500)
-                        return
-                    self._json({"ok": True})
-                else:
-                    self._send(404, "text/plain", b"not found")
-
-            def log_message(self, fmt, *args):
-                pass
-
-        try:
-            srv = http.server.ThreadingHTTPServer(
-                ("0.0.0.0", 8765), Handler)
-            srv.daemon_threads = True
+            with socket.create_connection(("127.0.0.1", 8765), timeout=0.35):
+                self.bstation_srv = True
         except OSError:
             return False
-        self.bstation_srv = srv
-        self.bstation_thread = threading.Thread(
-            target=srv.serve_forever, daemon=True)
-        self.bstation_thread.start()
+
+        state_path = os.path.join(DATA, "spdw_hub", "device_agent.json")
+        try:
+            with open(state_path, "r", encoding="utf-8") as stream:
+                state = json.load(stream)
+            self.bstation_pairing_pin = str(state.get("pairing_pin", ""))
+        except (OSError, ValueError, AttributeError):
+            self.bstation_pairing_pin = ""
         return True
 
     def basestation_serve_stop(self):
-        srv = getattr(self, "bstation_srv", None)
-        if srv:
-            srv.shutdown()
-            self.bstation_srv = None
+        """The shared gateway is service-owned; refresh rather than stop it."""
+        return self.basestation_serve_start()
 
     def own_ip(self):
         try:
@@ -6328,6 +6023,12 @@ class App(object):
                 tool = t; break
         if not tool:
             self.notify(f"Unknown tool: {tool_id}", "warning")
+            return
+        if tool.get("launcher_type") == "portable-voidcast":
+            # VoidCast is a full-screen app and must use the same mux session
+            # hand-off as the dedicated Media -> VoidCast IPTV menu action.
+            from desk.hubs.media import MediaHub
+            MediaHub(self).voidcast()
             return
         base = APP_DIR
         path = tool.get("path", "")
@@ -15554,25 +15255,72 @@ class App(object):
                 else:
                     self.pc_link_disconnect_all()
             elif btn == "R1":
+                self.basestation_serve_start()
                 self.push("bstationsend")
             elif btn == "B":
                 self.pop_state()
         elif top == "bstationsend":
-            if btn == "A":
-                if self.bstation_srv is None:
-                    self.basestation_serve_start()
-                else:
-                    self.basestation_serve_stop()
-            elif btn == "SELECT":
-                new_val = not self.cfg.get("bstation_always_on", False)
-                self.cfg["bstation_always_on"] = new_val
-                save_cfg(self.cfg)
-                if new_val and self.bstation_srv is None:
-                    self.basestation_serve_start()
-                elif not new_val and self.bstation_srv is not None:
-                    self.basestation_serve_stop()
-            elif btn == "B":
-                self.pop_state()
+            it = (self.lang == "it")
+            bs_col = (90, 200, 220)
+            self.header("SPDW HUB // DEVICE AGENT", icon="monitor")
+            self.npanel(8, 46, W - 16, 30, border=LINE, fill=INK, cut=6)
+            self.text("GATEWAY GESTITO DAL SERVIZIO VOID DESK" if it else
+                      "GATEWAY MANAGED BY VOID DESK SERVICE",
+                      (16, 53), self.f_tiny, self.accent)
+            self.content_panel(80, H - 40)
+            running = self.bstation_srv is not None
+            self.npanel(30, 92, W - 60, 208, border=bs_col,
+                       fill=(8, 14, 16), cut=12)
+            icons.draw(self.surface, "monitor", 46, 108, 26,
+                       OK_G if running else DIM)
+            status_s = (("gateway attivo" if it else "gateway online")
+                        if running else
+                        ("gateway non disponibile" if it else "gateway unavailable"))
+            self.text(status_s, (84, 110), self.f_med,
+                      OK_G if running else NO_R)
+            if running:
+                ip = self.own_ip() or "?"
+                url = "http://%s:8765/" % ip
+                self.text(("apri dal PC questo indirizzo:" if it
+                           else "open this address from the PC:"), (46, 144),
+                          self.f_tiny, DIM)
+                self.text(url, (46, 164), self.f_small, bs_col,
+                          maxw=W - 92)
+                pin = self.bstation_pairing_pin or "--------"
+                self.text(("PIN di pairing:" if it else "Pairing PIN:"),
+                          (46, 194), self.f_tiny, DIM)
+                self.text(pin, (162, 190), self.f_med, OK_G)
+                self.text(("Accesso protetto · file in entrata e uscita" if it
+                           else "Authenticated access · incoming and outgoing files"),
+                          (46, 222), self.f_tiny, FAINT, maxw=W - 92)
+                incoming_dir = os.path.join(DATA, "incoming")
+                outgoing_dir = os.path.join(DATA, "outgoing")
+                try:
+                    n_in = len(os.listdir(incoming_dir))
+                except OSError:
+                    n_in = 0
+                try:
+                    n_out = len(os.listdir(outgoing_dir))
+                except OSError:
+                    n_out = 0
+                self.text(("ricevuti: %d elementi" % n_in) if it else
+                          ("received: %d items" % n_in),
+                          (46, 250), self.f_small, FG)
+                self.text(("condivisi: %d elementi" % n_out) if it else
+                          ("shared: %d items" % n_out),
+                          (46, 272), self.f_small, FG)
+            else:
+                for j, line in enumerate(self.note_wrap(
+                        "il servizio SPDW Hub non risponde sulla porta 8765. "
+                        "Riavvia Void Desk e controlla il log del servizio." if it
+                        else "the SPDW Hub service is not responding on port 8765. "
+                        "Restart Void Desk and inspect the service log.",
+                        W - 92, self.f_small, 4)):
+                    self.text(line, (46, 148 + j * 20), self.f_small, DIM,
+                              maxw=W - 92)
+            self.footer([("A", "aggiorna" if it else "refresh"),
+                         ("Y", "aggiorna dettagli" if it else "refresh details"),
+                         ("B", self.t("back"))])
         elif top == "ctrldevices":
             n = len(self.ctrl_devices)
             if btn == "UP" and n:

@@ -13,6 +13,14 @@ REQUIRED_FILES = (
     "Void-Desk/mux_launch.sh",
     "Void-Desk/voiddesk.py",
     "Void-Desk/love/main.lua",
+    "Void-Desk/outdesk/VoidCast/voidcast/main.py",
+    "Void-Desk/outdesk/VoidCast/presets/config.default.json",
+    "Void-Desk/service/spdw_hub/__init__.py",
+    "Void-Desk/service/spdw_hub/device_agent.py",
+    "Void-Desk/service/spdw_hub/registry.py",
+    "Void-Desk/service/spdw_hub/services.json",
+    "Void-Desk/service/spdw_hub/addons.py",
+    "Void-Desk/service/spdw_hub/manifest.schema.json",
 )
 
 

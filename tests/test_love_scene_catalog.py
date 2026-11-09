@@ -31,3 +31,20 @@ def test_forge_shell_opens_existing_shell_scene():
     source = (LOVE / "scenes" / "hub_forge.lua").read_text(encoding="utf-8")
     assert 'sm.push("hub_shell", {})' in source
     assert (LOVE / "scenes" / "hub_shell.lua").is_file()
+
+
+def test_media_voidcast_entry_hands_off_to_bundled_outdesk_app():
+    source = (LOVE / "scenes" / "hub_media.lua").read_text(encoding="utf-8")
+    assert 'label = "VoidCast IPTV"' in source
+    assert 'bridge.call("voidcast_launch", {}' in source
+    assert "love.event.quit()" in source
+    assert "LÖVE prototype" not in source
+    assert "M3U, multi-source EPG, PVR and add-ons" in source
+
+def test_uplink_exposes_shared_spdw_device_agent_status_and_pairing():
+    source = (LOVE / "scenes" / "hub_uplink.lua").read_text(encoding="utf-8")
+    assert 'bridge.call("hub_gateway_status", {}' in source
+    assert 'label = "SPDW Hub Device Agent"' in source
+    assert "state.hub.pairing_pin" in source
+    assert "state.hub.port" in source
+
