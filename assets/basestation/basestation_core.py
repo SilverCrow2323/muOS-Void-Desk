@@ -13,6 +13,7 @@ import os
 import posixpath
 import secrets
 import stat
+import subprocess
 import tempfile
 import time
 import zipfile
@@ -288,3 +289,42 @@ def collect_host_stats(include_processes=False):
         except (OSError, ValueError):
             pass
     return result
+
+def collect_listener_snapshot(timeout=6, max_chars=250000):
+    """Collect the current machine's listening sockets without changing state.
+
+    Prefer ss and fall back to netstat. The caller decides how to label or
+    correlate the raw socket list with the SPDW service registry.
+    """
+    commands = (
+        ("ss", ["ss", "-lntup"]),
+        ("netstat", ["netstat", "-lntup"]),
+    )
+    failures = []
+    for tool, command in commands:
+        try:
+            result = subprocess.run(
+                command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                universal_newlines=True, timeout=timeout, check=False)
+        except FileNotFoundError:
+            failures.append("{} not installed".format(tool))
+            continue
+        except subprocess.TimeoutExpired:
+            failures.append("{} timed out".format(tool))
+            continue
+        except OSError as exc:
+            failures.append("{}: {}".format(tool, exc))
+            continue
+        return {
+            "tool": tool,
+            "return_code": int(result.returncode),
+            "stdout": str(result.stdout or "")[:max_chars],
+            "stderr": str(result.stderr or "")[:max_chars],
+        }
+    return {
+        "tool": None,
+        "return_code": None,
+        "stdout": "",
+        "stderr": "; ".join(failures) or "no listener tool available",
+    }
+\n
