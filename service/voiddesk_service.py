@@ -4,12 +4,21 @@ VoidDesk background service — reads .love_request.json,
 writes .love_response.json. Minimal, no external deps.
 Runs on both muOS (aarch64) and desktop x86_64.
 """
+import errno
+import fcntl
 import json
 import os
 import platform
+import re
+import pty
+import select
+import shlex
+import struct
+import signal
 import shutil
 import subprocess
 import sys
+import termios
 import time
 import traceback
 from pathlib import Path
@@ -36,6 +45,19 @@ try:
     import sysinfo as deskinfo
 except Exception:
     deskinfo = None
+
+try:
+    import syncthing as syncthing_discovery
+    import syncthing_api
+except Exception:
+    syncthing_discovery = None
+    syncthing_api = None
+
+sys.path.insert(0, str(APP_DIR / "service"))
+try:
+    import tailscale_manager
+except Exception:
+    tailscale_manager = None
 
 def log(msg):
     print(f"[service] {msg}", file=sys.stderr, flush=True)
@@ -251,6 +273,528 @@ def h_network_status(args):
         }}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+def _external_tool_target(tool):
+    """Resolve a registry launcher without permitting arbitrary path escape."""
+    launcher = str(tool.get("launcher") or "")
+    kind = tool.get("launcher_type")
+    if kind == "portable-voidcast" and launcher == "../VoidCast":
+        target = (APP_DIR.parent / "VoidCast").resolve()
+        if target.parent == APP_DIR.parent.resolve():
+            return target
+        return None
+    target = (APP_DIR / launcher).resolve()
+    try:
+        target.relative_to(APP_DIR.resolve())
+    except ValueError:
+        return None
+    return target
+
+
+def h_list_external(args):
+    registry_path = APP_DIR / "external" / "tools.json"
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        return {"ok": False, "error": "cannot read external tools: " + str(exc)}
+    tools = []
+    for tool in registry.get("tools", []):
+        if not isinstance(tool, dict):
+            continue
+        target = _external_tool_target(tool)
+        kind = tool.get("launcher_type")
+        if target is None:
+            exists = False
+        elif kind == "love":
+            exists = target.is_file() or (
+                target.is_dir() and (target / "main.lua").is_file()
+            )
+        elif kind == "sh":
+            exists = target.is_file()
+        elif kind == "portable-voidcast":
+            exists = target.is_dir() and (
+                (target / "mux_launch.sh").is_file()
+                or (target / "voidcast.py").is_file()
+            )
+        else:
+            exists = False
+        tools.append({
+            "id": str(tool.get("id") or ""),
+            "name": str(tool.get("name") or "External tool"),
+            "desc": str(tool.get("desc") or ""),
+            "hub": str(tool.get("hub") or "system"),
+            "native_engine": str(tool.get("native_engine") or ""),
+            "launcher_type": str(kind or ""),
+            "icon": str(tool.get("icon") or "gear"),
+            "exists": exists,
+        })
+    return {"ok": True, "tools": tools}
+
+
+def h_launch_external(args):
+    tool_id = str(args.get("id") or "")
+    return h_job_start({
+        "tool_id": tool_id,
+        "name": "External: " + tool_id,
+        "hub": "external",
+    })
+
+
+def h_toolbox_stats(args):
+    """Read-only counts for the LÖVE Toolbox dashboard."""
+    notes_dir = DATA / "notes"
+    texts_dir = DATA / "Texts"
+    text_exts = {
+        ".txt", ".md", ".log", ".cfg", ".ini", ".json", ".csv",
+        ".yml", ".yaml", ".sh", ".conf", ".xml",
+    }
+
+    def count_files(directory, allowed=None):
+        try:
+            with os.scandir(directory) as entries:
+                return sum(
+                    1 for entry in entries
+                    if entry.is_file(follow_symlinks=False)
+                    and (allowed is None or
+                         Path(entry.name).suffix.lower() in allowed)
+                )
+        except OSError:
+            return 0
+
+    return {
+        "ok": True,
+        "notes_count": count_files(notes_dir, {".txt"}),
+        "text_files": count_files(texts_dir, text_exts),
+    }
+
+
+def h_calendar_events(args):
+    """Return month-scoped events in the shape expected by LÖVE Calendar."""
+    try:
+        year = int(args.get("year"))
+        month = int(args.get("month"))
+        if month < 1 or month > 12:
+            raise ValueError("month must be between 1 and 12")
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "invalid calendar year or month"}
+
+    path = DATA / "calendar.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raw = []
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": "cannot read calendar: " + str(exc)}
+
+    if not isinstance(raw, list):
+        return {"ok": False, "error": "calendar data must be a list"}
+
+    from datetime import date
+    events = {}
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            event_date = date(
+                int(item["y"]), int(item["mo"]), int(item["d"])
+            )
+            hour = max(0, min(23, int(item.get("h", 0))))
+            minute = max(0, min(59, int(item.get("mi", 0))))
+            importance = max(0, min(2, int(item.get("imp", 0))))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+        if event_date.year != year or event_date.month != month:
+            continue
+        key = event_date.strftime("%Y-%m-%d")
+        events.setdefault(key, []).append({
+            "title": str(item.get("t") or "Untitled event")[:160],
+            "category": "personal",
+            "hour": hour,
+            "minute": minute,
+            "importance": importance,
+        })
+
+    for day_events in events.values():
+        day_events.sort(key=lambda event: (event["hour"], event["minute"]))
+    return {"ok": True, "events": events}
+
+
+# One interactive PTY is shared by the LÖVE terminal scene.
+_SHELL_MASTER = None
+_SHELL_PROC = None
+
+
+def h_shell_start(args):
+    global _SHELL_MASTER, _SHELL_PROC
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "interactive shell disabled during visual capture"}
+    if _SHELL_PROC is not None and _SHELL_PROC.poll() is None:
+        return {"ok": True, "already_running": True}
+    if _SHELL_MASTER is not None:
+        try:
+            os.close(_SHELL_MASTER)
+        except OSError:
+            pass
+        _SHELL_MASTER = None
+    master = slave = None
+    try:
+        master, slave = pty.openpty()
+        fcntl.ioctl(slave, termios.TIOCSWINSZ,
+                    struct.pack("HHHH", 24, 80, 0, 0))
+        shell = os.environ.get("SHELL") or "/bin/sh"
+        if not os.path.isfile(shell):
+            shell = "/bin/sh"
+        env = os.environ.copy()
+        env.setdefault("TERM", "xterm-256color")
+        process = subprocess.Popen(
+            [shell], stdin=slave, stdout=slave, stderr=slave,
+            cwd=str(APP_DIR), env=env, close_fds=True,
+            start_new_session=True,
+        )
+        os.close(slave)
+        slave = None
+        flags = fcntl.fcntl(master, fcntl.F_GETFL)
+        fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        _SHELL_MASTER = master
+        _SHELL_PROC = process
+        return {"ok": True, "pid": process.pid}
+    except (OSError, ValueError) as exc:
+        for fd in (master, slave):
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        return {"ok": False, "error": "cannot start shell: " + str(exc)}
+
+
+def h_shell_poll(args):
+    if _SHELL_MASTER is None or _SHELL_PROC is None:
+        return {"ok": False, "error": "shell is not running"}
+    chunks = []
+    total = 0
+    try:
+        readable, _, _ = select.select([_SHELL_MASTER], [], [], 0)
+        if readable:
+            while total < 32768:
+                try:
+                    chunk = os.read(_SHELL_MASTER, min(8192, 32768 - total))
+                except BlockingIOError:
+                    break
+                except OSError as exc:
+                    if exc.errno == errno.EIO:
+                        break
+                    raise
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": "shell poll failed: " + str(exc)}
+    return {
+        "ok": True,
+        "output": b"".join(chunks).decode("utf-8", errors="replace"),
+        "running": _SHELL_PROC.poll() is None,
+    }
+
+
+def h_shell_send(args):
+    if _SHELL_MASTER is None or _SHELL_PROC is None:
+        return {"ok": False, "error": "shell is not running"}
+    if _SHELL_PROC.poll() is not None:
+        return {"ok": False, "error": "shell process has exited"}
+    payload = str(args.get("text") or "")[:8192].encode(
+        "utf-8", errors="replace"
+    )
+    try:
+        sent = os.write(_SHELL_MASTER, payload)
+        return {"ok": True, "bytes_written": sent}
+    except OSError as exc:
+        return {"ok": False, "error": "shell write failed: " + str(exc)}
+
+
+def h_shell_kill(args):
+    global _SHELL_MASTER, _SHELL_PROC
+    process = _SHELL_PROC
+    if process is not None and process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except (AttributeError, ProcessLookupError, PermissionError, OSError):
+            try:
+                process.terminate()
+            except OSError:
+                pass
+    if _SHELL_MASTER is not None:
+        try:
+            os.close(_SHELL_MASTER)
+        except OSError:
+            pass
+    _SHELL_MASTER = None
+    _SHELL_PROC = None
+    return {"ok": True}
+
+
+# Background jobs are process-local: a service restart clears the live
+# process table, while each job's log remains available under data/.
+_JOBS = {}
+_JOB_SEQ = 0
+_ALLOWED_JOB_PACKAGES = {"htop", "ncdu", "ffmpeg", "curl"}
+_APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]{0,127}$")
+_APT_ACTIONS = {"update", "upgrade", "clean", "install", "remove"}
+_APT_CATALOG_MODES = {"search", "installed", "info"}
+
+
+def _valid_apt_packages(values):
+    return (isinstance(values, list) and 1 <= len(values) <= 20
+            and all(isinstance(value, str) and _APT_PACKAGE_RE.fullmatch(value)
+                    for value in values))
+
+
+def h_apt_catalog(args):
+    """Read package metadata from the Debian/Ubuntu XFCE chroot, never host APT."""
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "mode": str(args.get("mode") or "search"),
+                "packages": [], "note": "visual capture fixture"}
+    mode = str(args.get("mode") or "search")
+    if mode not in _APT_CATALOG_MODES:
+        return {"ok": False, "error": "unsupported catalog mode"}
+    script = APP_DIR / "bin" / "vd_apt_manage.py"
+    if not script.is_file():
+        return {"ok": False, "error": "APT manager is missing"}
+    command = [sys.executable, str(script), "catalog", mode]
+    if mode == "search":
+        query = str(args.get("query") or "").strip()[:80]
+        if not query or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 +_.-]*", query):
+            return {"ok": False, "error": "search query contains unsupported characters"}
+        command.append(query)
+    elif mode == "info":
+        packages = args.get("packages")
+        if not _valid_apt_packages(packages):
+            return {"ok": False, "error": "one to twenty valid package names are required"}
+        command.extend(packages)
+    elif args.get("packages"):
+        return {"ok": False, "error": "installed mode takes no package arguments"}
+    try:
+        result = subprocess.run(command, cwd=str(APP_DIR), capture_output=True,
+                                text=True, timeout=35, check=False)
+        output = (result.stdout or "")[-24000:]
+        if result.returncode:
+            return {"ok": False, "error": (result.stderr or output or
+                    "APT catalog query failed")[-600:]}
+        packages = []
+        for line in output.splitlines():
+            if mode == "search":
+                name, sep, description = line.partition(" - ")
+                if sep and _APT_PACKAGE_RE.fullmatch(name.strip()):
+                    packages.append({"name": name.strip(),
+                                     "description": description.strip()[:240]})
+            elif mode == "installed":
+                name, sep, version = line.partition("\t")
+                if sep and _APT_PACKAGE_RE.fullmatch(name.strip().split(":", 1)[0]):
+                    packages.append({"name": name.strip(), "version": version.strip()})
+        return {"ok": True, "mode": mode, "packages": packages[:100],
+                "details": output if mode == "info" else ""}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "APT catalog query timed out"}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot run APT catalog: " + str(exc)}
+
+
+
+
+def _job_refresh(job):
+    process = job.get("process")
+    if job["status"] == "running" and process is not None:
+        code = process.poll()
+        if code is not None:
+            job["status"] = "done" if code == 0 else "error"
+            job["progress"] = 100 if code == 0 else 0
+            job["exit_code"] = code
+    return job
+
+
+def _job_public(job):
+    _job_refresh(job)
+    return {
+        "id": job["id"],
+        "name": job["name"],
+        "hub": job["hub"],
+        "status": job["status"],
+        "started": job["started"],
+        "progress": job["progress"],
+        "color": [0.45, 0.72, 0.95],
+    }
+
+
+def h_job_start(args):
+    """Start only allowlisted package jobs or registered external tools."""
+    global _JOB_SEQ
+    command = None
+    cwd = APP_DIR
+    cmd_text = args.get("cmd")
+    tool_id = args.get("tool_id")
+
+    apt_action = args.get("apt_action")
+    if apt_action is not None:
+        action = str(apt_action)
+        if action not in _APT_ACTIONS:
+            return {"ok": False, "error": "APT action is not allowlisted"}
+        packages = args.get("packages", [])
+        if action in ("install", "remove"):
+            if not _valid_apt_packages(packages):
+                return {"ok": False, "error": "one to twenty valid package names are required"}
+        elif packages:
+            return {"ok": False, "error": "this APT action takes no package arguments"}
+        script = APP_DIR / "bin" / "vd_apt_manage.py"
+        if not script.is_file():
+            return {"ok": False, "error": "APT manager is missing"}
+        command = [sys.executable, str(script), action] + list(packages)
+    elif cmd_text:
+        try:
+            tokens = shlex.split(str(cmd_text))
+        except ValueError as exc:
+            return {"ok": False, "error": "invalid command: " + str(exc)}
+        if (len(tokens) != 3 or tokens[:2] !=
+                ["sh", "bin/vd_apt_install.sh"] or
+                tokens[2] not in _ALLOWED_JOB_PACKAGES):
+            return {"ok": False, "error": "command is not allowlisted"}
+        script = APP_DIR / "bin" / "vd_apt_install.sh"
+        if not script.is_file():
+            return {"ok": False, "error": "package installer is missing"}
+        command = ["sh", str(script), tokens[2]]
+    elif args.get("service_task") == "tailscale_start":
+        script = APP_DIR / "service" / "tailscale_job.py"
+        if not script.is_file():
+            return {"ok": False, "error": "Tailscale service job is missing"}
+        command = [sys.executable, str(script)]
+    elif tool_id:
+        try:
+            registry = json.loads(
+                (APP_DIR / "external" / "tools.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            tool = next(
+                (item for item in registry.get("tools", [])
+                 if item.get("id") == str(tool_id)),
+                None,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            return {"ok": False, "error": "cannot read external tools: " + str(exc)}
+        if not tool:
+            return {"ok": False, "error": "unknown external tool"}
+        launcher_type = tool.get("launcher_type")
+        launcher = tool.get("launcher", "")
+        if launcher_type == "portable-voidcast":
+            if launcher != "../VoidCast":
+                return {"ok": False, "error": "external tool path is not allowlisted"}
+            target = (APP_DIR.parent / "VoidCast").resolve()
+            if target.parent != APP_DIR.parent.resolve() or not target.is_dir():
+                return {"ok": False, "error": "VoidCast is not installed"}
+            shell_launcher = target / "mux_launch.sh"
+            python_launcher = target / "voidcast.py"
+            if shell_launcher.is_file():
+                command = ["sh", str(shell_launcher)]
+            elif python_launcher.is_file():
+                command = [sys.executable, str(python_launcher)]
+            else:
+                return {"ok": False, "error": "VoidCast launcher is missing"}
+            cwd = target
+        else:
+            target = (APP_DIR / launcher).resolve()
+            try:
+                target.relative_to(APP_DIR.resolve())
+            except ValueError:
+                return {"ok": False, "error": "external tool path escapes app directory"}
+            if launcher_type == "love":
+                if not target.is_file() and not (
+                    target.is_dir() and (target / "main.lua").is_file()
+                ):
+                    return {"ok": False, "error": "external tool is not installed"}
+                love_bin = APP_DIR / "lib" / "love"
+                love_exec = str(love_bin) if love_bin.is_file() else shutil.which("love")
+                if not love_exec:
+                    return {"ok": False, "error": "LÖVE runtime is not installed"}
+                command = [love_exec, str(target)]
+                cwd = target if target.is_dir() else target.parent
+            elif launcher_type == "sh":
+                if not target.is_file():
+                    return {"ok": False, "error": "external launcher is not installed"}
+                command = ["sh", str(target)]
+                cwd = target.parent
+            else:
+                return {"ok": False, "error": "unsupported external launcher type"}
+    else:
+        return {"ok": False, "error": "job requires cmd or tool_id"}
+
+    _JOB_SEQ += 1
+    job_id = str(_JOB_SEQ)
+    name = str(args.get("name") or tool_id or "Background job")[:80]
+    hub = str(args.get("hub") or "system")[:32]
+    log_path = DATA / ("love_job_%s.log" % job_id)
+    try:
+        DATA.mkdir(parents=True, exist_ok=True)
+        with log_path.open("ab") as log_file:
+            process = subprocess.Popen(
+                command, cwd=str(cwd), stdin=subprocess.DEVNULL,
+                stdout=log_file, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+    except OSError as exc:
+        return {"ok": False, "error": "cannot start job: " + str(exc)}
+
+    job = {
+        "id": job_id,
+        "name": name,
+        "hub": hub,
+        "status": "running",
+        "started": time.time(),
+        "progress": 0,
+        "process": process,
+        "log_path": log_path,
+    }
+    _JOBS[job_id] = job
+    return {"ok": True, "job": _job_public(job)}
+
+
+def h_job_list(args):
+    jobs = [_job_public(job) for job in _JOBS.values()]
+    jobs.sort(key=lambda job: job["started"], reverse=True)
+    return {"ok": True, "jobs": jobs}
+
+
+def h_job_cancel(args):
+    job = _JOBS.get(str(args.get("job_id", "")))
+    if not job:
+        return {"ok": False, "error": "unknown job"}
+    _job_refresh(job)
+    if job["status"] != "running":
+        return {"ok": True, "status": job["status"]}
+    process = job.get("process")
+    if process is not None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except (AttributeError, ProcessLookupError, PermissionError, OSError):
+            try:
+                process.terminate()
+            except OSError:
+                pass
+    job["status"] = "cancelled"
+    return {"ok": True, "status": "cancelled"}
+
+
+def h_job_log(args):
+    job = _JOBS.get(str(args.get("job_id", "")))
+    if not job:
+        return {"ok": False, "error": "unknown job"}
+    try:
+        lines = job["log_path"].read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()[-160:]
+    except OSError:
+        lines = []
+    return {"ok": True, "lines": lines}
+
 
 def h_media_status(args):
     try:
@@ -683,6 +1227,188 @@ def h_xfce_launch(args):
     return {"ok": False, "error": "XFCE never started — log: " + _tail_log(log_path, 12)}
 
 
+def h_tailscale_status(args):
+    """Read-only status from the bundled Rt:Tailscale-M service manager."""
+    if IS_VISUAL_CAPTURE:
+        return {
+            "ok": True, "installed": True, "available": True,
+            "backend": "Running", "daemon": True, "panel": False,
+            "watchdog": True, "taildrop_enabled": True, "autostart": True,
+            "version": "3.0.6", "tailscale_version": "1.80.0",
+            "auth_url": "https://login.tailscale.com/a/voiddesk-visual-fixture",
+            "tailnet": "visual-fixture.ts.net",
+            "self": {"name": "voiddesk-handheld", "ips": ["100.64.0.10"],
+                     "online": True, "user": "fixture@example.test"},
+            "peers": [
+                {"name": "desktop-pc", "ip": "100.64.0.20",
+                 "online": True, "exit_node": True, "using": False,
+                 "os": "linux", "user": "fixture@example.test"},
+                {"name": "home-server", "ip": "100.64.0.30",
+                 "online": False, "exit_node": False, "using": False,
+                 "os": "linux", "user": "fixture@example.test"},
+            ],
+            "taildrop": [{"name": "save-backup.zip", "size": 4096,
+                          "mtime": 0}],
+            "urls": [],
+        }
+    if tailscale_manager is None:
+        return {"ok": False, "error": "Tailscale service adapter unavailable"}
+    return tailscale_manager.status(APP_DIR)
+
+
+def h_tailscale_action(args):
+    """Allowlisted operations delegated to Rt:Tailscale-M's own manager."""
+    if tailscale_manager is None:
+        return {"ok": False, "error": "Tailscale service adapter unavailable"}
+    action = str(args.get("action") or "")
+    value = str(args.get("value") or "")
+    if action == "start":
+        return h_job_start({
+            "service_task": "tailscale_start",
+            "name": "Rt:Tailscale-M setup and start",
+            "hub": "uplink",
+        })
+    return tailscale_manager.action(APP_DIR, action, value)
+
+
+def _syncthing_rest(url, key, path, method="GET", payload=None):
+    import urllib.request
+    headers = {"X-API-Key": key}
+    data = None
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(payload).encode("utf-8")
+    elif method != "GET":
+        data = b""
+    request = urllib.request.Request(
+        url + path, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(request, timeout=2) as response:
+        body = response.read().decode("utf-8")
+        return json.loads(body) if body else {}
+
+
+def _syncthing_connection():
+    if syncthing_discovery is None:
+        return None
+    return syncthing_discovery.discover_connection(data_dir=DATA)
+
+
+def h_syncthing_status(args):
+    """Read-only status for the existing muOS Syncthing Web Service."""
+    if IS_VISUAL_CAPTURE:
+        return {
+            "ok": True, "available": True, "state": "Running",
+            "url": "http://127.0.0.1:7070", "id": "VOIDDESK-SYNC-CI",
+            "connected": 1,
+            "folders": [
+                {"id": "roms", "label": "ROMs", "path": "/mnt/mmc/ROMS",
+                 "pct": 84, "paused": False},
+                {"id": "saves", "label": "Save files", "path": "/mnt/mmc/SAVES",
+                 "pct": 100, "paused": True},
+            ],
+            "devices": [
+                {"id": "VOIDDESK-DESKTOP-CI", "name": "Desktop PC",
+                 "connected": True, "paused": False,
+                 "address": "192.168.1.20:22000"},
+            ],
+        }
+    connection = _syncthing_connection()
+    if not connection:
+        return {
+            "ok": True, "available": False, "state": "Not configured",
+            "message": "Enable Syncthing in muOS: Configuration > Connectivity > Web Services",
+            "folders": [], "devices": [], "connected": 0,
+        }
+    try:
+        url, key = connection["url"], connection["key"]
+        system = _syncthing_rest(url, key, "/rest/system/status")
+        config = _syncthing_rest(url, key, "/rest/config")
+        connections = _syncthing_rest(
+            url, key, "/rest/system/connections").get("connections", {})
+        from urllib.parse import quote
+        folders = []
+        for folder in config.get("folders", [])[:8]:
+            folder_id = str(folder.get("id") or "")
+            pct = -1
+            if folder_id:
+                try:
+                    completion = _syncthing_rest(
+                        url, key, "/rest/db/completion?folder=" +
+                        quote(folder_id, safe=""))
+                    pct = int(completion.get("completion", 0))
+                except Exception:
+                    pass
+            folders.append({
+                "id": folder_id,
+                "label": folder.get("label") or folder_id,
+                "path": folder.get("path", ""),
+                "pct": pct,
+                "paused": bool(folder.get("paused")),
+            })
+        devices = []
+        for device in config.get("devices", []):
+            device_id = str(device.get("deviceID") or "")
+            link = connections.get(device_id, {})
+            devices.append({
+                "id": device_id,
+                "name": device.get("name") or device_id[:12],
+                "connected": bool(link.get("connected")),
+                "paused": bool(link.get("paused")),
+                "address": link.get("address", ""),
+            })
+        return {
+            "ok": True, "available": True,
+            "state": "Running", "url": connection["url"],
+            "id": str(system.get("myID") or "?")[:18],
+            "connected": sum(1 for device in devices if device["connected"]),
+            "folders": folders, "devices": devices,
+        }
+    except Exception as exc:
+        return {
+            "ok": True, "available": False, "state": "Unavailable",
+            "message": "Syncthing API unavailable: " + str(exc)[:120],
+            "folders": [], "devices": [], "connected": 0,
+        }
+
+
+def h_syncthing_action(args):
+    """Perform only allowlisted operations on configured folders/devices."""
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "Syncthing actions are disabled in visual capture"}
+    if syncthing_api is None:
+        return {"ok": False, "error": "Syncthing adapter unavailable"}
+    connection = _syncthing_connection()
+    if not connection:
+        return {"ok": False, "error": "muOS Syncthing Web Service is not enabled"}
+    action = str(args.get("action") or "")
+    folder_id = str(args.get("folder") or "")
+    device_id = str(args.get("device") or "")
+    try:
+        config = _syncthing_rest(
+            connection["url"], connection["key"], "/rest/config")
+        if action in ("toggle_folder", "pause_folder", "resume_folder",
+                      "scan", "override"):
+            if not folder_id or not any(
+                str(item.get("id") or "") == folder_id
+                for item in config.get("folders", [])
+            ):
+                return {"ok": False, "error": "unknown Syncthing folder"}
+        elif action in ("toggle_device", "pause_device", "resume_device"):
+            if not device_id or not any(
+                str(item.get("deviceID") or "") == device_id
+                for item in config.get("devices", [])
+            ):
+                return {"ok": False, "error": "unknown Syncthing device"}
+        else:
+            return {"ok": False, "error": "unsupported Syncthing action"}
+        return syncthing_api.perform_action(
+            _syncthing_rest, connection["url"], connection["key"], action,
+            folder=folder_id, device=device_id,
+        )
+    except Exception as exc:
+        return {"ok": False, "error": "Syncthing action failed: " + str(exc)[:120]}
+
+
 HANDLERS = {
     "ping": h_ping,
     "get_config": h_get_config,
@@ -690,8 +1416,25 @@ HANDLERS = {
     "system_info": h_system_info,
     "network_status": h_network_status,
     "system_status": h_system_status,
+    "shell_start": h_shell_start,
+    "shell_poll": h_shell_poll,
+    "shell_send": h_shell_send,
+    "shell_kill": h_shell_kill,
+    "apt_catalog": h_apt_catalog,
+    "job_start": h_job_start,
+    "job_list": h_job_list,
+    "job_cancel": h_job_cancel,
+    "job_log": h_job_log,
     "media_status": h_media_status,
+    "list_external": h_list_external,
+    "launch_external": h_launch_external,
+    "toolbox_stats": h_toolbox_stats,
+    "calendar_events": h_calendar_events,
     "hotspot_toggle": h_hotspot_toggle,
+    "tailscale_status": h_tailscale_status,
+    "tailscale_action": h_tailscale_action,
+    "syncthing_status": h_syncthing_status,
+    "syncthing_action": h_syncthing_action,
 
     "session_list": h_session_list,
     "session_launch": h_session_launch,

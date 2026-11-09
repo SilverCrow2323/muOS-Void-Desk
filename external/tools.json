@@ -45,21 +45,6 @@
         0.82,
         0.55
       ]
-    },
-    {
-      "id": "rt_tailscale_m",
-      "name": "Rt:Tailscale-M",
-      "desc": "Tailscale VPN: QR login, exit nodes, Taildrop, peers",
-      "native_engine": "love",
-      "hub": "uplink",
-      "launcher_type": "love",
-      "launcher": "external/rt-tailscale-m",
-      "icon": "uplink",
-      "color": [
-        0.31,
-        0.8,
-        1.0
-      ]
     }
   ]
 }

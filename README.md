@@ -143,7 +143,7 @@ The root-level voiddesk.py is a convenience launcher for a Linux PC. It is not t
 Prerequisites: Linux, Python 3 and a terminal. The LÖVE frontend needs a system love executable (Debian/Ubuntu: sudo apt install love). The Pygame launcher creates .venv_desktop and installs pygame and psutil on first use.
 
 ~~~bash
-git clone https://github.com/SilverCrow2323/Void-Desk-Project.git
+git clone --recurse-submodules https://github.com/SilverCrow2323/Void-Desk-Project.git
 cd Void-Desk-Project
 
 python3 voiddesk.py
@@ -153,9 +153,14 @@ python3 voiddesk.py --engine love
 python3 voiddesk.py --engine py
 python3 voiddesk.py --repair
 python3 voiddesk.py --help
+
+# Build the muOS package (requires the pinned submodule above)
+python3 tools/build_muxapp.py
 ~~~
 
 The bundled LÖVE binary is architecture-specific; on a PC the launcher prefers the system installation.
+
+The Rt:Tailscale-M service is included as a pinned Git submodule. If you cloned without `--recurse-submodules`, run `git submodule update --init --recursive` before building or packaging Void Desk. The builder copies only the upstream service manager, watchdog, CLI wrapper and PIN-protected panel into `Void-Desk/external/rt-tailscale-m/app/RtTailscale`; the standalone upstream UI is not launched. Tailscale's official arm64 binaries are installed on first service start with upstream checksum verification.
 
 See the [visual capture workflow](docs/visual/README.md) to capture every LÖVE scene automatically, take F12 screenshots in either frontend, and generate the asset catalogue and visual galleries.
 

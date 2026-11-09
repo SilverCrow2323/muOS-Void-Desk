@@ -3,7 +3,6 @@ local bridge    = require("core.bridge")
 local sm        = require("core.scene_manager")
 local nodes     = require("core.nodes")
 local widgets   = require("core.widgets")
-local ext       = require("core.external")
 
 local state = {
     wifi    = { connected = false, ssid = "—", signal = 0, ip = "—" },
@@ -103,16 +102,12 @@ return dashboard.new({
               end)
               return "Toggling..."
           end },
-        { icon = "uplink", label = "Rt:Tailscale-M", value = "LOVE",
-          desc = "Tailscale VPN: QR login, exit nodes, peers",
-          action = function(scene)
-              scene.set_status("Launching Rt:Tailscale-M...")
-              ext.launch("rt_tailscale_m", function(resp)
-                  if resp.ok then scene.set_status("Rt:Tailscale-M launched")
-                  else scene.set_status("Failed: " .. (resp.error or "?")) end
-              end)
-              return "Launching..."
-          end },
+        { icon = "uplink", label = "Tailscale", value = "NATIVE",
+          desc = "Service, QR login, peers, exit nodes and Taildrop",
+          action = function() sm.push("hub_tailscale", {}) end },
+        { icon = "refresh-cw", label = "Syncthing", value = "NATIVE",
+          desc = "Folders, devices, pause/resume, rescan and sync status",
+          action = function() sm.push("hub_syncthing", {}) end },
         { icon = "globe", label = "Network Probe", desc = "Diagnostics: IP, gateway, latency",
           action = function(scene)
               bridge.call("system_info", {}, function(resp)

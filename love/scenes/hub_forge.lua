@@ -70,6 +70,15 @@ return dashboard.new({
     end,
 
     items = {
+        { icon = "pkg", label = "APT Package Manager",
+          desc = "Search, install, remove and maintain XFCE packages",
+          action = function(scene)
+              if sm.push("hub_apt", {}) then
+                  return "Opening APT manager..."
+              end
+              scene.set_status("APT manager: " .. tostring(sm.last_error() or "cannot open"))
+              return "APT manager unavailable"
+          end },
         { icon = "pkg", label = "Install XFCE Desktop",
           desc = "Install or repair the desktop chroot",
           action = function(scene)
@@ -111,11 +120,11 @@ return dashboard.new({
               return "Updating..."
           end },
         { icon = "trash", label = "Clean apt cache",
-          desc = "Reclaim disk space",
-          action = function(scene) scene.set_status("Clean: coming soon"); return "Clean: coming soon" end },
+          desc = "Run safe APT cache cleanup inside the XFCE image",
+          action = function() sm.push("hub_apt", {tab = "SYSTEM"}) end },
         { icon = "terminal", label = "Shell terminal",
           desc = "Open a terminal with on-screen keyboard",
-          action = function(scene) scene.set_status("Terminal: coming soon"); return "Terminal: coming soon" end },
+          action = function() sm.push("hub_shell", {}) end },
         { icon = "pkg", label = "Install htop",
 
           desc = "Interactive process viewer (apt in XFCE chroot)",
@@ -227,174 +236,6 @@ return dashboard.new({
               return "Installing curl..."
 
           end },
-
-        { icon = "pkg", label = "Install htop",
-
-
-          desc = "Interactive process viewer (apt in XFCE chroot)",
-
-
-          action = function(scene)
-
-
-              local cmd = "sh bin/vd_apt_install.sh htop"
-
-
-              bridge.call("job_start", { cmd = cmd, name = "apt: htop", hub = "forge" },
-
-
-                function(resp)
-
-
-                  if resp.ok then
-
-
-                    scene.set_status("Installing htop (see SELECT overlay)")
-
-
-                  else
-
-
-                    scene.set_status("Install: " .. (resp.error or "failed"))
-
-
-                  end
-
-
-                end)
-
-
-              return "Installing htop..."
-
-
-          end },
-
-
-        { icon = "pkg", label = "Install ncdu",
-
-
-          desc = "Disk usage analyser (apt in XFCE chroot)",
-
-
-          action = function(scene)
-
-
-              local cmd = "sh bin/vd_apt_install.sh ncdu"
-
-
-              bridge.call("job_start", { cmd = cmd, name = "apt: ncdu", hub = "forge" },
-
-
-                function(resp)
-
-
-                  if resp.ok then
-
-
-                    scene.set_status("Installing ncdu (see SELECT overlay)")
-
-
-                  else
-
-
-                    scene.set_status("Install: " .. (resp.error or "failed"))
-
-
-                  end
-
-
-                end)
-
-
-              return "Installing ncdu..."
-
-
-          end },
-
-
-        { icon = "pkg", label = "Install ffmpeg",
-
-
-          desc = "Audio/video codec toolkit (apt in XFCE chroot)",
-
-
-          action = function(scene)
-
-
-              local cmd = "sh bin/vd_apt_install.sh ffmpeg"
-
-
-              bridge.call("job_start", { cmd = cmd, name = "apt: ffmpeg", hub = "forge" },
-
-
-                function(resp)
-
-
-                  if resp.ok then
-
-
-                    scene.set_status("Installing ffmpeg (see SELECT overlay)")
-
-
-                  else
-
-
-                    scene.set_status("Install: " .. (resp.error or "failed"))
-
-
-                  end
-
-
-                end)
-
-
-              return "Installing ffmpeg..."
-
-
-          end },
-
-
-        { icon = "pkg", label = "Install curl",
-
-
-          desc = "HTTP client (apt in XFCE chroot)",
-
-
-          action = function(scene)
-
-
-              local cmd = "sh bin/vd_apt_install.sh curl"
-
-
-              bridge.call("job_start", { cmd = cmd, name = "apt: curl", hub = "forge" },
-
-
-                function(resp)
-
-
-                  if resp.ok then
-
-
-                    scene.set_status("Installing curl (see SELECT overlay)")
-
-
-                  else
-
-
-                    scene.set_status("Install: " .. (resp.error or "failed"))
-
-
-                  end
-
-
-                end)
-
-
-              return "Installing curl..."
-
-
-          end },
-
 
         { icon = "pkg", label = "Void Installer", desc = "Install/reinstall software (L1: tabs)", action = function(s) s.set_status("Opening installer..."); bridge.call("comp_install", {}, function(r) s.set_status(r.ok and (r.note or "ready") or ("err: " .. (r.error or "?"))) end); return "Installer..." end },
         { icon = "start", label = "Startup apps", desc = "Programs that boot with the desktop", action = function(s) s.set_status("Opening startup..."); bridge.call("comp_autostart", {}, function(r) s.set_status(r.ok and (r.note or "ready") or ("err: " .. (r.error or "?"))) end); return "Startup..." end },

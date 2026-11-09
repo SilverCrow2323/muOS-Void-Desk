@@ -198,9 +198,9 @@ return dashboard.new({
               return play_bootanim_and_launch(scene, "voidcast", "VoidCast",
                                                "voidcast_launch")
           end },
-        { badge = "R", label = "Repair desktop image",
-          desc = "Verify and repair the chroot",
-          action = function(scene) scene.set_status("Repair: coming soon"); return "Repair: coming soon" end },
+        { badge = "R", label = "Diagnostics & repair checks",
+          desc = "Read-only system, network and service diagnostics",
+          action = function() sm.push("hub_diagnostics", {}) end },
         { badge = "<", label = "Back",
           desc = "Return to Nexus",
           action = function() sm.switch("nexus", {}) end },

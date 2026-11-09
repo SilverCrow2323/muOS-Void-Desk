@@ -1,0 +1,3 @@
+[submodule "external/rt-tailscale-m"]
+	path = external/rt-tailscale-m
+	url = https://github.com/SilverCrow2323/muOS-Rt-Tailscale.git

@@ -8,6 +8,47 @@ local function equal(actual, expected, message)
     end
 end
 
+-- Every visible NEXUS node must point to an existing scene and texture.
+local nodes = require("core.nodes")
+local visible_nodes = nodes.visible()
+equal(#visible_nodes, 10, "visible NEXUS node count")
+local function file_exists(path)
+    local handle = io.open(path, "rb")
+    if handle then handle:close(); return true end
+    return false
+end
+for _, node in ipairs(visible_nodes) do
+    if node.scene ~= "quit" then
+        assert(file_exists("love/scenes/" .. node.scene .. ".lua"),
+               "missing scene for NEXUS node " .. node.name .. ": "
+                   .. tostring(node.scene))
+    end
+    local texture = nodes.PLANET_FILE[node.icon]
+    assert(texture, "missing texture mapping for NEXUS node " .. node.name)
+    assert(file_exists("love/assets/nexus_planets/" .. texture),
+           "missing texture file for NEXUS node " .. node.name .. ": "
+               .. tostring(texture))
+end
+
+-- Every release-critical subscene must exist on disk.
+assert(file_exists("love/scenes/hub_apt.lua"),
+       "missing native APT manager scene")
+assert(file_exists("love/scenes/hub_tailscale.lua"),
+       "missing native Tailscale scene")
+assert(file_exists("love/scenes/hub_syncthing.lua"),
+       "missing native Syncthing scene")
+assert(file_exists("love/scenes/hub_diagnostics.lua"),
+       "missing native diagnostics scene")
+assert(file_exists("love/scenes/hub_monitor.lua"),
+       "missing native system monitor scene")
+
+-- The integrated login screen must be able to generate a real QR matrix.
+local qr = require("lib.qr")
+local qr_ok, qr_matrix, qr_size = qr.encode(
+    "https://login.tailscale.com/a/voiddesk-regression-check")
+equal(qr_ok, true, "Tailscale login QR should encode")
+equal(qr_size, #qr_matrix, "QR matrix size should match its row count")
+
 -- A child scene should load on demand even when main.lua did not register it.
 local sm = require("core.scene_manager")
 local entered_value = nil

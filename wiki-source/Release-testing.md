@@ -6,6 +6,7 @@ The development line is v10.5.4-NEXUS. A release must not be described as stable
 
 Before publishing a test package:
 - build the .muxapp with only one top-level Void-Desk/ folder;
+- run `python3 tools/validate_muxapp.py path/to/VoidDesk.muxapp` and fix every reported error;
 - install it through Archive Manager on MustardOS 2606.0 Andromeda;
 - confirm startup, controller navigation and shutdown;
 - verify the Bluetooth panel and NEXUS animation together;

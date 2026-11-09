@@ -26,11 +26,23 @@ python3 tools/capture_love_screenshots.py --no-service
 
 This is a software-rendered desktop capture pass, not a substitute for screenshots from a physical handheld. The same batch pass runs in GitHub Actions and uploads a `voiddesk-love-visual-captures` artifact (screenshots, JSON sidecars, manifest and logs) with 30-day retention. Download it from the successful or failed workflow run under **Artifacts**. Capture mode uses fixed demonstration status values so the screenshots do not expose real hostnames, network identifiers or IP addresses.
 
+## Automated Pygame home-style smoke capture
+
+Run on Linux (also used by CI):
+
+~~~bash
+python3 tools/capture_pygame_screenshots.py --all-states
+~~~
+
+The harness starts the real Pygame application with isolated test configuration and SDL dummy video/audio drivers. It renders all five supported home styles (BLAME, HUD, Terminal, Orbit and NEXUS), then smoke-renders every state branch declared in `App.render_state()`. It writes PNGs, JSON sidecars and `data/visual-captures/pygame-home-manifest.json`. GitHub Actions uploads them as `voiddesk-pygame-visual-captures` with 30-day retention.
+
+Directly rendering a state does not prove it is reachable through navigation or that its actions work. This is renderer coverage, not end-to-end navigation, controller or hardware validation.
+
 ## Capture a single screen on-device
 
-Press **F12** on either frontend to save the current composed frame. Pygame uses the Linux evdev F12 key code; LÖVE queues a screenshot after the current draw frame. Both create PNG files and JSON sidecars under data/visual-captures/.
+Press **F12** on either frontend to save the current composed frame. Pygame captures the active display surface from its event loop; LÖVE queues a screenshot after the current draw frame. Both create PNG files and JSON sidecars under data/visual-captures/.
 
-The sidecar records engine, screen, UTC timestamp, resolution, capture mode and app version.
+The sidecar records engine, screen, UTC timestamp, resolution and app version.
 
 ## Generate the asset catalogue and visual galleries
 

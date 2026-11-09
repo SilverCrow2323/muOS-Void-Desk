@@ -173,5 +173,5 @@ class ToolboxHub(HubMixin):
         self.app.launch_external_tool("file_grid_diver")
 
     def rt_tailscale(self):
-        """Launch Rt:Tailscale-M (external LÖVE app)."""
-        self.app.launch_external_tool("rt_tailscale_m")
+        """Open the native Tailscale panel inside Void Desk."""
+        self.app.ts_open()

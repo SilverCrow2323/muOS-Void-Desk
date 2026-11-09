@@ -39,7 +39,8 @@ jobs:
         run: |
           ruff check --select E4,E7,E9,F63,F7,F82 \
             bin/bootstrap_lite.py desk/sysinfo.py desk/utils tests \
-            tools/visual_capture.py tools/capture_love_screenshots.py
+            tools/visual_capture.py tools/capture_love_screenshots.py \
+            tools/capture_pygame_screenshots.py tools/validate_muxapp.py
       - name: Validate POSIX shell entry points
         shell: bash
         run: |
@@ -68,6 +69,95 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/voiddesk/data/visual-captures"
           VOIDDESK_APP_DIR="$RUNNER_TEMP/voiddesk" luajit tests/test_love_core.lua
+
+
+  pygame-visual-capture:
+    name: Pygame visual capture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: "1"
+      VOIDDESK_NOINTRO: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Pygame runtime
+        run: python -m pip install --disable-pip-version-check pygame==2.6.1
+      - name: Capture supported Pygame home styles
+        run: python tools/capture_pygame_screenshots.py --all-states
+      - name: Upload Pygame visual captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voiddesk-pygame-visual-captures
+          path: |
+            data/visual-captures/pygame__*.png
+            data/visual-captures/pygame__*.json
+            data/visual-captures/pygame-home-manifest.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  muxapp-package:
+    name: Reproducible .muxapp package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build and validate the single-root package
+        run: |
+          python tools/build_muxapp.py \
+            --output "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
+          python tools/validate_muxapp.py \
+            "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
+          cd "$RUNNER_TEMP"
+          sha256sum -c Void-Desk-10.5.4.muxapp.sha256
+      - name: Upload installable package and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: voiddesk-muxapp-10.5.4
+          path: |
+            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp
+            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp.sha256
+          retention-days: 30
+
+  tailscale-integration:
+    name: Rt:Tailscale-M tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the pinned Rt:Tailscale-M source
+        run: |
+          git clone https://github.com/SilverCrow2323/muOS-Rt-Tailscale.git external/rt-tailscale-m
+          git -C external/rt-tailscale-m checkout d6aa05363cd5d56b07e63e2261c960a26d73cd9c
+      - name: Install Tailscale test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y shellcheck luajit qemu-user-static zip curl \
+            python3-pyflakes python3-qrcode python3-opencv love xvfb
+      - name: Run Rt:Tailscale-M static, model, QR and UI tests
+        run: |
+          cd external/rt-tailscale-m
+          bash tests/run_all.sh
+      - name: Build verified arm64 Tailscale binaries
+        run: |
+          cd external/rt-tailscale-m
+          bash build.sh --no-love
+          mkdir -p "$RUNNER_TEMP/rt-tailscale"
+          unzip -q dist/RtTailscale-M-*.muxapp -d "$RUNNER_TEMP/rt-tailscale"
+      - name: Exercise daemon, watchdog, boot and web-panel integration under QEMU
+        run: |
+          cd external/rt-tailscale-m
+          sudo env RT_BIN_DIR="$RUNNER_TEMP/rt-tailscale/RtTailscale/bin" \
+            bash tests/run_integration.sh
 
 
   love-visual-capture:

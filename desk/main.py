@@ -750,8 +750,6 @@ def comp_color(c):
     return (r, g, b)
 
 
-TS_BIN = os.environ.get("VD_TS_BIN", "/opt/muos/bin/tailscale")
-TS_SOCK = os.environ.get("VD_TS_SOCK", "/run/tailscale/tailscaled.sock")
 TS_GRAY = (196, 200, 208)
 
 WMO_CODES = {
@@ -8599,9 +8597,23 @@ class App(object):
                "cremisi": (220, 70, 90)}.get(
             self.cfg.get("ts_theme", "ciano"), (90, 200, 220))
 
+    def ts_manager(self):
+        service_dir = os.path.join(APP_DIR, "service")
+        if service_dir not in sys.path:
+            sys.path.insert(0, service_dir)
+        import tailscale_manager
+        return tailscale_manager
+
+    def ts_root(self):
+        return self.ts_manager().find_install(APP_DIR)
+
     def ts_cli(self, *args, timeout=10):
-        return subprocess.run([TS_BIN, "--socket=" + TS_SOCK]
-                              + list(args), capture_output=True,
+        root = self.ts_root()
+        if root is None:
+            return subprocess.CompletedProcess(
+                list(args), 127, "", "Rt:Tailscale-M service files not found")
+        return subprocess.run([str(root / "ts")] + list(args),
+                              cwd=str(root), capture_output=True,
                               text=True, timeout=timeout)
 
     def ts_netcheck(self):
@@ -8613,35 +8625,42 @@ class App(object):
             return {}
 
     def ts_status(self):
-        import json as _j
-        r = self.ts_cli("status", "--json")
-        st = _j.loads(r.stdout or "{}")
-        me = st.get("Self") or {}
+        snapshot = self.ts_manager().status(APP_DIR)
+        if not snapshot.get("installed"):
+            return {"state": "Not installed", "ip": "", "host": "",
+                    "ssh": False, "peers": [], "service": False,
+                    "setup_running": False, "autostart": False}
+        me = snapshot.get("self") or {}
         peers = []
-        for p in (st.get("Peer") or {}).values():
+        for peer in snapshot.get("peers") or []:
             peers.append({
-                "name": p.get("HostName", "?"),
-                "ip": (p.get("TailscaleIPs") or ["?"])[0],
-                "on": bool(p.get("Online")),
-                "os": p.get("OS", ""),
-                "exit": bool(p.get("ExitNodeOption")),
-                "using": bool(p.get("ExitNode"))})
-        peers.sort(key=lambda p: (not p["on"], p["name"].lower()))
-        return {"state": st.get("BackendState", "?"),
-                "ip": (me.get("TailscaleIPs") or [""])[0],
-                "host": me.get("HostName", ""),
-                "ssh": bool((st.get("Self") or {}).get("SSH_HostKeys")),
-                "peers": peers}
+                "name": peer.get("name", "?"),
+                "ip": peer.get("ip") or "?",
+                "on": bool(peer.get("online")),
+                "os": peer.get("os", ""),
+                "exit": bool(peer.get("exit_node")),
+                "using": bool(peer.get("using"))})
+        return {"state": ("Setup in progress" if snapshot.get("setup_running")
+                          else snapshot.get("backend", "?")),
+                "ip": (me.get("ips") or [""])[0],
+                "host": me.get("name", ""),
+                "ssh": False,
+                "peers": peers,
+                "service": bool(snapshot.get("daemon")),
+                "setup_running": bool(snapshot.get("setup_running")),
+                "autostart": bool(snapshot.get("autostart")),
+                "panel": bool(snapshot.get("panel")),
+                "auth_url": snapshot.get("auth_url", "")}
 
     def ts_open(self):
         it = (self.lang == "it")
-        if not os.path.exists(TS_BIN):
+        if self.ts_root() is None:
             self.info_lines = self.stub_lines(
                 "TAILSCALE",
-                ["tailscale not found in /opt/muos/bin: update muOS "
-                 "o install Rt-Tailscale." if it else
-                 "tailscale not found in /opt/muos/bin: update muOS or "
-                 "install Rt-Tailscale."])
+                ["Rt:Tailscale-M non e' incluso nel pacchetto / submodule "
+                 "non inizializzato." if it else
+                 "Rt:Tailscale-M service bundle is missing; initialize the "
+                 "project submodule and rebuild VoidDesk."])
             self.scroll = 0
             self.info_title = "TAILSCALE"
             self.push("info")
@@ -8653,7 +8672,7 @@ class App(object):
         if not self.ts:
             self.info_lines = self.stub_lines(
                 "TAILSCALE",
-                ["demone unreachable (socket %s)" % TS_SOCK])
+                ["daemon Rt:Tailscale-M non raggiungibile" if it else "Rt:Tailscale-M daemon unreachable"])
             self.scroll = 0
             self.info_title = "TAILSCALE"
             self.push("info")
@@ -8700,16 +8719,38 @@ class App(object):
                   else "Network diagnostics"))
         A.append(("recv", "Receive files (Taildrop)" if it
                   else "Receive files (Taildrop)"))
+        A.append(("start_service",
+                  ("Setup in corso" if (self.ts or {}).get("setup_running")
+                   else "Avvia servizio") if it else
+                  ("Setup in progress" if (self.ts or {}).get("setup_running")
+                   else "Start service")))
+        A.append(("autostart", "Avvio automatico: %s" %
+                  ("ON" if (self.ts or {}).get("autostart") else "OFF")))
+        A.append(("panel", "Pannello web locale: %s" %
+                  ("ON" if (self.ts or {}).get("panel") else "OFF")))
         A.append(("tstheme", "Tema Tailscale: %s" %
                   self.cfg.get("ts_theme", "ciano").upper()))
-        A.append(("rtapp", "Open Rt-Tailscale" if it
-                  else "Open Rt-Tailscale"))
         A.append(("logout", "Logout"))
         return A
 
     def ts_menu_do(self, key):
         it = (self.lang == "it")
-        if key == "up":
+        if key == "start_service":
+            self.run_busy(
+                "avvio servizio..." if it else "starting service...",
+                lambda: self.ts_manager().start_async(APP_DIR))
+            self.ts_refresh()
+        elif key == "autostart":
+            action = ("autostart_off" if (self.ts or {}).get("autostart")
+                      else "autostart_on")
+            self.run_busy("...", lambda: self.ts_manager().action(APP_DIR, action))
+            self.ts_refresh()
+        elif key == "panel":
+            action = ("panel_off" if (self.ts or {}).get("panel")
+                      else "panel_on")
+            self.run_busy("...", lambda: self.ts_manager().action(APP_DIR, action))
+            self.ts_refresh()
+        elif key == "up":
             self.run_busy("tailscale up...",
                           lambda: self.ts_cli("up", "--accept-dns=true",
                                               "--accept-routes=true",
@@ -8750,11 +8791,6 @@ class App(object):
             self.scroll = 0
             self.info_title = "TAILDROP"
             self.push("info")
-        elif key == "rtapp":
-            hit = [a for a in self.scan_muos()
-                   if "tailscale" in a["name"].lower()]
-            if hit:
-                self.launch_muos(hit[0])
         elif key == "logout":
             def go():
                 self.run_busy("...", lambda: self.ts_cli("logout"))
@@ -8764,11 +8800,14 @@ class App(object):
         elif key == "login":
             def job():
                 import re as _re
+                root = self.ts_root()
+                if root is None:
+                    return ""
                 proc = subprocess.Popen(
-                    [TS_BIN, "--socket=" + TS_SOCK, "up",
-                     "--accept-dns=true", "--accept-routes=true"],
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True)
+                    [str(root / "ts"), "up", "--accept-dns=true",
+                     "--accept-routes=true"],
+                    cwd=str(root), stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True)
                 url = ""
                 t0 = time.time()
                 for ln in proc.stdout:
@@ -8833,105 +8872,86 @@ class App(object):
             self.push("info")
 
     # ================== SYNCTHING: pannello nativo ==================
-    def sync_rest(self, url, key, path):
+    def sync_rest(self, url, key, path, method="GET", payload=None):
         import urllib.request
         import json as _j
-        req = urllib.request.Request(url + path,
-                                     headers={"X-API-Key": key})
+        headers = {"X-API-Key": key}
+        data = None
+        if payload is not None:
+            headers["Content-Type"] = "application/json"
+            data = _j.dumps(payload).encode("utf-8")
+        elif method != "GET":
+            data = b""
+        req = urllib.request.Request(
+            url + path, data=data, headers=headers, method=method)
         with urllib.request.urlopen(req, timeout=4) as r:
-            return _j.loads(r.read().decode() or "{}")
+            body = r.read().decode()
+            return _j.loads(body) if body else {}
 
     def sync_open(self):
+        """Open the native Syncthing REST panel.
+
+        On MustardOS Andromeda, attach to the optional built-in Web Service
+        (127.0.0.1:7070). Never spawn a duplicate host daemon on the handheld.
+        """
+        from desk.syncthing import discover_connection, is_muos_host
+
         it = (self.lang == "it")
         url = os.environ.get("VD_SYNC_URL")
         key = os.environ.get("VD_SYNC_KEY")
-        if not url:
-            cand = ["/mnt/mmc/MUOS/syncthing/config.xml",
-                    "/mnt/sdcard/MUOS/syncthing/config.xml",
-                    "/root/.local/state/syncthing/config.xml",
-                    "/root/.config/syncthing/config.xml",
-                    os.path.expanduser("~/.config/syncthing/config.xml")]
-            for r_ in MUOS_APP_ROOTS:
-                try:
-                    for d in os.listdir(r_):
-                        if "syncthing" in d.lower():
-                            for sub in ("config.xml",
-                                        "config/config.xml",
-                                        "state/config.xml"):
-                                cand.append(os.path.join(r_, d, sub))
-                except OSError:
-                    pass
-            root = os.path.join(DATA, "xfce_mnt")
-            cand += [os.path.join(root, c) for c in
-                     ("root/.local/state/syncthing/config.xml",
-                      "root/.config/syncthing/config.xml")]
-            for p in cand:
-                if os.path.exists(p):
-                    txt = open(p, errors="ignore").read()
-                    m = re.search(r"<apikey>([^<]+)</apikey>", txt)
-                    a = re.search(r"<address>([0-9.:]+)</address>", txt)
-                    if not m:
-                        apitxt = os.path.join(os.path.dirname(p),
-                                              "api.txt")
-                        if os.path.exists(apitxt):
-                            k2 = open(apitxt, errors="ignore"
-                                     ).read().strip()
-                            if k2:
-                                key = k2
-                                url = "http://" + (a.group(1) if a
-                                                   else "127.0.0.1:8384")
-                                self._sync_home = os.path.dirname(p)
-                                break
-                    if m:
-                        key = m.group(1)
-                        url = "http://" + (a.group(1) if a
-                                           else "127.0.0.1:8384")
-                        self._sync_home = os.path.dirname(
-                            os.path.dirname(p))
-                    break
+        connection = discover_connection(data_dir=DATA)
+        if connection:
+            url = url or connection["url"]
+            key = key or connection["key"]
+            self._sync_home = connection["home"]
+
         if not (url and key):
-            self.info_lines = self.stub_lines(
-                "SYNCTHING",
-                ["Syncthing not configured in image: install it "
-                 "from FORGE and run it once on the desktop." if it else
-                 "Syncthing not configured in the image: install it "
-                 "from FORGE and run it once in the desktop."])
+            if is_muos_host():
+                message = (
+                    "Attiva Syncthing in muOS: Configuration > Connectivity > "
+                    "Web Services > Syncthing. API locale: 127.0.0.1:7070."
+                    if it else
+                    "Enable Syncthing in muOS: Configuration > Connectivity > "
+                    "Web Services > Syncthing. Local API: 127.0.0.1:7070."
+                )
+            else:
+                message = (
+                    "Configura Syncthing e la sua API key prima di aprire il pannello."
+                    if it else
+                    "Configure Syncthing and its API key before opening the panel."
+                )
+            self.info_lines = self.stub_lines("SYNCTHING", [message])
             self.scroll = 0
             self.info_title = "SYNCTHING"
             self.push("info")
             return
 
         def job():
+            import urllib.parse
             try:
                 self.sync_rest(url, key, "/rest/system/ping")
             except Exception:
-                if os.environ.get("VD_SYNC_NOSTART"):
+                # Andromeda owns the host service lifecycle. Starting another
+                # daemon here risks a second database and conflicting ports.
+                if is_muos_host() or os.environ.get("VD_SYNC_NOSTART"):
                     return None
                 import shutil as _sh2
-                host_bin = _sh2.which("syncthing") or \
-                    ("/opt/muos/bin/syncthing"
-                     if os.path.exists("/opt/muos/bin/syncthing")
-                     else None)
+                host_bin = _sh2.which("syncthing")
                 if host_bin:
                     subprocess.Popen(
-                        [host_bin, "serve", "--no-browser",
-                         "--no-restart"],
-                        env=dict(os.environ,
-                                 HOME=getattr(self, "_sync_home",
-                                              "/root")),
-                        stdout=open(os.path.join(DATA,
-                                                 "syncthing.log"),
-                                    "ab"),
+                        [host_bin, "serve", "--no-browser", "--no-restart"],
+                        env=dict(os.environ, HOME=getattr(
+                            self, "_sync_home", "/root")),
+                        stdout=open(os.path.join(DATA, "syncthing.log"), "ab"),
                         stderr=subprocess.STDOUT)
                 else:
                     mnt = os.path.join(DATA, "xfce_mnt")
+                    if not os.path.isfile(os.path.join(mnt, "usr/bin/syncthing")):
+                        return None
                     subprocess.Popen(
                         ["chroot", mnt, "/usr/bin/env", "HOME=/root",
-                         "syncthing", "serve", "--no-browser",
-                         "--no-restart"],
-                        stdout=open(os.path.join(DATA,
-                                                 "syncthing.log"),
-                                    "ab"),
+                         "syncthing", "serve", "--no-browser", "--no-restart"],
+                        stdout=open(os.path.join(DATA, "syncthing.log"), "ab"),
                         stderr=subprocess.STDOUT)
                 for _ in range(16):
                     time.sleep(0.5)
@@ -8943,36 +8963,121 @@ class App(object):
             try:
                 st = self.sync_rest(url, key, "/rest/system/status")
                 cfg = self.sync_rest(url, key, "/rest/config")
+                connections = self.sync_rest(
+                    url, key, "/rest/system/connections").get("connections", {})
                 folders = []
-                for f in cfg.get("folders", []):
+                for folder in cfg.get("folders", []):
+                    folder_id = folder.get("id", "")
                     pct = -1
                     try:
-                        c = self.sync_rest(
+                        completion = self.sync_rest(
                             url, key,
-                            "/rest/db/completion?folder=" + f["id"])
-                        pct = int(c.get("completion", 0))
+                            "/rest/db/completion?folder=" + urllib.parse.quote(
+                                folder_id, safe=""))
+                        pct = int(completion.get("completion", 0))
                     except Exception:
                         pass
-                    folders.append((f.get("label") or f["id"],
-                                    f.get("path", ""), pct))
-                return {"id": st.get("myID", "?")[:14],
-                        "url": url, "key": key, "folders": folders}
+                    folders.append({
+                        "id": folder_id,
+                        "label": folder.get("label") or folder_id,
+                        "path": folder.get("path", ""),
+                        "pct": pct,
+                        "paused": bool(folder.get("paused")),
+                    })
+                devices = []
+                for device in cfg.get("devices", []):
+                    device_id = device.get("deviceID", "")
+                    connection = connections.get(device_id, {})
+                    devices.append({
+                        "id": device_id,
+                        "name": device.get("name") or device_id[:12],
+                        "connected": bool(connection.get("connected")),
+                        "paused": bool(connection.get("paused")),
+                        "address": connection.get("address", ""),
+                    })
+                return {
+                    "id": st.get("myID", "?")[:14],
+                    "url": url,
+                    "key": key,
+                    "folders": folders,
+                    "devices": devices,
+                    "connected": sum(1 for d in devices if d["connected"]),
+                }
             except Exception:
                 return None
+
         self.sync = self.run_busy(
-            "interrogo syncthing..." if it else "querying syncthing...",
+            "interrogo Syncthing..." if it else "querying Syncthing...",
             job)
         if not self.sync:
-            self.info_lines = self.stub_lines(
-                "SYNCTHING",
-                ["demone unreachable: avvialo nel desktop o "
-                 "riprova" if it else
-                 "daemon unreachable: start it in the desktop and retry"])
+            message = (
+                "Servizio muOS non raggiungibile. Controlla Web Services > "
+                "Syncthing e la connessione di rete."
+                if it else
+                "muOS service is unreachable. Check Web Services > "
+                "Syncthing and the network connection."
+            ) if is_muos_host() else (
+                "Demone non raggiungibile: avvialo e riprova."
+                if it else "Daemon unreachable: start it and retry."
+            )
+            self.info_lines = self.stub_lines("SYNCTHING", [message])
             self.scroll = 0
             self.info_title = "SYNCTHING"
             self.push("info")
         else:
+            self.sync_mode = getattr(self, "sync_mode", "folders")
+            count = (len(self.sync.get("devices", []))
+                     if self.sync_mode == "devices"
+                     else len(self.sync.get("folders", [])))
+            self.sync_sel = min(getattr(self, "sync_sel", 0),
+                                max(0, count - 1))
             self.push("syncpanel")
+
+    def sync_action(self, action):
+        """Pause/resume, rescan or override the selected Syncthing item."""
+        from desk.syncthing_api import perform_action
+
+        if not self.sync:
+            return
+        mode = getattr(self, "sync_mode", "folders")
+        items = (self.sync.get("devices", []) if mode == "devices"
+                 else self.sync.get("folders", []))
+        if not items:
+            return
+        selected = items[min(getattr(self, "sync_sel", 0), len(items) - 1)]
+        url, key = self.sync["url"], self.sync["key"]
+
+        def job():
+            try:
+                if mode == "devices":
+                    operation = "toggle_device"
+                    return perform_action(
+                        self.sync_rest, url, key, operation,
+                        device=selected.get("id"))
+                operation = {
+                    "toggle": "toggle_folder",
+                    "scan": "scan",
+                    "override": "override",
+                }.get(action)
+                if not operation:
+                    return {"ok": False, "error": "unsupported folder action"}
+                return perform_action(
+                    self.sync_rest, url, key, operation,
+                    folder=selected.get("id"))
+            except Exception as exc:
+                return {"ok": False, "error": str(exc)}
+
+        result = self.run_busy(
+            "Syncthing..." if self.lang != "it" else "Syncthing...",
+            job)
+        if not result or not result.get("ok"):
+            error = (result or {}).get("error", "Syncthing request failed")
+            self.info_lines = self.stub_lines("SYNCTHING", [error[:120]])
+            self.scroll = 0
+            self.info_title = "SYNCTHING"
+            self.push("info")
+            return
+        self.sync_open_refresh()
 
     # ================== VOID EDIT: editor di testo ==================
     def ed_load(self, path):
@@ -15931,7 +16036,35 @@ class App(object):
             elif btn == "B":
                 self.pop_state()
         elif top == "syncpanel":
-            if btn == "A":
+            mode = getattr(self, "sync_mode", "folders")
+            items = (self.sync or {}).get(
+                "devices" if mode == "devices" else "folders", [])
+            if btn == "UP" and items:
+                self.sync_sel = (self.sync_sel - 1) % len(items)
+            elif btn == "DOWN" and items:
+                self.sync_sel = (self.sync_sel + 1) % len(items)
+            elif btn in ("L1", "R1"):
+                self.sync_mode = "devices" if mode == "folders" else "folders"
+                self.sync_sel = 0
+            elif btn == "A" and items:
+                self.sync_action("toggle")
+            elif btn == "X" and mode == "folders" and items:
+                self.sync_action("scan")
+            elif btn == "Y" and mode == "folders" and items:
+                folder = items[self.sync_sel]
+                label = folder.get("label") or folder.get("id") or "folder"
+
+                def confirm_override():
+                    self.sync_action("override")
+
+                self.confirm = ((
+                    "Sovrascrivere i dati remoti con quelli locali di %s?" % label
+                    if self.lang == "it" else
+                    "Override remote data with the local copy of %s?" % label),
+                    confirm_override, "SYNCTHING", "refresh-cw",
+                    "Potentially destructive: confirm only if the handheld copy is authoritative.")
+                self.push("confirm")
+            elif btn == "SELECT":
                 self.sync_open_refresh()
             elif btn == "B":
                 self.pop_state()
@@ -21961,37 +22094,79 @@ class App(object):
         elif top == "syncpanel":
             it = (self.lang == "it")
             self.header("SYNCTHING", icon="remote")
-            sy = self.sync or {"id": "?", "folders": []}
+            sy = self.sync or {"id": "?", "folders": [], "devices": []}
+            mode = getattr(self, "sync_mode", "folders")
+            folders = sy.get("folders", [])
+            devices = sy.get("devices", [])
+            active = devices if mode == "devices" else folders
+            connected = sy.get("connected", 0)
+            summary = ("ID: %s  ·  %d/%d dispositivi connessi" %
+                       (sy.get("id", "?"), connected, len(devices)) if it else
+                       "ID: %s  ·  %d/%d devices connected" %
+                       (sy.get("id", "?"), connected, len(devices)))
             self.npanel(8, 48, W - 16, 30, border=LINE, fill=INK, cut=8)
-            self.text("ID: " + sy["id"], (20, 54), self.f_small, DIM)
-            ok = "demone on" if it else "daemon up"
-            self.text(ok, (W - 24 - self.f_small.size(ok)[0], 54),
-                      self.f_small, OK_G)
-            y = 92
-            if not sy["folders"]:
-                self.text("nessuna folder condivisa" if it
-                          else "no shared folders", (40, 140),
-                          self.f_med, DIM)
-            for lbl, path, pct in sy["folders"][:6]:
-                self.npanel(8, y, W - 16, 52, border=LINE, fill=INK)
-                self.text(lbl, (22, y + 6), self.f_med, FG,
-                          maxw=W - 160)
-                self.text(path, (22, y + 28), self.f_tiny, FAINT,
-                          maxw=W - 200)
-                if pct >= 0:
-                    ps = "%d%%" % pct
-                    self.text(ps, (W - 30 - self.f_med.size(ps)[0],
-                                   y + 6), self.f_med,
-                              OK_G if pct >= 100 else self.accent)
-                    bw = W - 190
-                    pygame.draw.rect(self.surface, (14, 15, 19),
-                                     (22, y + 44, bw, 5))
-                    pygame.draw.rect(self.surface,
-                                     OK_G if pct >= 100 else self.accent,
-                                     (22, y + 44, bw * pct // 100, 5))
-                y += 58
-            self.footer([("A", "update" if it else "refresh"),
-                         ("B", self.t("back"))])
+            self.text(summary, (20, 54), self.f_small, DIM, maxw=W - 40)
+            page = ("DISPOSITIVI" if it else "DEVICES") if mode == "devices" else "CARTELLE" if it else "FOLDERS"
+            self.text(page, (20, 84), self.f_tiny, self.accent)
+            if not active:
+                empty = ("Nessun dispositivo configurato" if it else
+                         "No configured devices") if mode == "devices" else (
+                         "Nessuna cartella condivisa" if it else
+                         "No shared folders")
+                self.text(empty, (40, 150), self.f_med, DIM)
+            y = 102
+            selected_index = getattr(self, "sync_sel", 0)
+            start_index = max(0, min(selected_index - 4, len(active) - 5))
+            for j in range(start_index, min(start_index + 5, len(active))):
+                item = active[j]
+                selected = j == selected_index
+                self.npanel(8, y, W - 16, 58,
+                            border=self.accent if selected else LINE,
+                            fill=INK, cut=7)
+                if mode == "devices":
+                    name = item.get("name") or item.get("id", "?")[:14]
+                    state = ("CONNESSO" if item.get("connected") else "OFFLINE") if it else (
+                        "CONNECTED" if item.get("connected") else "OFFLINE")
+                    if item.get("paused"):
+                        state = "IN PAUSA" if it else "PAUSED"
+                    self.text(name, (22, y + 6), self.f_med, FG,
+                              maxw=W - 170)
+                    self.text((item.get("address") or item.get("id", ""))[:62],
+                              (22, y + 30), self.f_tiny, FAINT,
+                              maxw=W - 190)
+                    color = OK_G if item.get("connected") and not item.get("paused") else self.accent
+                    self.text(state, (W - 24 - self.f_tiny.size(state)[0],
+                                      y + 8), self.f_tiny, color)
+                else:
+                    label = item.get("label") or item.get("id", "?")
+                    path = item.get("path", "")
+                    pct = item.get("pct", -1)
+                    self.text(label, (22, y + 5), self.f_med, FG,
+                              maxw=W - 160)
+                    self.text(path, (22, y + 27), self.f_tiny, FAINT,
+                              maxw=W - 190)
+                    state = ("IN PAUSA" if it else "PAUSED") if item.get("paused") else (
+                        "ATTIVA" if it else "ACTIVE")
+                    if pct >= 0:
+                        state += " · %d%%" % pct
+                    self.text(state, (W - 24 - self.f_tiny.size(state)[0],
+                                      y + 7), self.f_tiny,
+                              self.accent if item.get("paused") else OK_G)
+                    if pct >= 0:
+                        bw = W - 190
+                        pygame.draw.rect(self.surface, (14, 15, 19),
+                                         (22, y + 47, bw, 4))
+                        pygame.draw.rect(self.surface,
+                                         OK_G if pct >= 100 else self.accent,
+                                         (22, y + 47, int(bw * max(0, min(100, pct)) / 100), 4))
+                y += 64
+            if mode == "devices":
+                self.footer([("A", "pause/resume"), ("L1/R1", "folders"),
+                             ("SELECT", "refresh"), ("B", self.t("back"))])
+            else:
+                self.footer([("A", "pause/resume"), ("X", "scan"),
+                             ("Y", "override"), ("L1/R1", "devices"),
+                             ("SELECT", "refresh"), ("B", self.t("back"))])
         elif top == "osk":
             self.header(self.osk_title[:26], icon="keyboard")
             self.npanel(10, 52, W - 20, 50, border=self.accent, fill=INK)
