@@ -2245,8 +2245,8 @@ class MediaPanel(tk.Frame):
             return
         if not messagebox.askyesno(
             "Confirm Backup",
-            "Create a read-only backup of {} remote folder(s)?\\n\\n"
-            "No console files will be modified or deleted.\\n"
+            "Create a read-only backup of {} remote folder(s)?\n\n"
+            "No console files will be modified or deleted.\n"
             "SHA-256 checksums and a manifest will be included.".format(len(pairs))
         ):
             return
@@ -2288,7 +2288,7 @@ class MediaPanel(tk.Frame):
         self._log("Backup saved: {}".format(path))
         messagebox.showinfo(
             "Backup complete",
-            "{} file(s), {:.1f} MiB\\n\\n{}\\n\\n"
+            "{} file(s), {:.1f} MiB\n\n{}\n\n"
             "Manifest and SHA-256 checksums included.".format(
                 count, total / (1024.0 * 1024.0), path))
 
@@ -3299,7 +3299,7 @@ class VOIDBaseStation(tk.Tk):
                     self.media_panel.on_backup_error(payload)
                 elif kind == "diagnostics_complete":
                     self.log("Diagnostics report saved: {}".format(payload), "ok")
-                    messagebox.showinfo("Diagnostics", "Report saved successfully:\\n{}".format(payload))
+                    messagebox.showinfo("Diagnostics", "Report saved successfully:\n{}".format(payload))
                 elif kind == "diagnostics_error":
                     self.log("Diagnostics export failed: {}".format(payload), "err")
                     messagebox.showerror("Diagnostics", str(payload))
@@ -3520,7 +3520,7 @@ Tabs are selectable via click or shortcut."""
         report.tag_configure("muted", foreground=TEXT_DIM)
 
         def emit(line="", tag=None):
-            report.insert("end", line + "\\n", tag)
+            report.insert("end", line + "\n", tag)
 
         emit("SCHEMA: {}  VERSION: {}".format(
             registry.get("schema", "?"), registry.get("version", "?")), "heading")
@@ -3579,7 +3579,7 @@ Tabs are selectable via click or shortcut."""
             return True
         messagebox.showerror(
             "PC Link",
-            "Could not start the PC Link daemon on port {}.\\n"
+            "Could not start the PC Link daemon on port {}.\n"
             "Check whether another application is using it.".format(self.daemon.port))
         return False
 
@@ -3619,7 +3619,7 @@ Tabs are selectable via click or shortcut."""
         actions.pack(fill="x", padx=18, pady=(16, 10))
 
         def copy_details():
-            text = "{}\\n{}\\n{}".format(
+            text = "{}\n{}\n{}".format(
                 APP_NAME, entries["PC address"].get(),
                 entries["Authentication token"].get())
             self.clipboard_clear()
@@ -3629,7 +3629,7 @@ Tabs are selectable via click or shortcut."""
         def rotate_token():
             if not messagebox.askyesno(
                 "Rotate pairing token",
-                "This immediately invalidates the current token on all handhelds.\\n"
+                "This immediately invalidates the current token on all handhelds.\n"
                 "You will need to pair them again. Continue?", parent=top):
                 return
             self.daemon.store.cfg["token"] = generate_auth_token()
@@ -3706,7 +3706,7 @@ Tabs are selectable via click or shortcut."""
             detail.config(state="normal")
             detail.delete("1.0", "end")
             if not item:
-                detail.insert("end", "No handheld has reported telemetry yet.\\n\\n"
+                detail.insert("end", "No handheld has reported telemetry yet.\n\n"
                               "Open Void Desk → PC Uplink and pair it with the address and token shown in Tools → PC Link Pairing.")
             else:
                 stats = item.get("stats") or {}
@@ -3738,7 +3738,7 @@ Tabs are selectable via click or shortcut."""
                     "Received screenshots and files are saved in:",
                     str(INCOMING_DIR / str(device_id)),
                 ])
-                detail.insert("end", "\\n".join(lines))
+                detail.insert("end", "\n".join(lines))
             detail.config(state="disabled")
 
         listing.bind("<<ListboxSelect>>", show_selected)
@@ -3756,7 +3756,7 @@ Tabs are selectable via click or shortcut."""
                 self.log("Screenshot requested from handheld {}.".format(device_id), "ok")
                 messagebox.showinfo(
                     "Screenshot requested",
-                    "The handheld will upload its next screenshot on its next PC Link poll.\\n"
+                    "The handheld will upload its next screenshot on its next PC Link poll.\n"
                     "Check the received-files folder in a few seconds.", parent=top)
             except Exception as exc:
                 messagebox.showerror("Screenshot", str(exc), parent=top)
@@ -4001,8 +4001,8 @@ Tabs are selectable via click or shortcut."""
         """Legacy compatibility entry point; the client is built into Void Desk."""
         messagebox.showinfo(
             "PC Link",
-            "The PC Link client is already part of Void Desk.\\n\\n"
-            "No separate VOID_Uplink application needs to be installed.\\n"
+            "The PC Link client is already part of Void Desk.\n\n"
+            "No separate VOID_Uplink application needs to be installed.\n"
             "Use Tools → PC Link Pairing to connect this PC.")
         self.action_show_pairing()
 
