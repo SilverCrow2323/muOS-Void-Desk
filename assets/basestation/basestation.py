@@ -59,6 +59,9 @@ from basestation_core import (
     create_remote_backup, drain_device_messages, enqueue_device_message,
     generate_auth_token, safe_device_id, token_matches,
 )
+from basestation_web import (
+    list_received_files, load_service_registry, resolve_received_file,
+)
 
 try:
     import tkinter as tk
@@ -839,65 +842,22 @@ def make_daemon_handler(store):
             if path == "/api/hub/devices":
                 return self._json({"devices": store.devices_read()})
             if path == "/api/hub/registry":
-                candidates = [
-                    Path(__file__).resolve().parent / "services.json",
-                    Path(__file__).resolve().parents[2] / "service" / "spdw_hub" / "services.json",
-                ]
-                registry_path = next((candidate for candidate in candidates
-                                      if candidate.is_file()), None)
-                if registry_path is None:
-                    return self._json({"error": "service registry is not bundled"}, 404)
                 try:
-                    return self._json(json.loads(registry_path.read_text(encoding="utf-8")))
+                    return self._json(load_service_registry(__file__))
                 except (OSError, ValueError) as exc:
                     return self._json({"error": str(exc)}, 500)
             if path == "/api/hub/files":
-                files = []
                 try:
-                    INCOMING_DIR.mkdir(parents=True, exist_ok=True)
-                    for device_dir in sorted(INCOMING_DIR.iterdir(),
-                                              key=lambda entry: entry.name.lower()):
-                        if device_dir.is_symlink() or not device_dir.is_dir():
-                            continue
-                        device_id = safe_device_id(device_dir.name)
-                        for entry in sorted(device_dir.iterdir(),
-                                            key=lambda item: item.name.lower()):
-                            if entry.is_symlink() or not entry.is_file():
-                                continue
-                            info = entry.stat(follow_symlinks=False)
-                            files.append({
-                                "device": device_id,
-                                "name": entry.name,
-                                "size": int(info.st_size),
-                                "mtime": datetime.fromtimestamp(
-                                    info.st_mtime).astimezone().isoformat(
-                                        timespec="seconds"),
-                            })
-                            if len(files) >= 1000:
-                                break
-                        if len(files) >= 1000:
-                            break
+                    files = list_received_files(INCOMING_DIR, limit=1000)
                 except OSError as exc:
                     return self._json({"error": str(exc)}, 500)
                 return self._json({"files": files})
             if path == "/api/hub/files/download":
-                device_id = safe_device_id(first("device"))
-                name = first("name")
-                if (not name or name in (".", "..")
-                        or os.path.basename(name) != name
-                        or "/" in name or "\\" in name):
-                    return self._json({"error": "invalid file name"}, 400)
-                root = (INCOMING_DIR / device_id).resolve()
-                target = INCOMING_DIR / device_id / name
                 try:
-                    if target.is_symlink():
-                        return self._json({"error": "symbolic links are not downloadable"}, 400)
-                    target = target.resolve(strict=True)
-                    target.relative_to(root)
-                    if not target.is_file():
-                        return self._json({"error": "file not found"}, 404)
+                    target = resolve_received_file(
+                        INCOMING_DIR, first("device"), first("name"))
+                    filename = target.name
                     size = target.stat().st_size
-                    filename = safe_device_id(name) if name != os.path.basename(name) else name
                     self.send_response(200)
                     self.send_header("Content-Type", "application/octet-stream")
                     self.send_header("Content-Length", str(size))
@@ -905,7 +865,7 @@ def make_daemon_handler(store):
                     self.send_header("X-Content-Type-Options", "nosniff")
                     self.send_header("Content-Disposition",
                                      'attachment; filename="{}"'.format(
-                                         filename.replace('"', "_").replace("\r", "_").replace("\n", "_")))
+                                         filename.replace('"', "_").replace("\\r", "_").replace("\\n", "_")))
                     self.end_headers()
                     with target.open("rb") as stream:
                         while True:
@@ -914,8 +874,10 @@ def make_daemon_handler(store):
                                 break
                             self.wfile.write(chunk)
                     return
-                except (OSError, ValueError):
+                except FileNotFoundError:
                     return self._json({"error": "file not found"}, 404)
+                except (OSError, ValueError) as exc:
+                    return self._json({"error": str(exc)}, 400)
 
             if path == "/outbox":
                 return self._json({"messages": store.outbox_read(drain=True)})
