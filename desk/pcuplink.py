@@ -179,7 +179,8 @@ class PcClient:
                 except Exception:
                     pass
                 try:
-                    box, _ = self._get("/outbox")
+                    box, _ = self._get(
+                        "/device/%s/outbox" % self.device_id)
                     msgs = box.get("messages", [])
                     if msgs:
                         with self._lock:
