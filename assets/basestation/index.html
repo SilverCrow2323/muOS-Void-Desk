@@ -1076,6 +1076,35 @@ $("btnUp").onclick = function(){
 };
 
 /* ---- upload ---- */
+function uploadOneFile(file, retryAuth){
+  var fd = new FormData();
+  fd.append("file", file, file.name);
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 20000) : null;
+  return fetch("/api/upload?area=" + encodeURIComponent(state.area) +
+    "&path=" + encodeURIComponent(state.path),
+    { method:"POST", body:fd, credentials:"same-origin",
+      headers: {"X-CSRF-Token": hubCsrfToken},
+      signal: ctrl ? ctrl.signal : undefined })
+    .catch(function(err){
+      throw new Error(err.name === "AbortError" ?
+        "Upload of \"" + file.name + "\" timed out" : err.message);
+    })
+    .then(function(response){
+      if (response.status === 401 && retryAuth !== false){
+        if (timer) clearTimeout(timer);
+        return hubLogin().then(function(){ return uploadOneFile(file, false); });
+      }
+      return response.json().catch(function(){ return {}; }).then(function(data){
+        if (!response.ok || data.error){
+          throw new Error((data.error || "Upload failed") + ": " + file.name);
+        }
+        return data;
+      });
+    })
+    .finally(function(){ if (timer) clearTimeout(timer); });
+}
+
 function uploadFiles(files){
   var list = Array.prototype.slice.call(files);
   if (!list.length) return;
@@ -1085,23 +1114,7 @@ function uploadFiles(files){
   list.forEach(function(file, idx){
     chain = chain.then(function(){
       label.textContent = "Uploading " + (idx + 1) + "/" + list.length + "…";
-      var fd = new FormData();
-      fd.append("file", file, file.name);
-      var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-      var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 20000) : null;
-      return fetch("/api/upload?area=" + encodeURIComponent(state.area) +
-        "&path=" + encodeURIComponent(state.path),
-        { method:"POST", body:fd, credentials:"same-origin",
-          headers: {"X-CSRF-Token": hubCsrfToken},
-          signal: ctrl ? ctrl.signal : undefined })
-        .catch(function(err){
-          throw new Error(err.name === "AbortError" ?
-            "Upload of \"" + file.name + "\" timed out" : err.message);
-        })
-        .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){
-          if (!r.ok || j.error) throw new Error((j.error || "Upload failed") + ": " + file.name);
-        }); })
-        .finally(function(){ if (timer) clearTimeout(timer); });
+      return uploadOneFile(file, true);
     });
   });
   chain.then(function(){ toast("Upload complete"); load(); })
