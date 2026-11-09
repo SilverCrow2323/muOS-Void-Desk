@@ -36,9 +36,11 @@ class MediaHub(HubMixin):
     def voidcast(self):
         """Hand off to the bundled Outdesk VoidCast app via mux_launch.sh."""
         app = self.app
-        script = APP_DIR / "outdesk" / "VoidCast" / "voidcast" / "main.py"
-        if not script.is_file():
-            app.notify("VoidCast IPTV", "Outdesk/VoidCast non trovato", "warning")
+        app_root = APP_DIR / "outdesk" / "VoidCast"
+        script = app_root / "voidcast" / "main.py"
+        config = app_root / "presets" / "config.default.json"
+        if not script.is_file() or not config.is_file():
+            app.notify("VoidCast IPTV", "Outdesk/VoidCast incompleto: entrypoint o configurazione mancante", "warning")
             return
         if not MUOS_BOOTSTRAP.is_file():
             app.notify("VoidCast IPTV", "Il passaggio a VoidCast richiede il launcher muOS", "warning")
