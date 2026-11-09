@@ -567,10 +567,10 @@ class DeviceAgent:
 
             def do_POST(self):
                 path, query = self._query()
-                payload = self._body()
-                if payload is None:
-                    return self._json({"error": "invalid or oversized request body"}, 413)
                 if path == "/api/login":
+                    payload = self._body()
+                    if payload is None:
+                        return self._json({"error": "invalid or oversized request body"}, 413)
                     form = self._form(payload)
                     pin = str((form or {}).get("pin", ""))
                     ip = agent._request_ip(self)
@@ -594,11 +594,15 @@ class DeviceAgent:
                               "Path=/; Max-Age={}".format(session_id, SESSION_TTL))
                     return self._json({"ok": True, "csrf_token": csrf_token},
                                       200, {"Set-Cookie": cookie})
+
                 session_id, session = self._auth()
                 if session is None:
                     return
                 if not self._csrf(session):
                     return
+                payload = self._body()
+                if payload is None:
+                    return self._json({"error": "invalid or oversized request body"}, 413)
                 if path == "/api/logout":
                     agent._revoke_session(session_id)
                     cookie = ("spdw_session=; HttpOnly; SameSite=Strict; "
