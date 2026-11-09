@@ -41,6 +41,27 @@ python3 -m venv --system-site-packages .venv
 .venv/bin/python basestation.py
 ```
 
+## Open the PC web dashboard
+
+Start BaseStation and choose **Tools → Open SPDW Hub Web Dashboard**. The
+browser UI is served by the same PC Link daemon on TCP `8420`; it does not
+start a second web server or occupy another port.
+
+The initial browser dashboard provides:
+- PC host telemetry and paired handheld inventory.
+- Per-device notifications and screenshot requests.
+- A safe download view for files/screenshots received from handhelds.
+- Add-on and streaming migration status.
+
+The native BaseStation desktop application remains the supported interface for
+interactive SSH terminal sessions, SFTP folder synchronisation and verified
+save/state backups. Those privileged operations are not exposed as arbitrary
+browser shell commands.
+
+The browser asks for the existing PC Link token. It is held in session storage
+for the current tab and sent in the authenticated request header; it is not
+placed in URLs. Use the dashboard only on trusted LAN or Tailscale networks.
+
 ## Pair Void Desk
 
 1. Start BaseStation.
