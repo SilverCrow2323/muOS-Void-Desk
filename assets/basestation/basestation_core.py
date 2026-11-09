@@ -213,3 +213,77 @@ def create_remote_backup(sftp, roots, archive_path, metadata=None,
         except OSError:
             pass
         raise
+
+
+def collect_host_stats(include_processes=False):
+    """Return privacy-conscious PC telemetry for the Void Desk PC Link API."""
+    result = {
+        "cpu_percent": 0.0,
+        "memory": {"total_mb": 0.0, "used_mb": 0.0, "percent": 0.0},
+        "temperatures": [],
+        "uptime_s": 0,
+    }
+    try:
+        import psutil
+        result["cpu_percent"] = round(float(psutil.cpu_percent(interval=0.05)), 1)
+        memory = psutil.virtual_memory()
+        result["memory"] = {
+            "total_mb": round(memory.total / (1024.0 * 1024.0), 1),
+            "used_mb": round(memory.used / (1024.0 * 1024.0), 1),
+            "percent": round(float(memory.percent), 1),
+        }
+        result["uptime_s"] = max(0, int(time.time() - psutil.boot_time()))
+        try:
+            temperatures = psutil.sensors_temperatures(fahrenheit=False) or {}
+            for label, readings in temperatures.items():
+                for reading in readings:
+                    if reading.current is not None:
+                        result["temperatures"].append({
+                            "label": str(reading.label or label)[:48],
+                            "temp_c": round(float(reading.current), 1),
+                        })
+        except (AttributeError, OSError, RuntimeError):
+            pass
+        if include_processes:
+            processes = []
+            for process in psutil.process_iter(attrs=["name", "cpu_percent"]):
+                try:
+                    info = process.info
+                    processes.append({
+                        "name": str(info.get("name") or "process")[:48],
+                        "cpu_cum_pct": round(float(info.get("cpu_percent") or 0), 1),
+                    })
+                except (psutil.Error, TypeError, ValueError):
+                    continue
+            result["top_processes"] = sorted(
+                processes, key=lambda item: item["cpu_cum_pct"], reverse=True)[:5]
+    except ImportError:
+        # Linux fallback keeps the core PC Link dashboard useful without
+        # optional psutil; non-Linux systems simply report unavailable metrics.
+        try:
+            meminfo = {}
+            with open("/proc/meminfo", "r", encoding="ascii") as stream:
+                for line in stream:
+                    key, value = line.split(":", 1)
+                    meminfo[key] = int(value.strip().split()[0])
+            total = meminfo.get("MemTotal", 0) * 1024
+            available = meminfo.get("MemAvailable", 0) * 1024
+            used = max(0, total - available)
+            result["memory"] = {
+                "total_mb": round(total / (1024.0 * 1024.0), 1),
+                "used_mb": round(used / (1024.0 * 1024.0), 1),
+                "percent": round(100.0 * used / total, 1) if total else 0.0,
+            }
+        except (OSError, ValueError, KeyError):
+            pass
+        try:
+            with open("/proc/uptime", "r", encoding="ascii") as stream:
+                result["uptime_s"] = int(float(stream.read().split()[0]))
+        except (OSError, ValueError, IndexError):
+            pass
+        try:
+            with open("/proc/loadavg", "r", encoding="ascii") as stream:
+                result["load"] = [float(value) for value in stream.read().split()[:3]]
+        except (OSError, ValueError):
+            pass
+    return result
