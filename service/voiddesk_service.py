@@ -1003,6 +1003,7 @@ def h_voidcast_launch(args):
     if not script.exists():
         return {"ok": False, "error": "outdesk/VoidCast/voidcast/main.py missing"}
     try:
+        DATA.mkdir(parents=True, exist_ok=True)
         (DATA / ".pending_session").write_text("voidcast")
         return {"ok": True, "handoff": True,
                 "note": "handing off to VoidCast — VoidDesk will restart "
