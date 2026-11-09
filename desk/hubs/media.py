@@ -47,7 +47,7 @@ class MediaHub(HubMixin):
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             marker = DATA_DIR / ".pending_session"
             temporary = DATA_DIR / ".pending_session.tmp"
-            temporary.write_text("voidcast\\n", encoding="utf-8")
+            temporary.write_text("voidcast\n", encoding="utf-8")
             os.replace(str(temporary), str(marker))
         except OSError as exc:
             app.notify("VoidCast IPTV", "Impossibile avviare: " + str(exc), "warning")
