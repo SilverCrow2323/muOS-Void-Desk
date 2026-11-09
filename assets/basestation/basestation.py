@@ -56,7 +56,8 @@ from pathlib import Path
 
 from basestation_core import (
     atomic_write_json, collect_host_stats, collect_listener_snapshot,
-    create_remote_backup, generate_auth_token, safe_device_id, token_matches,
+    create_remote_backup, drain_device_messages, enqueue_device_message,
+    generate_auth_token, safe_device_id, token_matches,
 )
 
 try:
@@ -687,13 +688,11 @@ class DaemonStore:
                     boxes = {}
             except (OSError, ValueError):
                 boxes = {}
-            items = boxes.setdefault(safe_id, [])
-            items.append({
+            enqueue_device_message(boxes, safe_id, {
                 "title": str(title)[:80],
                 "body": str(body)[:300],
                 "ts": datetime.now().isoformat(timespec="seconds"),
-            })
-            boxes[safe_id] = items[-50:]
+            }, limit=50)
             atomic_write_json(DEVICE_OUTBOX_FILE, boxes)
 
     def device_outbox_drain(self, device_id):
@@ -705,9 +704,9 @@ class DaemonStore:
                     boxes = {}
             except (OSError, ValueError):
                 boxes = {}
-            pending = boxes.pop(safe_id, [])
+            pending = drain_device_messages(boxes, safe_id)
             atomic_write_json(DEVICE_OUTBOX_FILE, boxes)
-            return pending if isinstance(pending, list) else []
+            return pending
 
     def save_incoming(self, device_id, filename, payload):
         safe_id = self._safe_device_id(device_id)
