@@ -26,6 +26,8 @@ def valid_members():
         "Void-Desk/mux_launch.sh": b"#!/bin/sh\n",
         "Void-Desk/voiddesk.py": b"print('VoidDesk')\n",
         "Void-Desk/love/main.lua": b"function love.load() end\n",
+        "Void-Desk/outdesk/VoidCast/voidcast/main.py": b"print('VoidCast')\n",
+        "Void-Desk/outdesk/VoidCast/presets/config.default.json": b"{}\n",
     }
 
 
