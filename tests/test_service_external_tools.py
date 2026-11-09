@@ -100,9 +100,28 @@ def test_voidcast_external_launch_uses_mux_session_handoff(tmp_path, monkeypatch
     script = tmp_path / "outdesk" / "VoidCast" / "voidcast" / "main.py"
     script.parent.mkdir(parents=True)
     script.write_text("print('VoidCast')")
+    config = script.parents[1] / "presets" / "config.default.json"
+    config.parent.mkdir(parents=True)
+    config.write_text("{}")
 
     result = service.h_launch_external({"id": "voidcast"})
 
     assert result["ok"] is True
     assert result["handoff"] is True
-    assert (tmp_path / "data" / ".pending_session").read_text() == "voidcast"
+    assert (tmp_path / "data" / ".pending_session").read_text() == "voidcast\\n"
+
+
+def test_voidcast_external_launch_rejects_missing_default_configuration(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "APP_DIR", tmp_path)
+    monkeypatch.setattr(service, "DATA", tmp_path / "data")
+    monkeypatch.setattr(service, "IS_DEVICE", True)
+    script = tmp_path / "outdesk" / "VoidCast" / "voidcast" / "main.py"
+    script.parent.mkdir(parents=True)
+    script.write_text("print('VoidCast')")
+
+    result = service.h_launch_external({"id": "voidcast"})
+
+    assert result["ok"] is False
+    assert "default configuration missing" in result["error"]
+    assert not (tmp_path / "data" / ".pending_session").exists()
