@@ -49,10 +49,11 @@ DESTRUCTIVE_CAPABILITIES = {
 def _safe_relative_path(value):
     if not isinstance(value, str) or not value or "\\" in value:
         return False
-    candidate = Path(value)
-    if candidate.is_absolute():
+    raw_parts = value.split("/")
+    if any(part in ("", ".", "..") for part in raw_parts):
         return False
-    return all(part not in ("", ".", "..") for part in candidate.parts)
+    candidate = Path(value)
+    return not candidate.is_absolute() and bool(candidate.parts)
 
 
 def validate_addon_manifest(manifest, addon_dir=None):
@@ -80,8 +81,16 @@ def validate_addon_manifest(manifest, addon_dir=None):
     entrypoint = manifest.get("entrypoint")
     if not _safe_relative_path(entrypoint):
         errors.append("entrypoint must be a safe relative path")
-    elif addon_dir is not None and not (Path(addon_dir) / entrypoint).is_file():
-        errors.append("entrypoint file does not exist")
+    elif addon_dir is not None:
+        root = Path(addon_dir).resolve()
+        target = (root / entrypoint).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError:
+            errors.append("entrypoint resolves outside its add-on directory")
+        else:
+            if not target.is_file():
+                errors.append("entrypoint file does not exist")
 
     ui = manifest.get("ui")
     if not isinstance(ui, dict):
@@ -107,7 +116,7 @@ def validate_addon_manifest(manifest, addon_dir=None):
         errors.append("confirmation_actions must be a list")
         confirmation = []
     missing_confirm = sorted(
-        set(capabilities) & DESTRUCTIVE_CAPABILITIES - set(confirmation))
+        (set(capabilities) & DESTRUCTIVE_CAPABILITIES) - set(confirmation))
     if missing_confirm:
         errors.append("destructive capabilities need confirmation_actions: {}".format(
             ", ".join(missing_confirm)))
