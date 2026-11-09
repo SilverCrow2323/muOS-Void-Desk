@@ -249,3 +249,23 @@ def test_registry_reports_malformed_field_types_without_crashing():
     assert any("malformed has invalid auth model" in error for error in errors)
     assert any("malformed-family has invalid host role" in error for error in errors)
     assert any("malformed-family has invalid base_port" in error for error in errors)
+
+
+def test_registry_reports_unhashable_subsystem_parent_without_crashing():
+    registry = load_registry_module()
+    data = {
+        "schema": "spdw-service-registry",
+        "version": 1,
+        "services": [{
+            "id": "bad-subsystem",
+            "type": "subsystem",
+            "host": "handheld",
+            "protocol": "tcp",
+            "port": 22,
+            "shares_listener_with": [],
+        }],
+    }
+
+    errors = registry.validate_registry(data)
+
+    assert any("must name its parent listener" in error for error in errors)
