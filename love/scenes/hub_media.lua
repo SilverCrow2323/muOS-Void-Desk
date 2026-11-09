@@ -57,7 +57,7 @@ return dashboard.new({
                       -- starts the standalone Outdesk app, then restores Desk.
                       love.event.quit()
                   else
-                      scene.set_status("VoidCast failed: " .. (resp.error or "handoff unavailable"))
+                      scene.set_status("VoidCast failed: " .. (resp.error or resp.reason or "handoff unavailable"))
                   end
               end)
               return "Launching VoidCast..."
