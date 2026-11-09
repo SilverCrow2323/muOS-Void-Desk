@@ -9,6 +9,7 @@ local state = {
     bt      = { on = false, count = 0 },
     hotspot = { on = false, ssid = "—" },
     info    = { hostname = "—", gateway = "—" },
+    hub     = { running = false, port = 8765, pairing_pin = "", host = "0.0.0.0" },
 }
 
 local function refresh(scene, silent)
@@ -19,6 +20,24 @@ local function refresh(scene, silent)
             state.hotspot = resp.network.hotspot or state.hotspot
             state.info    = resp.network.info    or state.info
             if not silent then scene.set_status("Ready") end
+        end
+    end)
+    bridge.call("hub_gateway_status", {}, function(resp)
+        if resp.ok then
+            state.hub.running = not not resp.running
+            state.hub.port = tonumber(resp.port) or 8765
+            state.hub.pairing_pin = resp.pairing_pin or ""
+            state.hub.host = resp.host or "0.0.0.0"
+            if not silent then
+                scene.set_status(state.hub.running and "SPDW Hub Device Agent online"
+                    or "SPDW Hub Device Agent offline")
+            end
+        else
+            state.hub.running = false
+            state.hub.pairing_pin = ""
+            if not silent then
+                scene.set_status("SPDW Hub: " .. (resp.error or "unavailable"))
+            end
         end
     end)
 end
@@ -62,6 +81,13 @@ return dashboard.new({
                          state.wifi.ip or "—", {0.4,0.9,0.5}, alpha)
         widgets.info_row(20, 156, W-40, "Hostname",
                          state.info.hostname or "—", nc, alpha)
+        local hub_value = state.hub.running
+            and (state.hub.pairing_pin ~= "" and state.hub.pairing_pin
+                 or ("PORT " .. tostring(state.hub.port)))
+            or "OFFLINE"
+        widgets.info_row(20, 174, W-40, "SPDW Hub Device Agent",
+                         hub_value, state.hub.running and {0.35,0.9,0.6}
+                         or {0.8,0.35,0.4}, alpha)
     end,
 
     items = {
@@ -101,6 +127,22 @@ return dashboard.new({
                   scene.set_status("Hotspot: " .. (resp.state or resp.error or "toggling"))
               end)
               return "Toggling..."
+          end },
+        { icon = "monitor", label = "SPDW Hub Device Agent",
+          value = state.hub.running and "ONLINE" or "OFFLINE",
+          desc = "PC portal, pairing PIN and authenticated file gateway",
+          action = function(scene)
+              bridge.call("hub_gateway_status", {}, function(resp)
+                  if resp.ok and resp.running then
+                      local ip = state.wifi.ip or "?"
+                      scene.set_status("http://" .. ip .. ":" ..
+                          tostring(resp.port or 8765) .. "  PIN: " ..
+                          (resp.pairing_pin or "--------"))
+                  else
+                      scene.set_status("SPDW Hub: " .. (resp.error or "offline"))
+                  end
+              end)
+              return "Checking Device Agent..."
           end },
         { icon = "uplink", label = "Tailscale", value = "NATIVE",
           desc = "Service, QR login, peers, exit nodes and Taildrop",
