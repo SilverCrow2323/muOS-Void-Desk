@@ -59,7 +59,10 @@ def test_media_voidcast_reports_missing_muos_launcher(tmp_path, monkeypatch):
 def test_mux_launcher_bootstraps_pygame_runtime_for_voidcast_even_with_love_engine():
     from pathlib import Path
 
+    import subprocess
+
     launcher = Path(__file__).resolve().parents[1] / "mux_launch.sh"
+    subprocess.run(["sh", "-n", str(launcher)], check=True)
     source = launcher.read_text(encoding="utf-8")
     branch = source.split("            voidcast)", 1)[1].split("            *)", 1)[0]
 
