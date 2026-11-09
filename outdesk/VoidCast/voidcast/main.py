@@ -1442,12 +1442,14 @@ class App(object):
                    j.get_numhats(), j.get_numaxes()))
         if not self.joysticks:
             log("input: NESSUN joystick rilevato (SDL)")
-        if os.environ.get("VOIDCAST_FB") == "1":
-            if evinput.start():
-                log("input: lettore evdev attivo su %d device"
-                    % len(evinput._state["fds"]))
-            else:
-                log("input: evdev NON disponibile")
+        # muOS may expose its built-in controls as raw event devices rather
+        # than SDL joysticks. Use evdev only as a fallback; never process both
+        # paths at once, or a single button press could be dispatched twice.
+        if evinput.sync_with_joystick(bool(self.joysticks)):
+            log("input: fallback evdev attivo su %d device"
+                % len(evinput._state["fds"]))
+        elif not self.joysticks:
+            log("input: nessun joystick SDL né device evdev disponibile")
         if _ENV_BTN:
             log("input: mappa muOS attiva: %s"
                 % {k: v for k, v in sorted(_ENV_BTN.items())})
