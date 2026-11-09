@@ -686,13 +686,22 @@ class DaemonStore:
             raise ValueError("a safe filename is required")
         target_dir = INCOMING_DIR / safe_id
         target_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(str(INCOMING_DIR), 0o700)
+            os.chmod(str(target_dir), 0o700)
+        except OSError:
+            pass
         target = target_dir / name
         if target.exists():
-            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             target = target_dir / "{}_{}{}".format(target.stem, stamp, target.suffix)
         temp = target.with_name(target.name + ".partial")
         try:
             with open(temp, "wb") as stream:
+                try:
+                    os.chmod(str(temp), 0o600)
+                except OSError:
+                    pass
                 stream.write(payload)
                 stream.flush()
                 os.fsync(stream.fileno())
@@ -3620,8 +3629,18 @@ Tabs are selectable via click or shortcut."""
                 for temp in (stats.get("temperatures") or [])[:8]:
                     lines.append("  {}: {} °C".format(
                         temp.get("label", "TEMP"), temp.get("temp_c", "—")))
-                lines.extend(["", "SCREENSHOTS and received files are saved in:",
-                              str(INCOMING_DIR / str(device_id))])
+                lines.extend([
+                    "",
+                    "HANDHELD TELEMETRY:",
+                    "Battery: {}%".format(stats.get("battery_pct", "—")),
+                    "Temperature: {} °C".format(stats.get("temp_c", "—")),
+                    "Storage used: {}%".format(stats.get("storage_used_pct", "—")),
+                    "Void Desk: {}".format(stats.get("voiddesk_version", "—")),
+                    "Frontend: {}".format(stats.get("desk_env", "—")),
+                    "",
+                    "Received screenshots and files are saved in:",
+                    str(INCOMING_DIR / str(device_id)),
+                ])
                 detail.insert("end", "\\n".join(lines))
             detail.config(state="disabled")
 
