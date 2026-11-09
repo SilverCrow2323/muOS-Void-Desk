@@ -119,3 +119,61 @@ def test_addon_entrypoint_symlink_cannot_escape_addon_directory(tmp_path):
 
     assert any("resolves outside" in error for error in errors)
 
+
+
+def test_malformed_manifest_types_are_reported_without_crashing():
+    module = load_addons_module()
+    manifest = valid_manifest()
+    manifest["host"] = {"unexpected": "object"}
+    manifest["capabilities"] = [{}]
+    manifest["confirmation_actions"] = [{}]
+    manifest["listeners"] = [{
+        "host": {},
+        "protocol": [],
+        "port": True,
+        "bind": {},
+        "auth": "none",
+    }]
+
+    errors = module.validate_addon_manifest(manifest)
+
+    assert any("host must be pc" in error for error in errors)
+    assert any("capabilities must contain only strings" in error for error in errors)
+    assert any("confirmation_actions must contain only strings" in error for error in errors)
+    assert any("listeners[0] has invalid host" in error for error in errors)
+    assert any("listeners[0] has invalid protocol" in error for error in errors)
+    assert any("listeners[0] has invalid port" in error for error in errors)
+    assert any("listeners[0] bind must be" in error for error in errors)
+
+
+def test_discovery_handles_unhashable_manifest_ids(tmp_path):
+    module = load_addons_module()
+    addon_dir = tmp_path / "addons" / "bad-id"
+    addon_dir.mkdir(parents=True)
+    manifest = valid_manifest()
+    manifest["id"] = {"not": "hashable"}
+    (addon_dir / "addon.py").write_text("# inert\n", encoding="utf-8")
+    (addon_dir / "addon.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    discovered = module.discover_addons([tmp_path / "addons"])
+
+    assert len(discovered) == 1
+    assert discovered[0]["valid"] is False
+    assert discovered[0]["id"] == {"not": "hashable"}
+
+
+def test_discovery_rejects_symlinked_manifest(tmp_path):
+    module = load_addons_module()
+    root = tmp_path / "addons"
+    addon_dir = root / "sample"
+    addon_dir.mkdir(parents=True)
+    external = tmp_path / "external.json"
+    external.write_text(json.dumps(valid_manifest()), encoding="utf-8")
+    (addon_dir / "addon.py").write_text("# inert\n", encoding="utf-8")
+    (addon_dir / "addon.json").symlink_to(external)
+
+    discovered = module.discover_addons([root])
+
+    assert len(discovered) == 1
+    assert discovered[0]["valid"] is False
+    assert any("must not be a symlink" in error for error in discovered[0]["errors"])
