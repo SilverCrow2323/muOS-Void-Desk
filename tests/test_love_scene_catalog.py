@@ -40,3 +40,11 @@ def test_media_voidcast_entry_hands_off_to_bundled_outdesk_app():
     assert "love.event.quit()" in source
     assert "LÖVE prototype" not in source
     assert "M3U, multi-source EPG, PVR and add-ons" in source
+
+def test_uplink_exposes_shared_spdw_device_agent_status_and_pairing():
+    source = (LOVE / "scenes" / "hub_uplink.lua").read_text(encoding="utf-8")
+    assert 'bridge.call("hub_gateway_status", {}' in source
+    assert 'label = "SPDW Hub Device Agent"' in source
+    assert "state.hub.pairing_pin" in source
+    assert "state.hub.port" in source
+
