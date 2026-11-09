@@ -21,9 +21,15 @@
       "auth": "spdw-pairing-session",
       "owner": "spdw-device-agent",
       "management": true,
-      "state": "target",
-      "routes": ["/", "/api/v1/", "/files/", "/apps/", "/addons/"],
-      "notes": "Replaces the legacy unauthenticated BaseStation file portal on the same port."
+      "state": "implemented-source-unverified-hardware",
+      "routes": [
+        "/",
+        "/api/v1/",
+        "/files/",
+        "/apps/",
+        "/addons/"
+      ],
+      "notes": "Service-owned authenticated Device Agent on the legacy BaseStation port. Pairing PIN, session cookie, CSRF protection, file-path canonicalization and upload limits are implemented; muOS hardware verification remains."
     },
     {
       "id": "rt-tailscale-panel-legacy",
@@ -37,8 +43,10 @@
       "owner": "rt-tailscale-m",
       "management": false,
       "state": "migration",
-      "routes": ["/apps/tailscale/"],
-      "notes": "Legacy panel; bind to loopback and mount through the SPDW gateway until converted to an in-process add-on."
+      "routes": [
+        "/apps/tailscale/"
+      ],
+      "notes": "Standalone upstream panel defaults to this port; the Void Desk package build disables its separate panel and binds it loopback-only where configured. Full in-process Hub route remains planned."
     },
     {
       "id": "spdw-pc-gateway",
@@ -52,8 +60,13 @@
       "owner": "spdw-hub-pc",
       "management": true,
       "state": "compatibility",
-      "routes": ["/", "/api/v1/uplink/", "/api/v1/devices/", "/addons/"],
-      "notes": "Retains the current Void Desk PC Link discovery/API port; evolves into the PC dashboard without adding a new listener."
+      "routes": [
+        "/",
+        "/api/v1/uplink/",
+        "/api/v1/devices/",
+        "/addons/"
+      ],
+      "notes": "Existing PC Link listener and authenticated SPDW Hub browser dashboard at /; serves device inventory, notifications, screenshot requests and received-file inbox on the same port. No additional PC web listener."
     },
     {
       "id": "ssh",
@@ -90,7 +103,9 @@
       "host": "handheld",
       "owner": "rt-tailscale-m",
       "state": "adapter-planned",
-      "routes": ["/apps/tailscale/"],
+      "routes": [
+        "/apps/tailscale/"
+      ],
       "notes": "Reuse the existing CLI, daemon and panel logic; do not start a second externally exposed management server."
     },
     {
@@ -99,7 +114,9 @@
       "host": "pc",
       "owner": "rt-stream",
       "state": "source-audit-pending",
-      "routes": ["/addons/rt-stream/"],
+      "routes": [
+        "/addons/rt-stream/"
+      ],
       "notes": "The RT Stream daemon source and its existing listener contract must be imported and audited before an adapter is implemented."
     },
     {
@@ -114,7 +131,9 @@
       "owner": "sunshine",
       "management": false,
       "state": "target",
-      "routes": ["/addons/rt-stream/sunshine/"],
+      "routes": [
+        "/addons/rt-stream/sunshine/"
+      ],
       "notes": "Management UI should be loopback-only and accessed through the PC Hub adapter."
     },
     {
@@ -125,13 +144,49 @@
       "state": "protocol-required",
       "base_port": 47989,
       "members": [
-        {"name": "https", "port": 47984, "protocol": "tcp", "required": true},
-        {"name": "http", "port": 47989, "protocol": "tcp", "required": true},
-        {"name": "rtsp", "port": 48010, "protocol": "tcp", "required": true},
-        {"name": "video", "port": 47998, "protocol": "udp", "required": true},
-        {"name": "control", "port": 47999, "protocol": "udp", "required": true},
-        {"name": "audio", "port": 48000, "protocol": "udp", "required": true},
-        {"name": "microphone", "port": 48002, "protocol": "udp", "required": false, "notes": "Unused in the documented defaults"}
+        {
+          "name": "https",
+          "port": 47984,
+          "protocol": "tcp",
+          "required": true
+        },
+        {
+          "name": "http",
+          "port": 47989,
+          "protocol": "tcp",
+          "required": true
+        },
+        {
+          "name": "rtsp",
+          "port": 48010,
+          "protocol": "tcp",
+          "required": true
+        },
+        {
+          "name": "video",
+          "port": 47998,
+          "protocol": "udp",
+          "required": true
+        },
+        {
+          "name": "control",
+          "port": 47999,
+          "protocol": "udp",
+          "required": true
+        },
+        {
+          "name": "audio",
+          "port": 48000,
+          "protocol": "udp",
+          "required": true
+        },
+        {
+          "name": "microphone",
+          "port": 48002,
+          "protocol": "udp",
+          "required": false,
+          "notes": "Unused in the documented defaults"
+        }
       ],
       "notes": "Protocol transport is not an HTTP management listener and cannot be collapsed into one browser port. Revalidate the installed Sunshine version and settings."
     },
