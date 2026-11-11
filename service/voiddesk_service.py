@@ -211,6 +211,8 @@ def _muos_app_entries():
             try:
                 if child.is_symlink() or not child.is_dir():
                     continue
+                if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", child.name):
+                    continue
                 app_dir = child.resolve(strict=True)
                 if app_dir.parent != root_real or app_dir == current_app:
                     continue
