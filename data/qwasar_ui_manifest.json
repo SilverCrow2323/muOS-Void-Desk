@@ -514,6 +514,26 @@
         "show-availability"
       ],
       "minUiApi": "1.0"
+    },
+    {
+      "id": "navigation.launch-selector",
+      "kind": "navigation",
+      "stateModel": "stateful",
+      "slots": [
+        "instances",
+        "flavours",
+        "engines",
+        "profiles",
+        "sessions",
+        "actions"
+      ],
+      "customizable": [
+        "show-installation-details",
+        "default-engine",
+        "remember-selection",
+        "compact-mode"
+      ],
+      "minUiApi": "1.0"
     }
   ],
   "shell": {
@@ -1944,7 +1964,78 @@
       ],
       "allowMultipleInstances": true,
       "rememberLastSelection": true,
-      "fallbackPolicy": "ask"
+      "fallbackPolicy": "ask",
+      "component": {
+        "id": "launch.selector",
+        "type": "navigation.launch-selector",
+        "props": {
+          "title": "QWASAR // BOOT & INSTANCE SELECTOR",
+          "selectionOrder": [
+            "installed-instance",
+            "build-flavour",
+            "frontend-engine",
+            "user-profile",
+            "session-target"
+          ]
+        },
+        "slots": {
+          "instances": [
+            {
+              "id": "launch.instance-card",
+              "type": "widget.installation-card",
+              "props": {
+                "provider": "runtime.installed-instances"
+              }
+            }
+          ],
+          "flavours": [
+            {
+              "id": "launch.flavour-card",
+              "type": "widget.quick-tile",
+              "props": {
+                "provider": "runtime.available-flavours"
+              }
+            }
+          ],
+          "engines": [
+            {
+              "id": "launch.engine-card",
+              "type": "widget.quick-tile",
+              "props": {
+                "provider": "runtime.compatible-engines"
+              }
+            }
+          ],
+          "profiles": [
+            {
+              "id": "launch.profile-card",
+              "type": "widget.quick-tile",
+              "props": {
+                "provider": "profile.available"
+              }
+            }
+          ],
+          "sessions": [
+            {
+              "id": "launch.session-card",
+              "type": "widget.session-card",
+              "props": {
+                "provider": "runtime.session-targets"
+              }
+            }
+          ],
+          "actions": [
+            {
+              "id": "launch.continue",
+              "type": "menu.entry",
+              "props": {
+                "label": "Continue",
+                "actionId": "launch.confirm"
+              }
+            }
+          ]
+        }
+      }
     },
     "buildFlavours": [
       {
@@ -2153,6 +2244,23 @@
           "desktop-linux-x86_64"
         ],
         "notes": "Optional PC-only virtualization backend, detected through VBoxManage and host capability checks. VirtualBox 7.2 documentation lists Linux x86_64 hosts; do not advertise this on H700/muOS."
+      },
+      {
+        "id": "deskflow",
+        "status": "candidate",
+        "hostRole": "PC keyboard/mouse server",
+        "deviceRole": "handheld or PC client where a supported endpoint exists",
+        "transports": [
+          "keyboard-mouse",
+          "clipboard"
+        ],
+        "requiresInstallOnBothEnds": true,
+        "platforms": [
+          "muos-h700",
+          "desktop-linux-x86_64",
+          "desktop-other"
+        ],
+        "notes": "Alternative software-KVM backend to probe alongside Input Leap. Select only after both endpoints, session type, encryption and input permissions pass compatibility checks. It does not provide remote display."
       }
     ]
   },
