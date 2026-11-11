@@ -250,6 +250,14 @@ class QwasarSwitchboard:
                     f"profile binding references unknown action: {binding['actionId']}"
                 )
 
+        known_global_panels = set(self.manifest["shell"]["globalPanels"])
+        unknown_global_panels = set(profile["shell"].get("globalPanels", {})) - known_global_panels
+        if unknown_global_panels:
+            raise SwitchboardError(
+                "profile references unknown global panels: "
+                + ", ".join(sorted(unknown_global_panels))
+            )
+
         # Imported profiles are held to the same safety floor as UI edits.
         # A crafted .qprofile must not be able to hide recovery or disable
         # the central shell before the user opens Switchboard.
