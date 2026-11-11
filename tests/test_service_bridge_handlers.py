@@ -57,3 +57,74 @@ def test_calendar_events_rejects_invalid_month(tmp_path, monkeypatch):
     monkeypatch.setattr(service, "DATA", tmp_path)
     result = service.h_calendar_events({"year": 2026, "month": 13})
     assert result["ok"] is False
+
+
+def test_github_release_handler_returns_bounded_public_metadata(monkeypatch):
+    service = load_service()
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps([
+                {
+                    "tag_name": "v10.5.4",
+                    "name": "Void Desk 10.5.4",
+                    "html_url": "https://github.com/example/release",
+                    "published_at": "2026-11-11T12:00:00Z",
+                    "draft": False,
+                    "prerelease": True,
+                    "body": "Release notes",
+                },
+                {"tag_name": "draft", "draft": True},
+            ]).encode()
+
+    requested = {}
+
+    def fake_urlopen(request, timeout):
+        requested["url"] = request.full_url
+        requested["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(service.urllib.request, "urlopen", fake_urlopen)
+    result = service.h_gh_fetch_releases({})
+    assert result["ok"] is True
+    assert result["tag"] == "v10.5.4"
+    assert result["status"] == "available"
+    assert len(result["releases"]) == 1
+    assert result["releases"][0]["notes"] == "Release notes"
+    assert requested["timeout"] == 8
+    assert "api.github.com/repos/SilverCrow2323/Void-Desk-Project/releases" in requested["url"]
+
+
+def test_github_release_handler_reports_empty_release_catalog(monkeypatch):
+    service = load_service()
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b"[]"
+
+    monkeypatch.setattr(
+        service.urllib.request, "urlopen",
+        lambda *_args, **_kwargs: FakeResponse(),
+    )
+    result = service.h_gh_fetch_releases({})
+    assert result == {
+        "ok": True,
+        "tag": None,
+        "name": "No published releases",
+        "url": None,
+        "published_at": None,
+        "releases": [],
+        "status": "empty",
+    }
