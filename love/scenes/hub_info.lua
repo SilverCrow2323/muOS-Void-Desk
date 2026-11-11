@@ -22,9 +22,9 @@ end
 local function rebuild_items(scene)
     return {
         { icon = "info", label = "About project",
-          desc = "VoidDesk v10.5.1 — credits, stack, ecosystem",
+          desc = "QWASAR Desk — experimental LÖVE frontend, credits and ecosystem",
           action = function(sc)
-              sc.set_status("VoidDesk v10.5.1 · LÖVE 11.5 · Pygame 2.6 · SPDW Factory")
+              sc.set_status("QWASAR Desk · LÖVE 11.5 · Pygame 2.6 · SPDW Factory")
               return "About"
           end },
         { icon = "book", label = "Technical manual",
@@ -43,7 +43,7 @@ local function rebuild_items(scene)
               return "Manifesto"
           end },
         { icon = "refresh", label = "Check updates",
-          desc = "VoidDesk releases from GitHub",
+          desc = "QWASAR Desk releases from GitHub",
           action = function(sc)
               bridge.call("gh_fetch_releases", {}, function(resp)
                   if resp.ok then
@@ -83,7 +83,7 @@ local scene = dashboard.new({
         local W = love.graphics.getWidth()
         local nc = nodes.color_for(8)
         widgets.status_card(12, 62, (W-40)/2, 56, "info",
-            "VoidDesk", "v10.5.1 (NEXUS)", nc, "BUILD", alpha)
+            "QWASAR", "NEXUS / LÖVE prototype", nc, "BUILD", alpha)
         widgets.status_card(12 + (W-40)/2 + 8, 62, (W-40)/2, 56, "globe",
             "Platform", state.machine, {0.4,0.85,0.9},
             state.os:upper(), alpha)
