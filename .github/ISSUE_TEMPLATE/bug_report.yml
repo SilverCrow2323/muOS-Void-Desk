@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a reproducible VoidDesk defect.
+title: "[Bug]: "
+labels:
+  - "[Type] Bug"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing issues first. Never attach secrets, tokens, Wi-Fi passwords, private IP details or unredacted personal paths.
+  - type: input
+    id: version
+    attributes:
+      label: VoidDesk version or commit
+      placeholder: "10.5.4-NEXUS / commit SHA"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device model
+      placeholder: "Anbernic RG35XX H / RG35XX SP / other"
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware and version
+      placeholder: "muOS / ROCKNIX / KNULLI / Linux PC"
+    validations:
+      required: true
+  - type: dropdown
+    id: frontend
+    attributes:
+      label: Frontend
+      options:
+        - Pygame (primary)
+        - LÖVE (experimental)
+        - PC launcher
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - NEXUS UI
+        - Browser
+        - XFCE / desktop image
+        - Bluetooth
+        - Power / shutdown
+        - UPLINK / networking
+        - Media / VoidCast
+        - Packaging / installation
+        - QWASAR Studio
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List exact inputs and menu paths.
+      placeholder: "1. Boot the device...\n2. Open..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Include a short excerpt and name the log file. Redact private information.
+      render: text
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched for an existing report.
+          required: true
+        - label: I removed credentials and private network information.
+          required: true
