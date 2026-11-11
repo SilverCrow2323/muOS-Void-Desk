@@ -1,4 +1,4 @@
-# Void Desk Tool Catalog and Information Architecture
+# QWASAR Desk Tool Catalog and Information Architecture
 
 This is an inventory of tool families and entry points found in the current source tree. It is a source-grounded map, not a promise that every item is enabled on every firmware or PC. Availability depends on host packages, device capabilities, permissions, optional downloads and frontend coverage.
 
@@ -50,14 +50,14 @@ The registry is the best starting point for a future unified catalog, but it cur
 
 ### Standalone applications under outdesk/
 
-Source inventory includes BootAnimManager, Disc Crusher, EthoStore, ImageViewer, Little Mischief, MediaPlayer, Portable Forger and VoidCast. These should be separate catalog entries with explicit install source and compatibility metadata, not automatically treated as built-in Void Desk features.
+Source inventory includes BootAnimManager, Disc Crusher, EthoStore, ImageViewer, Little Mischief, MediaPlayer, Portable Forger and VoidCast. These should be separate catalog entries with explicit install source and compatibility metadata, not automatically treated as built-in QWASAR Desk features.
 
 **Security review flag:** Little Mischief contains Wi-Fi capture/scanning and attack-oriented scripts. Keep it isolated from the core catalog until its intended authorized-lab use, safeguards, permissions and packaging policy have been reviewed. Do not expose attack actions as ordinary connectivity utilities.
 
 ## Lifecycle and availability labels
 
 Use consistent status labels in the catalog:
-- `built_in`: shipped in the Void Desk package.
+- `built_in`: shipped in the QWASAR Desk package.
 - `optional_dependency`: requires a host package or runtime.
 - `external_app`: separately launched application.
 - `experimental`: incomplete or not feature-equivalent across engines.

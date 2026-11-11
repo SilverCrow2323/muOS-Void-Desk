@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Legacy version marker for BUILDCHECK.py and older package tooling: VOIDDESK NEXUS v10.5.4
 r"""
-VOIDDESK NEXUS v10.5.4 — Advanced Launcher & PC Runtime Environment
+QWASAR DESK / NEXUS v10.5.4 — PC Runtime & Launcher (legacy file: voiddesk.py)
 SPDW Factory · Single-File Hybrid Launcher & Diagnostics Suite
 
 Modes (dispatched by cli()):
@@ -43,14 +44,15 @@ class Color:
 
 BANNER = rf"""{Color.CYAN}{Color.BOLD}
  ╔══════════════════════════════════════════════════════════════════╗
- ║   __   ______  _____ _____  _____  ______  _____ _   _  _____    ║
- ║   \ \ / /  _ \|_   _|  __ \|  __ \|  ____|/ ____| | | |/ ____|   ║
- ║    \ V /| |_) | | | | |  | | |  | | |__  | (___ | |_| | (___     ║
- ║     > < |  _ <  | | | |  | | |  | |  __|  \___ \|  _  |\___ \    ║
- ║    / . \| |_) |_| |_| |__| | |__| | |____ ____) | | | |____) |   ║
- ║   /_/ \_\____/|_____|_____/|_____/|______|_____/|_| |_|_____/    ║
  ║                                                                  ║
- ║   {Color.GREEN}NEXUS HYBRID CONTROL INTERFACE · SPDW FACTORY v10.5.4{Color.CYAN}          ║
+ ║   ██████╗ ██╗    ██╗ █████╗ ███████╗ █████╗ ██████╗              ║
+ ║  ██╔═══██╗██║    ██║██╔══██╗██╔════╝██╔══██╗██╔══██╗             ║
+ ║  ██║   ██║██║ █╗ ██║███████║███████╗███████║██████╔╝             ║
+ ║  ██║▄▄ ██║██║███╗██║██╔══██║╚════██║██╔══██║██╔══██╗             ║
+ ║  ╚██████╔╝╚███╔███╔╝██║  ██║███████║██║  ██║██║  ██║             ║
+ ║   ╚══▀▀═╝  ╚══╝╚══╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝             ║
+ ║                                                                  ║
+ ║   {Color.GREEN}QWASAR // NEXUS CONTROL INTERFACE · SPDW FACTORY · v10.5.4{Color.CYAN}   ║
  ╚══════════════════════════════════════════════════════════════════╝{Color.RESET}"""
 
 DEFAULT_CONFIG = {
@@ -140,7 +142,7 @@ def launch_love():
 
 # ================================================================= SERVICE ==
 def start_service():
-    """Start the VoidDesk background daemon service."""
+    """Start the QWASAR background daemon service."""
     py = str(VENV_PY) if VENV_PY.is_file() else sys.executable
     svc_script = APP_DIR / "service" / "voiddesk_service.py"
     
@@ -315,7 +317,7 @@ def launch_py():
         subprocess.run([str(VENV_PY), "-m", "pip", "install", "-q", "pygame", "psutil"])
         print(f"  {Color.GREEN}✔ Venv created successfully!{Color.RESET}")
 
-    print(f"  {Color.GREEN}🚀 Re-executing VoidDesk inside Pygame VENV...{Color.RESET}")
+    print(f"  {Color.GREEN}🚀 Re-executing QWASAR Desk inside Pygame VENV...{Color.RESET}")
     env = dict(os.environ)
     env["VOIDDESK_APP_DIR"] = str(APP_DIR)
     env.setdefault("VOIDDESK_PC", "1")
@@ -353,7 +355,7 @@ def action_edit_config_tui():
     cfg = read_cfg()
     while True:
         os.system("clear" if os.name == "posix" else "cls")
-        print(f"{Color.CYAN}═══ VOIDDESK CONFIG EDITOR ═══{Color.RESET}\n")
+        print(f"{Color.CYAN}═══ QWASAR CONFIG EDITOR ═══{Color.RESET}\n")
         print(f"  1) Default Engine : {Color.GREEN}{cfg.get('engine', 'love').upper()}{Color.RESET}")
         print(f"  2) PC Mode        : {Color.YELLOW}{cfg.get('pc_mode', 'auto')}{Color.RESET}")
         print(f"  3) Debug Mode     : {'ON' if cfg.get('debug') else 'OFF'}")
@@ -458,9 +460,9 @@ def action_repair():
 
 # ==================================================================== MENU ==
 MENU = [
-    ("Launch VoidDesk (Default Config)", lambda: action_launch(read_cfg().get("engine", "love"))),
-    ("Launch VoidDesk → LÖVE Engine",    lambda: action_launch("love")),
-    ("Launch VoidDesk → Pygame Engine",  lambda: action_launch("py")),
+    ("Launch QWASAR Desk (Default Config)", lambda: action_launch(read_cfg().get("engine", "love"))),
+    ("Launch QWASAR Desk → LÖVE Engine",    lambda: action_launch("love")),
+    ("Launch QWASAR Desk → Pygame Engine",  lambda: action_launch("py")),
     ("Quick Switch Default Engine",       action_toggle_engine),
     ("Interactive Config Editor",         action_edit_config_tui),
     ("Log Matrix Inspector",              action_logs),
@@ -486,7 +488,7 @@ def tui_main():
         try:
             choice = input(f"  {Color.BOLD}Select Option [0-{len(MENU)}]: {Color.RESET}").strip()
             if choice == "0" or not choice:
-                print(f"\n  {Color.DIM}Exiting VoidDesk Nexus launcher.{Color.RESET}\n")
+                print(f"\n  {Color.DIM}Exiting QWASAR Desk launcher.{Color.RESET}\n")
                 return 0
             idx = int(choice) - 1
             if 0 <= idx < len(MENU):
@@ -498,7 +500,7 @@ def tui_main():
             return 0
 
 def print_help():
-    print(f"""{Color.BOLD}VoidDesk Nexus Launcher CLI Usage:{Color.RESET}
+    print(f"""{Color.BOLD}QWASAR Desk Launcher CLI Usage:{Color.RESET}
   ./voiddesk.py              Interactive Terminal TUI Dashboard
   ./voiddesk.py --love       Direct Launch LÖVE 2D Engine
   ./voiddesk.py --py         Direct Launch Pygame Venv Engine

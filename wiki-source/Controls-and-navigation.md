@@ -1,4 +1,4 @@
-# Controls and navigation
+# QWASAR Desk — Controls and navigation
 
 ## Default controls
 

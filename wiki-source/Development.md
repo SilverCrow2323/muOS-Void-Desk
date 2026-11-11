@@ -1,4 +1,4 @@
-# Development and architecture
+# QWASAR Desk — Development and architecture
 
 ## Runtime path
 
@@ -44,3 +44,10 @@ CI also runs focused LÖVE core tests for lazy scene loading, scene navigation a
 - Avoid blocking commands in render/update loops.
 - Record hardware and firmware used for manual tests.
 - Do not claim LÖVE parity with Pygame until verified feature by feature.
+
+
+## Symbiotic Layer work
+
+See [Symbiotic Layer](Symbiotic-Layer) for the integration contract and milestones. The current target is a normal muOS application; deeper integration must use documented extension points, stable identifiers, atomic persistence and reversible changes.
+
+The official muOS developer references are [Application Runner](https://community.muos.dev/t/application-runner/1282), [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) and [Frontend and Launching](https://muos.dev/docs/infrastructure/launching). Do not hardcode SD1/SD2 mount paths where the runner provides a resolved path, and do not bypass its setup/cleanup lifecycle.

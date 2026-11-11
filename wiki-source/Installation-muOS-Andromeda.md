@@ -9,8 +9,8 @@ The current packaging target is MustardOS (muOS) **2606.0 Andromeda** on compati
 1. Download the .muxapp asset from the relevant GitHub Release. Do not install the source-code ZIP.
 2. Copy the .muxapp file to the **ARCHIVE/** folder on SD1.
 3. On the handheld, open **Applications → Archive Manager**.
-4. Select the VoidDesk package and install it.
-5. Launch VoidDesk from the Applications menu.
+4. Select the QWASAR Desk package and install it.
+5. Launch QWASAR Desk from the Applications menu.
 
 The .muxapp archive has one top-level application directory: **Void-Desk/**. It contains the launcher and app files. There must not be an extra application/ directory nested inside the package.
 
@@ -24,3 +24,10 @@ The .muxapp archive has one top-level application directory: **Void-Desk/**. It 
 ## Recommended engine
 
 Use the **Pygame** frontend. The LÖVE frontend is an experimental prototype and is not yet a complete alternative.
+
+
+## QWASAR name transition
+
+The product identity is now QWASAR Desk, formerly Void Desk. The current installable package still uses the legacy `Void-Desk/` root and existing launcher/configuration paths. Do not rename or move these paths manually; a future migration will be handled by a versioned installer.
+
+QWASAR continues to launch through the official muOS application runner. Keep the native muOS frontend and recovery path available.
