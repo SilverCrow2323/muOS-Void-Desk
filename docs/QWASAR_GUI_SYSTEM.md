@@ -162,6 +162,7 @@ The initial component registry is engine-neutral. Each component defines a stabl
 | `layout.split` | Primary/secondary pane |
 | `surface.panel` | Framed panel, card or drawer surface |
 | `surface.overlay` | Layered floating surface |
+| `shell.header`, `shell.footer` | Composable application chrome with named contribution slots |
 
 ### Display and status
 
@@ -172,6 +173,7 @@ The initial component registry is engine-neutral. Each component defines a stabl
 | `widget.stat`, `widget.gauge`, `widget.progress` | Numeric status |
 | `widget.sparkline`, `widget.chart` | Trend and history |
 | `widget.quick-tile` | Compact shortcut/status tile |
+| `widget.installation-card`, `widget.session-card` | Launch-instance and session-target selection |
 | `widget.media-player` | Shared media state and transport controls |
 | `widget.item-list` | Data-backed list with empty/loading/error states |
 
@@ -182,6 +184,7 @@ The initial component registry is engine-neutral. Each component defines a stabl
 | `menu.list`, `menu.entry` | Controller/keyboard navigable menus |
 | `navigation.breadcrumb` | Current path and back context |
 | `navigation.drawer` | Side navigation / workspace switcher |
+| `navigation.launch-selector` | Pre-frontend selection of installed instance, flavour, engine, profile and session |
 | `input.toggle`, `input.slider`, `input.select` | Schema-backed settings inputs |
 | `overlay.drawer`, `overlay.dialog` | Modal and non-modal surfaces |
 | `feedback.toast`, `feedback.progress` | Temporary messages and job progress |
