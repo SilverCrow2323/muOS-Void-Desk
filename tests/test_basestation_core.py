@@ -302,3 +302,21 @@ def test_save_incoming_file_rejects_symlinked_incoming_root(tmp_path):
         raise AssertionError("symlinked incoming root must be rejected")
 
     assert not (outside / "handheld-01" / "escape.txt").exists()
+
+
+def test_save_incoming_file_ignores_preexisting_predictable_partial_symlink(tmp_path):
+    core = load_core()
+    incoming = tmp_path / "incoming"
+    device = incoming / "handheld-01"
+    device.mkdir(parents=True)
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"must remain unchanged")
+    stale_partial = device / "capture.png.partial"
+    stale_partial.symlink_to(outside)
+
+    saved = core.save_incoming_file(
+        incoming, "handheld-01", "capture.png", b"new payload")
+
+    assert saved.read_bytes() == b"new payload"
+    assert outside.read_bytes() == b"must remain unchanged"
+    assert stale_partial.is_symlink()
