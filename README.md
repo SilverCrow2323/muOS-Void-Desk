@@ -34,7 +34,7 @@ The long-term direction is a **Symbiotic Layer**. Void Desk uses the host firmwa
 
 ## At a glance
 
-The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md). The engine-neutral component, menu, widget, shell and workspace contract is in [QWASAR GUI System](docs/QWASAR_GUI_SYSTEM.md); boot/instance/session selection is in [QWASAR Boot and Session Model](docs/QWASAR_BOOT_AND_SESSION_MODEL.md). The module format, permissions, LEGO-style composition and release flavours are specified in [Void Desk Modules](docs/MODULE_SYSTEM.md). The read-only verifier and profile-only Switchboard are documented in [QWASAR Inspector](docs/QWASAR_INSPECTOR.md) and [QWASAR Switchboard](docs/QWASAR_SWITCHBOARD.md).
+The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md). The engine-neutral component, menu, widget, shell and workspace contract is in [QWASAR GUI System](docs/QWASAR_GUI_SYSTEM.md); boot/instance/session selection is in [QWASAR Boot and Session Model](docs/QWASAR_BOOT_AND_SESSION_MODEL.md). The module format, permissions, LEGO-style composition and release flavours are specified in [Void Desk Modules](docs/MODULE_SYSTEM.md).
 
 | | |
 |---|---|
