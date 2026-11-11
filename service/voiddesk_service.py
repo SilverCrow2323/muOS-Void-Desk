@@ -21,6 +21,8 @@ import sys
 import termios
 import time
 import traceback
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -79,6 +81,56 @@ def h_set_config(args):
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+def h_gh_fetch_releases(args):
+    """Return a bounded, public release summary for the Void Desk UI."""
+    if IS_VISUAL_CAPTURE:
+        return {
+            "ok": True, "tag": None, "name": "Visual capture",
+            "url": None, "releases": [], "status": "visual-fixture",
+        }
+
+    url = ("https://api.github.com/repos/"
+           "SilverCrow2323/Void-Desk-Project/releases?per_page=5")
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "VoidDesk-Love/10.5",
+            "Accept": "application/vnd.github+json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        return {"ok": False, "error": "GitHub release lookup failed: " + str(exc)[:120]}
+    if not isinstance(payload, list):
+        return {"ok": False, "error": "GitHub returned an unexpected release catalogue"}
+
+    releases = []
+    for item in payload[:5]:
+        if not isinstance(item, dict) or item.get("draft"):
+            continue
+        releases.append({
+            "tag": str(item.get("tag_name") or "")[:80],
+            "name": str(item.get("name") or item.get("tag_name") or "Release")[:120],
+            "url": str(item.get("html_url") or "")[:300],
+            "published_at": str(item.get("published_at") or "")[:40],
+            "prerelease": bool(item.get("prerelease")),
+            "notes": str(item.get("body") or "")[:500],
+        })
+
+    latest = releases[0] if releases else None
+    return {
+        "ok": True,
+        "tag": latest["tag"] if latest else None,
+        "name": latest["name"] if latest else "No published releases",
+        "url": latest["url"] if latest else None,
+        "published_at": latest["published_at"] if latest else None,
+        "releases": releases,
+        "status": "available" if latest else "empty",
+    }
+
 
 def h_system_info(args):
     try:
@@ -1414,6 +1466,7 @@ HANDLERS = {
     "get_config": h_get_config,
     "set_config": h_set_config,
     "system_info": h_system_info,
+    "gh_fetch_releases": h_gh_fetch_releases,
     "network_status": h_network_status,
     "system_status": h_system_status,
     "shell_start": h_shell_start,

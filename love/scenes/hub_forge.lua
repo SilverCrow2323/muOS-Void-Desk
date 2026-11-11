@@ -80,170 +80,126 @@ return dashboard.new({
               return "APT manager unavailable"
           end },
         { icon = "pkg", label = "Install XFCE Desktop",
-          desc = "Install or repair the desktop chroot",
+          desc = "Install or repair the optional Debian/Ubuntu desktop image",
           action = function(scene)
-              scene.set_status("Installing...")
+              scene.set_status("Installing XFCE desktop...")
               bridge.call("xfce_install", {}, function(resp)
                   if resp.ok then
-                      scene.set_status(resp.note or "installed")
+                      scene.set_status(resp.note or "XFCE installation started")
                       refresh(scene, true)
                   else
                       scene.set_status("Install: " .. (resp.error or "failed"))
                   end
               end)
-              return "Installing..."
+              return "Installing XFCE..."
           end },
         { icon = "play", label = "Launch XFCE Desktop",
-          desc = "Open the full desktop now",
+          desc = "Hand off the handheld display to the installed desktop",
           action = function(scene)
-              scene.set_status("Launching XFCE...")
-              bridge.call("xfce_launch", {}, function(resp)
+              scene.set_status("Handing off to XFCE...")
+              bridge.call("session_launch", {id = "xfce"}, function(resp)
                   if resp.ok then
-                      scene.set_status("XFCE: " .. (resp.note or "running"))
+                      scene.set_status(resp.note or "Starting XFCE...")
+                      if resp.handoff then love.event.quit() end
                   else
                       scene.set_status("Launch: " .. (resp.error or "failed"))
                   end
               end)
-              return "Launching..."
+              return "Launching XFCE..."
           end },
-        { icon = "refresh", label = "Update system",
-          desc = "apt update + upgrade in chroot",
+        { icon = "refresh", label = "Package maintenance",
+          desc = "Update, upgrade or clean the XFCE image package cache",
+          action = function()
+              if sm.push("hub_apt", {tab = "SYSTEM"}) then
+                  return "Opening package maintenance..."
+              end
+              return "APT maintenance unavailable"
+          end },
+        { icon = "terminal", label = "Shell terminal",
+          desc = "Open the non-blocking local service terminal",
+          action = function()
+              if sm.push("hub_shell", {}) then return "Opening shell..." end
+              return "Shell unavailable"
+          end },
+        { icon = "pkg", label = "Install htop",
+          desc = "Interactive process viewer in the XFCE image",
           action = function(scene)
-              scene.set_status("Updating...")
-              bridge.call("apt_update", {}, function(resp)
+              scene.set_status("Installing htop...")
+              bridge.call("job_start", {
+                  apt_action = "install", packages = {"htop"},
+                  name = "apt: htop", hub = "forge",
+              }, function(resp)
+                  scene.set_status(resp.ok and
+                      ("Job #" .. tostring(resp.job.id) .. " started")
+                      or ("Install: " .. (resp.error or "failed")))
+              end)
+              return "Installing htop..."
+          end },
+        { icon = "pkg", label = "Install ncdu",
+          desc = "Disk usage analyser in the XFCE image",
+          action = function(scene)
+              scene.set_status("Installing ncdu...")
+              bridge.call("job_start", {
+                  apt_action = "install", packages = {"ncdu"},
+                  name = "apt: ncdu", hub = "forge",
+              }, function(resp)
+                  scene.set_status(resp.ok and
+                      ("Job #" .. tostring(resp.job.id) .. " started")
+                      or ("Install: " .. (resp.error or "failed")))
+              end)
+              return "Installing ncdu..."
+          end },
+        { icon = "pkg", label = "Install ffmpeg",
+          desc = "Audio/video toolkit in the XFCE image",
+          action = function(scene)
+              scene.set_status("Installing ffmpeg...")
+              bridge.call("job_start", {
+                  apt_action = "install", packages = {"ffmpeg"},
+                  name = "apt: ffmpeg", hub = "forge",
+              }, function(resp)
+                  scene.set_status(resp.ok and
+                      ("Job #" .. tostring(resp.job.id) .. " started")
+                      or ("Install: " .. (resp.error or "failed")))
+              end)
+              return "Installing ffmpeg..."
+          end },
+        { icon = "pkg", label = "Install curl",
+          desc = "HTTP client in the XFCE image",
+          action = function(scene)
+              scene.set_status("Installing curl...")
+              bridge.call("job_start", {
+                  apt_action = "install", packages = {"curl"},
+                  name = "apt: curl", hub = "forge",
+              }, function(resp)
+                  scene.set_status(resp.ok and
+                      ("Job #" .. tostring(resp.job.id) .. " started")
+                      or ("Install: " .. (resp.error or "failed")))
+              end)
+              return "Installing curl..."
+          end },
+        { icon = "download", label = "Check Void Desk releases",
+          desc = "Read the latest public GitHub release metadata",
+          action = function(scene)
+              scene.set_status("Checking GitHub releases...")
+              bridge.call("gh_fetch_releases", {}, function(resp)
                   if resp.ok then
-                      scene.set_status("System updated")
+                      scene.set_status(resp.tag and ("Latest: " .. resp.tag)
+                          or "No published releases yet")
                   else
-                      scene.set_status("Update: " .. (resp.error or resp.reason or "failed"))
+                      scene.set_status("Release check: " .. (resp.error or "failed"))
                   end
               end)
-              return "Updating..."
+              return "Checking releases..."
           end },
-        { icon = "trash", label = "Clean apt cache",
-          desc = "Run safe APT cache cleanup inside the XFCE image",
-          action = function() sm.push("hub_apt", {tab = "SYSTEM"}) end },
-        { icon = "terminal", label = "Shell terminal",
-          desc = "Open a terminal with on-screen keyboard",
-          action = function() sm.push("hub_shell", {}) end },
-        { icon = "pkg", label = "Install htop",
-
-          desc = "Interactive process viewer (apt in XFCE chroot)",
-
-          action = function(scene)
-
-              local cmd = "sh bin/vd_apt_install.sh htop"
-
-              bridge.call("job_start", { cmd = cmd, name = "apt: htop", hub = "forge" },
-
-                function(resp)
-
-                  if resp.ok then
-
-                    scene.set_status("Installing htop (see SELECT overlay)")
-
-                  else
-
-                    scene.set_status("Install: " .. (resp.error or "failed"))
-
-                  end
-
-                end)
-
-              return "Installing htop..."
-
+        { icon = "terminal", label = "Shell & CLI tools",
+          desc = "Open the shell for supported command-line utilities",
+          action = function()
+              if sm.push("hub_shell", {}) then return "Opening shell..." end
+              return "Shell unavailable"
           end },
-
-        { icon = "pkg", label = "Install ncdu",
-
-          desc = "Disk usage analyser (apt in XFCE chroot)",
-
-          action = function(scene)
-
-              local cmd = "sh bin/vd_apt_install.sh ncdu"
-
-              bridge.call("job_start", { cmd = cmd, name = "apt: ncdu", hub = "forge" },
-
-                function(resp)
-
-                  if resp.ok then
-
-                    scene.set_status("Installing ncdu (see SELECT overlay)")
-
-                  else
-
-                    scene.set_status("Install: " .. (resp.error or "failed"))
-
-                  end
-
-                end)
-
-              return "Installing ncdu..."
-
-          end },
-
-        { icon = "pkg", label = "Install ffmpeg",
-
-          desc = "Audio/video codec toolkit (apt in XFCE chroot)",
-
-          action = function(scene)
-
-              local cmd = "sh bin/vd_apt_install.sh ffmpeg"
-
-              bridge.call("job_start", { cmd = cmd, name = "apt: ffmpeg", hub = "forge" },
-
-                function(resp)
-
-                  if resp.ok then
-
-                    scene.set_status("Installing ffmpeg (see SELECT overlay)")
-
-                  else
-
-                    scene.set_status("Install: " .. (resp.error or "failed"))
-
-                  end
-
-                end)
-
-              return "Installing ffmpeg..."
-
-          end },
-
-        { icon = "pkg", label = "Install curl",
-
-          desc = "HTTP client (apt in XFCE chroot)",
-
-          action = function(scene)
-
-              local cmd = "sh bin/vd_apt_install.sh curl"
-
-              bridge.call("job_start", { cmd = cmd, name = "apt: curl", hub = "forge" },
-
-                function(resp)
-
-                  if resp.ok then
-
-                    scene.set_status("Installing curl (see SELECT overlay)")
-
-                  else
-
-                    scene.set_status("Install: " .. (resp.error or "failed"))
-
-                  end
-
-                end)
-
-              return "Installing curl..."
-
-          end },
-
-        { icon = "pkg", label = "Void Installer", desc = "Install/reinstall software (L1: tabs)", action = function(s) s.set_status("Opening installer..."); bridge.call("comp_install", {}, function(r) s.set_status(r.ok and (r.note or "ready") or ("err: " .. (r.error or "?"))) end); return "Installer..." end },
-        { icon = "start", label = "Startup apps", desc = "Programs that boot with the desktop", action = function(s) s.set_status("Opening startup..."); bridge.call("comp_autostart", {}, function(r) s.set_status(r.ok and (r.note or "ready") or ("err: " .. (r.error or "?"))) end); return "Startup..." end },
-        { icon = "refresh", label = "Update Environments", desc = "apt update + upgrade", action = function(s) s.set_status("Updating..."); bridge.call("apt_update", {}, function(r) s.set_status(r.ok and "updated" or ("err: " .. (r.error or r.reason or "?"))) end); return "Updating..." end },
-        { icon = "download", label = "Void-Desk Update", desc = "GitHub releases", action = function(s) s.set_status("Checking GitHub..."); bridge.call("gh_fetch_releases", {}, function(r) s.set_status(r.ok and ("latest: " .. (r.tag or "?")) or ("err: " .. (r.error or "?"))) end); return "Checking..." end },
-        { icon = "terminal", label = "CLI Shooter", desc = "Terminal tools", action = function(s) s.set_status("Opening CLI..."); bridge.call("clihub_list", {}, function(r) s.set_status(r.ok and (r.note or "ready") or ("err: " .. (r.error or "?"))) end); return "CLI..." end },
         { icon = "back", label = "Back",
           desc = "Return to Nexus",
           action = function() sm.back() end },
+
     },
 })

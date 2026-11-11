@@ -43,8 +43,9 @@ Some screens exist, but several actions are placeholders or do not yet have a wo
 These bridge endpoints are not implemented yet:
 
 - muOS app discovery/launch: `list_muos_apps`, `launch_muos_app`
-- GitHub release feed: `gh_fetch_releases`
 - IPTV playlist and EPG loading: `iptv_load_playlist`, `iptv_load_epg`
+
+The GitHub release lookup is now served by `gh_fetch_releases` with a bounded request and an explicit empty-catalogue state. THE FORGE no longer calls the legacy `comp_install`, `comp_autostart`, or `clihub_list` commands: package work is routed through the native APT manager, the shell route opens the supported LÖVE PTY, and XFCE launch uses the muOS session hand-off.
 
 A screen can render in CI while its service action remains unavailable. Keep these gaps separate from visual test coverage and report them honestly in the UI.
 
@@ -58,7 +59,7 @@ A screen can render in CI while its service action remains unavailable. Keep the
 - Workshop diagnostics, live monitor, logs and cleanup are incomplete.
 - Media Library and Radio flows need parity work.
 - Desktop repair is a placeholder.
-- Some Forge actions call service commands that are not yet implemented.
+- The legacy Pygame component installer/autostart pages do not yet have native LÖVE equivalents; they are not exposed as live LÖVE actions.
 - Tool-specific UI and confirmation/error states still need validation on handheld hardware.
 
 The Settings screen can change the configured engine. The choice is applied after restarting the application. Use Pygame for normal use; switch to LÖVE only when deliberately testing the prototype.
