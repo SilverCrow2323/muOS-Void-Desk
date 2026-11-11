@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/schemas/voiddesk-plugin.schema.json",
+  "title": "Void Desk Official Plugin Manifest",
+  "description": "Maintainer-published plugin manifest. A valid manifest alone does not establish trust; signature and catalog allowlisting are mandatory at install time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifestVersion",
+    "id",
+    "name",
+    "version",
+    "publisher",
+    "compatibility",
+    "capabilities",
+    "artifact",
+    "signature"
+  ],
+  "properties": {
+    "manifestVersion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]{2,63}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayName"
+      ],
+      "properties": {
+        "id": {
+          "const": "voiddesk-official"
+        },
+        "displayName": {
+          "const": "Void Desk Official"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimumVoidDeskVersion",
+        "engines"
+      ],
+      "properties": {
+        "minimumVoidDeskVersion": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "maximumVoidDeskVersion": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "engines": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "py",
+              "love"
+            ]
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "muos",
+              "knulli",
+              "rocknix",
+              "custom",
+              "desktop"
+            ]
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "ui.panel",
+          "ui.menu-entry",
+          "device.read-status",
+          "network.read-status",
+          "media.read-state",
+          "storage.user-data"
+        ]
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "read-device-status",
+          "read-network-status",
+          "read-media-state",
+          "read-user-selected-files",
+          "write-plugin-private-data"
+        ]
+      }
+    },
+    "entrypoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pygame": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_./-]{1,128}$"
+        },
+        "love": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_./-]{1,128}$"
+        }
+      }
+    },
+    "settingsSchema": {
+      "type": "object",
+      "description": "JSON Schema describing non-secret plugin settings."
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "sha256",
+        "sizeBytes"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 52428800
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "description": "Detached signature metadata supplied by the official release pipeline.",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "keyId",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "enum": [
+            "ed25519"
+          ]
+        },
+        "keyId": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    }
+  }
+}
