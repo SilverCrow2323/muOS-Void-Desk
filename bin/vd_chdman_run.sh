@@ -11,6 +11,7 @@ LOG="$DATA/chd_op.log"
 DONE="$DATA/.chd_done"
 shift 0
 ARGS="$*"
+PY3="$(command -v python3)"
 
 . "$APP_DIR/bin/vd_mount_common.sh"
 MNTED() { vd_mount_present "$APP_DIR" "$1"; }
@@ -60,22 +61,58 @@ WE_MOUNTED_PROC=0
 WE_MOUNTED_SYS=0
 WE_MOUNTED_MMC=0
 WE_MOUNTED_SDCARD=0
+
+UNMOUNT_OWNED() {
+	_path=$1
+	MNTED "$_path"
+	_state=$?
+	if [ "$_state" -eq 0 ]; then
+		if ! umount "$_path" 2>/dev/null; then
+			umount -l "$_path" 2>/dev/null || true
+		fi
+		MNTED "$_path"
+		_after=$?
+		if [ "$_after" -ne 1 ]; then
+			echo "$(date) cleanup non verificato: $_path" >>"$LOG"
+			RC=1
+		fi
+	elif [ "$_state" -gt 1 ]; then
+		echo "$(date) impossibile verificare cleanup: $_path" >>"$LOG"
+		RC=1
+	fi
+}
+
+ABORT_SETUP() {
+	echo "$(date) preparazione mount fallita; chdman annullato" >>"$LOG"
+	echo "1" >"$DONE"
+	if [ "$WE_MOUNTED" = 1 ]; then
+		PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
+			"$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.umount_tree(sys.argv[1], sys.argv[2]) else 1)' \
+			"$MNT" "$IMG" >>"$LOG" 2>&1
+		[ "$?" -eq 0 ] || echo "$(date) cleanup immagine incompleto" >>"$LOG"
+	else
+		[ "$WE_MOUNTED_MMC" = 1 ] && UNMOUNT_OWNED "$MNT/mnt/mmc"
+		[ "$WE_MOUNTED_SDCARD" = 1 ] && UNMOUNT_OWNED "$MNT/mnt/sdcard"
+		[ "$WE_MOUNTED_PROC" = 1 ] && UNMOUNT_OWNED "$MNT/proc"
+		[ "$WE_MOUNTED_SYS" = 1 ] && UNMOUNT_OWNED "$MNT/sys"
+		[ "$WE_MOUNTED_DEV" = 1 ] && UNMOUNT_OWNED "$MNT/dev"
+	fi
+	exit 1
+}
+
 if ! MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev"; then
 	echo "$(date) stato mount /dev non valido; chdman annullato" >>"$LOG"
-	echo "1" >"$DONE"
-	exit 1
+	ABORT_SETUP()
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_DEV=1
 if ! MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc"; then
 	echo "$(date) stato mount /proc non valido; chdman annullato" >>"$LOG"
-	echo "1" >"$DONE"
-	exit 1
+	ABORT_SETUP()
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PROC=1
 if ! MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys"; then
 	echo "$(date) stato mount /sys non valido; chdman annullato" >>"$LOG"
-	echo "1" >"$DONE"
-	exit 1
+	ABORT_SETUP()
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SYS=1
 
@@ -86,9 +123,12 @@ for D in /mnt/mmc /mnt/sdcard; do
 	mkdir -p "$MNT$D"
 	MOUNT_IF_NEEDED "$MNT$D" mount -o bind "$D" "$MNT$D" || {
 		echo "$(date) stato mount non valido: $MNT$D; chdman annullato" >>"$LOG"
-		echo "1" >"$DONE"
-		exit 1
+		ABORT_SETUP()
 	}
+	case "$D" in
+		/mnt/mmc) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_MMC=1 ;;
+		/mnt/sdcard) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SDCARD=1 ;;
+	esac
 done
 
 echo "$(date) === chdman $ARGS ===" >>"$LOG"
@@ -98,14 +138,20 @@ chroot "$MNT" /usr/bin/env \
 RC=$?
 echo "$(date) chdman terminato (rc=$RC)" >>"$LOG"
 
-[ "$WE_MOUNTED_MMC" = 1 ] && { MNTED "$MNT/mnt/mmc" && umount "$MNT/mnt/mmc" 2>/dev/null; }
-[ "$WE_MOUNTED_SDCARD" = 1 ] && { MNTED "$MNT/mnt/sdcard" && umount "$MNT/mnt/sdcard" 2>/dev/null; }
-[ "$WE_MOUNTED_PROC" = 1 ] && { MNTED "$MNT/proc" && umount "$MNT/proc" 2>/dev/null; }
-[ "$WE_MOUNTED_SYS" = 1 ] && { MNTED "$MNT/sys" && umount "$MNT/sys" 2>/dev/null; }
-[ "$WE_MOUNTED_DEV" = 1 ] && { MNTED "$MNT/dev" && umount "$MNT/dev" 2>/dev/null; }
 if [ "$WE_MOUNTED" = 1 ]; then
-	sleep 0.3
-	umount "$MNT" 2>/dev/null || umount -l "$MNT" 2>/dev/null
+	PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
+		"$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.umount_tree(sys.argv[1], sys.argv[2]) else 1)' \
+		"$MNT" "$IMG" >>"$LOG" 2>&1
+	if [ "$?" -ne 0 ]; then
+		echo "$(date) cleanup immagine incompleto" >>"$LOG"
+		RC=1
+	fi
+else
+	[ "$WE_MOUNTED_MMC" = 1 ] && UNMOUNT_OWNED "$MNT/mnt/mmc"
+	[ "$WE_MOUNTED_SDCARD" = 1 ] && UNMOUNT_OWNED "$MNT/mnt/sdcard"
+	[ "$WE_MOUNTED_PROC" = 1 ] && UNMOUNT_OWNED "$MNT/proc"
+	[ "$WE_MOUNTED_SYS" = 1 ] && UNMOUNT_OWNED "$MNT/sys"
+	[ "$WE_MOUNTED_DEV" = 1 ] && UNMOUNT_OWNED "$MNT/dev"
 fi
 echo "$RC" >"$DONE"
 exit $RC
