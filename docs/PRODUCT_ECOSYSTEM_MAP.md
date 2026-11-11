@@ -259,13 +259,13 @@ LÖVE is the next engineering focus. Pygame remains the behavioural reference, b
 - Palette system: `love/theme/`.
 - Python local service bridge: `love/core/bridge.lua` ↔ `service/voiddesk_service.py`.
 - Current NEXUS catalogue contains 10 visible nodes, including End Session.
-- Automated LÖVE capture currently enumerates 25 scenes. This proves that those scenes can be entered and rendered in the capture environment; it does not prove every action works or that hardware-specific behaviour is correct.
+- Automated LÖVE capture currently enumerates 26 scenes. This proves that those scenes can be entered and rendered in the capture environment; it does not prove every action works or that hardware-specific behaviour is correct.
 - The current action audit checks all static scene routes and visible NEXUS destinations, checks the service registration of bridge commands, and has focused action checks for Session, Forge, Workshop, Toolbox and MUOS APPS. It is not yet a complete semantic audit of every selectable row in every hub.
 - A source-based, node-by-node status register is maintained in [LÖVE Frontend Gap Register](LOVE_FRONTEND_GAP_REGISTER.md).
 
 ### Verified gaps and boundaries
 
-- MEDIA VAULT still contains two non-functional rows: Void Radio and Media Library. Their current callbacks only publish a temporary status string; neither starts playback nor opens a library. These are the first LÖVE feature gaps to implement.
+- MEDIA VAULT now has a dedicated LÖVE Void Radio scene with an allowlisted station catalogue and a background audio-only mpv service path. Media Library remains a non-functional placeholder and is the next media feature gap to implement.
 - MUOS APPS now has service handlers for discovery and launch. Static tests verify that the scene calls both handlers and that the shell launcher validates the hand-off path. Real RG35XX-H testing is still required.
 - INFO and FORGE use the registered `gh_fetch_releases` handler. The handler performs a bounded public release lookup and returns explicit errors; network/offline behaviour still needs device testing.
 - IPTV has service handlers for playlist, EPG, play, stop and status. The LÖVE scene implements channel selection, group filtering and favourites. Playback still depends on the media player being installed and available on the target device.
