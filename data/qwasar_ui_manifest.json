@@ -534,6 +534,39 @@
         "compact-mode"
       ],
       "minUiApi": "1.0"
+    },
+    {
+      "id": "surface.overlay",
+      "kind": "surface",
+      "stateModel": "stateful",
+      "slots": [
+        "content",
+        "actions"
+      ],
+      "customizable": [
+        "tone",
+        "backdrop",
+        "dismissPolicy",
+        "layer"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.chart",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [
+        "legend",
+        "tooltip"
+      ],
+      "customizable": [
+        "series",
+        "axes",
+        "range",
+        "legend",
+        "grid"
+      ],
+      "minUiApi": "1.0"
     }
   ],
   "shell": {
