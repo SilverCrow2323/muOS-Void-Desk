@@ -51,6 +51,18 @@ except Exception:
     [ -z "$ENGINE" ] && ENGINE="love"
     echo "$(date) engine: $ENGINE" >>"$LOG"
 
+    # Build one engine-neutral profile snapshot for both Pygame and LÖVE.
+    # The resolver is read-only with respect to the source manifest/profile.
+    if [ -f "$APP_DIR/tools/qwasar_profile_resolver.py" ]; then
+        python3 "$APP_DIR/tools/qwasar_profile_resolver.py" \
+            --root "$APP_DIR" \
+            --output "$DATA/qwasar_effective_profile.json" >>"$LOG" 2>&1
+        PROFILE_RC=$?
+        if [ "$PROFILE_RC" -ne 0 ]; then
+            echo "$(date) QWASAR profile preflight failed (rc=$PROFILE_RC); continuing with legacy frontend defaults" >>"$LOG"
+        fi
+    fi
+
     # The py engine needs a bootstrapped pygame runtime (desk/../runtime).
     # If it was never built (or got wiped), build it now instead of
     # crashing; if that's not possible (offline, download failure, etc.)
