@@ -253,3 +253,65 @@ def test_media_library_handlers_are_registered():
     assert service.HANDLERS["media_list"] is service.h_media_list
     assert service.HANDLERS["media_play"] is service.h_media_play
     assert service.HANDLERS["media_stop"] is service.h_media_stop
+
+
+def test_media_play_uses_argument_list_and_selects_audio_mode(tmp_path, monkeypatch):
+    service = load_service()
+    root = tmp_path / "sd"
+    root.mkdir()
+    track = root / "track.flac"
+    track.write_bytes(b"audio")
+    monkeypatch.setattr(service, "MEDIA_ROOTS", (root,))
+    monkeypatch.setattr(service.shutil, "which", lambda name: "/usr/bin/mpv")
+    spawned = {}
+
+    class FakeProcess:
+        pid = 123
+        def poll(self):
+            return None
+        def terminate(self):
+            pass
+        def wait(self, timeout=None):
+            return 0
+
+    def fake_popen(args, **kwargs):
+        spawned["args"] = args
+        spawned["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(service.subprocess, "Popen", fake_popen)
+    result = service.h_media_play({"path": str(track)})
+    assert result["ok"] is True
+    assert spawned["args"] == [
+        "/usr/bin/mpv", "--no-terminal", "--no-video", str(track)
+    ]
+    assert "shell" not in spawned["kwargs"]
+
+
+def test_media_play_uses_video_window_for_video_files(tmp_path, monkeypatch):
+    service = load_service()
+    root = tmp_path / "sd"
+    root.mkdir()
+    video = root / "clip.mp4"
+    video.write_bytes(b"video")
+    monkeypatch.setattr(service, "MEDIA_ROOTS", (root,))
+    monkeypatch.setattr(service.shutil, "which", lambda name: "/usr/bin/mpv")
+    spawned = {}
+
+    class FakeProcess:
+        pid = 124
+        def poll(self):
+            return None
+        def terminate(self):
+            pass
+        def wait(self, timeout=None):
+            return 0
+
+    monkeypatch.setattr(
+        service.subprocess, "Popen",
+        lambda args, **kwargs: (spawned.update(args=args, kwargs=kwargs) or FakeProcess()),
+    )
+    result = service.h_media_play({"path": str(video)})
+    assert result["ok"] is True
+    assert "--force-window=yes" in spawned["args"]
+    assert "--no-video" not in spawned["args"]
