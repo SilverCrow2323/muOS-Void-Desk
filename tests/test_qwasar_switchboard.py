@@ -190,3 +190,46 @@ def test_reset_command_can_recover_a_corrupt_profile_and_back_it_up(tmp_path: Pa
     assert Path(str(profile_path) + ".bak").read_text(encoding="utf-8") == "{ broken json"
     recovered = QwasarSwitchboard(root, profile_path)
     assert recovered.preview()["profileId"] == "qwasar.profile.voiddesk.handheld-default"
+
+def test_menu_entries_can_be_hidden_shown_and_reordered_in_workspace_or_section(tmp_path: Path):
+    switchboard, _ = _switchboard(tmp_path)
+    switchboard.set_menu_entry_visibility("rt-toolbox", "toolbox.inspector", False)
+    workspace_menu = next(
+        item for item in switchboard.preview()["workspaces"]
+        if item["id"] == "rt-toolbox"
+    )["menu"]
+    inspector = next(item for item in workspace_menu if item["id"] == "toolbox.inspector")
+    assert inspector["visible"] is False
+
+    switchboard.set_menu_entry_visibility("rt-toolbox", "toolbox.inspector", True)
+    workspace_menu = next(
+        item for item in switchboard.preview()["workspaces"]
+        if item["id"] == "rt-toolbox"
+    )["menu"]
+    inspector = next(item for item in workspace_menu if item["id"] == "toolbox.inspector")
+    assert inspector["visible"] is True
+
+    switchboard.move_menu_entry(
+        "rt-toolbox", "toolbox.backup", 0, section_id="toolbox.files-storage"
+    )
+    toolbox = next(
+        item for item in switchboard.preview()["workspaces"]
+        if item["id"] == "rt-toolbox"
+    )
+    files = next(
+        item for item in toolbox["sections"]
+        if item["id"] == "toolbox.files-storage"
+    )
+    assert files["menu"][0]["id"] == "toolbox.backup"
+
+
+def test_menu_entries_inside_end_node_cannot_be_hidden(tmp_path: Path):
+    switchboard, _ = _switchboard(tmp_path)
+    with pytest.raises(SwitchboardError, match="protected"):
+        switchboard.set_menu_entry_visibility("end-node", "exit.poweroff", False)
+
+
+def test_switchboard_rejects_unknown_menu_entry_ids(tmp_path: Path):
+    switchboard, _ = _switchboard(tmp_path)
+    with pytest.raises(SwitchboardError, match="unknown menu entry"):
+        switchboard.set_menu_entry_visibility("rt-toolbox", "menu.not-registered", False)
