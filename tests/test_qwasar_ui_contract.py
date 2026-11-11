@@ -219,6 +219,7 @@ def test_inspector_and_switchboard_have_separate_safe_responsibilities():
     assert "enable" in tools["qwasar.switchboard"]["actions"]
     assert "disable" in tools["qwasar.switchboard"]["actions"]
     assert "shell.core" in management["protectedAreas"]
+    assert "end-node" in management["protectedAreas"]
 
 def test_portable_profile_schema_validates_data_only_layout_and_feature_overrides():
     schema_path = ROOT / "schemas" / "qwasar-profile.schema.json"
@@ -233,6 +234,10 @@ def test_portable_profile_schema_validates_data_only_layout_and_feature_override
     assert "bindings" in profile
     assert "enginePreference" not in profile
     assert "installPath" not in profile
+    profile["settings"] = {"panel": {"density": "compact"}}
+    jsonschema.Draft202012Validator(schema).validate(profile)
+    profile["settings"] = {"apiToken": "must-not-be-exported"}
+    assert not jsonschema.Draft202012Validator(schema).is_valid(profile)
 
 
 def test_profile_separates_disabled_from_hidden_contributions():
@@ -279,4 +284,21 @@ def test_declarative_modules_cannot_smuggle_module_code_handlers():
         "capability": "device.shell.root",
         "permission": "root-shell",
     }]
+    assert not jsonschema.Draft202012Validator(schema).is_valid(forged)
+
+
+def test_executable_module_entrypoints_must_be_relative_and_cannot_traverse():
+    import copy
+
+    schema = json.loads(
+        (ROOT / "schemas" / "qwasar-module.schema.json").read_text(encoding="utf-8")
+    )
+    module = json.loads(
+        (ROOT / "data" / "examples" / "qwasar-wifi-overview.module.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    forged = copy.deepcopy(module)
+    forged["kind"] = "executable"
+    forged["entrypoints"] = {"love": "../outside.lua"}
     assert not jsonschema.Draft202012Validator(schema).is_valid(forged)
