@@ -37,3 +37,29 @@ def test_workshop_actions_are_connected_to_real_tools():
     assert 'sm.push("hub_monitor"' in workshop
     assert 'sm.push("hub_apt", {tab = "SYSTEM"})' in workshop
     assert 'sm.push("hub_apt", {tab = "JOBS"})' in workshop
+
+
+def test_forge_bridge_calls_are_registered_and_legacy_dead_rows_are_gone():
+    forge = (ROOT / "love" / "scenes" / "hub_forge.lua").read_text(
+        encoding="utf-8"
+    )
+    service = (ROOT / "service" / "voiddesk_service.py").read_text(
+        encoding="utf-8"
+    )
+    registered = {
+        line.strip().split('"')[1]
+        for line in service.splitlines()
+        if line.strip().startswith('"') and '": h_' in line
+    }
+    called = set()
+    for line in forge.splitlines():
+        if 'bridge.call("' in line:
+            called.add(line.split('bridge.call("', 1)[1].split('"', 1)[0])
+    assert called <= registered, (
+        "Forge calls missing service handlers: "
+        + ", ".join(sorted(called - registered))
+    )
+    for stale in ("comp_install", "comp_autostart", "clihub_list"):
+        assert stale not in forge
+    assert 'bridge.call("session_launch", {id = "xfce"}' in forge
+    assert 'apt_action = "install"' in forge
