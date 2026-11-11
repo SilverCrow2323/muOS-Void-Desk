@@ -209,28 +209,7 @@
         "pattern": "^(?!.*(?:password|secret|token|credential|private[_-]?key|api[_-]?key|install[_-]?path|filesystem[_-]?path)).+$"
       },
       "additionalProperties": {
-        "oneOf": [
-          {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
-          {
-            "type": "array",
-            "maxItems": 64,
-            "items": {
-              "type": [
-                "string",
-                "number",
-                "boolean",
-                "null"
-              ]
-            }
-          }
-        ]
+        "$ref": "#/$defs/safeSettingValue"
       }
     }
   },
@@ -478,6 +457,35 @@
           }
         }
       }
+    },
+    "safeSettingValue": {
+      "oneOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/safeSettingValue"
+          }
+        },
+        {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "pattern": "^(?!.*(?:password|secret|token|credential|private[_-]?key|api[_-]?key|install[_-]?path|filesystem[_-]?path)).+$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/safeSettingValue"
+          }
+        }
+      ]
     }
   }
 }
