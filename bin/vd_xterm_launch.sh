@@ -82,7 +82,7 @@ UNMOUNT_OWNED() {
 	fi
 }
 
-ABORT_SETUP {
+ABORT_SETUP() {
 	echo "$(date) preparazione mount fallita; chroot annullato" >>"$LOG"
 	if [ "$WE_MOUNTED" = 1 ]; then
 		PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
