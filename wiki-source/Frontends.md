@@ -42,10 +42,11 @@ Some screens exist, but several actions are placeholders or do not yet have a wo
 
 These bridge endpoints are not implemented yet:
 
-- muOS app discovery/launch: `list_muos_apps`, `launch_muos_app`
 - IPTV playlist and EPG loading: `iptv_load_playlist`, `iptv_load_epg`
 
-The GitHub release lookup is now served by `gh_fetch_releases` with a bounded request and an explicit empty-catalogue state. THE FORGE no longer calls the legacy `comp_install`, `comp_autostart`, or `clihub_list` commands: package work is routed through the native APT manager, the shell route opens the supported LÖVE PTY, and XFCE launch uses the muOS session hand-off.
+MUOS app discovery and launch now use the fixed SD1/SD2 application roots, a live selectable list, and the shared `.muos_app` hand-off marker. The shell launcher validates the selected app path again before executing its `mux_launch.sh` and relaunches Void Desk when the child application exits.
+
+The GitHub release lookup is served by `gh_fetch_releases` with a bounded request and an explicit empty-catalogue state. THE FORGE no longer calls the legacy `comp_install`, `comp_autostart`, or `clihub_list` commands: package work is routed through the native APT manager, the shell route opens the supported LÖVE PTY, and XFCE launch uses the muOS session hand-off.
 
 A screen can render in CI while its service action remains unavailable. Keep these gaps separate from visual test coverage and report them honestly in the UI.
 
