@@ -183,7 +183,7 @@ Install the generated PC package with `sudo apt install ./dist/voiddesk_VERSION_
 
 ## Web browsers on muOS
 
-QWASAR's optional desktop browsers run inside the **XFCE environment**. NetSurf (`netsurf-gtk`), Falkon (`falkon`) and Dillo (`dillo`) are package choices for the separate Ubuntu desktop image; they are not browser binaries installed directly into the muOS host.
+Void Desk's optional desktop browsers run inside the **XFCE environment**. NetSurf (`netsurf-gtk`), Falkon (`falkon`) and Dillo (`dillo`) are package choices for the separate Ubuntu desktop image; they are not browser binaries installed directly into the muOS host.
 
 To use one:
 
