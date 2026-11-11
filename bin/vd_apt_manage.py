@@ -4,6 +4,7 @@ import fcntl
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,36 @@ import imgmount  # noqa: E402
 def fail(message, code=2):
     print(message, file=sys.stderr)
     return code
+
+
+def open_lock_file():
+    """Open the APT lock without following links or truncating existing data."""
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise OSError("safe lock-file flags are unavailable")
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        directory_flags |= os.O_CLOEXEC
+    directory_fd = os.open(str(DATA), directory_flags)
+    try:
+        lock_flags = os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            lock_flags |= os.O_CLOEXEC
+        lock_fd = os.open(LOCK.name, lock_flags, 0o600, dir_fd=directory_fd)
+    finally:
+        os.close(directory_fd)
+
+    try:
+        info = os.fstat(lock_fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise OSError("APT lock is not a standalone regular file")
+        if info.st_uid != os.geteuid():
+            raise OSError("APT lock is owned by a different user")
+        os.fchmod(lock_fd, 0o600)
+        return os.fdopen(lock_fd, "r+")
+    except Exception:
+        os.close(lock_fd)
+        raise
 
 
 def main(argv):
@@ -54,7 +85,12 @@ def main(argv):
     if not (DATA / ".xfce_ready").is_file() or not IMAGE.is_file():
         return fail("XFCE image is not installed")
     DATA.mkdir(parents=True, exist_ok=True)
-    with open(LOCK, "w") as lock:
+    try:
+        lock_file = open_lock_file()
+    except OSError as exc:
+        return fail("cannot open APT lock safely: " + (exc.strerror or str(exc)), 1)
+
+    with lock_file as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
