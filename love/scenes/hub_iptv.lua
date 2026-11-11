@@ -27,9 +27,9 @@ local function ensure_loaded()
             if ok then
                 status_msg = string.format("%d channels loaded", resp.count or 0)
                 -- then try to load EPG
-                if (resp.epg_urls and #resp.epg_urls > 0) or
-                    (cfg.epg_urls and #cfg.epg_urls > 0) then
-                    local urls = cfg.epg_urls or resp.epg_urls
+                local urls = iptv.select_epg_urls(
+                    cfg and cfg.epg_urls, resp and resp.epg_urls)
+                if #urls > 0 then
                     status_msg = "Loading EPG..."
                     iptv.load_epg(urls, function(r)
                         if r.ok then
