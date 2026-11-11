@@ -1,3 +1,4 @@
+import os
 import importlib.util
 from pathlib import Path
 
@@ -101,3 +102,92 @@ def test_apt_job_rejects_shell_metacharacters_and_unknown_actions(monkeypatch):
     bad_action = service.h_job_start({"apt_action": "dist-upgrade"})
     assert bad_package["ok"] is False
     assert bad_action["ok"] is False
+
+
+
+def load_manager_for_lock_tests():
+    script = ROOT / "bin" / "vd_apt_manage.py"
+    spec = importlib.util.spec_from_file_location("voiddesk_apt_lock_test", script)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def prepare_lock_manager(tmp_path, monkeypatch):
+    manager = load_manager_for_lock_tests()
+    data = tmp_path / "data"
+    data.mkdir()
+    image = data / "xfce.img"
+    image.write_bytes(b"test image")
+    (data / ".xfce_ready").write_text("ready")
+    monkeypatch.setattr(manager, "DATA", data)
+    monkeypatch.setattr(manager, "IMAGE", image)
+    monkeypatch.setattr(manager, "MOUNT", data / "xfce_mnt")
+    monkeypatch.setattr(manager, "LOCK", data / ".apt-manager.lock")
+    mount_calls = []
+    monkeypatch.setattr(manager.imgmount, "is_mounted", lambda _path: False)
+    monkeypatch.setattr(
+        manager.imgmount, "mount_img",
+        lambda *_args: (mount_calls.append("mount") or True, "")
+    )
+    monkeypatch.setattr(manager.imgmount, "umount_tree", lambda *_args: True)
+    return manager, data, mount_calls
+
+
+def test_apt_manager_refuses_symlink_lock_without_touching_target(
+        tmp_path, monkeypatch):
+    manager, _data, mount_calls = prepare_lock_manager(tmp_path, monkeypatch)
+    victim = tmp_path / "victim.txt"
+    victim.write_text("must remain unchanged")
+    manager.LOCK.symlink_to(victim)
+
+    assert manager.main(["clean"]) == 1
+    assert victim.read_text() == "must remain unchanged"
+    assert mount_calls == []
+
+
+def test_apt_manager_rejects_symlinked_data_directory(tmp_path, monkeypatch):
+    manager, data, mount_calls = prepare_lock_manager(tmp_path, monkeypatch)
+    linked_data = tmp_path / "data-link"
+    linked_data.symlink_to(data, target_is_directory=True)
+    monkeypatch.setattr(manager, "DATA", linked_data)
+    monkeypatch.setattr(manager, "LOCK", linked_data / ".apt-manager.lock")
+
+    assert manager.main(["clean"]) == 1
+    assert mount_calls == []
+
+
+def test_apt_manager_busy_lock_is_not_truncated(tmp_path, monkeypatch):
+    import fcntl
+
+    manager, _data, mount_calls = prepare_lock_manager(tmp_path, monkeypatch)
+    manager.LOCK.write_text("existing lock metadata")
+    with manager.LOCK.open("r+") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            assert manager.main(["clean"]) == 75
+        finally:
+            fcntl.flock(held.fileno(), fcntl.LOCK_UN)
+
+    assert manager.LOCK.read_text() == "existing lock metadata"
+    assert mount_calls == []
+
+
+def test_apt_manager_lock_has_private_permissions(tmp_path, monkeypatch):
+    manager, _data, _mount_calls = prepare_lock_manager(tmp_path, monkeypatch)
+    lock = manager.open_lock_file()
+    lock.close()
+
+    assert manager.LOCK.stat().st_mode & 0o777 == 0o600
+
+
+def test_apt_manager_rejects_hardlinked_lock(tmp_path, monkeypatch):
+    manager, _data, mount_calls = prepare_lock_manager(tmp_path, monkeypatch)
+    manager.LOCK.write_text("shared")
+    second_name = tmp_path / "other-link"
+    os.link(manager.LOCK, second_name)
+
+    assert manager.main(["clean"]) == 1
+    assert second_name.read_text() == "shared"
+    assert mount_calls == []
