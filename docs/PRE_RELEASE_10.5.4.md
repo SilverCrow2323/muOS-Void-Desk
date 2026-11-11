@@ -19,7 +19,7 @@ Deliver VoidDesk as a self-contained, controller-first control centre for Mustar
 | Area | Verified evidence | What it does not prove |
 |---|---|---|
 | Pygame visual capture | CI renders 103/103 declared render states, including native Syncthing management | Navigation reachability, correct actions, controller edge cases or device compatibility |
-| LÖVE visual capture | CI captures 25/25 registered scenes, including native Tailscale, Syncthing, diagnostics and monitor screens | Feature parity, service correctness or hardware operation |
+| LÖVE visual capture | CI captures 27/27 registered scenes, including native Tailscale, Syncthing, diagnostics and monitor screens | Feature parity, service correctness or hardware operation |
 | LÖVE Shell | Local service PTY endpoints and tests exist on the PR branch | Real muOS terminal usability, keyboard layout and lifecycle on handheld |
 | External tools | Registry-based discovery/launch and missing-tool reporting | Bundled submodule content is present in the final .muxapp |
 | APT | Native LÖVE APT Manager now provides Search, Installed, Jobs and System operations through a safe XFCE-image manager; CI baseline passed | Real muOS chroot search/install/remove/update/clean validation and failure recovery on hardware |
