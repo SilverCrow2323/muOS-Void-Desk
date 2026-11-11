@@ -154,3 +154,21 @@ def test_auto_discovery_remains_http_for_legacy_lan_servers(monkeypatch):
     assert len(found) == 1
     assert found[0]["host"] == "192.0.2.20"
     assert found[0]["scheme"] == "http"
+
+
+def test_legacy_http_client_does_not_require_optional_ssl_module(monkeypatch):
+    import builtins
+
+    module = load_module()
+    real_import = builtins.__import__
+
+    def without_ssl(name, *args, **kwargs):
+        if name == "ssl":
+            raise ImportError("ssl intentionally unavailable in this test")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", without_ssl)
+    client = module.PcClient("192.0.2.10", 8420, "secret")
+
+    assert client.scheme == "http"
+    assert client._ssl_context is None
