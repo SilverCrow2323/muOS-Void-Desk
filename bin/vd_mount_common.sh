@@ -2,9 +2,10 @@
 # Shared XFCE mount-state probe. Source this file, then call:
 #   vd_mount_present "$APP_DIR" "$mount_path"
 #
-# Return codes are deliberately fail-closed:
-#   0 = mounted (or unable to verify safely)
+# Return codes:
+#   0 = definitely mounted
 #   1 = definitely not mounted
+#   2 = state is unknown; callers must stop without mounting or chrooting
 vd_mount_present() {
     _vd_app_dir=$1
     _vd_mount_path=$2
@@ -14,8 +15,8 @@ vd_mount_present() {
         _vd_python="$(command -v python3 2>/dev/null || true)"
     fi
     if [ -z "$_vd_python" ]; then
-        echo "[mount] python3 unavailable; refusing to assume the image is unmounted" >&2
-        return 0
+        echo "[mount] python3 unavailable; mount state is unknown" >&2
+        return 2
     fi
 
     _vd_result=$(
@@ -37,8 +38,8 @@ print("mounted" if mounted else "unmounted")' \
     )
     _vd_status=$?
     if [ "$_vd_status" -ne 0 ]; then
-        echo "[mount] state check failed; refusing to stack another mount" >&2
-        return 0
+        echo "[mount] state check failed; refusing to change mount state" >&2
+        return 2
     fi
 
     case "$_vd_result" in
@@ -49,8 +50,36 @@ print("mounted" if mounted else "unmounted")' \
             return 1
             ;;
         *)
-            echo "[mount] unexpected state-check output; refusing to stack another mount" >&2
+            echo "[mount] unexpected state-check output; mount state is unknown" >&2
+            return 2
+            ;;
+    esac
+}
+
+# Ensure a path is mounted, but invoke the mount command only when the parser
+# positively reports it as unmounted. Unknown state is a hard stop.
+vd_mount_ensure() {
+    _vd_app_dir=$1
+    _vd_mount_path=$2
+    shift 2
+
+    vd_mount_present "$_vd_app_dir" "$_vd_mount_path"
+    _vd_state=$?
+    case "$_vd_state" in
+        0)
             return 0
+            ;;
+        1)
+            if [ "$#" -eq 0 ]; then
+                echo "[mount] missing mount command for $_vd_mount_path" >&2
+                return 2
+            fi
+            "$@"
+            return $?
+            ;;
+        *)
+            echo "[mount] refusing mount because state is unknown: $_vd_mount_path" >&2
+            return 2
             ;;
     esac
 }
