@@ -22,6 +22,7 @@ import termios
 import time
 import traceback
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -66,6 +67,15 @@ try:
     import tailscale_manager
 except Exception:
     tailscale_manager = None
+
+try:
+    import iptv_module
+    iptv_module.APP_DIR = APP_DIR
+except Exception:
+    iptv_module = None
+
+_IPTV_CHANNELS = []
+_IPTV_EPG = {}
 
 def log(msg):
     print(f"[service] {msg}", file=sys.stderr, flush=True)
