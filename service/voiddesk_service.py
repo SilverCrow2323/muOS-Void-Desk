@@ -67,6 +67,20 @@ try:
 except Exception:
     tailscale_manager = None
 
+try:
+    import iptv_module
+    iptv_module.APP_DIR = APP_DIR
+except Exception:
+    iptv_module = None
+
+_IPTV_CHANNELS = []
+_IPTV_EPG = {}
+_IPTV_ALLOWED_EPG_URLS = set()
+_IPTV_DEFAULT_CONFIG = {
+    "playlist_url": "https://iptv-org.github.io/iptv/countries/it.m3u",
+    "epg_urls": [],
+}
+
 def log(msg):
     print(f"[service] {msg}", file=sys.stderr, flush=True)
 
@@ -986,6 +1000,190 @@ def h_media_status(args):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+def _iptv_config():
+    """Read only the non-secret IPTV feed settings used by the LÖVE frontend."""
+    path = DATA / "iptv_config.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+
+    playlist_url = data.get("playlist_url")
+    try:
+        playlist_url = iptv_module.validate_feed_url(
+            playlist_url, resolve=False
+        ) if iptv_module is not None else None
+    except ValueError:
+        playlist_url = None
+    if not playlist_url:
+        playlist_url = _IPTV_DEFAULT_CONFIG["playlist_url"]
+
+    epg_urls = []
+    configured = data.get("epg_urls", [])
+    if isinstance(configured, list) and iptv_module is not None:
+        for candidate in configured[:8]:
+            try:
+                safe = iptv_module.validate_feed_url(candidate, resolve=False)
+            except (TypeError, ValueError):
+                continue
+            if safe not in epg_urls:
+                epg_urls.append(safe)
+
+    return {"playlist_url": playlist_url, "epg_urls": epg_urls}
+
+
+def h_iptv_get_config(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "config": dict(_IPTV_DEFAULT_CONFIG)}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+    return {"ok": True, "config": _iptv_config()}
+
+
+def h_iptv_load_playlist(args):
+    global _IPTV_CHANNELS, _IPTV_ALLOWED_EPG_URLS, _IPTV_EPG
+    if IS_VISUAL_CAPTURE:
+        _IPTV_CHANNELS = [
+            {"name": "News Fixture", "url": "https://stream.example.test/news.m3u8",
+             "tvg_id": "news.example.test", "tvg_name": "News Fixture",
+             "logo": "", "group": "News", "index": 0},
+            {"name": "Culture Fixture", "url": "https://stream.example.test/culture.m3u8",
+             "tvg_id": "culture.example.test", "tvg_name": "Culture Fixture",
+             "logo": "", "group": "Culture", "index": 1},
+        ]
+        _IPTV_ALLOWED_EPG_URLS = set()
+        _IPTV_EPG = {}
+        return {"ok": True, "channels": _IPTV_CHANNELS,
+                "groups": ["News", "Culture"], "epg_urls": [], "count": 2}
+
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+    url = args.get("url")
+    try:
+        safe_url = iptv_module.validate_feed_url(url)
+        playlist = iptv_module.fetch_text(safe_url, timeout=15)
+        parsed = iptv_module.parse_m3u(playlist)
+        _IPTV_CHANNELS = parsed["channels"]
+        _IPTV_ALLOWED_EPG_URLS = set(_iptv_config()["epg_urls"])
+        _IPTV_ALLOWED_EPG_URLS.update(parsed["epg_urls"])
+        _IPTV_EPG = {}
+        return {
+            "ok": True,
+            "channels": _IPTV_CHANNELS,
+            "groups": parsed["groups"],
+            "epg_urls": parsed["epg_urls"],
+            "count": len(_IPTV_CHANNELS),
+        }
+    except Exception as exc:
+        return {"ok": False, "error": "playlist load failed: " + str(exc)[:160]}
+
+
+def h_iptv_load_epg(args):
+    global _IPTV_EPG
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "channels_with_epg": 0, "programmes": 0}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+
+    requested = args.get("urls", [])
+    if not isinstance(requested, list):
+        return {"ok": False, "error": "EPG URLs must be a list"}
+    urls = []
+    for candidate in requested[:8]:
+        try:
+            safe = iptv_module.validate_feed_url(candidate)
+        except (TypeError, ValueError):
+            continue
+        if safe in _IPTV_ALLOWED_EPG_URLS and safe not in urls:
+            urls.append(safe)
+
+    if not urls:
+        _IPTV_EPG = {}
+        return {"ok": True, "channels_with_epg": 0, "programmes": 0}
+
+    merged = {}
+    total_programmes = 0
+    errors = []
+    for url in urls[:3]:
+        try:
+            payload = iptv_module.fetch_bytes(
+                url, timeout=20, max_bytes=iptv_module.MAX_EPG_BYTES
+            )
+            parsed = iptv_module.parse_xmltv(payload)
+            for key, programmes in parsed.items():
+                remaining = max(0, 50000 - total_programmes)
+                if remaining <= 0:
+                    break
+                selected = programmes[:remaining]
+                merged.setdefault(key, []).extend(selected)
+                total_programmes += len(selected)
+        except Exception as exc:
+            errors.append(str(exc)[:100])
+
+    for programmes in merged.values():
+        programmes.sort(key=lambda item: item["start"])
+        del programmes[1000:]
+
+    _IPTV_EPG = merged
+    return {
+        "ok": True,
+        "channels_with_epg": len(merged),
+        "programmes": total_programmes,
+        "warnings": errors[:3],
+    }
+
+
+def h_iptv_epg_for(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "now": None, "next": None}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+    channel = args.get("channel")
+    if not isinstance(channel, dict):
+        return {"ok": False, "error": "channel metadata is required"}
+    requested_url = channel.get("url")
+    if not any(item.get("url") == requested_url for item in _IPTV_CHANNELS):
+        return {"ok": False, "error": "channel is not in the active playlist"}
+    current, following = iptv_module.epg_now_next(_IPTV_EPG, channel)
+    return {"ok": True, "now": current, "next": following}
+
+
+def h_iptv_play(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "playback is disabled during visual capture"}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+    url = args.get("url")
+    channel = next(
+        (item for item in _IPTV_CHANNELS if item.get("url") == url),
+        None,
+    )
+    if channel is None:
+        return {"ok": False, "error": "channel is not in the active playlist"}
+    if not iptv_module.play(channel["url"], channel.get("name", "Live stream")):
+        state = iptv_module.status()
+        return {"ok": False, "error": state.get("error") or "mpv could not start"}
+    return {"ok": True, "state": "playing",
+            "channel": channel.get("name", "Live stream")}
+
+
+def h_iptv_stop(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "state": "idle"}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+    iptv_module.stop()
+    return {"ok": True, "state": iptv_module.status()["state"]}
+
+
+def h_iptv_status(args):
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+    return {"ok": True, **iptv_module.status()}
+
+
 def h_hotspot_toggle(args):
     dcheck = device_only("hotspot_toggle")
     if dcheck:
@@ -1598,6 +1796,13 @@ HANDLERS = {
     "job_cancel": h_job_cancel,
     "job_log": h_job_log,
     "media_status": h_media_status,
+    "iptv_get_config": h_iptv_get_config,
+    "iptv_load_playlist": h_iptv_load_playlist,
+    "iptv_load_epg": h_iptv_load_epg,
+    "iptv_epg_for": h_iptv_epg_for,
+    "iptv_play": h_iptv_play,
+    "iptv_stop": h_iptv_stop,
+    "iptv_status": h_iptv_status,
     "list_external": h_list_external,
     "launch_external": h_launch_external,
     "toolbox_stats": h_toolbox_stats,

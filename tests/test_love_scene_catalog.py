@@ -65,3 +65,23 @@ def test_love_visual_capture_includes_diagnostics_and_monitor():
 
     # The generic error/stub page is a fallback, not a user-facing feature.
     assert 'name = "hub_stub"' not in capture
+
+
+def test_all_love_bridge_commands_are_registered_by_the_service():
+    service = (ROOT / "service" / "voiddesk_service.py").read_text(
+        encoding="utf-8"
+    )
+    registered = set(re.findall(
+        r'^\s*"([a-z0-9_]+)"\s*:\s*h_[a-z0-9_]+,',
+        service,
+        re.MULTILINE,
+    ))
+    called = set()
+    for source_path in LOVE.rglob("*.lua"):
+        source = source_path.read_text(encoding="utf-8")
+        called.update(re.findall(
+            r'bridge\.call\(\s*["\']([a-z0-9_]+)["\']',
+            source,
+        ))
+    missing = sorted(called - registered)
+    assert not missing, "LÖVE bridge commands without service handlers: " + ", ".join(missing)
