@@ -1,6 +1,6 @@
 # QWASAR Studio — Technical Architecture
 
-**Product:** QWASAR Studio, the browser companion for QWASAR Desk  
+**Product:** QWASAR Studio, the browser companion for QWASAR-Env  
 **Status:** accepted product direction; foundation specification  
 **Scope:** browser companion, portable profiles, official plugin catalog, multi-engine readiness  
 **Initial runtime targets:** Pygame (py) and LÖVE (love). Qt 6 and LVGL are future adapters, not currently supported runtimes.
@@ -65,10 +65,10 @@ The existing data/desk_config.json remains the legacy runtime configuration duri
 
 ### Version 1 compatibility identifiers
 
-The public product name is **QWASAR Desk** and the browser companion is **QWASAR Studio**. Version 1 of the profile and plugin contracts deliberately keeps its original technical identifiers so existing drafts, tools and future importers do not need a silent breaking rename:
+The classic handheld application is **Void Desk**, the browser companion is **QWASAR Studio**, and both are components of **QWASAR-Env**. Version 1 of the profile and plugin contracts deliberately keeps its original technical identifiers so existing drafts, tools and future importers do not need a silent breaking rename:
 
 - Schema filenames and profile IDs such as `voiddesk-starter` remain stable.
-- The profile compatibility property `minimumVoidDeskVersion` keeps its v1 spelling even though it refers to the minimum **QWASAR Desk** runtime version.
+- The profile compatibility property `minimumVoidDeskVersion` keeps its v1 spelling even though it refers to the minimum **Void Desk** runtime version.
 - The official plugin publisher ID `voiddesk-official` and display name `Void Desk Official` remain reserved v1 compatibility values. Do not change them independently: a public publisher-identity migration requires a new manifest/schema version and an explicit migration path.
 - These identifiers are not the displayed product brand and must not be used for new user-facing copy.
 
@@ -139,7 +139,7 @@ Every write must be authenticated, authorized, size-limited, schema-validated, r
 - The sample profile validates against the profile schema.
 - A profile contains no secrets or host-specific runtime state.
 - Profile and menu item IDs are stable and independent of display labels.
-- Existing Pygame/LÖVE behaviour remains unchanged until a compatibility adapter is implemented and tested.
+- Existing Void Desk Pygame/LÖVE behaviour remains unchanged until a compatibility adapter is implemented and tested.
 - Do not claim Qt 6, LVGL, cloud sync, signatures or multi-version boot support before those components exist.
 
 ## Visual customization
