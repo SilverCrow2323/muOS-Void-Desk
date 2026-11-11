@@ -88,7 +88,30 @@ PC Link bearer token and offers host/device telemetry, notifications,
 screenshot requests and downloads from the per-device received-file inbox.
 It does not open an additional HTTP port.
 
-## 3. Sunshine / Moonlight transport
+## 3. RT Stream source and integration boundary
+
+The public release announcement points to
+[SilverCrow2323/dolphin-rt-stream](https://github.com/SilverCrow2323/dolphin-rt-stream)
+and describes version 4.2.1 on 22 October 2026. It presents RT Stream as a
+muOS Moonlight frontend plus a Linux PC portal for Dolphin/Sunshine library
+registration and launch management.
+
+This is **announcement-level context only**. The linked repository could not
+be read through the current GitHub connection: repository metadata, branches
+and raw source paths all returned HTTP 404. Consequently, no source revision,
+daemon contract, command, package name, config key or RT Stream-specific port
+has been verified here. Keep the registry state at
+`source-audit-pending`; do not activate or proxy an assumed service.
+
+Required evidence before an adapter is written:
+- readable upstream repository and exact commit/tag to integrate;
+- actual PC portal and handheld package entry points;
+- process/daemon ownership and start/stop/restart behavior;
+- Sunshine configuration paths and exact registration mechanism;
+- current TCP/UDP listeners, bind addresses and authentication;
+- failure, upgrade and rollback behavior.
+
+## 4. Sunshine / Moonlight transport
 
 Sunshine has a web UI and a GameStream transport family. Its current
 configuration documentation defines a base port (default `47989`) and a
@@ -106,7 +129,7 @@ Useful upstream references:
 - https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2configuration.html
 - https://docs.lizardbyte.dev/projects/sunshine/v0.21.0/about/advanced_usage.html
 
-## 4. Ownership target
+## 5. Ownership target
 
 | Service | Owner after migration | Listener policy |
 |---|---|---|
@@ -118,7 +141,7 @@ Useful upstream references:
 | Sunshine streaming | Sunshine daemon | Only required TCP/UDP media ports |
 | Syncthing/FileBrowser/other web apps | Respective existing services | Prefer API/SSH adapters; no duplicate Hub-managed web listeners |
 
-## 5. Machine-readable registry
+## 6. Machine-readable registry
 
 The initial source-of-truth inventory is
 `service/spdw_hub/services.json`; its passive validator is
@@ -135,7 +158,7 @@ the remaining TCP/UDP GameStream sockets without duplicating that endpoint.
 The registry describes target/migration policy, not live state. It must be
 compared with the active socket/process scan before a listener is changed.
 
-## 6. Live audit command set
+## 7. Live audit command set
 
 Before changing any bind address or stopping a legacy service, collect this
 from each device:
