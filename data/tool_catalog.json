@@ -1,0 +1,215 @@
+{
+  "schemaVersion": "1.0",
+  "source": "Current source-tree inventory; availability is runtime-dependent",
+  "categories": [
+    {
+      "id": "network-wireless",
+      "name": "Network & Wireless",
+      "workspace": "connect",
+      "hub": "uplink",
+      "tools": [
+        "wifi",
+        "hotspot",
+        "bluetooth",
+        "network-diagnostics",
+        "network-probe"
+      ]
+    },
+    {
+      "id": "remote-access-sync",
+      "name": "Remote Access & Sync",
+      "workspace": "connect",
+      "hub": "uplink",
+      "tools": [
+        "tailscale-m",
+        "syncthing",
+        "ftp",
+        "pc-uplink",
+        "basestation"
+      ]
+    },
+    {
+      "id": "controllers-peripherals",
+      "name": "Controllers & Peripherals",
+      "workspace": "connect",
+      "hub": "uplink",
+      "tools": [
+        "controller-tools",
+        "device-remapper",
+        "glyph-manager"
+      ]
+    },
+    {
+      "id": "files-productivity",
+      "name": "Files & Productivity",
+      "workspace": "create",
+      "hub": "toolbox",
+      "tools": [
+        "file-manager",
+        "text-editor",
+        "notes",
+        "calendar",
+        "calculator",
+        "clock"
+      ]
+    },
+    {
+      "id": "developer-tools",
+      "name": "Developer Tools",
+      "workspace": "create",
+      "hub": "develop",
+      "tools": [
+        "python-repl",
+        "shell-terminal",
+        "package-builders"
+      ]
+    },
+    {
+      "id": "system-health",
+      "name": "System Health",
+      "workspace": "maintain",
+      "hub": "workshop",
+      "tools": [
+        "device-check-rt",
+        "diagnostics",
+        "system-monitor",
+        "storage-analysis",
+        "jobs-logs"
+      ]
+    },
+    {
+      "id": "packages-environments",
+      "name": "Packages & Environments",
+      "workspace": "maintain",
+      "hub": "forge",
+      "tools": [
+        "component-installer",
+        "autostart-manager",
+        "system-updater",
+        "voiddesk-updater",
+        "apt-manager",
+        "cli-tools"
+      ]
+    },
+    {
+      "id": "performance-cleanup",
+      "name": "Performance & Cleanup",
+      "workspace": "maintain",
+      "hub": "workshop",
+      "tools": [
+        "boost-controls",
+        "apt-cache-cleanup",
+        "chd-utilities",
+        "duplicate-file-tools"
+      ]
+    },
+    {
+      "id": "handheld-games",
+      "name": "Handheld Apps & Games",
+      "workspace": "play",
+      "hub": "muos-apps",
+      "tools": [
+        "muos-app-discovery",
+        "portmaster",
+        "native-muxapp-browser",
+        "game-collections"
+      ]
+    },
+    {
+      "id": "media-playback",
+      "name": "Media Playback & Library",
+      "workspace": "media",
+      "hub": "media",
+      "tools": [
+        "internet-radio",
+        "media-library",
+        "voidcast",
+        "bgm-normalizer"
+      ]
+    },
+    {
+      "id": "appearance-controls",
+      "name": "Appearance & Controls",
+      "workspace": "configure",
+      "hub": "settings",
+      "tools": [
+        "theme-palette",
+        "font-scale",
+        "language",
+        "controller-bindings",
+        "status-bar",
+        "visual-effects",
+        "boot-animation"
+      ]
+    },
+    {
+      "id": "session-management",
+      "name": "Sessions",
+      "workspace": "configure",
+      "hub": "session",
+      "tools": [
+        "xfce-session",
+        "icewm-session",
+        "lxde-session",
+        "session-handoff",
+        "restart-exit"
+      ]
+    },
+    {
+      "id": "docs-community",
+      "name": "Documentation & Community",
+      "workspace": "discover",
+      "hub": "info-community",
+      "tools": [
+        "manual",
+        "project-info",
+        "muos-forum",
+        "muos-wiki"
+      ]
+    },
+    {
+      "id": "standalone-apps",
+      "name": "Standalone Applications",
+      "workspace": "extend",
+      "hub": "outerdesk",
+      "tools": [
+        "bootanim-manager",
+        "disc-crusher",
+        "ethostore",
+        "image-viewer",
+        "little-mischief",
+        "media-player",
+        "portable-forger"
+      ]
+    }
+  ],
+  "externalTools": [
+    {
+      "id": "voidcast",
+      "name": "VoidCast IPTV",
+      "hub": "media",
+      "engine": "py",
+      "launcherType": "portable-voidcast",
+      "status": "external_app"
+    },
+    {
+      "id": "bgm_normalizer",
+      "name": "BGM Normalizer",
+      "hub": "media",
+      "engine": "py",
+      "launcherType": "sh",
+      "status": "external_app"
+    },
+    {
+      "id": "file_gd_x",
+      "name": "File-GD X",
+      "hub": "toolbox",
+      "engine": "love",
+      "launcherType": "love",
+      "status": "external_app"
+    }
+  ],
+  "securityReview": [
+    "little-mischief"
+  ]
+}
