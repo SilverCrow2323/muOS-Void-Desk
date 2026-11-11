@@ -12,7 +12,7 @@ from desk.qwasar.profile_resolver import (
     QwasarProfileResolver,
 )
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROFILE = "data/profiles/voiddesk-handheld-default.qprofile.json"
 
 
@@ -205,7 +205,7 @@ def test_missing_custom_profile_falls_back_but_default_corruption_is_fatal(tmp_p
     assert composition["profile"]["id"] == "qwasar.profile.voiddesk.handheld-default"
 
     profile_path.write_text("{ broken default", encoding="utf-8")
-    with pytest.raises(ProfileResolutionError, match="invalid"):
+    with pytest.raises(ProfileResolutionError, match="cannot read"):
         resolver.resolve()
 
 
