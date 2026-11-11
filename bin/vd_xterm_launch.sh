@@ -14,9 +14,19 @@ IMG="$DATA/xfce.img"
 MNT="$DATA/xfce_mnt"
 LOG="$DATA/xterm.log"
 CMD="$1"
+PY3="$(command -v python3)"
 
 . "$APP_DIR/bin/vd_mount_common.sh"
 MNTED() { vd_mount_present "$APP_DIR" "$1"; }
+MOUNT_CREATED=0
+MOUNT_IF_NEEDED() {
+    _target=$1
+    shift
+    vd_mount_ensure "$APP_DIR" "$_target" "$@"
+    _mount_rc=$?
+    MOUNT_CREATED=$VD_MOUNT_CREATED
+    return "$_mount_rc"
+}
 
 if [ ! -f "$DATA/.xfce_ready" ] || [ ! -f "$IMG" ]; then
 	echo "$(date) base XFCE non pronta: niente terminale vero senza di essa" >>"$LOG"
@@ -25,27 +35,98 @@ fi
 
 WE_MOUNTED=0
 mkdir -p "$MNT"
-if ! MNTED "$MNT"; then
-	mount -o loop "$IMG" "$MNT" || {
-		echo "$(date) mount loop fallito" >>"$LOG"
+MNTED "$MNT"
+MOUNT_STATE=$?
+case "$MOUNT_STATE" in
+	0) ;;
+	1)
+		mount -o loop "$IMG" "$MNT" || {
+			echo "$(date) mount loop fallito" >>"$LOG"
+			exit 1
+		}
+		WE_MOUNTED=1
+		;;
+	*)
+		echo "$(date) stato mount non verificabile: abort prima del chroot" >>"$LOG"
 		exit 1
-	}
-	WE_MOUNTED=1
-fi
+		;;
+esac
 
 # stessa identica ricetta di /dev-proc-sys di xfce_launch.sh: senza,
 # xterm non trova nemmeno /dev/pts per aprire un pseudo-terminale
 for D in dev proc sys; do mkdir -p "$MNT/$D"; done
 WE_MOUNTED_DEV=0
-if ! MNTED "$MNT/dev"; then
-	mount -o bind /dev "$MNT/dev" && WE_MOUNTED_DEV=1
+WE_MOUNTED_PROC=0
+WE_MOUNTED_SYS=0
+WE_MOUNTED_PTS=0
+WE_MOUNTED_SHM=0
+WE_MOUNTED_INPUT=0
+
+UNMOUNT_OWNED() {
+	_path=$1
+	MNTED "$_path"
+	_state=$?
+	if [ "$_state" -eq 0 ]; then
+		if ! umount "$_path" 2>/dev/null; then
+			umount -l "$_path" 2>/dev/null || true
+		fi
+		MNTED "$_path"
+		_after=$?
+		if [ "$_after" -ne 1 ]; then
+			echo "$(date) cleanup non verificato: $_path" >>"$LOG"
+			RC=1
+		fi
+	elif [ "$_state" -gt 1 ]; then
+		echo "$(date) impossibile verificare cleanup: $_path" >>"$LOG"
+		RC=1
+	fi
+}
+
+ABORT_SETUP() {
+	echo "$(date) preparazione mount fallita; chroot annullato" >>"$LOG"
+	if [ "$WE_MOUNTED" = 1 ]; then
+		PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
+			"$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.umount_tree(sys.argv[1], sys.argv[2]) else 1)' \
+			"$MNT" "$IMG" >>"$LOG" 2>&1
+		[ "$?" -eq 0 ] || echo "$(date) cleanup immagine incompleto" >>"$LOG"
+	else
+		[ "$WE_MOUNTED_INPUT" = 1 ] && UNMOUNT_OWNED "$MNT/dev/input"
+		[ "$WE_MOUNTED_SHM" = 1 ] && UNMOUNT_OWNED "$MNT/dev/shm"
+		[ "$WE_MOUNTED_PTS" = 1 ] && UNMOUNT_OWNED "$MNT/dev/pts"
+		[ "$WE_MOUNTED_PROC" = 1 ] && UNMOUNT_OWNED "$MNT/proc"
+		[ "$WE_MOUNTED_SYS" = 1 ] && UNMOUNT_OWNED "$MNT/sys"
+		[ "$WE_MOUNTED_DEV" = 1 ] && UNMOUNT_OWNED "$MNT/dev"
+	fi
+	exit 1
+}
+
+if ! MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev"; then
+	echo "$(date) stato mount /dev non valido; abort prima del chroot" >>"$LOG"
+	ABORT_SETUP
 fi
-MNTED "$MNT/proc" || mount -t proc proc "$MNT/proc"
-MNTED "$MNT/sys" || mount -t sysfs sys "$MNT/sys"
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_DEV=1
+if ! MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc"; then
+	echo "$(date) stato mount /proc non valido; abort prima del chroot" >>"$LOG"
+	ABORT_SETUP
+fi
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PROC=1
+if ! MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys"; then
+	echo "$(date) stato mount /sys non valido; abort prima del chroot" >>"$LOG"
+	ABORT_SETUP
+fi
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SYS=1
 for SUB in /dev/pts /dev/shm /dev/input; do
 	[ -e "$SUB" ] || continue
 	mkdir -p "$MNT$SUB"
-	MNTED "$MNT$SUB" || mount -o bind "$SUB" "$MNT$SUB" 2>/dev/null
+	if ! MOUNT_IF_NEEDED "$MNT$SUB" mount -o bind "$SUB" "$MNT$SUB" 2>/dev/null; then
+		echo "$(date) stato mount non valido: $MNT$SUB; abort prima del chroot" >>"$LOG"
+		ABORT_SETUP
+	fi
+	case "$SUB" in
+		/dev/pts) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PTS=1 ;;
+		/dev/shm) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SHM=1 ;;
+		/dev/input) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_INPUT=1 ;;
+	esac
 done
 
 mkdir -p "$MNT/root" "$MNT/tmp"
@@ -59,7 +140,6 @@ printf '%s' "${KBH:-230}" > "$MNT/tmp/vd_kbd_h" 2>/dev/null
 
 # profilo dedicato "terminale": niente mouse, solo frecce vere -- qui
 # serve una tastiera seria, non un cursore che non useremo mai
-PY3="$(command -v python3)"
 PROFILE="terminale"
 mkdir -p "$MNT/root/.qjoypad3"
 if [ -n "$PY3" ] && ! "$PY3" "$APP_DIR/bin/gen_layout.py" "$PROFILE" \
@@ -104,14 +184,20 @@ while :; do
 done
 [ -n "$HOTKEY_PID" ] && kill "$HOTKEY_PID" 2>/dev/null
 
-for P in "$MNT/dev/input" "$MNT/dev/shm" "$MNT/dev/pts"; do
-	MNTED "$P" && umount "$P" 2>/dev/null
-done
-MNTED "$MNT/proc" && umount "$MNT/proc" 2>/dev/null
-MNTED "$MNT/sys" && umount "$MNT/sys" 2>/dev/null
-[ "$WE_MOUNTED_DEV" = 1 ] && { MNTED "$MNT/dev" && umount "$MNT/dev" 2>/dev/null; }
 if [ "$WE_MOUNTED" = 1 ]; then
-	sleep 0.3
-	umount "$MNT" 2>/dev/null || umount -l "$MNT" 2>/dev/null
+	PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
+		"$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.umount_tree(sys.argv[1], sys.argv[2]) else 1)' \
+		"$MNT" "$IMG" >>"$LOG" 2>&1
+	if [ "$?" -ne 0 ]; then
+		echo "$(date) cleanup immagine incompleto" >>"$LOG"
+		RC=1
+	fi
+else
+	[ "$WE_MOUNTED_INPUT" = 1 ] && UNMOUNT_OWNED "$MNT/dev/input"
+	[ "$WE_MOUNTED_SHM" = 1 ] && UNMOUNT_OWNED "$MNT/dev/shm"
+	[ "$WE_MOUNTED_PTS" = 1 ] && UNMOUNT_OWNED "$MNT/dev/pts"
+	[ "$WE_MOUNTED_PROC" = 1 ] && UNMOUNT_OWNED "$MNT/proc"
+	[ "$WE_MOUNTED_SYS" = 1 ] && UNMOUNT_OWNED "$MNT/sys"
+	[ "$WE_MOUNTED_DEV" = 1 ] && UNMOUNT_OWNED "$MNT/dev"
 fi
 exit $RC

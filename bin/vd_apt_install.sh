@@ -11,6 +11,15 @@ PY3="${PY3:-$(command -v python3 2>/dev/null)}"
 
 . "$APP_DIR/bin/vd_mount_common.sh"
 MNTED() { vd_mount_present "$APP_DIR" "$1"; }
+MOUNT_CREATED=0
+MOUNT_IF_NEEDED() {
+    _target=$1
+    shift
+    vd_mount_ensure "$APP_DIR" "$_target" "$@"
+    _mount_rc=$?
+    MOUNT_CREATED=$VD_MOUNT_CREATED
+    return "$_mount_rc"
+}
 
 if [ $# -eq 0 ]; then echo "Usage: $0 <package> [package...]"; exit 1; fi
 if [ ! -f "$IMG" ]; then echo "XFCE image not found: $IMG"; exit 2; fi
@@ -48,21 +57,33 @@ unmount_owned() {
     if ! umount "$TARGET" 2>/dev/null; then
         umount -l "$TARGET" 2>/dev/null || true
     fi
-    if MNTED "$TARGET"; then
-        echo "mount remains active: $TARGET" | tee -a "$LOG" >&2
-        CLEANUP_RC=1
-    fi
+    MNTED "$TARGET"
+    _state=$?
+    case "$_state" in
+        0)
+            echo "mount remains active: $TARGET" | tee -a "$LOG" >&2
+            CLEANUP_RC=1
+            ;;
+        1)
+            ;;
+        *)
+            echo "cannot verify mount cleanup: $TARGET" | tee -a "$LOG" >&2
+            CLEANUP_RC=1
+            ;;
+    esac
 }
 
-if ! MNTED "$MNT"; then
-    if mount -o loop "$IMG" "$MNT" 2>>"$LOG"; then
-        WE_MOUNTED=1
-    else
-        echo "mount failed" | tee -a "$LOG" >&2
-        SETUP_OK=0
-        RC=1
-        # A failed loop mount can still leave an unattached-to-mount loop
-        # device. Release it only after MNTED has confirmed the root is absent.
+if MOUNT_IF_NEEDED "$MNT" mount -o loop "$IMG" "$MNT"; then
+    [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED=1
+else
+    echo "mount failed or XFCE mount state is unknown" | tee -a "$LOG" >&2
+    SETUP_OK=0
+    RC=1
+    # Release a stale loop only after a second, positive confirmation that
+    # the root mountpoint is definitely absent.
+    MNTED "$MNT"
+    ROOT_STATE=$?
+    if [ "$ROOT_STATE" -eq 1 ]; then
         PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
           "$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.cleanup_stale(sys.argv[1]) or imgmount.loop_of(sys.argv[1]) is None else 1)' \
           "$IMG"
@@ -70,6 +91,10 @@ if ! MNTED "$MNT"; then
             echo "stale XFCE loop cleanup failed" | tee -a "$LOG" >&2
             CLEANUP_RC=1
         fi
+    else
+        echo "root mount state is still mounted or unknown; skipping loop detach" \
+          | tee -a "$LOG" >&2
+        CLEANUP_RC=1
     fi
 fi
 
@@ -84,29 +109,29 @@ if [ "$SETUP_OK" = 1 ]; then
     done
 fi
 
-if [ "$SETUP_OK" = 1 ] && [ -e /dev ] && ! MNTED "$MNT/dev"; then
-    if mount -o bind /dev "$MNT/dev" 2>>"$LOG"; then
-        DEV_MOUNTED=1
+if [ "$SETUP_OK" = 1 ] && [ -e /dev ]; then
+    if MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev" 2>>"$LOG"; then
+        [ "$MOUNT_CREATED" = 1 ] && DEV_MOUNTED=1
     else
-        echo "cannot bind /dev" | tee -a "$LOG" >&2
+        echo "cannot verify or bind /dev" | tee -a "$LOG" >&2
         SETUP_OK=0
         RC=1
     fi
 fi
-if [ "$SETUP_OK" = 1 ] && ! MNTED "$MNT/proc"; then
-    if mount -t proc proc "$MNT/proc" 2>>"$LOG"; then
-        PROC_MOUNTED=1
+if [ "$SETUP_OK" = 1 ]; then
+    if MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc" 2>>"$LOG"; then
+        [ "$MOUNT_CREATED" = 1 ] && PROC_MOUNTED=1
     else
-        echo "cannot mount proc" | tee -a "$LOG" >&2
+        echo "cannot verify or mount proc" | tee -a "$LOG" >&2
         SETUP_OK=0
         RC=1
     fi
 fi
-if [ "$SETUP_OK" = 1 ] && ! MNTED "$MNT/sys"; then
-    if mount -t sysfs sys "$MNT/sys" 2>>"$LOG"; then
-        SYS_MOUNTED=1
+if [ "$SETUP_OK" = 1 ]; then
+    if MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys" 2>>"$LOG"; then
+        [ "$MOUNT_CREATED" = 1 ] && SYS_MOUNTED=1
     else
-        echo "cannot mount sysfs" | tee -a "$LOG" >&2
+        echo "cannot verify or mount sysfs" | tee -a "$LOG" >&2
         SETUP_OK=0
         RC=1
     fi
