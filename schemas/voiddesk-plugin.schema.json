@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/schemas/voiddesk-plugin.schema.json",
-  "title": "Void Desk Official Plugin Manifest",
-  "description": "Maintainer-published plugin manifest. A valid manifest alone does not establish trust; signature and catalog allowlisting are mandatory at install time.",
+  "title": "QWASAR Desk Official Plugin Manifest",
+  "description": "Maintainer-published QWASAR Desk plugin manifest. Version 1 retains the legacy Void Desk publisher identity for compatibility. A valid manifest alone does not establish trust; signature and catalog allowlisting are mandatory at install time.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -63,11 +63,13 @@
       "properties": {
         "minimumVoidDeskVersion": {
           "type": "string",
-          "maxLength": 32
+          "maxLength": 32,
+          "description": "Minimum QWASAR Desk runtime version. The property name is retained for manifest version 1 compatibility."
         },
         "maximumVoidDeskVersion": {
           "type": "string",
-          "maxLength": 32
+          "maxLength": 32,
+          "description": "Maximum QWASAR Desk runtime version, when present. The property name is retained for manifest version 1 compatibility."
         },
         "engines": {
           "type": "array",
