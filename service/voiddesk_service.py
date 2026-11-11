@@ -1006,14 +1006,17 @@ def h_media_status(args):
             return {"ok": True, "media": {
                 "volume": 40,
                 "now_playing": None,
-                "library_count": 0,
+                "root_count": 3,
                 "recordings": 0,
             }}
         vol = deskinfo.volume() if deskinfo is not None else None
+        player = media_module.status() if media_module is not None else {}
+        current = player.get("current") if isinstance(player, dict) else None
+        now_playing = current.get("name") if isinstance(current, dict) else None
         return {"ok": True, "media": {
             "volume": vol if vol is not None else 0,
-            "now_playing": None,
-            "library_count": 0,
+            "now_playing": now_playing,
+            "root_count": len(_media_root_entries()),
             "recordings": 0,
         }}
     except Exception as e:
