@@ -38,10 +38,10 @@ esac
         env["PY3"] = ""
         env["PATH"] = "/nonexistent"
 
-    script = (
-        '. "$HELPER_PATH"\n'
-        'vd_mount_present "$APP_DIR" "$MOUNT_PATH"\n'
-    )
+    script = """\
+. "$HELPER_PATH"
+vd_mount_present "$APP_DIR" "$MOUNT_PATH"
+"""
     env["HELPER_PATH"] = str(HELPER)
     return subprocess.run(
         ["/bin/sh", "-c", script],
@@ -84,7 +84,7 @@ def test_shared_mount_probe_fails_closed_when_imgmount_import_raises(tmp_path):
     desk = app / "desk"
     desk.mkdir(parents=True)
     (desk / "imgmount.py").write_text(
-        "raise RuntimeError('simulated imgmount import failure')\n"
+        "raise RuntimeError('simulated imgmount import failure')"
     )
     env = os.environ.copy()
     env.update({
@@ -93,10 +93,10 @@ def test_shared_mount_probe_fails_closed_when_imgmount_import_raises(tmp_path):
         "PY3": sys.executable,
         "HELPER_PATH": str(HELPER),
     })
-    script = (
-        '. "$HELPER_PATH"\n'
-        'vd_mount_present "$APP_DIR" "$MOUNT_PATH"\n'
-    )
+    script = """\
+. "$HELPER_PATH"
+vd_mount_present "$APP_DIR" "$MOUNT_PATH"
+"""
 
     result = subprocess.run(
         ["/bin/sh", "-c", script],
