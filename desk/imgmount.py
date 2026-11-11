@@ -169,34 +169,85 @@ def mount_img(img, mnt, ro=False):
         attempts = [[]]
         fallback_opts = ["loop"]
 
-    # 1) loop esplicito (riuso quello gia' associato, se c'e')
+    # 1) Prefer an explicitly managed loop device. Never start the
+    # mount -o loop fallback while a failed explicit loop is still attached:
+    # mount(8) may allocate a second loop for the same backing image.
     dev = loop_of(img)
-    detach = False
+    owned_loop = False
     if dev and loop_is_mounted(dev):
         return False, "immagine gia' montata tramite %s; chiudere la sessione esistente" % dev
+
     if dev is None:
-        dev = free_loop()
-        if dev:
-            if _run(["losetup", dev, img]).returncode == 0:
-                detach = True
+        candidate = free_loop()
+        if candidate:
+            attached = _run(["losetup", candidate, img])
+            if attached.returncode == 0:
+                dev = candidate
+                owned_loop = True
             else:
-                dev = None
+                # A failed attach command can still leave a device configured
+                # on unusual backends or after a partial operation. Never use
+                # the classic loop fallback while that state is ambiguous.
+                dangling = loop_of(img)
+                if dangling:
+                    return False, (
+                        "losetup ha fallito ma l'immagine risulta associata a "
+                        "%s; fallback loop annullato" % dangling
+                    )
+
     err = "nessun /dev/loop libero"
     if dev:
         for opts in attempts:
-            r = _run(["mount"] + opts + [dev, mnt])
-            if r.returncode == 0:
+            result = _run(["mount"] + opts + [dev, mnt])
+            if result.returncode == 0:
                 return True, ""
-            err = (r.stderr or r.stdout).strip() or err
-        if detach:
-            _call(["losetup", "-d", dev])
+            err = (result.stderr or result.stdout).strip() or err
 
-    # 2) ripiego classico (sistemi senza losetup usabile)
-    for o in fallback_opts:
-        r = _run(["mount", "-o", o, img, mnt])
-        if r.returncode == 0:
+        if not owned_loop:
+            return False, (
+                "loop %s gia' associato all'immagine ma non montabile; "
+                "fallback loop evitato per non creare un secondo device: %s"
+                % (dev, err)
+            )
+
+        if _call(["losetup", "-d", dev]) != 0:
+            return False, (
+                "impossibile sganciare il loop %s dopo il mount fallito; "
+                "fallback loop annullato: %s" % (dev, err)
+            )
+        if loop_of(img) is not None:
+            return False, (
+                "il loop dell'immagine risulta ancora associato dopo il detach; "
+                "fallback loop annullato: %s" % err
+            )
+
+    # 2) Classical fallback is safe only when no loop for this image remains.
+    for option in fallback_opts:
+        result = _run(["mount", "-o", option, img, mnt])
+        if result.returncode == 0:
             return True, ""
-        err = (r.stderr or r.stdout).strip() or err
+        err = (result.stderr or result.stdout).strip() or err
+
+    # A failed mount -o loop should normally release its own loop. Verify
+    # that assumption; if it did not, clean only an unmounted stale device.
+    fallback_dev = loop_of(img)
+    if fallback_dev:
+        if loop_is_mounted(fallback_dev):
+            return False, (
+                "il fallback ha fallito ma l'immagine risulta ancora montata "
+                "tramite %s: %s" % (fallback_dev, err)
+            )
+        if _call(["losetup", "-d", fallback_dev]) != 0:
+            return False, (
+                "il fallback ha lasciato il loop %s occupato: %s"
+                % (fallback_dev, err)
+            )
+        if loop_of(img) is not None:
+            return False, (
+                "il loop %s e' ancora associato dopo la pulizia del fallback: %s"
+                % (fallback_dev, err)
+            )
+
     return False, err
 
 
