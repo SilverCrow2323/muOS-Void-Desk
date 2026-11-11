@@ -7,6 +7,7 @@ QWASAR Switchboard's first executable core is a **profile-only editor** in `tool
 - Enable, disable or hide a workspace or section.
 - Enable/disable a module in the profile (without uninstalling it).
 - Enable, disable or hide an installed contribution by stable ID.
+- Show/hide registered menu entries in workspaces and sections; reorder top-level menu entries.
 - Enable/disable a registered global panel.
 - Reorder workspaces and sections.
 - Preview the effective state after applying profile overrides.
@@ -16,9 +17,9 @@ QWASAR Switchboard's first executable core is a **profile-only editor** in `tool
 
 ## Safety and persistence
 
-The Switchboard core reads and validates the UI manifest and profile schemas before accepting changes. It checks workspace, section and action references, and rejects imported profiles that disable the central shell or the protected END NODE/recovery surfaces.
+The Switchboard core reads and validates the UI manifest and profile schemas before accepting changes. It checks workspace, section, menu, global-panel and action references, and rejects imported profiles that disable the central shell or hide protected END NODE/recovery menu entries.
 
-Mutations are prepared in memory first. Persistence is explicit and writes a same-directory temporary file, flushes it to disk, preserves the previous profile as a `.bak` backup and commits with an atomic replacement. A stable sibling lock serializes writers, and a SHA-256 snapshot rejects stale edits instead of silently overwriting changes made by another process. The implementation uses only standard-library filesystem primitives and does not import Pygame or the graphical frontend.
+Mutations are prepared in memory first. Persistence is explicit and writes a same-directory temporary file, flushes it to disk, preserves the previous profile as a `.bak` backup and commits with an atomic replacement. A stable sibling lock serializes writers, and a SHA-256 snapshot rejects stale edits instead of silently overwriting changes made by another process. The file itself is flushed before replacement; directory fsync is best-effort for removable filesystems that do not support it. The implementation uses only standard-library filesystem primitives and does not import Pygame or the graphical frontend. `reset-profile` validates the bundled default independently and can recover a corrupt destination while preserving it as `.bak`.
 
 Module enable/disable here is only a profile state change. It does **not** install/uninstall a package, stop a provider/job, grant permissions, or execute module code. The future runtime coordinator must consume the updated profile and perform any provider lifecycle changes through the existing service/job boundary.
 
@@ -53,6 +54,8 @@ Other commands:
 python3 tools/qwasar_switchboard.py --profile /tmp/my-voiddesk.qprofile.json --save section-state rt-toolbox toolbox.files-storage hidden
 python3 tools/qwasar_switchboard.py --profile /tmp/my-voiddesk.qprofile.json --save module-state community.network.example disabled
 python3 tools/qwasar_switchboard.py --profile /tmp/my-voiddesk.qprofile.json --save move-workspace rt-toolbox 0
+python3 tools/qwasar_switchboard.py --profile /tmp/my-voiddesk.qprofile.json --save menu-visibility rt-toolbox toolbox.inspector hide
+python3 tools/qwasar_switchboard.py --profile /tmp/my-voiddesk.qprofile.json --save move-menu rt-toolbox toolbox.backup 0 --section toolbox.files-storage
 python3 tools/qwasar_switchboard.py --profile /tmp/my-voiddesk.qprofile.json --save reset-profile
 ```
 
