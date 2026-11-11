@@ -13,7 +13,8 @@
     "publisher",
     "compatibility",
     "capabilities",
-    "artifact"
+    "artifact",
+    "signature"
   ],
   "properties": {
     "manifestVersion": {
