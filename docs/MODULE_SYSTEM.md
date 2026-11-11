@@ -193,86 +193,34 @@ Feature availability is the intersection of module compatibility, frontend adapt
 
 ## 5. Manifest contract
 
-The proposed `module.json` is the source of truth for module identity and compatibility. A future `qwasar-module.schema.json` must validate it with a strict schema and reject unknown executable fields.
+The canonical QWASAR module manifest is validated by schemas/qwasar-module.schema.json. The old schemas/voiddesk-plugin.schema.json remains a compatibility import format until installed modules can be migrated safely.
 
 Required manifest fields:
 
 | Field | Meaning |
 |---|---|
-| `manifestVersion` | Module manifest contract version |
-| `id` | Stable reverse-DNS-like identifier, e.g. `community.network.wifi-manager` |
-| `name`, `description` | Localisable display metadata |
-| `version` | Semantic version |
-| `publisher` | Stable publisher ID and display name |
-| `license` | SPDX identifier or explicit reviewed licence reference |
-| `compatibility` | Void Desk API range, engines, firmware targets, device families and architectures |
-| `contributions` | Slot type, contribution ID, entry route and display metadata |
-| `capabilities` | Typed APIs the module needs |
-| `permissions` | User-visible permission requests mapped to capabilities |
-| `dependencies` | Module IDs and compatible version ranges |
-| `desktopPackages` | Optional APT package declarations for the XFCE image |
-| `settingsSchema` | Schema for non-secret user settings |
-| `files` | Package path, size and SHA-256 for every file |
-| `entrypoints` | Approved engine-adapter entrypoints (when executable modules are enabled) |
-| `tests` | Declared contract tests and supported validation command IDs |
-| `artifact` | Immutable HTTPS artifact URI, digest and size |
-| `signature` | Detached signature algorithm, key ID and signature |
+| manifestVersion, id, name, version | Stable identity and semantic release version |
+| kind | declarative (registered components/host actions only) or executable (signed engine adapter code) |
+| publisher, license | Stable publisher identity and declared licence |
+| compatibility | Minimum Void Desk/UI API, engines, platforms, device families and architectures |
+| contributions | Stable slot, component type, workspace/section target, label, component props and optional action/provider references |
+| actions | Typed route, host-capability or signed module-handler declarations; never raw shell strings |
+| capabilities, permissions | Host APIs and user-visible grants required |
+| dependencies | Other module IDs and version constraints |
+| desktopPackages | Optional validated APT package declarations; no install scripts |
+| settingsSchema | Strict schema for non-secret module settings |
+| entrypoints | Engine-specific adapter entrypoints for executable modules only |
+| files | Relative package path, size and SHA-256 for every packaged file |
+| artifact, signature | Immutable HTTPS artifact, digest and detached Ed25519 signature |
+| provenance | Optional source repository, commit and reproducible build metadata |
 
-Example manifest (illustrative v1 shape, not a currently installable module):
+### Contribution contract
 
-~~~json
-{
-  "manifestVersion": "1.0",
-  "id": "community.network.wifi-dashboard",
-  "name": "Wi-Fi Dashboard",
-  "description": "A compact Wi-Fi status and scan panel.",
-  "version": "1.2.0",
-  "publisher": {
-    "id": "community-example",
-    "displayName": "Community Example"
-  },
-  "license": "MIT",
-  "compatibility": {
-    "minimumVoidDeskApi": "1.0",
-    "engines": ["py", "love"],
-    "platforms": ["muos"],
-    "deviceFamilies": ["h700"],
-    "architectures": ["aarch64"]
-  },
-  "contributions": [
-    {
-      "id": "wifi-dashboard.main",
-      "slot": "hub.panel",
-      "route": "community.network.wifi-dashboard.main",
-      "label": "Wi-Fi",
-      "icon": "assets/icons/wifi.svg"
-    }
-  ],
-  "capabilities": ["network.read-status", "network.wifi.scan"],
-  "permissions": ["read-network-status", "scan-wifi"],
-  "dependencies": [],
-  "desktopPackages": [],
-  "settingsSchema": "schemas/settings.schema.json",
-  "entrypoints": {
-    "pygame": "ui/pygame/main.py",
-    "love": "ui/love/main.lua"
-  },
-  "artifact": {
-    "url": "https://example.invalid/wifi-dashboard-1.2.0.qmod",
-    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-    "sizeBytes": 42000
-  },
-  "signature": {
-    "algorithm": "ed25519",
-    "keyId": "community-example-2026",
-    "value": "REPLACE_WITH_DETACHED_SIGNATURE"
-  }
-}
-~~~
+A contribution must reference a component type already registered by the installed QWASAR UI API. Its properties are checked against that component's strict propsSchema; its slot must be one supported by the API; action IDs must resolve to a declared typed action. It cannot supply a new renderer primitive or bypass the shell.
 
-The example's URL and digest are placeholders. A real module cannot be installed until the artifact exists, its digest matches, its signature chains to a trusted publisher, and every requested capability is approved.
+Declarative modules can contribute existing components and reference host-owned actions/providers. They cannot contain module-handler executable actions. Executable modules require engine entrypoints, verified signatures, reviewed capabilities and an appropriate isolation/trust tier. Until this infrastructure is implemented, third-party executable modules remain unavailable.
 
----
+An illustrative declarative example is in [data/examples/qwasar-wifi-overview.module.json](../data/examples/qwasar-wifi-overview.module.json). Its artifact URL, digest and signature are placeholders; it validates structure only and is not installable.
 
 ## 6. Capability and permission model
 
