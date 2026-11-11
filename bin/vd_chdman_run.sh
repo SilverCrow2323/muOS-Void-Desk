@@ -14,10 +14,14 @@ ARGS="$*"
 
 . "$APP_DIR/bin/vd_mount_common.sh"
 MNTED() { vd_mount_present "$APP_DIR" "$1"; }
+MOUNT_CREATED=0
 MOUNT_IF_NEEDED() {
     _target=$1
     shift
     vd_mount_ensure "$APP_DIR" "$_target" "$@"
+    _mount_rc=$?
+    MOUNT_CREATED=$VD_MOUNT_CREATED
+    return "$_mount_rc"
 }
 
 rm -f "$DONE"
@@ -52,21 +56,28 @@ esac
 
 for D in dev proc sys; do mkdir -p "$MNT/$D"; done
 WE_MOUNTED_DEV=0
+WE_MOUNTED_PROC=0
+WE_MOUNTED_SYS=0
+WE_MOUNTED_MMC=0
+WE_MOUNTED_SDCARD=0
 if ! MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev"; then
 	echo "$(date) stato mount /dev non valido; chdman annullato" >>"$LOG"
 	echo "1" >"$DONE"
 	exit 1
 fi
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_DEV=1
 if ! MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc"; then
 	echo "$(date) stato mount /proc non valido; chdman annullato" >>"$LOG"
 	echo "1" >"$DONE"
 	exit 1
 fi
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PROC=1
 if ! MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys"; then
 	echo "$(date) stato mount /sys non valido; chdman annullato" >>"$LOG"
 	echo "1" >"$DONE"
 	exit 1
 fi
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SYS=1
 
 # le SD, cosi' chdman vede i file dei giochi -- stesso posto identico
 # sia fuori che dentro il chroot, nessuna traduzione di percorso serve
@@ -87,11 +98,10 @@ chroot "$MNT" /usr/bin/env \
 RC=$?
 echo "$(date) chdman terminato (rc=$RC)" >>"$LOG"
 
-for D in /mnt/mmc /mnt/sdcard; do
-	MNTED "$MNT$D" && umount "$MNT$D" 2>/dev/null
-done
-MNTED "$MNT/proc" && umount "$MNT/proc" 2>/dev/null
-MNTED "$MNT/sys" && umount "$MNT/sys" 2>/dev/null
+[ "$WE_MOUNTED_MMC" = 1 ] && { MNTED "$MNT/mnt/mmc" && umount "$MNT/mnt/mmc" 2>/dev/null; }
+[ "$WE_MOUNTED_SDCARD" = 1 ] && { MNTED "$MNT/mnt/sdcard" && umount "$MNT/mnt/sdcard" 2>/dev/null; }
+[ "$WE_MOUNTED_PROC" = 1 ] && { MNTED "$MNT/proc" && umount "$MNT/proc" 2>/dev/null; }
+[ "$WE_MOUNTED_SYS" = 1 ] && { MNTED "$MNT/sys" && umount "$MNT/sys" 2>/dev/null; }
 [ "$WE_MOUNTED_DEV" = 1 ] && { MNTED "$MNT/dev" && umount "$MNT/dev" 2>/dev/null; }
 if [ "$WE_MOUNTED" = 1 ]; then
 	sleep 0.3
