@@ -121,17 +121,18 @@ for _, id in ipairs(theme_ids) do
            "incomplete theme palette: " .. id)
 end
 
-local obstruction = config.path() .. ".tmp"
-os.execute("mkdir -p " .. string.format("%q", obstruction))
+local data_dir = root .. "/data"
+local held_dir = data_dir .. ".held"
+assert(os.rename(data_dir, held_dir), "test must be able to hold the data directory")
 equal(config.set("theme", "must-not-persist"), false,
-      "config write should fail when temp path is blocked")
+      "config write should fail when the data directory is unavailable")
 equal(config.get("theme"), "megastructure",
       "failed config write must preserve in-memory value")
+assert(os.rename(held_dir, data_dir), "test must restore the data directory")
 local verify_file = assert(io.open(config.path(), "r"))
 local verify_text = verify_file:read("*a")
 verify_file:close()
 equal(verify_text, saved_text, "failed config write must preserve last good file")
-os.execute("rmdir " .. string.format("%q", obstruction))
 local request_path = bridge.req_path()
 local processing_path = root .. "/data/.love_request.processing"
 local response_path = bridge.resp_path()
