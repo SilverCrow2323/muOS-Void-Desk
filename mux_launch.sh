@@ -99,6 +99,12 @@ except Exception:
 # exited and released the framebuffer.
 run_muos_app() {
     APP_SCRIPT="$1"
+    # Pygame's existing marker stores the application directory; LÖVE uses
+    # the same format. Accept an explicit launcher path too for compatibility.
+    case "$APP_SCRIPT" in
+        */mux_launch.sh) ;;
+        *) APP_SCRIPT="${APP_SCRIPT%/}/mux_launch.sh" ;;
+    esac
     APP_ROOT=""
     case "$APP_SCRIPT" in
         /mnt/mmc/MUOS/application/*/mux_launch.sh)
