@@ -107,6 +107,19 @@ The **Build Void Desk** GitHub Actions workflow can be started manually from the
 
 Artifacts are available from the workflow run for 30 days. Hardware compatibility still requires testing on the target handheld.
 
+### Build both packages locally
+
+On Debian/Ubuntu (or a Debian-based Linux PC), run the repository-root helper:
+
+```bash
+chmod +x build-packages.sh
+./build-packages.sh
+```
+
+It creates a validated muOS `.muxapp` and an architecture-independent PC `.deb` under `dist/`, each with a SHA-256 sidecar. The PC package installs a desktop-menu entry and the `voiddesk` command; its first launch needs Internet access to install Pygame and psutil into a per-user virtual environment. Use `./build-packages.sh --help` for version and output-directory options.
+
+Install the generated PC package with `sudo apt install ./dist/voiddesk_VERSION_all.deb`. Copy the `.muxapp` to the device SD card `ARCHIVE/` folder and install it with muOS Archive Manager.
+
 [Build Void Desk workflow](.github/workflows/build-void-desk.yml) · [PC bundle instructions](packaging/pc/README.md)
 
 ## Web browsers on muOS
