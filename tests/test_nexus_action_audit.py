@@ -23,7 +23,7 @@ def test_visible_hub_actions_have_no_dead_coming_soon_placeholders():
 
 def test_all_scene_routes_resolve_to_real_scene_files():
     scene_files = sorted((LOVE / "scenes").glob("*.lua"))
-    route_pattern = re.compile(r"sm\\.(?:push|switch)\\(\\s*[\"']([\\w_]+)[\"']")
+    route_pattern = re.compile(r"""sm\.(?:push|switch)\(\s*["']([\w_]+)["']""")
     for source_path in scene_files:
         source = source_path.read_text(encoding="utf-8")
         for target in route_pattern.findall(source):
@@ -35,7 +35,7 @@ def test_all_scene_routes_resolve_to_real_scene_files():
 
 def test_every_visible_nexus_node_resolves_to_a_scene_or_builtin_action():
     nodes = (LOVE / "core" / "nodes.lua").read_text(encoding="utf-8")
-    declared = re.findall(r'scene\\s*=\\s*[\"']([\\w_]+)[\"']', nodes)
+    declared = re.findall(r"""scene\s*=\s*["']([\w_]+)["']""", nodes)
     assert declared, "NEXUS node catalogue contains no scene declarations"
     for target in declared:
         if target == "quit":
