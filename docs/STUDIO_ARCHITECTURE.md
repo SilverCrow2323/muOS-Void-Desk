@@ -131,3 +131,7 @@ Every write must be authenticated, authorized, size-limited, schema-validated, r
 - Profile and menu item IDs are stable and independent of display labels.
 - Existing Pygame/LÖVE behaviour remains unchanged until a compatibility adapter is implemented and tested.
 - Do not claim Qt 6, LVGL, cloud sync, signatures or multi-version boot support before those components exist.
+
+## Visual customization
+
+Profiles store `visualStyle` and `palette` independently. A visual style controls composition and rendering language (for example Megastructure, Manga Ink, Industrial, Terminal, Neon Noir or Minimal); a palette controls colours. Engines advertise which combinations they implement. The initial profile schema defines the identifiers, but cross-engine visual parity requires separate adapter implementation and screenshot evidence.
