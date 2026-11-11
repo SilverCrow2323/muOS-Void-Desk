@@ -1,4 +1,4 @@
-# QWASAR Desk — Symbiotic Layer
+# Void Desk — Symbiotic Layer
 
 **Product identity:** Void Desk, the classic handheld application in QWASAR-Env  
 **Current implementation:** a muOS-launched application with Pygame as the reference frontend and LÖVE as an experimental frontend.  
