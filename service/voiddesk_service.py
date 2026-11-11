@@ -4,6 +4,7 @@ VoidDesk background service — reads .love_request.json,
 writes .love_response.json. Minimal, no external deps.
 Runs on both muOS (aarch64) and desktop x86_64.
 """
+import atexit
 import errno
 import fcntl
 import json
@@ -78,6 +79,21 @@ try:
     media_module.configure(APP_DIR)
 except Exception:
     media_module = None
+
+def _shutdown_media_players():
+    if media_module is not None:
+        try:
+            media_module.stop()
+        except Exception:
+            pass
+    if iptv_module is not None:
+        try:
+            iptv_module.stop()
+        except Exception:
+            pass
+
+
+atexit.register(_shutdown_media_players)
 
 MEDIA_ROOT_CANDIDATES = (
     (Path("/mnt/mmc"), "SD1"),
@@ -1184,6 +1200,8 @@ def h_iptv_play(args):
     )
     if channel is None:
         return {"ok": False, "error": "channel is not in the active playlist"}
+    if media_module is not None:
+        media_module.stop()
     if not iptv_module.play(channel["url"], channel.get("name", "Live stream")):
         state = iptv_module.status()
         return {"ok": False, "error": state.get("error") or "mpv could not start"}
@@ -1332,6 +1350,8 @@ def h_media_play_file(args):
     suffix = path.suffix.lower()
     if suffix not in MEDIA_AUDIO_EXTENSIONS | MEDIA_VIDEO_EXTENSIONS:
         return {"ok": False, "error": "selected file type is not playable"}
+    if iptv_module is not None:
+        iptv_module.stop()
     return media_module.play_file(
         str(path), path.name, video=suffix in MEDIA_VIDEO_EXTENSIONS
     )
@@ -1384,6 +1404,8 @@ def h_radio_play(args):
         return {"ok": False, "error": "radio playback is disabled during visual capture"}
     if media_module is None:
         return {"ok": False, "error": "radio service unavailable"}
+    if iptv_module is not None:
+        iptv_module.stop()
     return media_module.play_radio(str(args.get("station_id") or ""))
 
 
