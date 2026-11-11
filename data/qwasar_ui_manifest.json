@@ -1,0 +1,1514 @@
+{
+  "schemaVersion": "1.0",
+  "id": "qwasar.ui.void-desk.default",
+  "apiVersion": "1.0",
+  "description": "Reference QWASAR interface composition for Void Desk. This is a target manifest; entries marked planned or migration-target are not yet active runtime contributions.",
+  "engineAdapters": [
+    {
+      "id": "pygame",
+      "status": "current",
+      "uiApi": "1.0",
+      "notes": "Reference Void Desk frontend; native renderer."
+    },
+    {
+      "id": "love",
+      "status": "current",
+      "uiApi": "1.0",
+      "notes": "Alternative Void Desk frontend; composition migration remains incomplete."
+    },
+    {
+      "id": "qt6",
+      "status": "planned",
+      "uiApi": "1.0",
+      "notes": "Future desktop-native adapter."
+    },
+    {
+      "id": "lvgl",
+      "status": "planned",
+      "uiApi": "1.0",
+      "notes": "Future embedded/low-resource adapter."
+    },
+    {
+      "id": "web",
+      "status": "planned",
+      "uiApi": "1.0",
+      "notes": "Future QWASAR Studio preview/renderer adapter; not an installed handheld runtime."
+    }
+  ],
+  "componentRegistry": [
+    {
+      "id": "layout.stack",
+      "kind": "layout",
+      "stateModel": "stateless",
+      "slots": [
+        "children"
+      ],
+      "customizable": [
+        "direction",
+        "gap",
+        "padding",
+        "align"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "layout.row",
+      "kind": "layout",
+      "stateModel": "stateless",
+      "slots": [
+        "children"
+      ],
+      "customizable": [
+        "gap",
+        "align",
+        "justify",
+        "wrap"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "layout.column",
+      "kind": "layout",
+      "stateModel": "stateless",
+      "slots": [
+        "children"
+      ],
+      "customizable": [
+        "gap",
+        "align",
+        "padding"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "layout.grid",
+      "kind": "layout",
+      "stateModel": "stateless",
+      "slots": [
+        "children"
+      ],
+      "customizable": [
+        "columns",
+        "minChildWidth",
+        "gap",
+        "density"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "layout.scroll",
+      "kind": "layout",
+      "stateModel": "stateful",
+      "slots": [
+        "content"
+      ],
+      "customizable": [
+        "axis",
+        "scrollbar",
+        "overscan"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "layout.split",
+      "kind": "layout",
+      "stateModel": "stateful",
+      "slots": [
+        "primary",
+        "secondary"
+      ],
+      "customizable": [
+        "ratio",
+        "minPaneSize",
+        "collapseAt"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "surface.panel",
+      "kind": "surface",
+      "stateModel": "stateless",
+      "slots": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "customizable": [
+        "tone",
+        "border",
+        "padding",
+        "radius"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "display.text",
+      "kind": "display",
+      "stateModel": "stateless",
+      "slots": [],
+      "customizable": [
+        "textStyle",
+        "maxLines",
+        "wrap",
+        "localizationKey"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "display.icon",
+      "kind": "display",
+      "stateModel": "stateless",
+      "slots": [],
+      "customizable": [
+        "iconId",
+        "size",
+        "tone"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "display.badge",
+      "kind": "display",
+      "stateModel": "stateless",
+      "slots": [],
+      "customizable": [
+        "label",
+        "tone",
+        "shape"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.status-card",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [
+        "leading",
+        "body",
+        "trailing"
+      ],
+      "customizable": [
+        "title",
+        "value",
+        "detail",
+        "status"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.stat",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [],
+      "customizable": [
+        "label",
+        "value",
+        "unit",
+        "trend"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.gauge",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [],
+      "customizable": [
+        "value",
+        "min",
+        "max",
+        "label"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.progress",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [],
+      "customizable": [
+        "value",
+        "max",
+        "label",
+        "indeterminate"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.sparkline",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [],
+      "customizable": [
+        "series",
+        "range",
+        "label"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.media-player",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [
+        "metadata",
+        "transport",
+        "volume"
+      ],
+      "customizable": [
+        "compact",
+        "showQueue",
+        "showSeek"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.quick-tile",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [
+        "icon",
+        "label",
+        "status"
+      ],
+      "customizable": [
+        "size",
+        "emphasis"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.item-list",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [
+        "items",
+        "empty",
+        "loading",
+        "error"
+      ],
+      "customizable": [
+        "selection",
+        "rowDensity"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "menu.list",
+      "kind": "menu",
+      "stateModel": "stateful",
+      "slots": [
+        "entries",
+        "empty",
+        "loading",
+        "error"
+      ],
+      "customizable": [
+        "orientation",
+        "rowDensity",
+        "wrapNavigation"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "menu.entry",
+      "kind": "menu",
+      "stateModel": "stateful",
+      "slots": [
+        "leading",
+        "label",
+        "trailing"
+      ],
+      "customizable": [
+        "kind",
+        "enabled",
+        "dangerous",
+        "shortcut"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "navigation.breadcrumb",
+      "kind": "navigation",
+      "stateModel": "stateful",
+      "slots": [
+        "items"
+      ],
+      "customizable": [
+        "compact",
+        "showHome"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "navigation.drawer",
+      "kind": "navigation",
+      "stateModel": "stateful",
+      "slots": [
+        "content"
+      ],
+      "customizable": [
+        "edge",
+        "modal",
+        "width"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "input.toggle",
+      "kind": "input",
+      "stateModel": "stateful",
+      "slots": [],
+      "customizable": [
+        "value",
+        "label",
+        "disabled"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "input.slider",
+      "kind": "input",
+      "stateModel": "stateful",
+      "slots": [],
+      "customizable": [
+        "value",
+        "min",
+        "max",
+        "step",
+        "unit"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "input.select",
+      "kind": "input",
+      "stateModel": "stateful",
+      "slots": [
+        "options"
+      ],
+      "customizable": [
+        "value",
+        "label",
+        "disabled"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "overlay.drawer",
+      "kind": "overlay",
+      "stateModel": "stateful",
+      "slots": [
+        "content"
+      ],
+      "customizable": [
+        "edge",
+        "modal",
+        "dismissIntent"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "overlay.dialog",
+      "kind": "overlay",
+      "stateModel": "stateful",
+      "slots": [
+        "title",
+        "body",
+        "actions"
+      ],
+      "customizable": [
+        "tone",
+        "modal",
+        "confirmation"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "feedback.toast",
+      "kind": "feedback",
+      "stateModel": "stateful",
+      "slots": [],
+      "customizable": [
+        "message",
+        "tone",
+        "duration"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "feedback.progress",
+      "kind": "feedback",
+      "stateModel": "stateful",
+      "slots": [],
+      "customizable": [
+        "label",
+        "value",
+        "cancelAction"
+      ],
+      "minUiApi": "1.0"
+    }
+  ],
+  "shell": {
+    "header": {
+      "id": "shell.header",
+      "type": "layout.row",
+      "props": {
+        "region": "header",
+        "heightToken": "shell.header.height",
+        "density": "comfortable"
+      },
+      "slots": {
+        "leading": [
+          {
+            "id": "header.brand",
+            "type": "display.icon",
+            "props": {
+              "iconId": "qwasar.voiddesk-mark",
+              "size": "brand"
+            }
+          }
+        ],
+        "context": [
+          {
+            "id": "header.context",
+            "type": "display.text",
+            "props": {
+              "localizationKey": "shell.context.title",
+              "textStyle": "context-title"
+            }
+          }
+        ],
+        "status": [
+          {
+            "id": "header.status",
+            "type": "layout.row",
+            "props": {
+              "gapToken": "space.2"
+            },
+            "children": [
+              {
+                "id": "header.network",
+                "type": "widget.status-card",
+                "props": {
+                  "provider": "system.network.summary",
+                  "compact": true
+                }
+              },
+              {
+                "id": "header.battery",
+                "type": "widget.stat",
+                "props": {
+                  "provider": "system.battery",
+                  "unit": "%"
+                }
+              }
+            ]
+          }
+        ],
+        "trailing": [
+          {
+            "id": "header.profile",
+            "type": "display.badge",
+            "props": {
+              "provider": "profile.active",
+              "fallback": "DEFAULT"
+            }
+          }
+        ]
+      }
+    },
+    "footer": {
+      "id": "shell.footer",
+      "type": "layout.row",
+      "props": {
+        "region": "footer",
+        "heightToken": "shell.footer.height",
+        "density": "compact"
+      },
+      "slots": {
+        "navigation": [
+          {
+            "id": "footer.navigation-hints",
+            "type": "widget.item-list",
+            "props": {
+              "provider": "navigation.context-hints",
+              "maxItems": 4
+            }
+          }
+        ],
+        "status": [
+          {
+            "id": "footer.runtime-status",
+            "type": "display.text",
+            "props": {
+              "provider": "runtime.status.short"
+            }
+          }
+        ]
+      }
+    },
+    "homePanels": {
+      "left": {
+        "enabled": true,
+        "placement": "left",
+        "collapsible": true,
+        "collapsedByDefault": false,
+        "preferredWidth": 112,
+        "content": {
+          "id": "home.left-panel",
+          "type": "surface.panel",
+          "slots": {
+            "body": [
+              {
+                "id": "home.favourites",
+                "type": "widget.item-list",
+                "props": {
+                  "provider": "profile.favourites",
+                  "maxItems": 5
+                }
+              }
+            ]
+          }
+        }
+      },
+      "right": {
+        "enabled": true,
+        "placement": "right",
+        "collapsible": true,
+        "collapsedByDefault": true,
+        "preferredWidth": 124,
+        "content": {
+          "id": "home.right-panel",
+          "type": "surface.panel",
+          "slots": {
+            "body": [
+              {
+                "id": "home.telemetry",
+                "type": "layout.stack",
+                "children": [
+                  {
+                    "id": "home.network-summary",
+                    "type": "widget.status-card",
+                    "props": {
+                      "provider": "system.network.summary"
+                    }
+                  },
+                  {
+                    "id": "home.storage-summary",
+                    "type": "widget.stat",
+                    "props": {
+                      "provider": "system.storage.primary"
+                    }
+                  },
+                  {
+                    "id": "home.jobs-summary",
+                    "type": "widget.status-card",
+                    "props": {
+                      "provider": "jobs.summary"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "globalPanels": {
+      "mediaPlayer": {
+        "enabled": true,
+        "placement": "bottom",
+        "modal": false,
+        "triggerAction": "panel.media.toggle",
+        "dismissIntent": "overlay.dismiss",
+        "content": {
+          "id": "panel.media-player",
+          "type": "surface.panel",
+          "slots": {
+            "body": [
+              {
+                "id": "panel.media-controls",
+                "type": "widget.media-player",
+                "props": {
+                  "provider": "media.active-player",
+                  "compact": false,
+                  "showSeek": true,
+                  "showQueue": false
+                }
+              }
+            ]
+          }
+        }
+      },
+      "jobCenter": {
+        "enabled": true,
+        "placement": "right",
+        "modal": false,
+        "triggerAction": "panel.jobs.toggle",
+        "dismissIntent": "overlay.dismiss",
+        "content": {
+          "id": "panel.job-center",
+          "type": "widget.item-list",
+          "props": {
+            "provider": "jobs.active-and-recent"
+          }
+        }
+      }
+    },
+    "statusDock": {
+      "id": "shell.status-dock",
+      "type": "layout.row",
+      "props": {
+        "provider": "jobs.foreground-summary",
+        "visibleWhen": "jobs.active"
+      }
+    }
+  },
+  "workspaces": [
+    {
+      "id": "start-session",
+      "nodeId": 0,
+      "label": "START SESSION",
+      "template": "session-selector",
+      "status": "current",
+      "description": "Desktop/session selection, install prerequisites and controlled hand-off.",
+      "layout": {
+        "id": "session.layout",
+        "type": "layout.stack",
+        "children": [
+          {
+            "id": "session.environments",
+            "type": "layout.grid",
+            "props": {
+              "columns": 3
+            },
+            "children": [
+              {
+                "id": "session.xfce",
+                "type": "widget.quick-tile",
+                "props": {
+                  "label": "XFCE",
+                  "provider": "session.xfce.state"
+                }
+              },
+              {
+                "id": "session.icewm",
+                "type": "widget.quick-tile",
+                "props": {
+                  "label": "IceWM",
+                  "provider": "session.icewm.state"
+                }
+              },
+              {
+                "id": "session.lxde",
+                "type": "widget.quick-tile",
+                "props": {
+                  "label": "LXDE",
+                  "provider": "session.lxde.state"
+                }
+              }
+            ]
+          },
+          {
+            "id": "session.resources",
+            "type": "layout.row",
+            "children": [
+              {
+                "id": "session.disk",
+                "type": "widget.stat",
+                "props": {
+                  "provider": "system.storage.primary"
+                }
+              },
+              {
+                "id": "session.ram",
+                "type": "widget.stat",
+                "props": {
+                  "provider": "system.memory"
+                }
+              }
+            ]
+          },
+          {
+            "id": "session.menu",
+            "type": "menu.list",
+            "props": {
+              "source": "workspace.menu"
+            }
+          }
+        ]
+      },
+      "menu": [
+        {
+          "id": "session.launch-xfce",
+          "kind": "command",
+          "label": "Launch XFCE",
+          "actionId": "session.launch.xfce",
+          "icon": "desktop"
+        },
+        {
+          "id": "session.install-xfce",
+          "kind": "command",
+          "label": "Install XFCE",
+          "actionId": "session.install.xfce",
+          "icon": "download",
+          "confirmation": "host-required"
+        }
+      ],
+      "capabilities": [
+        "desktop.session.launch"
+      ]
+    },
+    {
+      "id": "the-forge",
+      "nodeId": 3,
+      "label": "THE FORGE",
+      "template": "package-workbench",
+      "status": "current",
+      "description": "APT, packages, desktop image and installable modules.",
+      "layout": {
+        "id": "forge.layout",
+        "type": "layout.split",
+        "props": {
+          "ratio": 0.42,
+          "collapseAt": "handheld"
+        },
+        "slots": {
+          "primary": [
+            {
+              "id": "forge.catalog",
+              "type": "menu.list",
+              "props": {
+                "source": "packages.catalog"
+              }
+            }
+          ],
+          "secondary": [
+            {
+              "id": "forge.details",
+              "type": "surface.panel",
+              "slots": {
+                "body": [
+                  {
+                    "id": "forge.package-details",
+                    "type": "display.text",
+                    "props": {
+                      "provider": "packages.selected.details"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "widgets": [
+        {
+          "id": "forge.job-progress",
+          "type": "feedback.progress",
+          "props": {
+            "provider": "jobs.apt.foreground"
+          }
+        }
+      ],
+      "menu": [
+        {
+          "id": "forge.apt",
+          "kind": "route",
+          "label": "APT Package Manager",
+          "actionId": "route.forge.apt"
+        },
+        {
+          "id": "forge.desktop",
+          "kind": "route",
+          "label": "Desktop Image",
+          "actionId": "route.forge.desktop"
+        },
+        {
+          "id": "forge.updates",
+          "kind": "command",
+          "label": "Check updates",
+          "actionId": "forge.check-updates"
+        }
+      ],
+      "capabilities": [
+        "desktop.apt.search",
+        "desktop.apt.install"
+      ]
+    },
+    {
+      "id": "uplink",
+      "nodeId": 5,
+      "label": "UPLINK",
+      "template": "network-console",
+      "status": "current",
+      "description": "Network, VPN, Bluetooth, remote access and sync.",
+      "layout": {
+        "id": "uplink.layout",
+        "type": "layout.stack",
+        "children": [
+          {
+            "id": "uplink.overview",
+            "type": "layout.grid",
+            "props": {
+              "columns": 2
+            },
+            "children": [
+              {
+                "id": "uplink.wifi",
+                "type": "widget.status-card",
+                "props": {
+                  "provider": "network.wifi"
+                }
+              },
+              {
+                "id": "uplink.bluetooth",
+                "type": "widget.status-card",
+                "props": {
+                  "provider": "network.bluetooth"
+                }
+              },
+              {
+                "id": "uplink.tailscale",
+                "type": "widget.status-card",
+                "props": {
+                  "provider": "service.tailscale"
+                }
+              },
+              {
+                "id": "uplink.syncthing",
+                "type": "widget.status-card",
+                "props": {
+                  "provider": "service.syncthing"
+                }
+              }
+            ]
+          },
+          {
+            "id": "uplink.menu",
+            "type": "menu.list",
+            "props": {
+              "source": "workspace.menu"
+            }
+          }
+        ]
+      },
+      "menu": [
+        {
+          "id": "uplink.wifi-open",
+          "kind": "route",
+          "label": "Wi-Fi",
+          "actionId": "route.uplink.wifi"
+        },
+        {
+          "id": "uplink.tailscale-open",
+          "kind": "route",
+          "label": "Tailscale",
+          "actionId": "route.uplink.tailscale"
+        },
+        {
+          "id": "uplink.syncthing-open",
+          "kind": "route",
+          "label": "Syncthing",
+          "actionId": "route.uplink.syncthing"
+        }
+      ],
+      "capabilities": [
+        "network.read-status"
+      ]
+    },
+    {
+      "id": "media-vault",
+      "nodeId": 2,
+      "label": "MEDIA VAULT",
+      "template": "media-library",
+      "status": "current",
+      "description": "Radio, IPTV, local library and shared player.",
+      "layout": {
+        "id": "media.layout",
+        "type": "layout.split",
+        "props": {
+          "ratio": 0.58,
+          "collapseAt": "handheld"
+        },
+        "slots": {
+          "primary": [
+            {
+              "id": "media.sources",
+              "type": "menu.list",
+              "props": {
+                "source": "media.sources"
+              }
+            },
+            {
+              "id": "media.items",
+              "type": "widget.item-list",
+              "props": {
+                "provider": "media.selected-source.items"
+              }
+            }
+          ],
+          "secondary": [
+            {
+              "id": "media.now-playing",
+              "type": "widget.media-player",
+              "props": {
+                "provider": "media.active-player",
+                "compact": false
+              }
+            }
+          ]
+        }
+      },
+      "menu": [
+        {
+          "id": "media.radio",
+          "kind": "route",
+          "label": "Void Radio",
+          "actionId": "route.media.radio"
+        },
+        {
+          "id": "media.iptv",
+          "kind": "route",
+          "label": "VoidCast IPTV",
+          "actionId": "route.media.iptv"
+        },
+        {
+          "id": "media.library",
+          "kind": "route",
+          "label": "Media Library",
+          "actionId": "route.media.library"
+        }
+      ],
+      "capabilities": [
+        "media.read-state",
+        "media.playback.control"
+      ]
+    },
+    {
+      "id": "rt-toolbox",
+      "nodeId": 4,
+      "label": "RT:TOOLBOX",
+      "template": "tool-workbench",
+      "status": "migration-target",
+      "description": "Unified quick tools, file workspace, diagnostics, monitoring and developer utilities.",
+      "layout": {
+        "id": "toolbox.layout",
+        "type": "layout.stack",
+        "children": [
+          {
+            "id": "toolbox.quick-access",
+            "type": "layout.grid",
+            "props": {
+              "columns": 3
+            },
+            "children": [
+              {
+                "id": "toolbox.calculator",
+                "type": "widget.quick-tile",
+                "props": {
+                  "label": "Calculator",
+                  "route": "tool.calc"
+                }
+              },
+              {
+                "id": "toolbox.clock",
+                "type": "widget.quick-tile",
+                "props": {
+                  "label": "Clock",
+                  "route": "tool.clock"
+                }
+              },
+              {
+                "id": "toolbox.calendar",
+                "type": "widget.quick-tile",
+                "props": {
+                  "label": "Calendar",
+                  "route": "tool.calendar"
+                }
+              }
+            ]
+          },
+          {
+            "id": "toolbox.health",
+            "type": "layout.grid",
+            "props": {
+              "columns": 2
+            },
+            "children": [
+              {
+                "id": "toolbox.diagnostics",
+                "type": "widget.status-card",
+                "props": {
+                  "label": "Void Diag",
+                  "provider": "system.diagnostics.summary"
+                }
+              },
+              {
+                "id": "toolbox.monitor",
+                "type": "widget.status-card",
+                "props": {
+                  "label": "Void Monitor",
+                  "provider": "system.monitor.summary"
+                }
+              }
+            ]
+          },
+          {
+            "id": "toolbox.menu",
+            "type": "menu.list",
+            "props": {
+              "source": "workspace.menu"
+            }
+          }
+        ]
+      },
+      "sections": [
+        {
+          "id": "toolbox.quick-access-section",
+          "label": "Quick Access"
+        },
+        {
+          "id": "toolbox.files",
+          "label": "Files"
+        },
+        {
+          "id": "toolbox.diagnostics-section",
+          "label": "Diagnostics"
+        },
+        {
+          "id": "toolbox.monitor-section",
+          "label": "Monitor"
+        },
+        {
+          "id": "toolbox.maintenance",
+          "label": "Maintenance"
+        },
+        {
+          "id": "toolbox.developer",
+          "label": "Developer"
+        }
+      ],
+      "menu": [
+        {
+          "id": "toolbox.diagnostics-open",
+          "kind": "route",
+          "label": "Void Diag",
+          "actionId": "route.toolbox.diagnostics"
+        },
+        {
+          "id": "toolbox.monitor-open",
+          "kind": "route",
+          "label": "Void Monitor",
+          "actionId": "route.toolbox.monitor"
+        },
+        {
+          "id": "toolbox.files-open",
+          "kind": "route",
+          "label": "File Manager",
+          "actionId": "route.toolbox.files"
+        },
+        {
+          "id": "toolbox.editor-open",
+          "kind": "route",
+          "label": "Text Editor",
+          "actionId": "route.toolbox.editor"
+        },
+        {
+          "id": "toolbox.shell-open",
+          "kind": "route",
+          "label": "Shell",
+          "actionId": "route.toolbox.shell",
+          "capabilities": [
+            "device.shell.pty"
+          ]
+        }
+      ],
+      "capabilities": [
+        "device.read-status"
+      ]
+    },
+    {
+      "id": "settings",
+      "nodeId": 7,
+      "label": "SETTINGS",
+      "template": "settings-workbench",
+      "status": "current",
+      "description": "Grouped preferences, themes, input mapping and profile composition.",
+      "layout": {
+        "id": "settings.layout",
+        "type": "layout.split",
+        "slots": {
+          "primary": [
+            {
+              "id": "settings.categories",
+              "type": "menu.list",
+              "props": {
+                "source": "settings.categories"
+              }
+            }
+          ],
+          "secondary": [
+            {
+              "id": "settings.form",
+              "type": "surface.panel",
+              "slots": {
+                "body": [
+                  {
+                    "id": "settings.editor",
+                    "type": "input.select",
+                    "props": {
+                      "provider": "settings.selected.editor"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "menu": [
+        {
+          "id": "settings.appearance",
+          "kind": "submenu",
+          "label": "Appearance",
+          "children": [
+            {
+              "id": "settings.theme",
+              "kind": "route",
+              "label": "Theme and palette",
+              "actionId": "route.settings.theme"
+            },
+            {
+              "id": "settings.layout",
+              "kind": "route",
+              "label": "Layout and panels",
+              "actionId": "route.settings.layout"
+            }
+          ]
+        },
+        {
+          "id": "settings.controls",
+          "kind": "route",
+          "label": "Controls",
+          "actionId": "route.settings.controls"
+        }
+      ]
+    },
+    {
+      "id": "info-community",
+      "nodeId": 8,
+      "label": "INFO / COMMUNITY",
+      "template": "reference-library",
+      "status": "migration-target",
+      "description": "Manual, release notes, credits, help and community catalogue.",
+      "layout": {
+        "id": "info.layout",
+        "type": "layout.grid",
+        "props": {
+          "columns": 2
+        },
+        "children": [
+          {
+            "id": "info.manual",
+            "type": "widget.quick-tile",
+            "props": {
+              "label": "Technical Manual",
+              "route": "info.manual"
+            }
+          },
+          {
+            "id": "info.releases",
+            "type": "widget.quick-tile",
+            "props": {
+              "label": "Releases",
+              "route": "info.releases"
+            }
+          },
+          {
+            "id": "info.community",
+            "type": "widget.quick-tile",
+            "props": {
+              "label": "Community",
+              "route": "info.community"
+            }
+          },
+          {
+            "id": "info.credits",
+            "type": "widget.quick-tile",
+            "props": {
+              "label": "Credits",
+              "route": "info.credits"
+            }
+          }
+        ]
+      },
+      "menu": []
+    },
+    {
+      "id": "end-node",
+      "nodeId": 9,
+      "label": "END NODE",
+      "template": "system-exit",
+      "status": "current",
+      "description": "Exit, restart and safe power-off.",
+      "layout": {
+        "id": "exit.layout",
+        "type": "surface.panel",
+        "props": {
+          "tone": "warning"
+        },
+        "children": [
+          {
+            "id": "exit.notice",
+            "type": "display.text",
+            "props": {
+              "localizationKey": "exit.confirm-exit"
+            }
+          }
+        ]
+      },
+      "menu": [
+        {
+          "id": "exit.return",
+          "kind": "command",
+          "label": "Return to muOS",
+          "actionId": "system.return"
+        },
+        {
+          "id": "exit.poweroff",
+          "kind": "command",
+          "label": "Power off",
+          "actionId": "system.poweroff",
+          "confirmation": "host-typed"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "session.launch.xfce",
+      "kind": "command",
+      "target": "session_launch",
+      "capability": "desktop.session.launch",
+      "permission": "desktop-session-launch",
+      "confirmation": "host-required",
+      "status": "implemented"
+    },
+    {
+      "id": "session.install.xfce",
+      "kind": "command",
+      "target": "xfce_install",
+      "capability": "desktop.session.install",
+      "permission": "desktop-image-write",
+      "confirmation": "host-required",
+      "status": "implemented"
+    },
+    {
+      "id": "route.forge.apt",
+      "kind": "route",
+      "target": "hub_apt",
+      "status": "implemented"
+    },
+    {
+      "id": "route.forge.desktop",
+      "kind": "route",
+      "target": "hub_session",
+      "status": "implemented"
+    },
+    {
+      "id": "forge.check-updates",
+      "kind": "command",
+      "target": "gh_fetch_releases",
+      "status": "implemented"
+    },
+    {
+      "id": "route.uplink.wifi",
+      "kind": "route",
+      "target": "hub_uplink",
+      "status": "implemented"
+    },
+    {
+      "id": "route.uplink.tailscale",
+      "kind": "route",
+      "target": "hub_tailscale",
+      "status": "implemented"
+    },
+    {
+      "id": "route.uplink.syncthing",
+      "kind": "route",
+      "target": "hub_syncthing",
+      "status": "implemented"
+    },
+    {
+      "id": "route.media.radio",
+      "kind": "route",
+      "target": "hub_radio",
+      "status": "planned"
+    },
+    {
+      "id": "route.media.iptv",
+      "kind": "route",
+      "target": "hub_iptv",
+      "status": "implemented"
+    },
+    {
+      "id": "route.media.library",
+      "kind": "route",
+      "target": "hub_media_library",
+      "status": "planned"
+    },
+    {
+      "id": "route.toolbox.diagnostics",
+      "kind": "route",
+      "target": "hub_diagnostics",
+      "status": "implemented"
+    },
+    {
+      "id": "route.toolbox.monitor",
+      "kind": "route",
+      "target": "hub_monitor",
+      "status": "implemented"
+    },
+    {
+      "id": "route.toolbox.files",
+      "kind": "route",
+      "target": "tool.file-manager",
+      "status": "planned"
+    },
+    {
+      "id": "route.toolbox.editor",
+      "kind": "route",
+      "target": "tool_editor",
+      "status": "implemented"
+    },
+    {
+      "id": "route.toolbox.shell",
+      "kind": "route",
+      "target": "hub_shell",
+      "capability": "device.shell.pty",
+      "permission": "shell-session",
+      "confirmation": "host-required",
+      "status": "implemented"
+    },
+    {
+      "id": "route.settings.theme",
+      "kind": "route",
+      "target": "hub_settings",
+      "status": "implemented"
+    },
+    {
+      "id": "route.settings.layout",
+      "kind": "route",
+      "target": "settings.layout-designer",
+      "status": "planned"
+    },
+    {
+      "id": "route.settings.controls",
+      "kind": "route",
+      "target": "settings.controls",
+      "status": "planned"
+    },
+    {
+      "id": "route.info.manual",
+      "kind": "route",
+      "target": "info.manual",
+      "status": "planned"
+    },
+    {
+      "id": "route.info.releases",
+      "kind": "route",
+      "target": "info.releases",
+      "status": "implemented"
+    },
+    {
+      "id": "route.info.community",
+      "kind": "route",
+      "target": "info.community",
+      "status": "planned"
+    },
+    {
+      "id": "route.info.credits",
+      "kind": "route",
+      "target": "info.credits",
+      "status": "planned"
+    },
+    {
+      "id": "system.return",
+      "kind": "system",
+      "target": "return-to-muos",
+      "confirmation": "none",
+      "status": "implemented"
+    },
+    {
+      "id": "system.poweroff",
+      "kind": "system",
+      "target": "device-poweroff",
+      "permission": "device-power-control",
+      "confirmation": "host-typed",
+      "dangerous": true,
+      "status": "implemented"
+    },
+    {
+      "id": "panel.media.toggle",
+      "kind": "overlay",
+      "target": "shell.globalPanels.mediaPlayer",
+      "status": "planned"
+    },
+    {
+      "id": "panel.jobs.toggle",
+      "kind": "overlay",
+      "target": "shell.globalPanels.jobCenter",
+      "status": "planned"
+    }
+  ],
+  "keymap": [
+    {
+      "id": "shortcut.media.m",
+      "actionId": "panel.media.toggle",
+      "input": "keyboard",
+      "value": "m",
+      "default": true
+    },
+    {
+      "id": "shortcut.jobs.select",
+      "actionId": "panel.jobs.toggle",
+      "input": "gamepad-intent",
+      "value": "select",
+      "default": false
+    }
+  ],
+  "legacyAliases": [
+    {
+      "oldId": "hub_toolbox",
+      "newId": "rt-toolbox",
+      "section": "toolbox.quick-access-section"
+    },
+    {
+      "oldId": "hub_workshop",
+      "newId": "rt-toolbox",
+      "section": "toolbox.diagnostics-section"
+    },
+    {
+      "oldId": "hub_diagnostics",
+      "newId": "rt-toolbox",
+      "section": "toolbox.diagnostics-section"
+    },
+    {
+      "oldId": "hub_monitor",
+      "newId": "rt-toolbox",
+      "section": "toolbox.monitor-section"
+    },
+    {
+      "oldId": "WORKSHOP",
+      "newId": "rt-toolbox",
+      "section": "toolbox.diagnostics-section"
+    },
+    {
+      "oldId": "TOOLBOX",
+      "newId": "rt-toolbox",
+      "section": "toolbox.quick-access-section"
+    }
+  ]
+}
