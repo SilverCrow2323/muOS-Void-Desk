@@ -82,7 +82,7 @@ UNMOUNT_OWNED() {
 	fi
 }
 
-ABORT_SETUP() {
+ABORT_SETUP {
 	echo "$(date) preparazione mount fallita; chroot annullato" >>"$LOG"
 	if [ "$WE_MOUNTED" = 1 ]; then
 		PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
@@ -102,17 +102,17 @@ ABORT_SETUP() {
 
 if ! MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev"; then
 	echo "$(date) stato mount /dev non valido; abort prima del chroot" >>"$LOG"
-	ABORT_SETUP()
+	ABORT_SETUP
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_DEV=1
 if ! MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc"; then
 	echo "$(date) stato mount /proc non valido; abort prima del chroot" >>"$LOG"
-	ABORT_SETUP()
+	ABORT_SETUP
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PROC=1
 if ! MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys"; then
 	echo "$(date) stato mount /sys non valido; abort prima del chroot" >>"$LOG"
-	ABORT_SETUP()
+	ABORT_SETUP
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SYS=1
 for SUB in /dev/pts /dev/shm /dev/input; do
@@ -120,7 +120,7 @@ for SUB in /dev/pts /dev/shm /dev/input; do
 	mkdir -p "$MNT$SUB"
 	if ! MOUNT_IF_NEEDED "$MNT$SUB" mount -o bind "$SUB" "$MNT$SUB" 2>/dev/null; then
 		echo "$(date) stato mount non valido: $MNT$SUB; abort prima del chroot" >>"$LOG"
-		ABORT_SETUP()
+		ABORT_SETUP
 	fi
 	case "$SUB" in
 		/dev/pts) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PTS=1 ;;
