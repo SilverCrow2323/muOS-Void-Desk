@@ -73,6 +73,25 @@ try:
 except Exception:
     iptv_module = None
 
+try:
+    import media_module
+    media_module.configure(APP_DIR)
+except Exception:
+    media_module = None
+
+MEDIA_ROOT_CANDIDATES = (
+    (Path("/mnt/mmc"), "SD1"),
+    (Path("/mnt/sdcard"), "SD2"),
+    (DATA, "Void Desk Data"),
+)
+MEDIA_AUDIO_EXTENSIONS = {
+    ".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma", ".opus",
+}
+MEDIA_VIDEO_EXTENSIONS = {
+    ".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v",
+}
+MEDIA_EXTENSIONS = MEDIA_AUDIO_EXTENSIONS | MEDIA_VIDEO_EXTENSIONS | {".m3u", ".m3u8"}
+
 _IPTV_CHANNELS = []
 _IPTV_EPG = {}
 _IPTV_ALLOWED_EPG_URLS = set()
@@ -1184,6 +1203,195 @@ def h_iptv_status(args):
     return {"ok": True, **iptv_module.status()}
 
 
+def _media_root_entries():
+    roots = []
+    for root, label in MEDIA_ROOT_CANDIDATES:
+        try:
+            real = root.resolve(strict=True)
+            if real.is_dir() and not any(item["path"] == str(real) for item in roots):
+                roots.append({"id": label.lower().replace(" ", "-"),
+                              "label": label, "path": str(real)})
+        except OSError:
+            continue
+    return roots
+
+
+def _media_resolve_path(value):
+    if not isinstance(value, str) or not value or len(value) > 4096:
+        raise ValueError("a valid media path is required")
+    candidate = Path(value)
+    if not candidate.is_absolute() or any(part == ".." for part in candidate.parts):
+        raise ValueError("media path must be absolute and cannot traverse parents")
+
+    for root in _media_root_entries():
+        base = Path(root["path"])
+        try:
+            relative = candidate.relative_to(base)
+        except ValueError:
+            continue
+
+        current = base
+        for part in relative.parts:
+            if part in ("", "."):
+                continue
+            current = current / part
+            if current.is_symlink():
+                raise ValueError("symbolic links are not allowed in the media browser")
+
+        try:
+            resolved = candidate.resolve(strict=True)
+        except OSError as exc:
+            raise ValueError("media path does not exist") from exc
+        if resolved == base or base in resolved.parents:
+            return resolved, root
+    raise ValueError("media path is outside SD1, SD2 and Void Desk Data")
+
+
+def h_media_roots(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "roots": [
+            {"id": "sd1", "label": "SD1", "path": "fixture://sd1"},
+            {"id": "sd2", "label": "SD2", "path": "fixture://sd2"},
+            {"id": "data", "label": "Void Desk Data", "path": "fixture://data"},
+        ]}
+    return {"ok": True, "roots": _media_root_entries()}
+
+
+def h_media_list(args):
+    requested = args.get("path")
+    if IS_VISUAL_CAPTURE:
+        samples = {
+            "fixture://sd1": [
+                {"name": "MUSIC", "type": "dir", "path": "fixture://sd1/MUSIC", "size": 0},
+                {"name": "VIDEO", "type": "dir", "path": "fixture://sd1/VIDEO", "size": 0},
+            ],
+            "fixture://sd1/MUSIC": [
+                {"name": "Ambient Session.ogg", "type": "audio", "path": "fixture://track/audio", "size": 7340032},
+            ],
+            "fixture://sd1/VIDEO": [
+                {"name": "Void Trailer.mp4", "type": "video", "path": "fixture://track/video", "size": 73400320},
+            ],
+            "fixture://sd2": [],
+            "fixture://data": [],
+        }
+        if requested not in samples:
+            return {"ok": False, "error": "fixture media path is unavailable"}
+        return {"ok": True, "path": requested, "entries": samples[requested]}
+
+    try:
+        current, root = _media_resolve_path(requested)
+        if not current.is_dir():
+            return {"ok": False, "error": "selected media path is not a folder"}
+        entries = []
+        for child in sorted(current.iterdir(), key=lambda item: item.name.casefold()):
+            if child.name.startswith(".") or child.is_symlink():
+                continue
+            try:
+                real = child.resolve(strict=True)
+                if real.parent != current:
+                    continue
+                if child.is_dir():
+                    entries.append({
+                        "name": child.name[:160], "type": "dir",
+                        "path": str(real), "size": 0,
+                    })
+                elif child.is_file() and child.suffix.lower() in MEDIA_EXTENSIONS:
+                    suffix = child.suffix.lower()
+                    media_type = (
+                        "audio" if suffix in MEDIA_AUDIO_EXTENSIONS else
+                        "video" if suffix in MEDIA_VIDEO_EXTENSIONS else "playlist"
+                    )
+                    entries.append({
+                        "name": child.name[:160], "type": media_type,
+                        "path": str(real), "size": child.stat().st_size,
+                    })
+            except OSError:
+                continue
+            if len(entries) >= 200:
+                break
+        return {"ok": True, "path": str(current), "root": root["label"],
+                "entries": entries}
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)[:160]}
+
+
+def h_media_play_file(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "media playback is disabled during visual capture"}
+    if media_module is None:
+        return {"ok": False, "error": "media playback service unavailable"}
+    try:
+        path, _root = _media_resolve_path(args.get("path"))
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)[:160]}
+    if not path.is_file():
+        return {"ok": False, "error": "selected media item is not a file"}
+    suffix = path.suffix.lower()
+    if suffix not in MEDIA_AUDIO_EXTENSIONS | MEDIA_VIDEO_EXTENSIONS:
+        return {"ok": False, "error": "selected file type is not playable"}
+    return media_module.play_file(
+        str(path), path.name, video=suffix in MEDIA_VIDEO_EXTENSIONS
+    )
+
+
+def h_media_stop(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "state": "idle"}
+    if media_module is None:
+        return {"ok": False, "error": "media playback service unavailable"}
+    return media_module.stop()
+
+
+def h_media_playback_status(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "playing": False, "current": None,
+                "icy_title": "", "paused": False, "buffering": False, "volume": 0}
+    if media_module is None:
+        return {"ok": False, "error": "media playback service unavailable"}
+    return media_module.status()
+
+
+def h_radio_list(args):
+    tab = str(args.get("tab") or "all")
+    if IS_VISUAL_CAPTURE:
+        stations = [
+            {"id": "fixture-radio-01", "name": "Void Signal Radio",
+             "tags": "ambient · electronic", "country": "US",
+             "category": "all", "favorite": True},
+            {"id": "fixture-radio-02", "name": "Italia Broadcast",
+             "tags": "news · talk", "country": "IT",
+             "category": "italia", "favorite": False},
+        ]
+        return {"ok": True, "tab": tab, "stations": stations, "count": len(stations)}
+    if media_module is None:
+        return {"ok": False, "error": "radio service unavailable"}
+    return media_module.list_stations(tab)
+
+
+def h_radio_toggle_favorite(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "radio changes are disabled during visual capture"}
+    if media_module is None:
+        return {"ok": False, "error": "radio service unavailable"}
+    return media_module.toggle_favorite(str(args.get("station_id") or ""))
+
+
+def h_radio_play(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "radio playback is disabled during visual capture"}
+    if media_module is None:
+        return {"ok": False, "error": "radio service unavailable"}
+    return media_module.play_radio(str(args.get("station_id") or ""))
+
+
+def h_radio_stop(args):
+    return h_media_stop(args)
+
+
+def h_radio_status(args):
+    return h_media_playback_status(args)
+
+
 def h_hotspot_toggle(args):
     dcheck = device_only("hotspot_toggle")
     if dcheck:
@@ -1796,6 +2004,16 @@ HANDLERS = {
     "job_cancel": h_job_cancel,
     "job_log": h_job_log,
     "media_status": h_media_status,
+    "media_roots": h_media_roots,
+    "media_list": h_media_list,
+    "media_play_file": h_media_play_file,
+    "media_stop": h_media_stop,
+    "media_playback_status": h_media_playback_status,
+    "radio_list": h_radio_list,
+    "radio_toggle_favorite": h_radio_toggle_favorite,
+    "radio_play": h_radio_play,
+    "radio_stop": h_radio_stop,
+    "radio_status": h_radio_status,
     "iptv_get_config": h_iptv_get_config,
     "iptv_load_playlist": h_iptv_load_playlist,
     "iptv_load_epg": h_iptv_load_epg,
