@@ -91,6 +91,7 @@ def test_shared_mount_probe_fails_closed_when_imgmount_import_raises(tmp_path):
         "APP_DIR": str(app),
         "MOUNT_PATH": "/mnt/Void Desk/xfce_mnt",
         "PY3": sys.executable,
+        "PYTHONPATH": str(desk) + os.pathsep + env.get("PYTHONPATH", ""),
         "HELPER_PATH": str(HELPER),
     })
     script = (
