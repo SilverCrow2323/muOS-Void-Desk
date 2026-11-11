@@ -112,7 +112,7 @@ class QwasarSwitchboard:
 
     A profile update is validated before it replaces the in-memory snapshot.
     save() then verifies that the source file has not changed since load and
-    commits the complete profile using the repository's atomic I/O helper.
+    commits the complete profile with a same-directory atomic replacement.
     """
 
     def __init__(
