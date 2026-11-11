@@ -19,7 +19,7 @@ vd_mount_present() {
     fi
 
     _vd_result=$(
-        PYTHONPATH="$_vd_app_dir/desk\${PYTHONPATH:+:$PYTHONPATH}" \
+        PYTHONPATH="$_vd_app_dir/desk${PYTHONPATH:+:$PYTHONPATH}" \
             "$_vd_python" -c \
             'import sys
 try:
