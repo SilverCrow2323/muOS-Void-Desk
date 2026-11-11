@@ -4,6 +4,8 @@ on:
   push:
     branches: ["main", "codex/**"]
   pull_request:
+    # Avoid rerunning CI for label, assignment, draft-conversion and review-request events.
+    types: [opened, synchronize, reopened, ready_for_review]
     # Documentation-only changes do not need to reinstall the full native
     # toolchain or rebuild the handheld/PC packages.
     paths-ignore:
