@@ -820,7 +820,8 @@
         "installPolicy",
         "bootloaderAdapters",
         "sessionTargets",
-        "integrations"
+        "integrations",
+        "packageAdapters"
       ],
       "properties": {
         "selector": {
@@ -1014,6 +1015,68 @@
               "notes": {
                 "type": "string",
                 "maxLength": 800
+              }
+            }
+          }
+        },
+        "packageAdapters": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "status",
+              "platforms",
+              "target",
+              "hostMutation",
+              "notes"
+            ],
+            "properties": {
+              "id": {
+                "enum": [
+                  "apt.desktop-image",
+                  "apt.desktop-host",
+                  "muos-buildroot"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "current",
+                  "planned",
+                  "forbidden"
+                ]
+              },
+              "platforms": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "muos-h700",
+                    "desktop-linux-x86_64",
+                    "desktop-linux-arm64",
+                    "desktop-other"
+                  ]
+                }
+              },
+              "target": {
+                "enum": [
+                  "optional-debian-ubuntu-image",
+                  "host-linux-package-database",
+                  "muos-buildroot-host"
+                ]
+              },
+              "hostMutation": {
+                "type": "boolean"
+              },
+              "requiresExplicitApproval": {
+                "type": "boolean"
+              },
+              "notes": {
+                "type": "string",
+                "maxLength": 600
               }
             }
           }
