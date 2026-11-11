@@ -79,7 +79,7 @@ The source-grounded inventory and proposed categories are in [docs/TOOL_CATALOG.
 
 ## Visual identity — the Megastructure
 
-QWASAR's signature direction is raw industrial science fiction: monumental architecture, steel, deep blacks, manga-like ink contrast, technical markings and restrained signal colours. The mood may evoke dark architectural cyberpunk manga, but all QWASAR artwork, symbols and layouts must be original.
+Void Desk's signature visual direction is raw industrial science fiction: monumental architecture, steel, deep blacks, manga-like ink contrast, technical markings and restrained signal colours. The mood may evoke dark architectural cyberpunk manga, but all QWASAR artwork, symbols and layouts must be original.
 
 The visual system separates **style** (composition, typography, geometry, texture and motion) from **palette** (colour tokens). Proposed styles:
 
@@ -112,24 +112,24 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for execution flow.
 
 ## The Symbiotic Layer roadmap
 
-QWASAR's goal is deeper integration with muOS, not an unsafe firmware takeover:
+Void Desk's goal is deeper integration with muOS, not an unsafe firmware takeover:
 
 1. **Application layer:** use the official muOS application runner and lifecycle, including its storage and foreground-process handling.
 2. **Service layer:** manage QWASAR-owned services with explicit startup, health checks, permissions and clean shutdown.
 3. **Shared capability layer:** expose device, network, storage and media capabilities to Pygame, LÖVE and future frontends through typed APIs.
 4. **Experience layer:** optional QWASAR navigation, profiles, artwork, themes and dashboards, while preserving return to the native muOS frontend.
-5. **Studio and ecosystem:** browser companion, profile editor, official plugin catalog and platform adapters for KNULLI, ROCKNIX and custom systems after validation.
+5. **Studio and ecosystem:** QWASAR Studio brings together Module Forge, LEGO-style Layout Designer, Release Composer and Community Library; platform adapters for KNULLI, ROCKNIX and custom systems follow validation.
 6. **Deeper integration:** only through documented, reversible extension points with backup, rollback and a recovery path.
 
-The muOS developer documentation describes its app runner, launcher metadata, setup helpers, storage paths and extension mechanisms. QWASAR will use those interfaces rather than patching boot internals or replacing system files. See [Application Runner](https://community.muos.dev/t/application-runner/1282), [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) and [Frontend and Launching](https://muos.dev/docs/infrastructure/launching).
+The muOS developer documentation describes its app runner, launcher metadata, setup helpers, storage paths and extension mechanisms. Void Desk will use those interfaces rather than patching boot internals or replacing system files. See [Application Runner](https://community.muos.dev/t/application-runner/1282), [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) and [Frontend and Launching](https://muos.dev/docs/infrastructure/launching).
 
 **Non-negotiable:** muOS must remain bootable and recoverable if QWASAR is disabled, uninstalled or fails to start. No bootloader replacement, destructive init changes or irreversible system modifications are part of this roadmap.
 
-## QWASAR Studio — browser companion
+## QWASAR Studio — one web app for modules, layouts and builds
 
-Studio is planned as an opt-in web/PWA companion. It will let users edit menu layouts, labels, profiles and visual choices, then import/export or sync profiles with a device. Initial sharing is limited to profiles and official plugins; third-party plugin publishing is out of scope for v1.
+QWASAR Studio is planned as one opt-in browser/PWA application with four workbenches: **Module Forge** for creating and validating tools, **Layout Designer** for assembling NEXUS/workspace sections like LEGO blocks, **Release Composer** for selecting Full/Essential/Slim or a custom permitted module set, and **Community Library** for discovering and sharing profiles and reviewed modules.
 
-The profile/plugin schemas and trust boundaries are being developed under `schemas/`. Cloud API and device pairing are planned components, not deployed services.
+Profiles are declarative data and never execute code. Executable modules require a separate manifest, capability/permission review, signature and safe runtime. APT package recipes target only the optional Debian/Ubuntu desktop image, never the muOS host. The detailed contract is in [docs/MODULE_SYSTEM.md](docs/MODULE_SYSTEM.md). Cloud API, online publishing, device pairing and remote builds are planned components, not deployed services.
 
 ## Installation on muOS
 
@@ -152,13 +152,15 @@ The installed root remains `Void-Desk/` during this branding transition.
 
 **Pygame is the recommended daily-use frontend.** LÖVE is included for development and testing only; several actions and routes remain incomplete.
 
-## Build QWASAR / Void Desk packages
+## Build Void Desk packages
 
-The **Build Void Desk** GitHub Actions workflow is available from the Actions tab. Start it manually and select:
+The **Build Void Desk** GitHub Actions workflow is available from the Actions tab. The current builder produces the default package set; Full/Essential/Slim variants will be added after the module registry and lockfile are implemented. The target release model is three reproducible `.muxapp` flavours:
 
-- `all` — build both targets.
-- `muos` — build and validate the muOS `.muxapp`.
-- `pc` — build the Linux PC bundle.
+- **Full** — all maintained and compatible first-party modules.
+- **Essential** — core daily-use hubs and tools.
+- **Slim** — minimal shell/module manager; add modules later.
+
+The existing build workflow still uses its current `all` / `muos` / `pc` inputs; flavour-specific outputs are a planned extension, not available yet.
 
 Outputs include SHA-256 checksums. Workflow artifacts are retained for 30 days. The current PC output is a portable Linux source bundle, not an AppImage or statically linked executable; its first launch creates a Python virtual environment and installs Pygame/psutil.
 
