@@ -1,6 +1,6 @@
 # Void Desk Frontends — Pygame and LÖVE
 
-The handheld application is **Void Desk**, part of the wider **QWASAR-Env** ecosystem. See [the product and device map](../docs/PRODUCT_ECOSYSTEM_MAP.md) for the cross-device architecture and LÖVE completion gates.
+The handheld application is **Void Desk**, part of the wider **QWASAR-Env** ecosystem. See [the product and device map](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/PRODUCT_ECOSYSTEM_MAP.md) for the cross-device architecture and LÖVE completion gates.
 
 ## Pygame (recommended)
 
