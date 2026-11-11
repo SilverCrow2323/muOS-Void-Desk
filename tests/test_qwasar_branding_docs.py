@@ -53,12 +53,19 @@ def test_pygame_user_facing_copy_uses_qwasar_brand():
     assert "VoidDesk wasn't built to be perfect" not in source
     assert '"VOID DESK"' not in source
 
-def test_ci_retries_apt_mirrors_and_keeps_independent_jobs_running():
+def test_ci_uses_one_bounded_apt_install_and_system_python_for_integration():
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
-    assert workflow.count("if: ${{ !cancelled() }}") == 3
-    assert workflow.count("bash tools/ci_apt_install.sh") == 3
+    assert workflow.count("bash tools/ci_apt_install.sh") == 1
+    assert "name: Lua, LÖVE and Rt:Tailscale-M integration" in workflow
+    assert "cancel-in-progress: true" in workflow
+
+    integration = workflow.split("  linux-integration:\\n", 1)[1]
+    # Native Python modules are installed by APT, so this job must use Ubuntu's
+    # system interpreter rather than setup-python's isolated interpreter.
+    assert "actions/setup-python@v5" not in integration
+    assert "python3-pyflakes python3-qrcode python3-opencv" in integration
 
     installer = (ROOT / "tools" / "ci_apt_install.sh").read_text(
         encoding="utf-8"
