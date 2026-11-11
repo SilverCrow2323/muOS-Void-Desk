@@ -30,7 +30,7 @@ Void Desk is the classic controller-first handheld application within the QWASAR
 
 The long-term direction is a **Symbiotic Layer**. Void Desk uses the host firmware's supported application, service, storage and theme extension points, then progressively provides a richer experience without making the original firmware unbootable or difficult to recover. It is not a replacement firmware image today.
 
-> **Brand transition:** QWASAR Desk is the new product name. The repository slug, installed package root (`Void-Desk/`), launcher names and existing configuration paths remain unchanged for compatibility. A coordinated package/identifier migration will be a separate, reversible change.
+> **Naming:** Void Desk is the classic handheld application; QWASAR-Env is the cross-device ecosystem. The repository slug, installed package root (`Void-Desk/`), launcher names and existing configuration paths remain unchanged for compatibility.
 
 ## At a glance
 
@@ -57,7 +57,7 @@ Compatibility is evidence-based. muOS Andromeda on compatible H700 devices is th
 
 NEXUS is an animated, orbit-based hub selector designed for D-pad and controller navigation.
 
-<img src="resources/nexus-menu.png" alt="QWASAR Desk NEXUS interface (legacy Void Desk artwork)" width="720">
+<img src="resources/nexus-menu.png" alt="Void Desk NEXUS interface (legacy Void Desk artwork)" width="720">
 
 ### Hubs and workspaces
 
@@ -305,7 +305,7 @@ Bug reports should include version, device, firmware, selected engine, reproduct
 
 ### Device power-off
 
-When QWASAR Desk is started as a muOS application, the power-off action returns control to `mux_launch.sh`. The launcher stops the local companion service, syncs pending filesystem writes, then requests a forced power-off, with kernel power-off fallbacks if the first command returns. This is separate from **END SESSION → Close**, which only exits QWASAR Desk.
+When Void Desk is started as a muOS application, the power-off action returns control to `mux_launch.sh`. The launcher stops the local companion service, syncs pending filesystem writes, then requests a forced power-off, with kernel power-off fallbacks if the first command returns. This is separate from **END SESSION → Close**, which only exits Void Desk.
 
 If the device does not power off, preserve `data/voiddesk.log` and report the device model, muOS build and whether the screen/LED state changed. Avoid repeated hard resets while storage writes may still be in progress.
 
@@ -324,7 +324,7 @@ See [SECURITY.md](SECURITY.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits and licensing
 
-QWASAR Desk is the evolving product identity of Void Desk, maintained by **Sir Pips / SPDW Factory**. The repository acknowledges Pygame, LÖVE, MustardOS/muOS, Debian/Ubuntu and upstream projects listed in [THIRD-PARTY.md](THIRD-PARTY.md).
+Void Desk is the evolving product identity of Void Desk, maintained by **Sir Pips / SPDW Factory**. The repository acknowledges Pygame, LÖVE, MustardOS/muOS, Debian/Ubuntu and upstream projects listed in [THIRD-PARTY.md](THIRD-PARTY.md).
 
 There is currently no root-level LICENSE file. Do not assume a specific open-source license until the corresponding license text is published.
 
