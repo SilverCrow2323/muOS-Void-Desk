@@ -11,7 +11,8 @@ LOG="$DATA/apt_install.log"
 if [ $# -eq 0 ]; then echo "Usage: $0 <package> [package...]"; exit 1; fi
 if [ ! -f "$IMG" ]; then echo "XFCE image not found: $IMG"; exit 2; fi
 
-MNTED() { grep -q " $1 " /proc/mounts 2>/dev/null; }
+. "$APP_DIR/bin/vd_mount_common.sh"
+MNTED() { vd_mount_present "$APP_DIR" "$1"; }
 mkdir -p "$DATA" "$MNT"
 : > "$LOG"
 echo "$(date) === vd_apt_install: $* ===" >> "$LOG"
