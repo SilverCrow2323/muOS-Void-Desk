@@ -206,7 +206,7 @@
       "type": "object",
       "maxProperties": 64,
       "propertyNames": {
-        "pattern": "^(?!.*(?:password|secret|token|credential|private[_-]?key|api[_-]?key|install[_-]?path|filesystem[_-]?path)).+$"
+        "pattern": "^(?!.*(?:[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll]|[Pp][Rr][Ii][Vv][Aa][Tt][Ee][_ -]?[Kk][Ee][Yy]|[Aa][Pp][Ii][_ -]?[Kk][Ee][Yy]|[Ii][Nn][Ss][Tt][Aa][Ll][Ll][_ -]?[Pp][Aa][Tt][Hh]|[Ff][Ii][Ll][Ee][Ss][Yy][Ss][Tt][Ee][Mm][_ -]?[Pp][Aa][Tt][Hh])).+$"
       },
       "additionalProperties": {
         "$ref": "#/$defs/safeSettingValue"
@@ -479,7 +479,7 @@
           "type": "object",
           "maxProperties": 64,
           "propertyNames": {
-            "pattern": "^(?!.*(?:password|secret|token|credential|private[_-]?key|api[_-]?key|install[_-]?path|filesystem[_-]?path)).+$"
+            "pattern": "^(?!.*(?:[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll]|[Pp][Rr][Ii][Vv][Aa][Tt][Ee][_ -]?[Kk][Ee][Yy]|[Aa][Pp][Ii][_ -]?[Kk][Ee][Yy]|[Ii][Nn][Ss][Tt][Aa][Ll][Ll][_ -]?[Pp][Aa][Tt][Hh]|[Ff][Ii][Ll][Ee][Ss][Yy][Ss][Tt][Ee][Mm][_ -]?[Pp][Aa][Tt][Hh])).+$"
           },
           "additionalProperties": {
             "$ref": "#/$defs/safeSettingValue"
