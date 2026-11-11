@@ -19,13 +19,13 @@ Deliver VoidDesk as a self-contained, controller-first control centre for Mustar
 | Area | Verified evidence | What it does not prove |
 |---|---|---|
 | Pygame visual capture | CI renders 103/103 declared render states, including native Syncthing management | Navigation reachability, correct actions, controller edge cases or device compatibility |
-| LÖVE visual capture | CI captures 23/23 registered scenes, including native Tailscale, Syncthing, diagnostics and monitor screens | Feature parity, service correctness or hardware operation |
+| LÖVE visual capture | CI captures 25/25 registered scenes, including native Tailscale, Syncthing, diagnostics and monitor screens | Feature parity, service correctness or hardware operation |
 | LÖVE Shell | Local service PTY endpoints and tests exist on the PR branch | Real muOS terminal usability, keyboard layout and lifecycle on handheld |
 | External tools | Registry-based discovery/launch and missing-tool reporting | Bundled submodule content is present in the final .muxapp |
 | APT | Native LÖVE APT Manager now provides Search, Installed, Jobs and System operations through a safe XFCE-image manager; CI baseline passed | Real muOS chroot search/install/remove/update/clean validation and failure recovery on hardware |
 | Tailscale | Native LÖVE and Pygame panels use the pinned Rt:Tailscale-M manager; QR login, peer/exit-node controls, Taildrop inventory, autostart and localhost-only optional panel are implemented; CI passes the upstream 21/21 QEMU service checks and real package build | Identity migration and physical muOS lifecycle validation |
 | Syncthing | Native Pygame and LÖVE Uplink panels list folders/devices, connection and completion state, and support folder pause/resume, scan, confirmed override and device pause/resume; API keys stay in the service bridge and Andromeda discovery/no-duplicate-daemon safeguards are retained | Add/remove flows, disabled-service UX refinements and real-device API tests |
-| NEXUS actions | Route/placeholder audit now covers Session, Forge, Workshop and Toolbox; Workshop actions connect to diagnostics, monitor, APT System and Jobs; Python acceptance tests pass | Full machine-readable registry, action-driven navigation for every hub and physical controller QA |
+| NEXUS actions | Route/handler audit covers Session, Forge, Workshop, Toolbox and MUOS APPS; Forge calls registered service operations; MUOS app discovery/launch uses fixed SD1/SD2 roots and a validated launcher hand-off | Full machine-readable registry, remaining IPTV service bridge, action-driven navigation for every hub and physical controller QA |
 | PC link | BaseStation/PcClient already exchange telemetry, notifications and screenshots | Remote keyboard/mouse, virtual display, secure pairing lifecycle and latency budgets |
 
 ## Workstream 1 — NEXUS node and action audit
