@@ -217,3 +217,25 @@ def test_inspector_and_switchboard_have_separate_safe_responsibilities():
     assert "enable" in tools["qwasar.switchboard"]["actions"]
     assert "disable" in tools["qwasar.switchboard"]["actions"]
     assert "shell.core" in management["protectedAreas"]
+
+def test_portable_profile_schema_validates_data_only_layout_and_feature_overrides():
+    schema_path = ROOT / "schemas" / "qwasar-profile.schema.json"
+    sample_path = ROOT / "data" / "profiles" / "voiddesk-handheld-default.qprofile.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    profile = json.loads(sample_path.read_text(encoding="utf-8"))
+    jsonschema.Draft202012Validator.check_schema(schema)
+    jsonschema.Draft202012Validator(schema).validate(profile)
+    assert "workspaceOrder" in profile
+    assert "shell" in profile
+    assert "workspaceOverrides" in profile
+    assert "bindings" in profile
+    assert "enginePreference" not in profile
+    assert "installPath" not in profile
+
+
+def test_profile_separates_disabled_from_hidden_contributions():
+    schema = json.loads(
+        (ROOT / "schemas" / "qwasar-profile.schema.json").read_text(encoding="utf-8")
+    )
+    states = schema["$defs"]["contributionState"]["properties"]["state"]["enum"]
+    assert states == ["enabled", "disabled", "hidden"]
