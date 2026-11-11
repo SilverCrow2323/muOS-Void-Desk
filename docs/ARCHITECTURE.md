@@ -1,4 +1,4 @@
-# VoidDesk architecture
+# QWASAR Desk architecture
 
 This note maps the source tree and main runtime paths. It does not imply that every optional integration is available on every firmware.
 
@@ -18,7 +18,7 @@ mux_launch.sh
    '-- engine = love -> lib/love love/
            |
            '-- session hand-off -> bin/xfce_launch.sh
-                                  -> return to VoidDesk
+                                  -> return to QWASAR Desk
 ~~~
 
 The launcher re-reads the configured engine before each run. If the Pygame runtime is not ready, it calls bin/bootstrap_lite.py. Pygame is the recommended, more complete frontend. If the Pygame process fails, the launcher can start LÖVE as an emergency fallback; that fallback is an experimental, incomplete prototype and is not feature-equivalent.
@@ -75,13 +75,13 @@ The Pygame frontend reads header indicators through `App.status_snapshot()`. Thi
 
 ## Device power-off sequence
 
-For the muOS package launcher, the Pygame frontend writes `data/.pending_poweroff` and exits normally. The shell launcher detects the marker, stops and waits for `service/voiddesk_service.py`, synchronizes filesystem writes, and invokes the forced power-off command with fallbacks. This avoids leaving the VoidDesk companion service running while the system is asked to power down.
+For the muOS package launcher, the Pygame frontend writes `data/.pending_poweroff` and exits normally. The shell launcher detects the marker, stops and waits for `service/voiddesk_service.py`, synchronizes filesystem writes, and invokes the forced power-off command with fallbacks. This avoids leaving the QWASAR Desk companion service running while the system is asked to power down.
 
 The direct power-off fallback in the standalone/PC path is separate from the device hand-off. Neither path can be certified by headless CI; final behaviour must be checked on the target hardware.
 
 ## Service and hand-off
 
-The local service provides the bridge used by frontends for system information, network state, media state, jobs and desktop session actions. The launcher uses data/.pending_session as a hand-off marker: the frontend exits, the shell launcher starts the requested session after the display has been released, and VoidDesk is launched again when that session ends.
+The local service provides the bridge used by frontends for system information, network state, media state, jobs and desktop session actions. The launcher uses data/.pending_session as a hand-off marker: the frontend exits, the shell launcher starts the requested session after the display has been released, and QWASAR Desk is launched again when that session ends.
 
 Treat the service and any local web/file integrations as privileged surfaces. Do not expose them to untrusted networks.
 
@@ -104,6 +104,6 @@ The current source-grounded tool inventory and proposed workspace/category model
 
 The visual identity direction, including the Megastructure, Manga Ink, Industrial, Terminal, Neon Noir and Minimal styles, is documented in [Visual Identity](VISUAL_IDENTITY.md). Style (layout/render treatment) and palette (colours) are separate concepts.
 
-## Void Desk Studio companion
+## QWASAR Studio companion
 
-The browser companion, portable profile format, official-only plugin trust model, and planned device-sync boundary are specified in [Void Desk Studio — Technical Architecture](STUDIO_ARCHITECTURE.md). That document is the source of truth for profile/schema contracts and staged Studio rollout. Studio does not replace the existing handheld launcher or local service, and it does not make the local service internet-facing.
+The browser companion, portable profile format, official-only plugin trust model, and planned device-sync boundary are specified in [QWASAR Studio — Technical Architecture](STUDIO_ARCHITECTURE.md). That document is the source of truth for profile/schema contracts and staged Studio rollout. Studio does not replace the existing handheld launcher or local service, and it does not make the local service internet-facing.
