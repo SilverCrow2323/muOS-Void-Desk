@@ -136,3 +136,73 @@ def test_visual_capture_media_handlers_return_offline_fixtures(monkeypatch):
     assert entries["ok"] is True
     assert {item["type"] for item in entries["entries"]} == {"dir"}
     assert service.HANDLERS["media_play_file"]({"path": "fixture://track/audio"})["ok"] is False
+
+
+def test_media_service_registers_typed_commands_and_serializes_player_ownership(monkeypatch):
+    service = load_service_module()
+    monkeypatch.setattr(service, "IS_VISUAL_CAPTURE", False)
+
+    calls = []
+
+    class FakeIPTV:
+        def stop(self):
+            calls.append("iptv-stop")
+        def play(self, url, name):
+            calls.append(("iptv-play", url, name))
+            return True
+        def status(self):
+            return {"state": "playing", "channel": {"name": "Fixture channel"}}
+
+    class FakeMedia:
+        def stop(self):
+            calls.append("media-stop")
+            return {"ok": True, "state": "idle"}
+        def play_radio(self, station_id):
+            calls.append(("radio-play", station_id))
+            return {"ok": True, "state": "playing", "name": "Fixture radio"}
+        def play_file(self, path, name, video=False):
+            calls.append(("file-play", path, name, video))
+            return {"ok": True, "state": "playing", "kind": "video" if video else "audio"}
+        def status(self):
+            return {"ok": True, "playing": False, "current": None}
+
+    fake_iptv = FakeIPTV()
+    fake_media = FakeMedia()
+    monkeypatch.setattr(service, "iptv_module", fake_iptv)
+    monkeypatch.setattr(service, "media_module", fake_media)
+    monkeypatch.setattr(service, "_IPTV_CHANNELS", [
+        {"url": "https://stream.example.test/channel.m3u8", "name": "Fixture channel"}
+    ])
+
+    expected = {
+        "media_roots", "media_list", "media_play_file", "media_stop",
+        "media_playback_status", "radio_list", "radio_toggle_favorite",
+        "radio_play", "radio_stop", "radio_status",
+    }
+    assert expected <= set(service.HANDLERS)
+
+    radio = service.HANDLERS["radio_play"]({"station_id": "fixture-id"})
+    assert radio["ok"] is True
+    assert calls[:2] == ["iptv-stop", ("radio-play", "fixture-id")]
+
+    calls.clear()
+    service.HANDLERS["iptv_play"]({"url": "https://stream.example.test/channel.m3u8"})
+    assert calls[:2] == ["media-stop", (
+        "iptv-play", "https://stream.example.test/channel.m3u8", "Fixture channel"
+    )]
+
+
+def test_media_browser_hides_playlist_files_until_local_import_is_supported(tmp_path, monkeypatch):
+    service = load_service_module()
+    root = tmp_path / "sd1"
+    root.mkdir()
+    (root / "radio.m3u").write_text("#EXTM3U\n")
+    (root / "video.m3u8").write_text("#EXTM3U\n")
+    (root / "song.mp3").write_bytes(b"audio")
+    monkeypatch.setattr(service, "IS_VISUAL_CAPTURE", False)
+    monkeypatch.setattr(service, "MEDIA_ROOT_CANDIDATES", ((root, "SD1"),))
+
+    response = service.HANDLERS["media_list"]({"path": str(root)})
+    names = {entry["name"] for entry in response["entries"]}
+    assert response["ok"] is True
+    assert names == {"song.mp3"}
