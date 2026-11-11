@@ -57,7 +57,6 @@ Portable JSON import/export is the v1 baseline and must work without an account 
 
 The initial client should be a static, progressively enhanced PWA. Do not place device credentials in exported profiles or browser storage without a dedicated credential design.
 
-#
 ## One Studio application, four workbenches
 
 QWASAR Studio is one responsive PWA. The following are workbenches inside it, not separate products or repositories:
@@ -128,15 +127,16 @@ The module bundle and capability contract is defined in [Void Desk Modules](MODU
 
 ### Module manager
 
-Plugins are separately versioned packages with a manifest, compatibility range, declared capabilities, immutable artifact digest and detached signature. In v1:
-- Only maintainer-controlled publisher IDs are accepted.
-- The signed official catalog is the allowlist; unknown publishers and unsigned packages are rejected.
+Executable modules are separately versioned bundles with a manifest, compatibility range, declared capabilities, immutable artifact digest and detached signature.
+
+- The legacy v1 `voiddesk-plugin` contract remains official-publisher-only for compatibility. Do not silently broaden its fixed publisher ID.
+- The proposed `.qmod` contract can support reviewed community publishers only after signing, source review, capability enforcement and sandboxing exist.
 - Verify signature, digest, schema, compatibility and permissions before installation.
 - No arbitrary shell execution. Privileged integrations require reviewed host-side capabilities with narrow typed APIs.
 - Install, update, disable and remove are explicit actions. Updates are staged and rollback-capable.
 - Profiles may reference module IDs and configure schema-approved non-secret options. Sharing a profile never silently installs a module. Missing modules are reported and can be resolved separately through the module library.
 
-The manifest schema is not proof that signing/distribution already exists. Key management, rotation, revocation and publisher allowlisting must be implemented before plugin installation is enabled.
+The manifest schema is not proof that signing/distribution already exists. Key management, rotation, revocation, publisher review and the sandboxed runtime must be implemented before community executable module installation is enabled.
 
 ### Multi-engine and multi-version
 
@@ -169,8 +169,8 @@ Every write must be authenticated, authorized, size-limited, schema-validated, r
 - Sharing is off by default and requires preview plus explicit confirmation.
 - Export only an allowlist of portable fields; strip device identifiers and secrets.
 - Profiles are data only. Import cannot execute commands or install modules.
-- Plugin sharing is limited to official catalog entries. Profiles may declare dependencies but cannot bundle plugin code.
-- Show provenance, version, compatibility, permissions, digest and update date for every plugin.
+- Executable module packages are distributed only through the approved module library. Profiles may declare module dependencies but cannot bundle module code.
+- Show provenance, version, compatibility, permissions, digest, review state and update date for every module.
 
 ## Rollout
 
