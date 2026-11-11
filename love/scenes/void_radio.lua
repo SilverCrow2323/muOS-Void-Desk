@@ -20,6 +20,7 @@ local filters = {
 local keyboard = {"QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM", " 0123456789"}
 local filter_index, entries, selected = 1, {}, 1
 local query, status, now_playing, icy_title = "", "Connecting to Radio Browser...", "", ""
+local volume, paused = 70, false
 local keyboard_mode, key_row, key_col = false, 1, 1
 local busy, poll_timer = false, 0
 local favorite_ids = {}
@@ -103,14 +104,18 @@ local function toggle_favorite()
         end)
 end
 
-local function radio_action(action)
-    bridge.call("radio_action", {action = action}, function(resp)
+local function radio_action(action, value)
+    bridge.call("radio_action", {action = action, value = value}, function(resp)
         if resp.ok then
             if action == "stop" then
                 now_playing, icy_title = "", ""
                 status = "Stream stopped"
             elseif action == "toggle_pause" then
-                status = resp.pause and "Stream paused" or "Stream resumed"
+                paused = resp.pause == true
+                status = paused and "Stream paused" or "Stream resumed"
+            elseif action == "volume" then
+                volume = resp.volume or volume
+                status = "Volume: " .. tostring(volume) .. "%"
             end
         else
             status = resp.error or "Radio control failed"
@@ -127,6 +132,8 @@ local function poll_status()
                 icy_title = ""
             else
                 icy_title = s.icy_title or s.icy_name or ""
+                volume = tonumber(s.volume) or volume
+                paused = s.pause == true
             end
         end
     end)
@@ -149,6 +156,7 @@ function scene.enter()
     entries, selected, query = {}, 1, ""
     filter_index, keyboard_mode = 1, false
     status, now_playing, icy_title = "Connecting to Radio Browser...", "", ""
+    volume, paused = 70, false
     load_favorites()
     load_stations()
     input.on("press", function(action)
@@ -193,6 +201,10 @@ function scene.enter()
             key_row, key_col = 1, 1
         elseif action == "select" then
             radio_action("toggle_pause")
+        elseif action == "l2" then
+            radio_action("volume", math.max(0, volume - 5))
+        elseif action == "r2" then
+            radio_action("volume", math.min(100, volume + 5))
         elseif action == "start" then
             radio_action("stop")
         elseif action == "b" or action == "menu" then
@@ -233,6 +245,7 @@ function scene.draw()
 
     love.graphics.setColor(0.55, 0.62, 0.68, 0.9)
     love.graphics.print("SEARCH: " .. (query ~= "" and query or "[Y] open keyboard"), 16, 96)
+    love.graphics.printf(string.format("VOL %d%% %s", volume, paused and "[PAUSED]" or ""), W - 150, 96, 134, "right")
     local top, row_h = 124, 29
     local visible = 8
     local first = math.max(1, math.min(selected - 4, math.max(1, #entries - visible + 1)))
@@ -302,7 +315,7 @@ function scene.draw()
         {icon = "dpad", label = "Navigate"},
         {icon = "btn_a", label = "Play"},
         {icon = "btn_b", label = "Back"},
-    }, right_text = "X fav  SELECT pause  START stop"})
+    }, right_text = "X fav  SELECT pause  L2/R2 volume  START stop"})
     if th.scanlines then effects.scanlines(W, H, 0.05) end
     if th.vignette then effects.vignette(W, H, 0.3) end
     love.graphics.setColor(1, 1, 1, 1)
