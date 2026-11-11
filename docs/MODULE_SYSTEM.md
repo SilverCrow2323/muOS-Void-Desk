@@ -48,7 +48,7 @@ A profile is JSON data. It cannot contain executable code, shell commands, scrip
 
 Sharing a profile never silently installs a module.
 
-Suggested portable extension: `.qprofile` (JSON document; extension is a proposal). Existing Void Desk profile JSON and schema v1 remain compatibility inputs during migration.
+Portable profiles use the .qprofile JSON format validated by schemas/qwasar-profile.schema.json. The older Void Desk profile schema remains a compatibility import path during migration. A profile is layout/activation data only: renderer preference and installed-instance paths remain local launch configuration, not shareable profile properties.
 
 ### B. Modules — functional building blocks
 
