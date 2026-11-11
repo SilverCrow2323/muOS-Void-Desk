@@ -11,7 +11,11 @@ import copy
 import fcntl
 import hashlib
 import json
+import os
+import shutil
+import stat
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -20,7 +24,6 @@ try:
 except ImportError:  # pragma: no cover - covered by CLI error path
     jsonschema = None  # type: ignore[assignment]
 
-from desk.utils.atomic_io import atomic_write_text
 
 
 DEFAULT_MANIFEST = "data/qwasar_ui_manifest.json"
@@ -60,6 +63,33 @@ def _digest(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError as exc:
         raise SwitchboardError(f"cannot fingerprint profile {path}: {exc}") from exc
+
+
+def _atomic_write_profile(path: Path, text: str) -> None:
+    """Write in the target directory, fsync, retain a backup and replace atomically."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            os.fchmod(stream.fileno(), mode)
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if path.exists():
+            shutil.copy2(path, str(path) + ".bak")
+        os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
 
 
 class QwasarSwitchboard:
@@ -453,7 +483,7 @@ class QwasarSwitchboard:
                         "profile changed on disk since load; reload before saving: "
                         f"{self.profile_path}"
                     )
-                atomic_write_text(str(self.profile_path), serialized, backup=True)
+                _atomic_write_profile(self.profile_path, serialized)
                 self._loaded_digest = _digest(self.profile_path)
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         except ConcurrentProfileUpdate:
