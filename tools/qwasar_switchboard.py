@@ -255,39 +255,79 @@ class QwasarSwitchboard:
         # the central shell before the user opens Switchboard.
         for region_name in ("header", "footer"):
             if profile["shell"][region_name].get("enabled") is False:
-                raise SwitchboardError(f"protected shell region cannot be disabled: {region_name}")
+                raise SwitchboardError(
+                    f"protected shell region cannot be disabled: {region_name}"
+                )
         for override in profile.get("workspaceOverrides", []):
             workspace_id = override["id"]
             if self._is_protected(workspace_id) and (
                 override.get("enabled") is False or override.get("visible") is False
             ):
-                raise SwitchboardError(f"protected workspace cannot be disabled or hidden: {workspace_id}")
+                raise SwitchboardError(
+                    f"protected workspace cannot be disabled or hidden: {workspace_id}"
+                )
+            base_workspace = workspace_map[workspace_id]
+            base_sections = {
+                item["id"]: item for item in base_workspace.get("sections", [])
+            }
+            for entry_id in override.get("hiddenMenuEntries", []):
+                entry = self._find_menu_entry(base_workspace.get("menu", []), entry_id)
+                if (
+                    self._is_protected(workspace_id)
+                    or self._is_protected(entry_id)
+                    or (entry and self._is_protected(entry.get("actionId", "")))
+                ):
+                    raise SwitchboardError(
+                        f"profile cannot hide protected menu entry {entry_id} in {workspace_id}"
+                    )
             for section in override.get("sections", []):
                 section_id = section["id"]
                 if self._is_protected(section_id) and (
                     section.get("enabled") is False or section.get("visible") is False
                 ):
-                    raise SwitchboardError(f"protected section cannot be disabled or hidden: {section_id}")
+                    raise SwitchboardError(
+                        f"protected section cannot be disabled or hidden: {section_id}"
+                    )
+                base_menu = base_sections[section_id].get("menu", [])
+                for entry_id in section.get("hiddenMenuEntries", []):
+                    entry = self._find_menu_entry(base_menu, entry_id)
+                    if (
+                        self._is_protected(workspace_id)
+                        or self._is_protected(section_id)
+                        or self._is_protected(entry_id)
+                        or (entry and self._is_protected(entry.get("actionId", "")))
+                    ):
+                        raise SwitchboardError(
+                            f"profile cannot hide protected menu entry {entry_id} in section {section_id}"
+                        )
                 for contribution in section.get("contributions", []):
                     contribution_id = contribution["contributionId"]
                     if self._is_protected(contribution_id) and contribution["state"] != "enabled":
-                        raise SwitchboardError(f"protected contribution cannot be disabled or hidden: {contribution_id}")
+                        raise SwitchboardError(
+                            f"protected contribution cannot be disabled or hidden: {contribution_id}"
+                        )
             for contribution in override.get("contributions", []):
                 contribution_id = contribution["contributionId"]
                 if self._is_protected(contribution_id) and contribution["state"] != "enabled":
-                    raise SwitchboardError(f"protected contribution cannot be disabled or hidden: {contribution_id}")
+                    raise SwitchboardError(
+                        f"protected contribution cannot be disabled or hidden: {contribution_id}"
+                    )
+        for module in profile.get("moduleStates", []):
+            if self._is_protected(module["moduleId"]) and module["enabled"] is False:
+                raise SwitchboardError(
+                    f"profile cannot disable protected module {module['moduleId']}"
+                )
         for contribution in profile.get("contributionStates", []):
             contribution_id = contribution["contributionId"]
             if self._is_protected(contribution_id) and contribution["state"] != "enabled":
-                raise SwitchboardError(f"protected contribution cannot be disabled or hidden: {contribution_id}")
-
-        for key, id_key in (
-            ("moduleStates", "moduleId"),
-            ("contributionStates", "contributionId"),
-        ):
-            values = [item[id_key] for item in profile.get(key, [])]
-            if len(values) != len(set(values)):
-                raise SwitchboardError(f"profile contains duplicate IDs in {key}")
+                raise SwitchboardError(
+                    f"protected contribution cannot be disabled or hidden: {contribution_id}"
+                )
+        for panel_id, panel_override in profile["shell"].get("globalPanels", {}).items():
+            if self._is_protected(panel_id) and panel_override.get("enabled") is False:
+                raise SwitchboardError(
+                    f"profile cannot disable protected global panel {panel_id}"
+                )
 
     def _edit(self, mutator: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
         candidate = copy.deepcopy(self.profile)
@@ -372,6 +412,8 @@ class QwasarSwitchboard:
             raise SwitchboardError("module enabled state must be a boolean")
         if not module_id or len(module_id) > 96:
             raise SwitchboardError("module ID must contain 1..96 characters")
+        if not enabled:
+            self._ensure_changeable(module_id, "disabled")
 
         def mutate(profile: dict[str, Any]) -> None:
             states = profile.setdefault("moduleStates", [])
@@ -502,6 +544,8 @@ class QwasarSwitchboard:
             raise SwitchboardError(f"unknown global panel: {panel_id}")
         if not isinstance(enabled, bool):
             raise SwitchboardError("global panel enabled state must be a boolean")
+        if not enabled:
+            self._ensure_changeable(panel_id, "disabled")
 
         def mutate(profile: dict[str, Any]) -> None:
             overrides = profile["shell"].setdefault("globalPanels", {})
