@@ -259,7 +259,7 @@ LÖVE is the next engineering focus. Pygame remains the behavioural reference, b
 - Palette system: `love/theme/`.
 - Python local service bridge: `love/core/bridge.lua` ↔ `service/voiddesk_service.py`.
 - Current NEXUS catalogue contains 10 visible nodes, including End Session.
-- Automated LÖVE capture covers 23 registered scenes. This proves rendering only, not that every action works or is reachable.
+- Automated LÖVE capture covers 25 registered user-facing scenes, including Diagnostics and Monitor. This proves rendering only, not that every action works or is reachable.
 - The current static action audit is focused on Session, Forge, Workshop and Toolbox. It does not yet audit all visible hubs and child actions.
 
 ### Known gaps to resolve
