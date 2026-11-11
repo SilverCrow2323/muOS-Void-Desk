@@ -79,11 +79,18 @@ def _atomic_write_profile(path: Path, text: str) -> None:
         if path.exists():
             shutil.copy2(path, str(path) + ".bak")
         os.replace(temporary, path)
-        directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
         try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+            directory_fd = os.open(
+                path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            )
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError:
+            # Some removable/FAT-like filesystems do not support directory fsync.
+            # The file itself has already been flushed before the atomic rename.
+            pass
     except Exception:
         try:
             os.unlink(temporary)
