@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0",
+  "id": "voiddesk-starter",
+  "name": "Void Desk Starter",
+  "description": "A minimal portable profile with default home navigation.",
+  "author": "Void Desk Official",
+  "compatibility": {
+    "platforms": [
+      "muos",
+      "knulli",
+      "rocknix",
+      "custom"
+    ],
+    "minimumVoidDeskVersion": "10.5.4"
+  },
+  "engine": {
+    "preference": "auto",
+    "fallbackAllowed": false
+  },
+  "menu": [
+    {
+      "id": "nexus-home",
+      "route": "home.nexus",
+      "label": "NEXUS",
+      "enabled": true
+    },
+    {
+      "id": "uplink",
+      "route": "hub.uplink",
+      "label": "UPLINK",
+      "enabled": true
+    },
+    {
+      "id": "workshop",
+      "route": "hub.workshop",
+      "label": "WORKSHOP",
+      "enabled": true
+    },
+    {
+      "id": "settings",
+      "route": "hub.settings",
+      "label": "SETTINGS",
+      "enabled": true
+    }
+  ],
+  "plugins": [],
+  "theme": {
+    "id": "crimson"
+  },
+  "visualStyle": "megastructure",
+  "palette": "crimson"
+}
