@@ -66,7 +66,9 @@ def main(argv):
         if not ok:
             return fail("cannot mount XFCE image: " + (error or "unknown error"), 1)
 
-        bind_targets = []
+        operation_code = 1
+        operation_error = None
+        cleanup_error = None
         try:
             for source, target, kind in (
                 ("/dev", MOUNT / "dev", "bind"),
@@ -74,52 +76,71 @@ def main(argv):
                 ("sys", MOUNT / "sys", "sysfs"),
             ):
                 target.mkdir(parents=True, exist_ok=True)
-                if not imgmount.is_mounted(str(target)):
-                    if kind == "bind":
-                        command = ["mount", "--bind", source, str(target)]
-                    else:
-                        command = ["mount", "-t", kind, source, str(target)]
-                    result = subprocess.run(command, capture_output=True, text=True)
-                    if result.returncode:
-                        return fail("cannot prepare chroot mounts: " +
-                                    (result.stderr or result.stdout)[-500:], 1)
-                    bind_targets.append(str(target))
-            resolv = Path("/etc/resolv.conf")
-            if resolv.is_file():
-                shutil.copyfile(str(resolv), str(MOUNT / "etc/resolv.conf"))
-
-            if catalog and mode == "search":
-                command = ["apt-cache", "search", "--names-only", args[0]]
-            elif catalog and mode == "installed":
-                command = ["dpkg-query", "-W", "-f=${binary:Package}\\t${Version}\\n"]
-            elif catalog:
-                command = ["apt-cache", "show"] + args
-            elif action == "update":
-                command = ["apt-get", "update"]
-            elif action == "upgrade":
-                command = ["apt-get", "upgrade", "-y"]
-            elif action == "clean":
-                command = ["apt-get", "clean"]
-            elif action == "install":
-                command = ["apt-get", "install", "-y", "--no-install-recommends"] + args
+                if imgmount.is_mounted(str(target)):
+                    continue
+                if kind == "bind":
+                    mount_command = ["mount", "--bind", source, str(target)]
+                else:
+                    mount_command = ["mount", "-t", kind, source, str(target)]
+                mounted = subprocess.run(
+                    mount_command, capture_output=True, text=True
+                )
+                if mounted.returncode:
+                    detail = (mounted.stderr or mounted.stdout or
+                              "mount command failed")[-500:]
+                    operation_error = "cannot prepare chroot mounts: " + detail
+                    break
             else:
-                command = ["apt-get", "remove", "-y"] + args
+                resolv = Path("/etc/resolv.conf")
+                if resolv.is_file():
+                    shutil.copyfile(str(resolv), str(MOUNT / "etc/resolv.conf"))
 
-            env = dict(os.environ)
-            env["DEBIAN_FRONTEND"] = "noninteractive"
-            env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-            result = subprocess.run(
-                ["chroot", str(MOUNT), "/usr/bin/env",
-                 "DEBIAN_FRONTEND=noninteractive",
-                 "PATH=" + env["PATH"]] + command,
-                cwd=str(APP), env=env, text=True, check=False,
-            )
-            return result.returncode
+                if catalog and mode == "search":
+                    command = ["apt-cache", "search", "--names-only", args[0]]
+                elif catalog and mode == "installed":
+                    command = ["dpkg-query", "-W", "-f=${binary:Package}\\t${Version}\\n"]
+                elif catalog:
+                    command = ["apt-cache", "show"] + args
+                elif action == "update":
+                    command = ["apt-get", "update"]
+                elif action == "upgrade":
+                    command = ["apt-get", "upgrade", "-y"]
+                elif action == "clean":
+                    command = ["apt-get", "clean"]
+                elif action == "install":
+                    command = ["apt-get", "install", "-y", "--no-install-recommends"] + args
+                else:
+                    command = ["apt-get", "remove", "-y"] + args
+
+                env = dict(os.environ)
+                env["DEBIAN_FRONTEND"] = "noninteractive"
+                env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                result = subprocess.run(
+                    ["chroot", str(MOUNT), "/usr/bin/env",
+                     "DEBIAN_FRONTEND=noninteractive",
+                     "PATH=" + env["PATH"]] + command,
+                    cwd=str(APP), env=env, text=True, check=False,
+                )
+                operation_code = result.returncode
+        except OSError as exc:
+            operation_error = "APT manager execution failed: " + str(exc)
         finally:
-            for target in reversed(bind_targets):
-                subprocess.run(["umount", target], stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL, check=False)
-            imgmount.umount_tree(str(MOUNT), str(IMAGE))
+            try:
+                cleanup_ok = imgmount.umount_tree(str(MOUNT), str(IMAGE))
+            except Exception as exc:
+                cleanup_ok = False
+                cleanup_error = "cleanup raised an error: " + str(exc)
+            if not cleanup_ok and cleanup_error is None:
+                cleanup_error = "XFCE image is still mounted or its loop device is busy"
+
+        if operation_error:
+            print(operation_error, file=sys.stderr)
+        if cleanup_error:
+            print("cannot safely finish APT operation: " + cleanup_error,
+                  file=sys.stderr)
+            if operation_code == 0:
+                operation_code = 1
+        return operation_code
 
 
 if __name__ == "__main__":
