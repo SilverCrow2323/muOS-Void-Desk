@@ -211,5 +211,5 @@ def test_background_radio_rejects_unsafe_urls_before_spawning(monkeypatch):
 
     ok, error = module.play_audio("file:///etc/passwd", "Unsafe")
     assert not ok
-    assert "HTTP" not in (error or "") or error
+    assert error == "stream URL must use HTTP, HTTPS, RTSP or RTMP"
     assert not spawned
