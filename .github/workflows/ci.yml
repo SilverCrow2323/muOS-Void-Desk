@@ -121,9 +121,6 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
       # One runner, one apt update, one dependency install. Previously Lua,
       # LÖVE and Tailscale each created a separate runner and repeated APT work.
       - name: Install native integration dependencies once
