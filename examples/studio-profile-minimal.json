@@ -1,9 +1,9 @@
 {
   "schemaVersion": "1.0",
   "id": "voiddesk-starter",
-  "name": "Void Desk Starter",
+  "name": "QWASAR Desk Starter",
   "description": "A minimal portable profile with default home navigation.",
-  "author": "Void Desk Official",
+  "author": "QWASAR Studio",
   "compatibility": {
     "platforms": [
       "muos",
