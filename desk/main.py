@@ -12467,7 +12467,7 @@ class App(object):
         return img
 
     def brand_symbol(self, h):
-        """Simbolo Void Desk per l'header, in cache per altezza --
+        """Simbolo QWASAR per l'header, in cache per altezza --
         stesso file della bootanim, caricato una volta sola."""
         if not hasattr(self, "_brand_symbol_cache"):
             self._brand_symbol_cache = {}
@@ -17825,7 +17825,7 @@ class App(object):
                 self._rtsh_font = pygame.font.Font(FONT_MONO_PATH, 13)
             font_t = self._rtsh_font
             if self.rtsh_welcome:
-                bt = "Void-DESK"
+                bt = "QWASAR DESK"
                 bw_ = font_t.size(bt)[0]
                 self.text(bt, ((W - bw_) // 2, 8), font_t, DIM)
                 pygame.draw.line(self.surface, (30, 33, 40), (0, 30),
@@ -22784,7 +22784,7 @@ class App(object):
         jingle = None
         if self.cfg.get("sfx", True):
             jingle = self.build_intro_jingle()
-        intro.play(self.surface, pygame.display.flip, "Void-DESK",
+        intro.play(self.surface, pygame.display.flip, "QWASAR DESK",
                    self.accent, skip_check=can_skip, font_path=FONT_PATH,
                    duration=0.45, menu_surf=menu_img,
                    jingle=jingle)
