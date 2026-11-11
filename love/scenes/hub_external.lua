@@ -8,13 +8,20 @@ local category = "all"
 local status_msg = "Loading external tools..."
 local categories_list = {"all", "media", "toolbox", "uplink", "workshop"}
 
+local function publish_status(scene, message)
+    status_msg = tostring(message or "")
+    if scene and scene.set_status then
+        scene.set_status(status_msg)
+    end
+end
+
 local function refresh(scene, silent)
-    if not silent then scene.set_status("Loading external tools...") end
+    if not silent then publish_status(scene, "Loading external tools...") end
     ext.load(function(ok)
         if ok then
-            scene.set_status(string.format("%d tools available", #ext.state.tools))
+            publish_status(scene, string.format("%d tools available", #ext.state.tools))
         else
-            scene.set_status("Error: " .. (ext.state.error or "load failed"))
+            publish_status(scene, "Error: " .. (ext.state.error or "load failed"))
         end
     end)
 end
@@ -23,7 +30,6 @@ local function items_for(cat)
     local list = {}
     local tools = ext.by_hub(cat == "all" and nil or cat)
     for _, t in ipairs(tools) do
-        local badge_letter = (t.icon or "?"):sub(1,1):upper()
         local native_badge = (t.native_engine == "love") and "LOVE" or "PY"
         table.insert(list, {
             icon = t.icon or "gear",
@@ -31,15 +37,15 @@ local function items_for(cat)
             desc = (t.desc or "") .. (t.exists and "" or "  [NOT INSTALLED]"),
             action = function(scene)
                 if not t.exists then
-                    scene.set_status("Not installed: " .. t.name)
+                    publish_status(scene, "Not installed: " .. t.name)
                     return "Not installed"
                 end
-                scene.set_status("Launching " .. t.name .. "...")
+                publish_status(scene, "Launching " .. t.name .. "...")
                 ext.launch(t.id, function(resp)
                     if resp.ok then
-                        scene.set_status("Launched: " .. t.name)
+                        publish_status(scene, "Launched: " .. t.name)
                     else
-                        scene.set_status("Failed: " .. (resp.error or "unknown"))
+                        publish_status(scene, "Failed: " .. (resp.error or "unknown"))
                     end
                 end)
                 return "Launching..."
@@ -53,7 +59,7 @@ local function items_for(cat)
             local idx = 1
             for i, c in ipairs(categories_list) do if c == category then idx = i end end
             category = categories_list[(idx % #categories_list) + 1]
-            scene.set_status("Category: " .. category)
+            publish_status(scene, "Category: " .. category)
             return "Category: " .. category
         end,
     })

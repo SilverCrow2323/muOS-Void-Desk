@@ -87,6 +87,19 @@ function iptv.load_playlist(url, on_done)
     end)
 end
 
+-- Prefer configured EPG sources only when the configured list is non-empty.
+-- An empty Lua table is truthy, so a plain `cfg_urls or playlist_urls` fallback
+-- would incorrectly hide playlist-provided EPG sources.
+function iptv.select_epg_urls(cfg_urls, playlist_urls)
+    if type(cfg_urls) == "table" and #cfg_urls > 0 then
+        return cfg_urls
+    end
+    if type(playlist_urls) == "table" and #playlist_urls > 0 then
+        return playlist_urls
+    end
+    return {}
+end
+
 function iptv.load_epg(urls, on_done)
     local st = iptv.state
     st.epg_loading = true
