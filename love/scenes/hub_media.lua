@@ -44,13 +44,13 @@ return dashboard.new({
     end,
 
     items = {
-        { icon = "music", label = "Void Radio", desc = "Internet radio stations",
-          action = function(scene) scene.set_status("Radio: soon"); return "Radio" end },
+        { icon = "music", label = "Void Radio", desc = "Curated stations, favourites and recent streams",
+          action = function() sm.push("hub_radio", {}) end },
         { icon = "video", label = "VoidCast IPTV", value = "LIVE",
           desc = "TV streams and EPG guide (LÖVE prototype)",
           action = function() sm.push("hub_iptv", {}) end },
-        { icon = "folder", label = "Media Library", desc = "Browse local audio/video on SD",
-          action = function(scene) scene.set_status("Library: soon"); return "Library" end },
+        { icon = "folder", label = "Media Library", desc = "Browse local audio/video on SD1, SD2 and Void Desk Data",
+          action = function() sm.push("hub_media_library", {}) end },
         { icon = "music", label = "BGM Normalizer", value = "PY",
           desc = "LUFS-normalize music to OGG",
           action = function(scene)
