@@ -1,117 +1,170 @@
 <div align="center">
 
-<img src="resources/vdlogo.png" alt="VoidDesk" width="550">
+<pre>
+╔════════════════════════════════════════════════════════════════════╗
+║                                                                    ║
+║   ██████╗ ██╗    ██╗ █████╗ ███████╗ █████╗ ██████╗                ║
+║  ██╔═══██╗██║    ██║██╔══██╗██╔════╝██╔══██╗██╔══██╗               ║
+║  ██║   ██║██║ █╗ ██║███████║███████╗███████║██████╔╝               ║
+║  ██║▄▄ ██║██║███╗██║██╔══██║╚════██║██╔══██║██╔══██╗               ║
+║  ╚██████╔╝╚███╔███╔╝██║  ██║███████║██║  ██║██║  ██║               ║
+║   ╚══▀▀═╝  ╚══╝╚══╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝               ║
+║                           // DESK                                  ║
+╚════════════════════════════════════════════════════════════════════╝
+</pre>
 
-# VOIDDESK — NEXUS
+# QWASAR DESK
 
-**A handheld-first Linux desktop hub for H700 devices.**
+**A symbiotic Linux handheld environment.**
+
+*BORN IN THE VOID. BUILT BEYOND THE FIRMWARE.*
 
 [![CI](https://github.com/SilverCrow2323/Void-Desk-Project/actions/workflows/ci.yml/badge.svg)](https://github.com/SilverCrow2323/Void-Desk-Project/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/SilverCrow2323/Void-Desk-Project?label=release)](https://github.com/SilverCrow2323/Void-Desk-Project/releases)
 
-*The void does not stare back. It compiles.*
+**Formerly Void Desk / VoidDesk · SPDW Factory**
 
 </div>
 
-VoidDesk turns a Linux handheld into a controller-first workstation. It combines a native framebuffer interface, system utilities, media tools, connectivity panels, diagnostics and an optional Linux desktop running in an isolated image.
+QWASAR Desk is the evolving identity of Void Desk: a controller-first environment that grows around Linux handheld firmware. It brings system tools, connectivity, media, diagnostics, desktop sessions and a configurable visual shell into one navigable experience.
+
+The long-term direction is a **Symbiotic Layer**. QWASAR should use the host firmware's supported application, service, storage and theme extension points, then progressively provide a richer experience without making the original firmware unbootable or difficult to recover. It is not a replacement firmware image today.
+
+> **Brand transition:** QWASAR Desk is the new product name. The repository slug, installed package root (`Void-Desk/`), launcher names and existing configuration paths remain unchanged for compatibility. A coordinated package/identifier migration will be a separate, reversible change.
 
 ## At a glance
 
 | | |
 |---|---|
-| Project line | **10.5.4-NEXUS** (release candidate in `main`; see CHANGELOG.md) |
-| Latest published package | **v10.2.0** (published 2026-08-11; v10.5.4 is not yet downloadable) |
-| Primary target | Anbernic RG35XX-H / Allwinner H700 |
-| Primary firmware path | muOS application launcher |
-| Native UI | Python + Pygame framebuffer frontend |
-| Experimental UI | LÖVE 2D prototype; incomplete and not feature-equivalent to Pygame |
-| Desktop session | XFCE in an Ubuntu image; optional tooling is device-dependent |
-| Configuration | data/desk_config.json |
-| Device entry point | mux_launch.sh |
-| PC/development launcher | voiddesk.py |
-| License | Not declared in this repository; see note below |
+| Product identity | **QWASAR Desk** (formerly Void Desk) |
+| Development line | **10.5.4-NEXUS** release candidate |
+| Latest published handheld package | **v10.2.0** (2026-08-11); v10.5.4 is not yet a published release |
+| Primary target | Anbernic RG35XX-H / compatible Allwinner H700 handhelds |
+| Current firmware target | MustardOS / muOS 2606.0 Andromeda |
+| Main frontend | Python + Pygame framebuffer UI |
+| Experimental frontend | LÖVE 2D; incomplete and not feature-equivalent to Pygame |
+| PC entry point | `voiddesk.py` |
+| Handheld entry point | `mux_launch.sh` |
+| User configuration | `data/desk_config.json` |
+| Optional desktop | XFCE in a separate Ubuntu image |
+| License | No root-level LICENSE file is currently declared |
 
-> **Compatibility:** The current packaging target is MustardOS / muOS 2606.0 Andromeda on compatible Allwinner H700 handhelds. Hardware-specific behaviour still requires device-level verification on each model. Older firmware releases and other distributions are not claimed as supported.
+Compatibility is evidence-based. muOS Andromeda on compatible H700 devices is the current packaging target. KNULLI, ROCKNIX and custom firmware are strategic targets, not blanket compatibility claims; each needs a platform adapter and hardware validation.
 
-## What VoidDesk includes
+## NEXUS — the current home interface
 
-### NEXUS — the home interface
+NEXUS is an animated, orbit-based hub selector designed for D-pad and controller navigation.
 
-An animated, orbit-based hub selector designed for D-pad navigation. The UI supports themes, layout choices, sound, transitions, overlays and display effects.
+<img src="resources/nexus-menu.png" alt="QWASAR Desk NEXUS interface (legacy Void Desk artwork)" width="720">
 
-<img src="resources/nexus-menu.png" alt="VoidDesk NEXUS home screen" width="720">
+### Hubs and workspaces
 
-### The hubs
-
-| Hub | Purpose | Representative tools |
+| Hub | Workspace | Purpose |
 |---|---|---|
-| **START SESSION** | Start or repair the optional desktop | XFCE image bootstrap and session hand-off |
-| **THE FORGE** | Manage components and packages | Status, install/remove, update and cleanup |
-| **UPLINK** | Connectivity and device links | Wi-Fi, hotspot, Bluetooth, Tailscale, PC uplink, BaseStation, controllers |
-| **MEDIA VAULT** | Audio and video | Internet radio, VoidCast, media library, background audio |
-| **WORKSHOP** | Maintenance and diagnostics | System stats, logs, storage, monitoring, backup, CHD, duplicate-file tools |
-| **RT:TOOLBOX** | Everyday utilities | Calculator, clock, calendar, notes, RSS, weather, file manager, FTP, sync, terminal, editor |
-| **MUOS APPS** | Discover handheld applications | App grid, glyph and controller utilities |
-| **SETTINGS** | Personalize the interface | Theme, language, font scale, home style, VFX, status bar, controls |
-| **INFO & ABOUT** | Project documentation | About, manual, quick controls, update information |
-| **END SESSION** | Leave or restart the session | App restart, reboot, power-off |
+| **START SESSION** | Configure | Start or repair the optional desktop |
+| **THE FORGE** | Maintain | Components, packages, updates and CLI tools |
+| **UPLINK** | Connect | Wi-Fi, hotspot, Bluetooth, Tailscale, PC Uplink, BaseStation and controllers |
+| **MEDIA VAULT** | Media | Radio, IPTV, media library and audio tools |
+| **WORKSHOP** | Maintain | Device checks, diagnostics, storage, monitor, logs and maintenance |
+| **RT:TOOLBOX** | Create | Calculator, clock, calendar, notes, file manager, terminal and utilities |
+| **MUOS APPS / GAMES** | Play | Handheld app discovery, PortMaster hand-off and game tools |
+| **SETTINGS** | Configure | Visuals, language, fonts, controller bindings and status indicators |
+| **INFO / COMMUNITY** | Discover | Manuals, project information and community links |
+| **OUTERDESK** | Extend | Standalone applications and optional integrations |
+| **END SESSION** | Configure | Exit, restart, reboot and power-off flows |
 
-Tool availability depends on host firmware, installed packages, hardware and permissions. A listed feature is not a guarantee that it is available on every device.
+The source-grounded inventory and proposed categories are in [docs/TOOL_CATALOG.md](docs/TOOL_CATALOG.md) and `data/tool_catalog.json`. Availability depends on firmware, hardware, dependencies, permissions and frontend implementation; a menu entry alone is not proof that a tool is usable.
 
-### Visual system
+## Visual identity — the Megastructure
 
-The interface uses a dark industrial aesthetic, custom artwork, planet-like hub nodes, CRT effects and multiple colour themes. Artwork is stored mainly in resources/, assets/ and love/assets/.
+QWASAR's signature direction is raw industrial science fiction: monumental architecture, steel, deep blacks, manga-like ink contrast, technical markings and restrained signal colours. The mood may evoke dark architectural cyberpunk manga, but all QWASAR artwork, symbols and layouts must be original.
+
+The visual system separates **style** (composition, typography, geometry, texture and motion) from **palette** (colour tokens). Proposed styles:
+
+- **Megastructure** — brutalist, monumental, steel and signal red/cyan.
+- **Manga Ink** — high-contrast monochrome, paper, ink and restrained vermilion.
+- **Industrial** — riveted panels, measurement marks and hazard accents.
+- **Terminal** — phosphor, monospace and low-motion information density.
+- **Neon Noir** — layered night-city contrast, used sparingly.
+- **Minimal** — quiet surfaces, clear hierarchy and reduced effects.
+
+Pygame contains the main industrial visual language and several home styles. LÖVE has its own palette system; full visual parity is still in development. See [docs/VISUAL_IDENTITY.md](docs/VISUAL_IDENTITY.md).
 
 <img src="resources/forge-menu.png" alt="The Forge" width="48%">
 <img src="resources/uplink-hub.png" alt="Uplink" width="48%">
-
 <img src="resources/media_vault.png" alt="Media Vault" width="48%">
 <img src="resources/workshop.png" alt="Workshop" width="48%">
 
-## Components and entry points
+## Runtime architecture
 
-- **Python frontend:** main implementation in desk/; entry point is desk/main.py.
-- **LÖVE frontend (experimental):** incomplete prototype in love/; it is not feature-equivalent to Pygame and is not the recommended daily-use engine.
-- **Local service:** service/voiddesk_service.py provides the backend used by frontend panels and session actions.
-- **VoidCast:** standalone IPTV/media application under outdesk/VoidCast/voidcast/.
-- **External tools:** optional applications and integrations under outdesk/.
-- **Device launcher:** mux_launch.sh starts the local service, chooses the engine and handles session hand-off.
-- **PC launcher:** voiddesk.py provides a terminal menu and direct launch options for development and desktop testing.
+- **Pygame:** reference frontend in `desk/`; entry point `desk/main.py`.
+- **LÖVE:** experimental frontend in `love/`; entry point `love/main.lua`.
+- **Local service:** `service/voiddesk_service.py` provides the bridge for host status, jobs and selected device actions.
+- **Device launcher:** `mux_launch.sh` uses the muOS application lifecycle, launches the local service and selects the frontend.
+- **PC launcher:** `voiddesk.py` provides development and desktop launch modes.
+- **Standalone tools:** `outdesk/` and `external/tools.json` describe optional applications and integrations.
 
-See [Architecture](docs/ARCHITECTURE.md) for execution flow.
+The local service is a privileged boundary and must remain local by default. Future Studio sync must be device-initiated and authenticated; it must not expose the existing host-control service to the internet.
 
-## Installation on the handheld
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for execution flow.
 
-> **Release status (2026-11-08):** the latest published handheld package is `VoidDesk_v10.2.0.muxapp` (release `v10.2.0`, published 2026-08-11). The `main` branch has advanced to the `v10.5.4-NEXUS` release candidate, but that candidate has **not** been published as a `.muxapp` package yet. The v10.2.0 download therefore does not include the v10.5.4 changes listed in the changelog.
+## The Symbiotic Layer roadmap
 
-1. Open [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) and download the latest **published `.muxapp` asset**. Check the release tag before installing; the source-code ZIP is not a replacement for the muOS application package.
-2. Copy the `.muxapp` file to the SD1 `ARCHIVE/` folder.
-3. On the handheld, open **Applications → Archive Manager** and install the package.
-4. Launch VoidDesk from Applications and follow the on-screen setup/repair flow for the optional desktop image.
+QWASAR's goal is deeper integration with muOS, not an unsafe firmware takeover:
 
-### First-run checklist
+1. **Application layer:** use the official muOS application runner and lifecycle, including its storage and foreground-process handling.
+2. **Service layer:** manage QWASAR-owned services with explicit startup, health checks, permissions and clean shutdown.
+3. **Shared capability layer:** expose device, network, storage and media capabilities to Pygame, LÖVE and future frontends through typed APIs.
+4. **Experience layer:** optional QWASAR navigation, profiles, artwork, themes and dashboards, while preserving return to the native muOS frontend.
+5. **Studio and ecosystem:** browser companion, profile editor, official plugin catalog and platform adapters for KNULLI, ROCKNIX and custom systems after validation.
+6. **Deeper integration:** only through documented, reversible extension points with backup, rollback and a recovery path.
 
-- Keep the device connected to reliable Wi-Fi during downloads.
-- Keep at least **1.5–2 GB free storage** for the desktop image, as stated by the original installation guide. Actual requirements vary with selected components.
-- Keep the device powered while an image or package installation is running.
-- Back up important saves and configuration before updating firmware or replacing the package.
-- If setup is interrupted, inspect the log before repeating storage-intensive operations.
+The muOS developer documentation describes its app runner, launcher metadata, setup helpers, storage paths and extension mechanisms. QWASAR will use those interfaces rather than patching boot internals or replacing system files. See [Application Runner](https://community.muos.dev/t/application-runner/1282), [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) and [Frontend and Launching](https://muos.dev/docs/infrastructure/launching).
 
-**Pygame is the recommended frontend.** LÖVE is included for ongoing development and testing only; several hubs and actions remain incomplete in that engine. The Pygame frontend can bootstrap its runtime on demand. The improved bootstrap validates HTTPS certificates, verifies the published PyPI SHA-256 digest, checks archive paths and tests the import before replacing the active runtime. The desktop image bootstrap is separate.
+**Non-negotiable:** muOS must remain bootable and recoverable if QWASAR is disabled, uninstalled or fails to start. No bootloader replacement, destructive init changes or irreversible system modifications are part of this roadmap.
 
-## Build Void Desk packages
+## QWASAR Studio — browser companion
 
-The **Build Void Desk** GitHub Actions workflow can be started manually from the Actions tab. Choose `all`, `muos` or `pc`, then provide a version label. The run publishes downloadable artifacts:
-- **muOS:** validated `.muxapp` package plus SHA-256 checksum.
-- **Linux PC:** portable source bundle for Linux x86_64/aarch64 plus SHA-256 checksum. It creates a Python virtual environment and installs Pygame/psutil on first launch; it is not an AppImage or statically linked binary.
+Studio is planned as an opt-in web/PWA companion. It will let users edit menu layouts, labels, profiles and visual choices, then import/export or sync profiles with a device. Initial sharing is limited to profiles and official plugins; third-party plugin publishing is out of scope for v1.
 
-Artifacts are available from the workflow run for 30 days. Hardware compatibility still requires testing on the target handheld.
+The profile/plugin schemas and trust boundaries are being developed under `schemas/`. Cloud API and device pairing are planned components, not deployed services.
 
-[Build Void Desk workflow](.github/workflows/build-void-desk.yml) · [PC bundle instructions](packaging/pc/README.md)
+## Installation on muOS
+
+The latest published package remains `VoidDesk_v10.2.0.muxapp` (release v10.2.0, published 2026-08-11). The v10.5.4-NEXUS source line is a release candidate and has not yet been published as an installable package.
+
+1. Download the latest published **.muxapp** asset from [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases). Do not use the source ZIP as an installer.
+2. Copy the package to SD1 `ARCHIVE/`.
+3. On the handheld, open **Applications → Archive Manager** and install it.
+4. Launch the app from Applications and follow the on-screen setup flow.
+
+The installed root remains `Void-Desk/` during this branding transition.
+
+### First-run guidance
+
+- Back up saves and personal configuration before installing test builds or changing firmware.
+- Keep the device powered during package or optional desktop-image installation.
+- Verify available storage before installing the optional XFCE image.
+- Keep Wi-Fi and valid TLS certificates available for dependency/bootstrap downloads.
+- Preserve logs if setup fails before retrying storage-intensive operations.
+
+**Pygame is the recommended daily-use frontend.** LÖVE is included for development and testing only; several actions and routes remain incomplete.
+
+## Build QWASAR / Void Desk packages
+
+The **Build Void Desk** workflow is being introduced as the package pipeline for the QWASAR transition. Once the build-workflow change is merged, start it from GitHub Actions and select:
+
+- `all` — build both targets.
+- `muos` — build and validate the muOS `.muxapp`.
+- `pc` — build the Linux PC bundle.
+
+Outputs include SHA-256 checksums. Workflow artifacts are retained for 30 days. The current PC output is a portable Linux source bundle, not an AppImage or statically linked executable; its first launch creates a Python virtual environment and installs Pygame/psutil.
+
+See [packaging/pc/README.md](packaging/pc/README.md). Installed package and release identifiers remain Void Desk until a separate migration is ready.
 
 ## Web browsers on muOS
 
-VoidDesk exposes optional desktop browsers through the **XFCE environment**. NetSurf (`netsurf-gtk`), Falkon (`falkon`) and Dillo (`dillo`) are package choices for the Ubuntu desktop image; they are not browser binaries installed directly into the muOS host.
+QWASAR's optional desktop browsers run inside the **XFCE environment**. NetSurf (`netsurf-gtk`), Falkon (`falkon`) and Dillo (`dillo`) are package choices for the separate Ubuntu desktop image; they are not browser binaries installed directly into the muOS host.
 
 To use one:
 
@@ -119,7 +172,7 @@ To use one:
 2. Open **THE FORGE → BROWSER / RETE** and install the browser into the desktop image.
 3. Launch it from the XFCE application menu or an XFCE terminal.
 
-The separate `qtWebBrowser` entry in EthoStore is a third-party muOS application. It is not the same component as the XFCE browsers above and is not bundled or maintained by VoidDesk.
+The separate `qtWebBrowser` entry in EthoStore is a third-party muOS application. It is not the same component as the XFCE browsers above and is not bundled or maintained by QWASAR.
 
 ### Browser launch errors
 
@@ -127,9 +180,33 @@ An `Input/output error` is not specific enough to identify one cause. Record whi
 
 - `data/xfce_session.log` — XFCE session output.
 - `data/session_xfce.log` — X/desktop startup output.
-- `data/voiddesk.log` — VoidDesk launcher and session hand-off output.
+- `data/voiddesk.log` — QWASAR launcher and session hand-off output.
 
 Installing a browser inside the XFCE image does not make it executable from the muOS host; those are separate environments.
+
+## Run on a Linux PC
+
+Prerequisites: Linux, Python 3.10+, a graphical session and a terminal. The first Pygame launch creates `.venv_desktop` and installs Pygame and psutil. The LÖVE frontend requires a system LÖVE installation.
+
+~~~bash
+git clone --recurse-submodules https://github.com/SilverCrow2323/Void-Desk-Project.git
+cd Void-Desk-Project
+
+python3 voiddesk.py
+python3 voiddesk.py --py
+python3 voiddesk.py --love
+python3 voiddesk.py --engine py
+python3 voiddesk.py --engine love
+python3 voiddesk.py --repair
+python3 voiddesk.py --help
+~~~
+
+Initialize submodules before package builds if you did not clone recursively:
+
+~~~bash
+git submodule update --init --recursive
+python3 tools/build_muxapp.py
+~~~
 
 ## Controls
 
@@ -138,69 +215,35 @@ Installing a browser inside the XFCE image does not make it executable from the 
 | D-pad | Navigate |
 | A | Confirm / open |
 | B | Back / cancel |
-| X | Context or secondary action (varies by panel) |
-| Y | Cycle view or secondary list action |
+| X / Y | Context or secondary action |
 | L1 / R1 | Change tab or category |
-| START | Panel-specific action / dialog confirmation |
-| SELECT | Refresh or rescan where supported |
+| START / SELECT | Panel-specific action |
 
-Use the in-app quick guide when a panel defines different shortcuts.
-
-## Desktop and development launch
-
-The root-level voiddesk.py is a convenience launcher for a Linux PC. It is not the muOS package installer and does not make every handheld-only operation available on a desktop.
-
-Prerequisites: Linux, Python 3 and a terminal. The LÖVE frontend needs a system love executable (Debian/Ubuntu: sudo apt install love). The Pygame launcher creates .venv_desktop and installs pygame and psutil on first use.
-
-~~~bash
-git clone --recurse-submodules https://github.com/SilverCrow2323/Void-Desk-Project.git
-cd Void-Desk-Project
-
-python3 voiddesk.py
-python3 voiddesk.py --love
-python3 voiddesk.py --py
-python3 voiddesk.py --engine love
-python3 voiddesk.py --engine py
-python3 voiddesk.py --repair
-python3 voiddesk.py --help
-
-# Build the muOS package (requires the pinned submodule above)
-python3 tools/build_muxapp.py
-~~~
-
-The bundled LÖVE binary is architecture-specific; on a PC the launcher prefers the system installation.
-
-The Rt:Tailscale-M service is included as a pinned Git submodule. If you cloned without `--recurse-submodules`, run `git submodule update --init --recursive` before building or packaging Void Desk. The builder copies only the upstream service manager, watchdog, CLI wrapper and PIN-protected panel into `Void-Desk/external/rt-tailscale-m/app/RtTailscale`; the standalone upstream UI is not launched. Tailscale's official arm64 binaries are installed on first service start with upstream checksum verification.
-
-See the [visual capture workflow](docs/visual/README.md) to capture every LÖVE scene automatically, take F12 screenshots in either frontend, and generate the asset catalogue and visual galleries.
+The active screen footer remains the source of truth for panel-specific shortcuts.
 
 ## Configuration and generated data
 
 | Path | Role |
 |---|---|
-| data/desk_config.json | Main user configuration |
-| data/iptv_config.json | IPTV configuration |
-| data/voiddesk.log | Device launcher and session log |
-| data/logs/ | Additional runtime logs |
-| data/.pygame_ready | Pygame bootstrap completion marker |
-| data/visual-captures/ | Local F12 screenshots and JSON metadata; ignored by Git |
-| data/sdl_path.txt | Detected SDL library path |
-| runtime/ | Downloaded Pygame runtime; ignored by Git |
-| data/xfce.img | Optional desktop image |
+| `data/desk_config.json` | Main user configuration |
+| `data/iptv_config.json` | IPTV configuration |
+| `data/voiddesk.log` | Device launcher and session log |
+| `data/logs/` | Additional runtime logs |
+| `data/visual-captures/` | Local screenshots and JSON metadata |
+| `runtime/` | Downloaded Pygame runtime |
+| `data/xfce.img` | Optional desktop image |
 
-Back up personal configuration and media/list files before reinstalling. Generated runtime directories and logs are excluded from version control.
+Back up personal configuration and media/list files before reinstalling. Generated runtime files and logs are excluded from version control.
 
 ## Repository map
 
-~~~text
+```text
 .
-├── .github/workflows/   # Continuous integration
+├── .github/workflows/   # Continuous integration and package builds
 ├── assets/              # Fonts, sounds, glyphs and platform assets
 ├── bin/                 # Bootstrap, diagnostics and session scripts
 ├── data/                # Configuration and local runtime state
-├── desk/                # Python framebuffer application and hubs
-│   ├── hubs/            # Feature panels
-│   └── utils/           # Safe I/O, extraction, cache and calculation helpers
+├── desk/                # Python/Pygame application and hubs
 ├── lib/                 # Runtime libraries and framebuffer helpers
 ├── love/                # LÖVE frontend, scenes, widgets and themes
 ├── outdesk/             # Standalone applications and integrations
@@ -210,14 +253,11 @@ Back up personal configuration and media/list files before reinstalling. Generat
 ├── tools/               # Visual asset and screenshot inventory tools
 ├── wiki-source/         # Source pages for the GitHub Wiki
 ├── voidcast_addons/     # VoidCast add-ons
-├── BUILDCHECK.py        # Repository integrity checks
 ├── mux_launch.sh        # muOS device entry point
-└── voiddesk.py          # PC/development launcher
-~~~
+└── voiddesk.py          # Legacy PC/development launcher
+```
 
 ## Development and quality checks
-
-The repository includes focused tests for atomic file writes, safe calculation and archive extraction.
 
 ~~~bash
 python3 -m venv .venv
@@ -230,18 +270,16 @@ pytest -q
 python BUILDCHECK.py
 ~~~
 
-The optional headless smoke test requires Pygame: python BUILDCHECK.py --smoke.
-
-GitHub Actions checks Python compilation, focused tests, critical Ruff diagnostics, shell syntax and LuaJIT bytecode compilation. A green result does not replace testing on the target handheld. See [Development](docs/DEVELOPMENT.md).
+CI also checks LuaJIT syntax, shell parsing and visual captures. A green CI run does not replace tests on the target handheld. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Troubleshooting
 
 | Symptom | First checks |
 |---|---|
-| Black screen or immediate exit | data/voiddesk.log, engine choice, framebuffer permissions, free storage |
+| Black screen or immediate exit | `data/voiddesk.log`, engine choice, framebuffer permissions, free storage |
 | Pygame engine fails | Device clock, CA certificates and bootstrap logs; do not disable TLS verification |
-| LÖVE missing on PC | Install the PC build of LÖVE and retry python3 voiddesk.py --love |
-| Desktop session does not start | data/voiddesk.log, desktop-image readiness, free storage |
+| LÖVE missing on PC | Install the PC build of LÖVE and retry `python3 voiddesk.py --love` |
+| Desktop session does not start | `data/voiddesk.log`, desktop-image readiness, free storage |
 | A hub reports a missing tool | Install the optional dependency, then re-run diagnostics |
 | Controls stop responding | Return to the parent panel, reconnect the controller, inspect diagnostics |
 | Update or repair fails | Preserve logs and open an issue with device/firmware details |
@@ -250,32 +288,34 @@ Bug reports should include version, device, firmware, selected engine, reproduct
 
 ### Device power-off
 
-When VoidDesk is started as a muOS application, the power-off action returns control to `mux_launch.sh`. The launcher stops the local companion service, syncs pending filesystem writes, then requests a forced power-off, with kernel power-off fallbacks if the first command returns. This is separate from **END SESSION → Close**, which only exits VoidDesk.
+When QWASAR Desk is started as a muOS application, the power-off action returns control to `mux_launch.sh`. The launcher stops the local companion service, syncs pending filesystem writes, then requests a forced power-off, with kernel power-off fallbacks if the first command returns. This is separate from **END SESSION → Close**, which only exits QWASAR Desk.
 
 If the device does not power off, preserve `data/voiddesk.log` and report the device model, muOS build and whether the screen/LED state changed. Avoid repeated hard resets while storage writes may still be in progress.
 
 ## Security and responsible use
 
-VoidDesk can interact with the host system, install packages, manage network interfaces and expose local services.
+QWASAR can interact with host utilities, install packages, manage network interfaces, mount an optional desktop image and start local services.
 
-- Review commands and package operations before confirming them.
-- Use network tools only on devices and networks you own or are explicitly authorized to administer.
-- Do not expose BaseStation or other local services to untrusted networks.
-- Do not publish configuration files, logs or screenshots containing credentials or private network information.
-- Keep firmware, packages and the device clock up to date.
-- Treat third-party playlists, add-ons, archives and downloads as untrusted input.
+- Review package and system operations before confirming them.
+- Use network tools only on devices and networks you own or are authorized to administer.
+- Do not expose local services to untrusted networks.
+- Treat imported profiles, archives, playlists and add-ons as untrusted data.
+- Keep credentials, host identifiers and private files out of profile exports and screenshots.
+- Preserve a working muOS recovery path; never make the host firmware depend on QWASAR starting successfully.
 
 See [SECURITY.md](SECURITY.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Credits and license
+## Credits and licensing
 
-VoidDesk is credited in the project materials to **Sir Pips / SPDW Factory**. The repository also acknowledges Pygame, LÖVE, muOS, Debian/Ubuntu, iptv-org, Open-Meteo and Radio Browser, alongside contributors listed in CHANGELOG.md.
+QWASAR Desk is the evolving product identity of Void Desk, maintained by **Sir Pips / SPDW Factory**. The repository acknowledges Pygame, LÖVE, MustardOS/muOS, Debian/Ubuntu and upstream projects listed in [THIRD-PARTY.md](THIRD-PARTY.md).
 
-The repository currently has no root-level LICENSE file, even though older README content displayed an MIT badge. The badge has been removed rather than making an unsupported legal claim. The maintainer should add the intended license text before redistribution under a specific open-source license.
+There is currently no root-level LICENSE file. Do not assume a specific open-source license until the corresponding license text is published.
 
 <div align="center">
 
-**VOIDDESK NEXUS · built for the void, by the void.**
+**QWASAR DESK // THE SYMBIOTIC LAYER**
+
+*The void is not empty. It is infrastructure.*
 
 [Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) · [Issues](https://github.com/SilverCrow2323/Void-Desk-Project/issues) · [Source](https://github.com/SilverCrow2323/Void-Desk-Project)
 
