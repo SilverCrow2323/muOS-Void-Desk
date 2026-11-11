@@ -128,10 +128,8 @@ def have(b):
 
 
 def mounted(p):
-    try:
-        return (" %s " % os.path.abspath(p)) in open("/proc/mounts").read()
-    except OSError:
-        return False
+    """Use the shared /proc/mounts parser, including escaped mount paths."""
+    return imgmount.is_mounted(p)
 
 
 def pids_of(*names):
