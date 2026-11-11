@@ -1,6 +1,6 @@
-# QWASAR Desk architecture
+# QWASAR Desk — Runtime Architecture
 
-This note maps the source tree and main runtime paths. It does not imply that every optional integration is available on every firmware.
+QWASAR Desk is the new product identity of Void Desk. Existing runtime names and package paths remain unchanged during the brand migration. This note maps the source tree and main runtime paths; it does not imply that every optional integration is available on every firmware.
 
 ## Runtime overview
 
@@ -104,6 +104,12 @@ The current source-grounded tool inventory and proposed workspace/category model
 
 The visual identity direction, including the Megastructure, Manga Ink, Industrial, Terminal, Neon Noir and Minimal styles, is documented in [Visual Identity](VISUAL_IDENTITY.md). Style (layout/render treatment) and palette (colours) are separate concepts.
 
+
+## QWASAR Symbiotic Layer
+
+The long-term host integration strategy is documented in [SYMBIOTIC_LAYER.md](SYMBIOTIC_LAYER.md). It prioritises the official muOS application runner, data-driven extension points, explicit service ownership, SD1/SD2-safe paths and reversible integration. It does not authorise bootloader replacement, protected frontend patching or destructive changes to host init scripts.
+
 ## QWASAR Studio companion
 
 The browser companion, portable profile format, official-only plugin trust model, and planned device-sync boundary are specified in [QWASAR Studio — Technical Architecture](STUDIO_ARCHITECTURE.md). That document is the source of truth for profile/schema contracts and staged Studio rollout. Studio does not replace the existing handheld launcher or local service, and it does not make the local service internet-facing.
+
