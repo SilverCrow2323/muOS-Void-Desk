@@ -217,22 +217,6 @@
       "engine": "love",
       "launcherType": "love",
       "status": "external_app"
-    },
-    {
-      "id": "qwasar-inspector",
-      "name": "QWASAR Inspector",
-      "hub": "rt-toolbox",
-      "engine": "shared",
-      "launcherType": "builtin",
-      "status": "planned"
-    },
-    {
-      "id": "qwasar-switchboard",
-      "name": "QWASAR Switchboard",
-      "hub": "rt-toolbox",
-      "engine": "shared",
-      "launcherType": "builtin",
-      "status": "planned"
     }
   ],
   "securityReview": [
@@ -331,6 +315,24 @@
         "os-installation-selection"
       ],
       "notes": "Optional OS-level boot menu adapter; not an engine selector."
+    }
+  ],
+  "builtInTools": [
+    {
+      "id": "qwasar-inspector",
+      "name": "QWASAR Inspector",
+      "hub": "rt-toolbox",
+      "engine": "shared",
+      "status": "planned",
+      "role": "read-only-validator"
+    },
+    {
+      "id": "qwasar-switchboard",
+      "name": "QWASAR Switchboard",
+      "hub": "rt-toolbox",
+      "engine": "shared",
+      "status": "planned",
+      "role": "profile-feature-manager"
     }
   ]
 }
