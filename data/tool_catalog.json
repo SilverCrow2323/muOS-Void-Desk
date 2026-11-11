@@ -259,5 +259,78 @@
       "name": "Developer & Terminal",
       "status": "target"
     }
+  ],
+  "integrations": [
+    {
+      "id": "input-leap",
+      "category": "pc-input-bridge",
+      "status": "candidate",
+      "workspace": "uplink",
+      "roles": [
+        "pc-server",
+        "client"
+      ],
+      "transports": [
+        "keyboard-mouse",
+        "clipboard"
+      ],
+      "requiresBothEndpoints": true,
+      "notes": "Optional software-KVM backend; does not transport video."
+    },
+    {
+      "id": "deskflow",
+      "category": "pc-input-bridge",
+      "status": "candidate",
+      "workspace": "uplink",
+      "roles": [
+        "pc-server",
+        "client"
+      ],
+      "transports": [
+        "keyboard-mouse",
+        "clipboard"
+      ],
+      "requiresBothEndpoints": true,
+      "notes": "Alternative software-KVM backend; capability detection required."
+    },
+    {
+      "id": "qwasar-link",
+      "category": "remote-workstation",
+      "status": "planned",
+      "workspace": "uplink",
+      "transports": [
+        "keyboard-mouse",
+        "remote-display",
+        "file-transfer",
+        "telemetry"
+      ],
+      "notes": "QWASAR-owned pairing and PC companion transport."
+    },
+    {
+      "id": "virtualbox",
+      "category": "pc-virtualization",
+      "status": "planned",
+      "workspace": "start-session",
+      "platforms": [
+        "desktop-linux-x86_64"
+      ],
+      "transports": [
+        "vm-console"
+      ],
+      "notes": "Optional PC-only VM provider."
+    },
+    {
+      "id": "grub2",
+      "category": "pc-bootloader",
+      "status": "planned",
+      "workspace": "start-session",
+      "platforms": [
+        "desktop-linux-x86_64"
+      ],
+      "transports": [
+        "os-installation-selection"
+      ],
+      "notes": "Optional OS-level boot menu adapter; not an engine selector."
+    }
   ]
 }
