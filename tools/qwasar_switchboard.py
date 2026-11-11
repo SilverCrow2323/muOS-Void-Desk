@@ -87,10 +87,10 @@ class QwasarSwitchboard:
         self.manifest = _read_json(self.manifest_path, "QWASAR UI manifest")
         self.profile = _read_json(self.profile_path, "QWASAR profile")
         self._validate_ui_manifest()
-        self._validate_profile(self.profile)
         self.protected_areas = set(
             self.manifest["featureManagement"]["protectedAreas"]
         )
+        self._validate_profile(self.profile)
         self._loaded_digest = _digest(self.profile_path)
 
     def _resolve(self, path: str | Path) -> Path:
