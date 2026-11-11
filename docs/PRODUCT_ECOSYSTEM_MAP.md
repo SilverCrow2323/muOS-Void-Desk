@@ -17,22 +17,38 @@ The ecosystem should have one umbrella identity and clearly separated products. 
 | **Void Desk** | The classic controller-first handheld application. It owns the NEXUS interface, local tools, frontend engines, and handheld lifecycle | Current product; first delivery priority |
 | **Rt:QWASAR** | Reserved name for a future shared runtime/device-agent layer and its platform adapters | Reserved; not a separate product or repository yet |
 | **QWASAR Hub** | Optional server/API service for device registry, pairing, profile/catalog distribution, and sync coordination | Planned; not deployed |
-| **QWASAR Studio** | Browser/PWA interface connected to QWASAR Hub: profile editor, device view, import/export, and official catalog UI | Existing design direction; implementation is not deployed |
+| **QWASAR Studio** | One browser/PWA product containing Module Forge, Layout Designer, Release Composer, and Community Library | Existing design direction; implementation is not deployed |
 | **QWASAR Link** | Native PC companion/agent for secure device pairing, transfers, telemetry, remote input, and remote display | Planned; legacy BaseStation is only a prototype reference |
-| **Void Desk AppBuilder** | Tooling to create, validate, package, and eventually install handheld applications | Existing package scripts are the foundation; a complete AppBuilder product is not yet implemented |
+| **Void Desk AppBuilder engine** | Local/reproducible build and validation engine for `.muxapp` flavours | Existing `build-packages.sh` and `tools/build_muxapp.py` are the foundation; the module-aware engine is future work |
 
 ### Naming rules
 
 - Use **QWASAR-Env** when referring to the ecosystem as a whole.
 - Use **Void Desk** when referring to the classic handheld application. Do not rename its installed paths, package identifiers, or repository slug in the same change as a branding update.
-- Use **QWASAR Studio** for the browser experience and **QWASAR Hub** for its optional server/API.
+- Use **QWASAR Studio** for one unified browser experience: Module Forge, Layout Designer, Release Composer and Community Library. Use **QWASAR Hub** for its optional server/API.
 - Use **QWASAR Link** for the PC companion. It is not the same thing as the browser interface.
 - Reserve **Rt:QWASAR** for the shared runtime/device-agent layer. Do not use the `Rt:` prefix as the public umbrella name; it is better suited to a runtime component.
-- Keep **Void Desk AppBuilder** inside the Void Desk repository until it supports multiple independent products/platforms and has its own release cadence.
+- Keep the AppBuilder engine inside the Void Desk repository; Studio is its user-facing web workbench, not a second builder application.
 
 The name QWASAR-Env does not imply a new firmware distribution or a monolithic operating system. It is a coordinated environment assembled from independently installable applications and services.
 
 ---
+
+
+## 1A. Void Desk as a modular environment
+
+Void Desk is a multifunctional handheld hub whose sections are assembled from replaceable modules. The user can rearrange, rename, hide, disable, replace and create contributions in stable NEXUS/workspace slots. Modules declare compatibility, dependencies, typed capabilities, permissions, UI contributions and optional XFCE APT package requirements. Profiles describe layout only; they never execute code. APT packages are installed only inside the optional Debian/Ubuntu desktop image, never on the muOS Buildroot host.
+
+The precise proposed bundle structure, manifest, slot model, permission contract, community trust tiers and Full/Essential/Slim package flavours are specified in [Void Desk Modules](MODULE_SYSTEM.md). This is a proposed contract: module execution, community publishing, signing and custom builds must not be described as implemented until those systems exist.
+
+QWASAR Studio remains one web app with four workbenches:
+
+- **Module Forge:** create, document and validate a module.
+- **Layout Designer:** compose Void Desk sections and tiles like LEGO blocks.
+- **Release Composer:** select Full, Essential, Slim or a custom first-party module set and request a reproducible package build.
+- **Community Library:** discover and share profiles and, after the trust infrastructure exists, reviewed executable modules.
+
+The current AppBuilder scripts are the local build engine. Studio will become the visual front-end to that engine and to a controlled remote build pipeline; it is not a separate fifth product.
 
 ## 2. Device-by-device responsibility map
 
@@ -48,11 +64,11 @@ The name QWASAR-Env does not imply a new firmware distribution or a monolithic o
 Responsibilities:
 
 - Launch as a normal muOS application through the supported application runner.
-- Provide NEXUS navigation and controller-first hubs.
+- Provide NEXUS navigation and controller-first workspaces whose sections are composed from stable module contribution slots.
 - Run the local Python service and expose typed, allowlisted capabilities to the frontends.
 - Manage connectivity, APT operations inside the optional Debian/Ubuntu XFCE image, media integrations, diagnostics, jobs, and session hand-off.
 - Keep working offline for local features; network-only functions must show an explicit offline state.
-- Export/import portable profiles and later pair with Studio/Link without requiring either to use the local privileged service directly.
+- Compose sections from built-in/installed modules, export/import portable layout profiles, and later pair with Studio/Link without requiring either to use the local privileged service directly.
 
 Platform boundary:
 
@@ -132,15 +148,15 @@ The old VOID BaseStation code is a prototype, not the security foundation for QW
 
 Initial responsibilities:
 
-- import/export and validate portable profiles locally;
-- edit menu order, names, descriptions, icons, visibility and supported settings;
-- preview the profile before export/apply;
-- inspect paired-device metadata after explicit pairing;
-- browse the official plugin catalogue when that service exists.
+- **Module Forge:** create a module from templates, define its manifest, add frontend adapters/assets/docs and inspect permissions;
+- **Layout Designer:** rearrange NEXUS nodes, workspace sections, tiles and widgets like LEGO blocks;
+- **Release Composer:** select Full/Essential/Slim or a custom safe module set, validate dependencies and request a reproducible build;
+- **Community Library:** inspect, share and review portable profiles and, after trust infrastructure exists, executable modules;
+- import/export and validate portable profiles locally, without requiring QWASAR Hub.
 
 Mobile/tablet browsers are clients of Studio, not privileged device agents. They must never receive unrestricted shell, filesystem, or host-control access.
 
-The first Studio milestone should work without accounts or cloud services through local JSON import/export. Remote profile sync is opt-in and requires QWASAR Hub.
+The first Studio milestone should work without accounts or cloud services through local profile editing, module-manifest validation and JSON import/export. Online publishing, device sync and controlled remote builds are opt-in and require QWASAR Hub or a dedicated build service.
 
 ### Device H — Optional QWASAR Hub host (PC, NAS, or server)
 
@@ -391,4 +407,4 @@ The first implementation work after this map should stay inside `Void-Desk-Proje
 5. Complete the highest-priority UPLINK and Forge user journeys, testing each backend operation as it is connected.
 6. Start the physical H700 acceptance checklist before declaring LÖVE complete.
 
-No QWASAR Hub, Studio, Link, or runtime repository needs to be created to do this work.
+No QWASAR Hub, Studio, Link, or runtime repository needs to be created to do this work. Keep the module contract and built-in registry in Void-Desk-Project while Void Desk LÖVE is completed.
