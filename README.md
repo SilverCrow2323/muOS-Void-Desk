@@ -123,7 +123,7 @@ Void Desk's goal is deeper integration with muOS, not an unsafe firmware takeove
 
 The muOS developer documentation describes its app runner, launcher metadata, setup helpers, storage paths and extension mechanisms. Void Desk will use those interfaces rather than patching boot internals or replacing system files. See [Application Runner](https://community.muos.dev/t/application-runner/1282), [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) and [Frontend and Launching](https://muos.dev/docs/infrastructure/launching).
 
-**Non-negotiable:** muOS must remain bootable and recoverable if QWASAR is disabled, uninstalled or fails to start. No bootloader replacement, destructive init changes or irreversible system modifications are part of this roadmap.
+**Non-negotiable:** muOS must remain bootable and recoverable if Void Desk is disabled, uninstalled or fails to start. No bootloader replacement, destructive init changes or irreversible system modifications are part of this roadmap.
 
 ## QWASAR Studio — one web app for modules, layouts and builds
 
