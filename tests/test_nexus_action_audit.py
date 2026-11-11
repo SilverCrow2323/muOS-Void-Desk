@@ -8,6 +8,7 @@ AUDITED_SCENES = (
     "hub_forge.lua",
     "hub_workshop.lua",
     "hub_toolbox.lua",
+    "hub_mapps.lua",
 )
 
 
@@ -63,3 +64,24 @@ def test_forge_bridge_calls_are_registered_and_legacy_dead_rows_are_gone():
         assert stale not in forge
     assert 'bridge.call("session_launch", {id = "xfce"}' in forge
     assert 'apt_action = "install"' in forge
+
+
+def test_muos_apps_scene_builds_a_dynamic_selectable_application_list():
+    scene = (ROOT / "love" / "scenes" / "hub_mapps.lua").read_text(
+        encoding="utf-8"
+    )
+    assert 'bridge.call("list_muos_apps"' in scene
+    assert 'bridge.call("launch_muos_app", { path = app.path }' in scene
+    assert "scene._get_items = items_for" in scene
+    assert "Launch selected app" not in scene
+
+
+def test_muos_app_handoff_is_validated_by_the_shell_launcher():
+    launcher = (ROOT / "mux_launch.sh").read_text(encoding="utf-8")
+    assert 'MUOS_APP="$DATA/.muos_app"' in launcher
+    assert 'run_muos_app "$MUOS_APP_SCRIPT"' in launcher
+    assert "/mnt/mmc/MUOS/application/*/mux_launch.sh" in launcher
+    assert "/mnt/sdcard/MUOS/application/*/mux_launch.sh" in launcher
+    assert 'APP_REAL" != "$ROOT_REAL/$APP_NAME"' in launcher
+    assert 'APP_REAL" = "$APP_DIR"' in launcher
+
