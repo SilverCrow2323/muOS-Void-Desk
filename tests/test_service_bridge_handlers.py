@@ -128,3 +128,8 @@ def test_github_release_handler_reports_empty_release_catalog(monkeypatch):
         "releases": [],
         "status": "empty",
     }
+
+
+def test_github_release_command_is_registered():
+    service = load_service()
+    assert service.HANDLERS["gh_fetch_releases"] is service.h_gh_fetch_releases
