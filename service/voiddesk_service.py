@@ -1065,10 +1065,14 @@ def h_media_play(args):
         return {"ok": False, "error": "mpv is not installed"}
     h_media_stop({})
     try:
+        video = target.suffix.lower() in MEDIA_VIDEO_EXTS
+        player_args = [player, "--no-terminal"]
+        player_args.append("--force-window=yes" if video else "--no-video")
+        player_args.append(str(target))
         _MEDIA_PLAYER_PROC = subprocess.Popen(
-            [player, "--no-terminal", "--force-window=yes", str(target)],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, close_fds=True,
+            player_args, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            close_fds=True,
         )
         _MEDIA_NOW_PLAYING = target.name
         return {"ok": True, "playing": _MEDIA_NOW_PLAYING,
