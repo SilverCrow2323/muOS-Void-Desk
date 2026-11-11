@@ -7,7 +7,6 @@
 # ============================================================================
 import json
 import re
-import ssl
 import threading
 import time
 import urllib.request
@@ -98,13 +97,20 @@ class PcClient:
         self.host = host
         self.port = int(port) if port else 8420
         self.scheme = normalize_scheme(scheme)
-        self._ssl_context = (ssl.create_default_context()
-                             if self.scheme == "https" else None)
-        self._https_opener = (
-            urllib.request.build_opener(
+        self._ssl_context = None
+        self._https_opener = None
+        if self.scheme == "https":
+            # Keep the legacy HTTP client importable on minimal muOS Python
+            # builds that omit the optional ssl module. HTTPS fails closed.
+            try:
+                import ssl
+            except ImportError as exc:
+                raise RuntimeError(
+                    "HTTPS support is unavailable: Python ssl module missing") from exc
+            self._ssl_context = ssl.create_default_context()
+            self._https_opener = urllib.request.build_opener(
                 urllib.request.HTTPSHandler(context=self._ssl_context),
                 _NoRedirectHandler())
-            if self.scheme == "https" else None)
         self.token = token
         self.poll_s = poll_s
         self.device_id = re.sub(
