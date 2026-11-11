@@ -180,6 +180,8 @@ def test_component_types_slots_and_ids_are_registered_and_unique():
     assert len(registry) == len(manifest["componentRegistry"])
     for definition in registry.values():
         jsonschema.Draft202012Validator.check_schema(definition["propsSchema"])
+        assert definition["propsSchema"]["additionalProperties"] is False
+        assert set(definition["customizable"]) <= set(definition["propsSchema"]["properties"])
     nodes = _load_component_nodes(manifest)
     for node in nodes:
         assert node["type"] in registry, (
