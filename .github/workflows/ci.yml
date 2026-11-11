@@ -62,9 +62,10 @@ jobs:
       - name: Install LuaJIT (retry transient package mirror failures)
         run: |
           set -euo pipefail
+          APT_OPTIONS=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
           for attempt in 1 2 3; do
-            if sudo apt-get update -qq -o Acquire::Retries=2 &&
-               sudo apt-get install -y -o Acquire::Retries=2 luajit; then
+            if sudo apt-get update -qq "${APT_OPTIONS[@]}" &&
+               sudo apt-get install -y "${APT_OPTIONS[@]}" luajit; then
               exit 0
             fi
             if [[ "$attempt" -eq 3 ]]; then
@@ -155,10 +156,11 @@ jobs:
       - name: Install Tailscale test dependencies (retry transient package mirror failures)
         run: |
           set -euo pipefail
+          APT_OPTIONS=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
           packages=(shellcheck luajit qemu-user-static zip curl python3-pyflakes python3-qrcode python3-opencv love xvfb)
           for attempt in 1 2 3; do
-            if sudo apt-get update -qq -o Acquire::Retries=2 &&
-               sudo apt-get install -y -o Acquire::Retries=2 "${packages[@]}"; then
+            if sudo apt-get update -qq "${APT_OPTIONS[@]}" &&
+               sudo apt-get install -y "${APT_OPTIONS[@]}" "${packages[@]}"; then
               exit 0
             fi
             if [[ "$attempt" -eq 3 ]]; then
@@ -195,10 +197,11 @@ jobs:
       - name: Install LÖVE 11.5 and virtual display (retry transient package mirror failures)
         run: |
           set -euo pipefail
+          APT_OPTIONS=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
           packages=(love xvfb libgl1-mesa-dri)
           for attempt in 1 2 3; do
-            if sudo apt-get update -qq -o Acquire::Retries=2 &&
-               sudo apt-get install -y -o Acquire::Retries=2 "${packages[@]}"; then
+            if sudo apt-get update -qq "${APT_OPTIONS[@]}" &&
+               sudo apt-get install -y "${APT_OPTIONS[@]}" "${packages[@]}"; then
               exit 0
             fi
             if [[ "$attempt" -eq 3 ]]; then
