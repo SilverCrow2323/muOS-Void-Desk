@@ -61,7 +61,7 @@ def test_ci_uses_one_bounded_apt_install_and_system_python_for_integration():
     assert "name: Lua, LÖVE and Rt:Tailscale-M integration" in workflow
     assert "cancel-in-progress: true" in workflow
 
-    integration = workflow.split("  linux-integration:\\n", 1)[1]
+    integration = workflow.split("  linux-integration:", 1)[1]
     # Native Python modules are installed by APT, so this job must use Ubuntu's
     # system interpreter rather than setup-python's isolated interpreter.
     assert "actions/setup-python@v5" not in integration
