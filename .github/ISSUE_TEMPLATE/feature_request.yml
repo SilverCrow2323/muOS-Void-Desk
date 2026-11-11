@@ -1,0 +1,59 @@
+name: Feature request
+description: Propose a focused capability or improvement.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Prefer one independently reviewable capability per request. Explain the user problem before suggesting an implementation.
+  - type: input
+    id: platform
+    attributes:
+      label: Target platform or device
+      placeholder: "muOS H700 / ROCKNIX / KNULLI / Linux PC / cross-platform"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - NEXUS UI
+        - Browser
+        - XFCE / desktop image
+        - UPLINK / networking
+        - Media / VoidCast
+        - Workshop / diagnostics
+        - Packaging / installation
+        - QWASAR Studio
+        - Developer tooling / CI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What cannot users do today, or what is unnecessarily difficult?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: Describe the outcome, not only a preferred technical implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Compatibility and resource constraints
+      description: Mention controller-first interaction, ARM64/H700 limits, storage, RAM and offline operation where relevant.
+    validations:
+      required: false
