@@ -260,19 +260,18 @@ LÖVE is the next engineering focus. Pygame remains the behavioural reference, b
 - Python local service bridge: `love/core/bridge.lua` ↔ `service/voiddesk_service.py`.
 - Current NEXUS catalogue contains 10 visible nodes, including End Session.
 - Automated LÖVE capture covers 27 registered user-facing scenes, including Diagnostics, Monitor, Radio and Media Library. This proves rendering only, not that every action works or is reachable.
-- The current static action audit is focused on Session, Forge, Workshop and Toolbox. It does not yet audit all visible hubs and child actions.
+- Static checks now audit all scene push/switch destinations, all NEXUS scene declarations and every LÖVE `bridge.call` against the service handler registry. This proves route/handler registration, not every interaction sequence or physical control behaviour.
 
 ### Known gaps to resolve
 
-- MEDIA VAULT still presents Void Radio and Media Library actions marked as coming soon.
+- MEDIA VAULT now has LÖVE Radio and Media Library scenes. CI checks the curated station catalogue, favourites/recents persistence, safe local media roots, service bridge and 27-scene visual capture; actual MPV playback and H700 storage behaviour still require device validation.
 - MUOS APPS calls app-discovery and launch bridge commands; the corresponding service handlers need verification and implementation or an honest unavailable state.
 - INFO and FORGE call the GitHub release-feed bridge command; the service path must be verified and covered by tests.
-- IPTV calls playlist and EPG bridge commands; end-to-end service coverage and failure states must be verified.
+- IPTV playlist/EPG service integration is covered by CI security/parser tests; real stream compatibility, EPG provider behaviour and playback need device validation.
 - Some Forge, repair, Workshop, and External Tools actions need a command-by-command audit against the service allowlist.
-- The automated screenshot batch currently omits some scene files such as Diagnostics and Monitor. Add user-facing scenes to capture; do not promote the generic stub screen as a normal destination.
 - The menu must not present an operation as successful before the backend confirms it.
 
-These items are an audit queue, not permission to invent backend behaviour. For every missing operation choose one of: implement a safe backend handler, route to an existing verified implementation, or disable/hide the action with an explicit reason.
+These items are an audit queue, not permission to invent backend behaviour. For every missing operation choose one of: implement a safe backend handler, route to an existing verified implementation, or disable/hide the action with an explicit reason. Visual capture and bridge registration are not substitutes for live hardware evidence.
 
 ---
 
