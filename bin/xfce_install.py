@@ -237,7 +237,7 @@ mounted = imgmount.is_mounted
 
 
 def umount_all():
-    imgmount.umount_tree(MNT, IMG)
+    return imgmount.umount_tree(MNT, IMG)
 
 
 def apt_with_progress(pkgs, scr, log, remove=False, upgrade=False):
@@ -388,8 +388,11 @@ def main():
         return 1
 
     os.makedirs(MNT, exist_ok=True)
-    umount_all()                       # smonta anche i bind lasciati da XFCE
-    imgmount.cleanup_stale(IMG)        # libera loop rimasti appesi
+    if not umount_all():
+        note("FATAL: mount XFCE ancora attivi; impossibile preparare l'immagine")
+        scr.close()
+        logf.close()
+        return 1
     ok, err = imgmount.mount_img(IMG, MNT)
     if not ok:
         note("FATAL: mount immagine failed - %s" % (err or "?"))
@@ -523,9 +526,13 @@ def main():
         time.sleep(3)
         return 0
     finally:
-        umount_all()
+        cleanup_ok = umount_all()
+        if not cleanup_ok:
+            note("FATAL: cleanup XFCE incompleto; mount o loop ancora attivi")
         scr.close()
         logf.close()
+        if not cleanup_ok:
+            return 1
 
 
 if __name__ == "__main__":
