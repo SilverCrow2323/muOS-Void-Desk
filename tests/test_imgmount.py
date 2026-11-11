@@ -414,3 +414,72 @@ def test_mount_img_keeps_loop_left_mounted_by_failed_fallback(
     assert not ok
     assert "/dev/loop10" in error
     assert ["losetup", "-d", "/dev/loop10"] not in commands
+
+
+def test_mount_img_refuses_fallback_when_detach_reports_success_but_loop_remains(
+        monkeypatch, tmp_path):
+    image = tmp_path / "xfce.img"
+    image.write_bytes(b"image")
+    mountpoint = tmp_path / "xfce_mnt"
+    state = {"loop": None}
+    commands = []
+
+    monkeypatch.setattr(imgmount.os, "makedirs", lambda *_a, **_k: None)
+    monkeypatch.setattr(imgmount, "is_mounted", lambda _path: False)
+    monkeypatch.setattr(imgmount, "loop_of", lambda _image: state["loop"])
+    monkeypatch.setattr(imgmount, "loop_is_mounted", lambda _device: False)
+    monkeypatch.setattr(imgmount, "free_loop", lambda: "/dev/loop11")
+
+    def run(command):
+        commands.append(command)
+        if command[:2] == ["losetup", "/dev/loop11"]:
+            state["loop"] = "/dev/loop11"
+            return _fake_result()
+        if command[0] == "mount":
+            return _fake_result(1, stderr="explicit mount failed")
+        raise AssertionError("unexpected command: %r" % command)
+
+    def call(command):
+        commands.append(command)
+        assert command == ["losetup", "-d", "/dev/loop11"]
+        # Simulate lazy kernel detach: command succeeds but device is still
+        # listed by losetup because an open reference remains.
+        return 0
+
+    monkeypatch.setattr(imgmount, "_run", run)
+    monkeypatch.setattr(imgmount, "_call", call)
+
+    ok, error = imgmount.mount_img(image, mountpoint)
+
+    assert not ok
+    assert "loop dell'immagine risulta ancora associato" in error
+    assert not any(command[:2] == ["mount", "-o"] for command in commands)
+
+
+def test_mount_img_refuses_fallback_after_partial_losetup_attach_failure(
+        monkeypatch, tmp_path):
+    image = tmp_path / "xfce.img"
+    image.write_bytes(b"image")
+    mountpoint = tmp_path / "xfce_mnt"
+    state = {"loop": None}
+    commands = []
+
+    monkeypatch.setattr(imgmount.os, "makedirs", lambda *_a, **_k: None)
+    monkeypatch.setattr(imgmount, "is_mounted", lambda _path: False)
+    monkeypatch.setattr(imgmount, "loop_of", lambda _image: state["loop"])
+    monkeypatch.setattr(imgmount, "free_loop", lambda: "/dev/loop12")
+
+    def run(command):
+        commands.append(command)
+        if command[:2] == ["losetup", "/dev/loop12"]:
+            state["loop"] = "/dev/loop12"
+            return _fake_result(1, stderr="simulated partial attach failure")
+        raise AssertionError("fallback must not start: %r" % command)
+
+    monkeypatch.setattr(imgmount, "_run", run)
+
+    ok, error = imgmount.mount_img(image, mountpoint)
+
+    assert not ok
+    assert "/dev/loop12" in error
+    assert not any(command[0] == "mount" for command in commands)
