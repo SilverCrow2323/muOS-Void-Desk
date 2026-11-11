@@ -396,6 +396,10 @@ Do not make the cross-device backend a prerequisite for the handheld application
 
 ---
 
+## 7A. QWASAR Studio Store hosting
+
+The selected v1 hosting direction is GitHub Pages for one static QWASAR Studio PWA. QWASAR Store, Module Forge, Layout Designer and Release Composer are workbenches in the same web application. The public JSON catalogue is static and generated from reviewed immutable release metadata; module/profile/package binaries are distributed from GitHub Releases. GitHub Actions validates and deploys the PWA. Pages is not the account, upload, moderation, device-pairing or remote-build backend. Those functions remain future QWASAR Hub responsibilities. See [QWASAR Store Portal Architecture](QWASAR_STORE_PORTAL.md).
+
 ## 8. Immediate next engineering increments
 
 The first implementation work after this map should stay inside `Void-Desk-Project`:
