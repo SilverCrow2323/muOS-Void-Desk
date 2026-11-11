@@ -19,6 +19,8 @@ local BATCH_SCENES = {
     { name = "hub_syncthing", args = {} },
     { name = "hub_media", args = {} },
     { name = "hub_workshop", args = {} },
+    { name = "hub_diagnostics", args = {} },
+    { name = "hub_monitor", args = {} },
     { name = "hub_toolbox", args = {} },
     { name = "hub_mapps", args = {} },
     { name = "hub_external", args = {} },

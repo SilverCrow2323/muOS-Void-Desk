@@ -53,3 +53,15 @@ def test_external_tools_status_widget_uses_the_same_status_publisher():
     assert 'publish_status(scene, "Launched: " .. t.name)' in source
     assert 'publish_status(scene, "Failed: " .. (resp.error or "unknown"))' in source
     assert 'scene.set_status("Loading external tools...")' not in source
+
+
+def test_love_visual_capture_includes_diagnostics_and_monitor():
+    capture = (LOVE / "core" / "visual_capture.lua").read_text(
+        encoding="utf-8"
+    )
+    for scene in ("hub_diagnostics", "hub_monitor"):
+        assert f'name = "{scene}"' in capture
+        assert (LOVE / "scenes" / f"{scene}.lua").is_file()
+
+    # The generic error/stub page is a fallback, not a user-facing feature.
+    assert 'name = "hub_stub"' not in capture
