@@ -43,8 +43,13 @@ def main():
             scr.draw()
             time.sleep(5)
             return 1
-        imgmount.umount_tree(MNT, IMG)
-        imgmount.cleanup_stale(IMG)
+        if not imgmount.umount_tree(MNT, IMG):
+            scr.msg = ("FATAL: mount XFCE ancora attivi; remount annullato"
+                       if lang == "it" else
+                       "FATAL: XFCE mounts still active; remount aborted")
+            scr.draw()
+            log.write((scr.msg + "\n").encode())
+            return 1
         ok, err = imgmount.mount_img(IMG, MNT)
         if not ok:
             scr.msg = "FATAL: mount - %s" % err
@@ -97,9 +102,17 @@ def main():
         time.sleep(3)
         return 0
     finally:
-        imgmount.umount_tree(MNT, IMG)
+        cleanup_ok = imgmount.umount_tree(MNT, IMG)
+        if not cleanup_ok:
+            scr.msg = ("FATAL: cleanup XFCE incompleto; mount o loop ancora attivi"
+                       if lang == "it" else
+                       "FATAL: XFCE cleanup incomplete; mounts or loop still active")
+            scr.draw()
+            log.write((scr.msg + "\n").encode())
         scr.close()
         log.close()
+        if not cleanup_ok:
+            return 1
 
 
 if __name__ == "__main__":

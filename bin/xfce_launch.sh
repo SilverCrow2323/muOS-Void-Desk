@@ -38,7 +38,13 @@ PROG() {
 
 PY3="$(command -v python3)"
 
-MNTED() { grep -q " $1 " /proc/mounts 2>/dev/null; }
+. "$APP_DIR/bin/vd_mount_common.sh"
+MNTED() { vd_mount_present "$APP_DIR" "$1"; }
+MOUNT_IF_NEEDED() {
+    _target=$1
+    shift
+    vd_mount_ensure "$APP_DIR" "$_target" "$@"
+}
 
 CLEANUP() {
 	BOOST_TEARDOWN
@@ -59,8 +65,8 @@ CLEANUP() {
 
 PROG 8 "monto l'immagine ext4" "mounting the ext4 image"
 mkdir -p "$MNT"
-MNTED "$MNT" || mount -o loop "$IMG" "$MNT" || {
-	echo "$(date) mount loop fallito" >>"$XLOG"
+MOUNT_IF_NEEDED "$MNT" mount -o loop "$IMG" "$MNT" || {
+	echo "$(date) mount loop fallito o stato mount non verificabile" >>"$XLOG"
 	exit 1
 }
 # l'ambiente scelto e' davvero installato? Altrimenti xfce e nota nel log
@@ -85,16 +91,32 @@ rm -f "$MNT/tmp/.vd_x_up" 2>/dev/null
 
 PROG 18 "collego i dispositivi" "binding devices"
 for D in dev proc sys; do mkdir -p "$MNT/$D"; done
-MNTED "$MNT/dev" || mount -o bind /dev "$MNT/dev"
-MNTED "$MNT/proc" || mount -t proc proc "$MNT/proc"
-MNTED "$MNT/sys" || mount -t sysfs sys "$MNT/sys"
+MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev" || {
+	echo "$(date) impossibile verificare/preparare $MNT/dev" >>"$XLOG"
+	CLEANUP
+	exit 1
+}
+MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc" || {
+	echo "$(date) impossibile verificare/preparare $MNT/proc" >>"$XLOG"
+	CLEANUP
+	exit 1
+}
+MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys" || {
+	echo "$(date) impossibile verificare/preparare $MNT/sys" >>"$XLOG"
+	CLEANUP
+	exit 1
+}
 
 # ATTENZIONE: "mount -o bind" NON e' ricorsivo: i mount dentro /dev
 # (pts, shm, snd...) vanno rimontati a mano o il chroot resta muto.
 for SUB in /dev/pts /dev/shm /dev/snd /dev/input /dev/dri /dev/bus/usb; do
 	[ -e "$SUB" ] || continue
 	mkdir -p "$MNT$SUB"
-	MNTED "$MNT$SUB" || mount -o bind "$SUB" "$MNT$SUB" 2>/dev/null
+	MOUNT_IF_NEEDED "$MNT$SUB" mount -o bind "$SUB" "$MNT$SUB" 2>/dev/null || {
+		echo "$(date) impossibile verificare/preparare $MNT$SUB" >>"$XLOG"
+		CLEANUP
+		exit 1
+	}
 done
 
 PROG 28 "servizi host: rete e bluetooth" "host services: network, bluetooth"
@@ -103,7 +125,11 @@ for RUN in /run/dbus /var/run/dbus /run/udev /run/wpa_supplicant \
 	/var/run/wpa_supplicant /var/lib/bluetooth /run/systemd; do
 	[ -e "$RUN" ] || continue
 	mkdir -p "$MNT$RUN"
-	MNTED "$MNT$RUN" || mount -o bind "$RUN" "$MNT$RUN" 2>/dev/null
+	MOUNT_IF_NEEDED "$MNT$RUN" mount -o bind "$RUN" "$MNT$RUN" 2>/dev/null || {
+		echo "$(date) impossibile verificare/preparare $MNT$RUN" >>"$XLOG"
+		CLEANUP
+		exit 1
+	}
 done
 cp -f /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null
 
@@ -292,7 +318,11 @@ PROG 62 "condivido le SD nel desktop" "sharing SD cards"
 for D in /mnt/mmc /mnt/sdcard; do
 	[ -d "$D" ] || continue
 	mkdir -p "$MNT$D"
-	MNTED "$MNT$D" || mount -o bind "$D" "$MNT$D"
+	MOUNT_IF_NEEDED "$MNT$D" mount -o bind "$D" "$MNT$D" || {
+		echo "$(date) impossibile verificare/preparare $MNT$D" >>"$XLOG"
+		CLEANUP
+		exit 1
+	}
 done
 
 # componenti di servizio (una tantum): accessibilita', zenity, task manager

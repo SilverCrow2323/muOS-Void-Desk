@@ -128,10 +128,8 @@ def have(b):
 
 
 def mounted(p):
-    try:
-        return (" %s " % os.path.abspath(p)) in open("/proc/mounts").read()
-    except OSError:
-        return False
+    """Use the shared /proc/mounts parser, including escaped mount paths."""
+    return imgmount.is_mounted(p)
 
 
 def pids_of(*names):
@@ -702,9 +700,14 @@ class Panel(object):
             img = os.path.join(DATA, "xfce.img")
             mnt = os.path.join(DATA, "xfce_mnt")
             n = len(imgmount.submounts(mnt))
-            imgmount.umount_tree(mnt, img)
-            imgmount.cleanup_stale(img)
+            cleanup_ok = imgmount.umount_tree(mnt, img)
             free = imgmount.loop_of(img) is None
+            if not cleanup_ok:
+                return ("cleanup incompleto: %d mount ancora attivi, loop %s" %
+                        (n, "libero" if free else "occupato")
+                        if self.lang == "it" else
+                        "cleanup incomplete: %d mounts remain, loop %s"
+                        % (n, "free" if free else "busy"))
             return ("liberati %d mount, loop %s" %
                     (n, "libero" if free else "ancora occupato")
                     if self.lang == "it" else
