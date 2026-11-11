@@ -192,6 +192,23 @@ def test_media_service_registers_typed_commands_and_serializes_player_ownership(
     )]
 
 
+def test_media_handlers_and_radio_commands_are_registered():
+    service = load_service_module()
+    expected = {
+        "media_roots",
+        "media_list",
+        "media_play_file",
+        "media_stop",
+        "media_playback_status",
+        "radio_list",
+        "radio_toggle_favorite",
+        "radio_play",
+        "radio_stop",
+        "radio_status",
+    }
+    assert expected <= set(service.HANDLERS)
+
+
 def test_media_browser_hides_playlist_files_until_local_import_is_supported(tmp_path, monkeypatch):
     service = load_service_module()
     root = tmp_path / "sd1"
