@@ -81,7 +81,7 @@ def _clean_station(station: dict) -> dict | None:
     }
 
 
-def _catalog_sources(config: dict) -> tuple[list[dict], list[dict]]:
+def _catalog_sources(config: dict) -> tuple[list[dict], list[dict], list[dict]]:
     builtins = [entry for raw in RADIO_BUILTIN if (entry := _clean_station(raw))]
     favorites = [entry for raw in config.get("radio_favorites", [])[:100]
                  if (entry := _clean_station(raw))]
