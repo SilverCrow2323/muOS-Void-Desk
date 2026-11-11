@@ -113,18 +113,33 @@ def loop_is_mounted(device):
 
 
 def umount_tree(mnt, img=None):
-    """Unmount all mounts below mnt and release its loop when possible.
+    """Unmount a mount tree and verify that no mount or loop remains.
 
-    Returns True only when the root mountpoint is no longer mounted.
+    A lazy unmount is only a fallback attempt, not proof of cleanup. The
+    function returns False while any descendant mount remains or while the
+    image's loop device cannot be detached.
     """
     for path in submounts(mnt):
         if _call(["umount", path]) != 0:
             _call(["umount", "-l", path])
+
+    # Check the whole tree, not only the root: a lazy-detached child can
+    # otherwise be left behind while the root appears to be gone.
+    if submounts(mnt) or is_mounted(mnt):
+        return False
+
     if img:
         device = loop_of(img)
-        if device and not loop_is_mounted(device):
-            _call(["losetup", "-d", device])
-    return not is_mounted(mnt)
+        if device:
+            if loop_is_mounted(device):
+                return False
+            if _call(["losetup", "-d", device]) != 0:
+                return False
+            # losetup may defer detach while the kernel still holds a ref.
+            if loop_of(img) is not None:
+                return False
+
+    return not submounts(mnt) and not is_mounted(mnt)
 
 
 def free_loop():
