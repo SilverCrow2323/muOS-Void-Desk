@@ -179,3 +179,14 @@ def test_imported_profile_cannot_disable_the_central_shell(tmp_path: Path):
 
     with pytest.raises(SwitchboardError, match="protected shell region"):
         QwasarSwitchboard(root, profile_path)
+
+def test_reset_command_can_recover_a_corrupt_profile_and_back_it_up(tmp_path: Path):
+    root, profile_path = _fixture(tmp_path)
+    profile_path.write_text("{ broken json", encoding="utf-8")
+
+    restored = QwasarSwitchboard.restore_default(root, profile_path)
+
+    assert restored == profile_path
+    assert Path(str(profile_path) + ".bak").read_text(encoding="utf-8") == "{ broken json"
+    recovered = QwasarSwitchboard(root, profile_path)
+    assert recovered.preview()["profileId"] == "qwasar.profile.voiddesk.handheld-default"
