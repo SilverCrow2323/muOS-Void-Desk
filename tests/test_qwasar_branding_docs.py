@@ -58,8 +58,14 @@ def test_ci_retries_apt_mirrors_and_keeps_independent_jobs_running():
         encoding="utf-8"
     )
     assert workflow.count("if: ${{ !cancelled() }}") == 3
-    assert workflow.count("Acquire::Retries=1") == 3
-    assert workflow.count("Acquire::http::Timeout=20") == 3
-    assert workflow.count("Acquire::https::Timeout=20") == 3
-    assert "LuaJIT installation failed after 3 attempts." in workflow
-    assert "LÖVE dependency installation failed after 3 attempts." in workflow
+    assert workflow.count("bash tools/ci_apt_install.sh") == 3
+
+    installer = (ROOT / "tools" / "ci_apt_install.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "azure\\.archive\\.ubuntu\\.com" in installer
+    assert "timeout --kill-after=10s" in installer
+    assert "Acquire::Retries=1" in installer
+    assert "QWASAR_CI_APT_UPDATE_TIMEOUT:-120" in installer
+    assert "QWASAR_CI_APT_INSTALL_TIMEOUT:-180" in installer
+    assert "for attempt in 1 2; do" in installer
