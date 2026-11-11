@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TAILSCALE_COMMIT = "d6aa05363cd5d56b07e63e2261c960a26d73cd9c"
 SKIP_ROOT_FILES = {
     ".gitignore", ".gitattributes", ".gitmodules", ".editorconfig",
-    ".DS_Store", "Thumbs.db",
+    ".DS_Store", "Thumbs.db", "build-packages.sh",
 }
 SKIP_DIRS = {
     ".git", ".github", ".pytest_cache", ".ruff_cache", "__pycache__",
