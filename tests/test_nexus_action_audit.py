@@ -99,3 +99,15 @@ def test_muos_app_handoff_is_validated_by_the_shell_launcher():
     assert 'APP_REAL" = "$APP_DIR"' in launcher
     assert 'APP_SCRIPT="${APP_SCRIPT%/}/mux_launch.sh"' in launcher
     assert 'if [ "$RC" -eq 16 ] && [ -f "$MUOS_APP" ]; then' in launcher
+
+
+
+def test_void_radio_routes_to_a_real_love_scene_and_registered_commands():
+    media = (LOVE / "scenes" / "hub_media.lua").read_text(encoding="utf-8")
+    radio_path = LOVE / "scenes" / "hub_radio.lua"
+    assert 'sm.push("hub_radio", {})' in media
+    assert radio_path.is_file()
+    radio = radio_path.read_text(encoding="utf-8")
+    for command in ("radio_list", "radio_status", "radio_play", "radio_stop"):
+        assert f'bridge.call("{command}"' in radio
+    assert "Radio: soon" not in media
