@@ -233,3 +233,21 @@ def test_switchboard_rejects_unknown_menu_entry_ids(tmp_path: Path):
     switchboard, _ = _switchboard(tmp_path)
     with pytest.raises(SwitchboardError, match="unknown menu entry"):
         switchboard.set_menu_entry_visibility("rt-toolbox", "menu.not-registered", False)
+
+def test_imported_profile_cannot_hide_end_node_menu_actions(tmp_path: Path):
+    root, profile_path = _fixture(tmp_path)
+    profile = _profile(profile_path)
+    profile["workspaceOverrides"].append({
+        "id": "end-node",
+        "hiddenMenuEntries": ["exit.poweroff"],
+    })
+    profile_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SwitchboardError, match="protected menu entry"):
+        QwasarSwitchboard(root, profile_path)
+
+
+def test_switchboard_cannot_disable_protected_module_identifiers(tmp_path: Path):
+    switchboard, _ = _switchboard(tmp_path)
+    with pytest.raises(SwitchboardError, match="protected"):
+        switchboard.set_module_enabled("end-node.recovery", False)
