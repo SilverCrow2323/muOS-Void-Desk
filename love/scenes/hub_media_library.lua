@@ -76,8 +76,6 @@ local function enter_selected()
                 message = "Playback failed: " .. (resp.error or "unknown error")
             end
         end)
-    elseif entry.type == "playlist" then
-        message = "M3U playlist: open IPTV to load a configured feed"
     end
 end
 
