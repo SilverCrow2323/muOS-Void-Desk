@@ -14,6 +14,11 @@ ARGS="$*"
 
 . "$APP_DIR/bin/vd_mount_common.sh"
 MNTED() { vd_mount_present "$APP_DIR" "$1"; }
+MOUNT_IF_NEEDED() {
+    _target=$1
+    shift
+    vd_mount_ensure "$APP_DIR" "$_target" "$@"
+}
 
 rm -f "$DONE"
 : >"$LOG"
@@ -26,29 +31,53 @@ fi
 
 WE_MOUNTED=0
 mkdir -p "$MNT"
-if ! MNTED "$MNT"; then
-	mount -o loop "$IMG" "$MNT" || {
-		echo "$(date) mount loop fallito" >>"$LOG"
+MNTED "$MNT"
+MOUNT_STATE=$?
+case "$MOUNT_STATE" in
+	0) ;;
+	1)
+		mount -o loop "$IMG" "$MNT" || {
+			echo "$(date) mount loop fallito" >>"$LOG"
+			echo "1" >"$DONE"
+			exit 1
+		}
+		WE_MOUNTED=1
+		;;
+	*)
+		echo "$(date) stato mount non verificabile; chdman annullato" >>"$LOG"
 		echo "1" >"$DONE"
 		exit 1
-	}
-	WE_MOUNTED=1
-fi
+		;;
+esac
 
 for D in dev proc sys; do mkdir -p "$MNT/$D"; done
 WE_MOUNTED_DEV=0
-if ! MNTED "$MNT/dev"; then
-	mount -o bind /dev "$MNT/dev" && WE_MOUNTED_DEV=1
+if ! MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev"; then
+	echo "$(date) stato mount /dev non valido; chdman annullato" >>"$LOG"
+	echo "1" >"$DONE"
+	exit 1
 fi
-MNTED "$MNT/proc" || mount -t proc proc "$MNT/proc"
-MNTED "$MNT/sys" || mount -t sysfs sys "$MNT/sys"
+if ! MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc"; then
+	echo "$(date) stato mount /proc non valido; chdman annullato" >>"$LOG"
+	echo "1" >"$DONE"
+	exit 1
+fi
+if ! MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys"; then
+	echo "$(date) stato mount /sys non valido; chdman annullato" >>"$LOG"
+	echo "1" >"$DONE"
+	exit 1
+fi
 
 # le SD, cosi' chdman vede i file dei giochi -- stesso posto identico
 # sia fuori che dentro il chroot, nessuna traduzione di percorso serve
 for D in /mnt/mmc /mnt/sdcard; do
 	[ -d "$D" ] || continue
 	mkdir -p "$MNT$D"
-	MNTED "$MNT$D" || mount -o bind "$D" "$MNT$D"
+	MOUNT_IF_NEEDED "$MNT$D" mount -o bind "$D" "$MNT$D" || {
+		echo "$(date) stato mount non valido: $MNT$D; chdman annullato" >>"$LOG"
+		echo "1" >"$DONE"
+		exit 1
+	}
 done
 
 echo "$(date) === chdman $ARGS ===" >>"$LOG"
