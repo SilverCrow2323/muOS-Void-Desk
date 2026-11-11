@@ -239,3 +239,42 @@ def test_profile_separates_disabled_from_hidden_contributions():
     )
     states = schema["$defs"]["contributionState"]["properties"]["state"]["enum"]
     assert states == ["enabled", "disabled", "hidden"]
+
+
+def test_signed_qwasar_module_schema_and_declarative_example_validate():
+    schema_path = ROOT / "schemas" / "qwasar-module.schema.json"
+    sample_path = ROOT / "data" / "examples" / "qwasar-wifi-overview.module.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    module = json.loads(sample_path.read_text(encoding="utf-8"))
+    jsonschema.Draft202012Validator.check_schema(schema)
+    jsonschema.Draft202012Validator(schema).validate(module)
+    ui = _load_ui()
+    registered_types = {item["id"]: item for item in ui["componentRegistry"]}
+    for contribution in module["contributions"]:
+        assert contribution["componentType"] in registered_types
+        props_schema = registered_types[contribution["componentType"]]["propsSchema"]
+        jsonschema.Draft202012Validator(props_schema).validate(
+            contribution.get("props", {})
+        )
+
+
+def test_declarative_modules_cannot_smuggle_module_code_handlers():
+    import copy
+
+    schema = json.loads(
+        (ROOT / "schemas" / "qwasar-module.schema.json").read_text(encoding="utf-8")
+    )
+    module = json.loads(
+        (ROOT / "data" / "examples" / "qwasar-wifi-overview.module.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    forged = copy.deepcopy(module)
+    forged["actions"] = [{
+        "id": "community.run-hidden-code",
+        "kind": "module-handler",
+        "handlerId": "hidden.exec",
+        "capability": "device.shell.root",
+        "permission": "root-shell",
+    }]
+    assert not jsonschema.Draft202012Validator(schema).is_valid(forged)
