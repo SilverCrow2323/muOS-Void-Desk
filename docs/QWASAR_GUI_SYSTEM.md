@@ -225,35 +225,45 @@ A module can contribute a menu entry only to a slot supported by the installed U
 
 ## 8. Workspaces have different visual grammars
 
-A generic list dashboard is a fallback, not the design target. The workspace declares a template, and each template composes the same components differently.
+A generic list dashboard is a fallback, not the design target. Each workspace uses a purpose-specific template while reusing the same component registry and action contracts.
 
-| Workspace | Template | Layout grammar |
+| Workspace | Template | Responsibility and visual grammar |
 |---|---|---|
-| START SESSION | `session-selector` | Three compact environment cards, install/launch actions, disk/RAM summary and hand-off state |
-| THE FORGE | `package-workbench` | Package/environment tabs, search/filter, package list, details/confirmation pane and persistent job dock |
-| UPLINK | `network-console` | Connection overview, service cards, peer/device lists and grouped connect/manage actions |
-| MEDIA VAULT | `media-library` | Source tabs, library/list pane, now-playing panel, IPTV/radio entry points and playback hand-off |
-| RT:TOOLBOX | `tool-workbench` | Quick tools grid, category navigation, diagnostics/monitor widgets and contextual tool area |
-| SETTINGS | `settings-workbench` | Grouped schema-backed forms, current values, reset/preview and save state |
-| INFO / COMMUNITY | `reference-library` | Documentation/release cards, changelog, credits and community resources |
-| END NODE | `system-exit` | Focused confirmation surface for exit, reboot or power-off; no unrelated widgets |
+| START SESSION | session-selector | Separate launch lanes for desktop environments, standalone terminal sessions, paired PC workstation and optional PC virtual machines. Uses environment/session cards, availability checks and hand-off state. |
+| THE FORGE | package-workbench | One package control centre for APT, Void Desk instances/flavours, QMOD modules, external applications, frontend engines and PC virtualization dependencies. Uses category tabs, package search, details, dependency preview, confirmations and a persistent job dock. |
+| UPLINK | network-console | All online/network-facing services: Wi-Fi, Bluetooth, hotspot, VPN, Tailscale, Syncthing, QWASAR Link pairing, software-KVM input bridge and online catalogues. Uses connection cards, peers, trust and sync states. |
+| MEDIA VAULT | media-library | Audio/video players, Internet radio, IPTV/streaming, local media sources, playlists and playback queue. Uses a source selector, content list and shared now-playing panel. |
+| RT:TOOLBOX | tool-workbench | Installed Void Desk tools, utilities and system-facing tools, grouped into four stable sections below. Uses quick tiles, category navigation, diagnostics widgets and a contextual work area. |
+| SETTINGS | settings-workbench | Grouped schema-backed forms for themes, palettes, controls, display, input, layout, shell panels and user preferences. |
+| INFO / COMMUNITY | reference-library | Technical manual, release notes, changelog, credits, help and community resources. |
+| END NODE | system-exit | Exit, return-to-firmware, reboot and safe power-off confirmations. No unrelated widgets. |
 
-### RT:TOOLBOX consolidation
+### RT:TOOLBOX — four sections
 
-Merge the current TOOLBOX destination with the current WORKSHOP/diagnostics destination into one top-level **RT:TOOLBOX** node.
+The current separate TOOLBOX and WORKSHOP/diagnostics destinations converge into one top-level **RT:TOOLBOX** workspace. The four categories are:
 
-Proposed internal sections:
+1. **Everyday Tools** — calculator, clock/timer, calendar, notes, text editor, screenshots and pinned quick utilities.
+2. **Files & Storage** — File-GD X, file manager, archive tools, checksums, duplicate detection, backup/restore and storage browsing.
+3. **System & Diagnostics** — Void Diag, Void Monitor, hardware/service health, logs, storage analysis, cleanup and safe repair helpers.
+4. **Developer & Terminal** — bounded shell, Python console, build tools, package/manifest validation, QWASAR Inspector and development utilities.
 
-1. **Quick Access** — calculator, clock, calendar, editor and pinned tools.
-2. **Files** — file manager, media/file helpers and user-selected storage tools.
-3. **Diagnostics** — Void Diag, system information, service health and logs.
-4. **Monitor** — CPU, RAM, temperature, storage and live history.
-5. **Maintenance** — safe cleanup, backup/restore, cache and repair helpers.
-6. **Developer** — shell, Python tools and build utilities, gated by capability/permissions.
+The Toolbox presents installed/available tools and allows the user to pin, arrange and open them. **THE FORGE remains responsible for install, update and uninstall.** A Toolbox disable/hide operation changes the active profile; it does not silently uninstall files or purge dependencies.
 
-Move APT package operations and desktop-image installation to **THE FORGE**, so package management remains in one place. RT:TOOLBOX can link to the package workbench but should not own a second APT menu.
+Two cross-cutting controls are available from the Toolbox:
 
-Keep legacy route IDs such as `hub_toolbox` and `hub_workshop` as aliases during migration. Old profiles should resolve to RT:TOOLBOX with the appropriate section selected rather than breaking.
+- **QWASAR Inspector:** read-only verification of schemas, modules, routes, actions, providers, assets, dependencies, engine/platform compatibility, permissions and package integrity.
+- **QWASAR Switchboard:** profile-level enable/disable, hide/show, reorder and restore-defaults for workspaces, sections, modules, widgets, menu entries and global panels.
+
+### START SESSION — launch targets are not tools
+
+START SESSION is for entering a separate environment or session:
+
+- **Desktop environments:** XFCE, IceWM, LXDE and later registered desktop sessions.
+- **Standalone terminal sessions:** PTY shell, Python console and future TUI sessions. These are separate from the bounded in-app shell panel in RT:TOOLBOX.
+- **PC workstation:** opens a paired QWASAR Link workflow. Input sharing and remote display remain separate capabilities.
+- **Virtual machines:** launches registered VMs on a compatible PC host. On handheld this entry is unavailable, not a fake action.
+
+APT and VM dependency installation remain in THE FORGE. The session is launched here only after the backend confirms readiness.
 
 ## 9. Layout and responsive rules
 
@@ -333,3 +343,47 @@ Studio's future Layout Designer consumes the same manifest and schemas. It edits
 ---
 
 This document defines the intended QWASAR GUI architecture. It does not claim that profile-driven runtime composition, dynamic component installation, the global M media overlay or the consolidated RT:TOOLBOX navigation is already implemented.
+
+
+## 15. Boot, installation flavours and engine selection
+
+There are two separate selectors and they must never be confused:
+
+1. **Bootloader / OS selector:** chooses a complete bootable operating-system installation. An optional GRUB2 adapter is a PC-only integration for this purpose.
+2. **QWASAR pre-frontend launch selector:** runs after the host OS or firmware has started and chooses an installed Void Desk instance, build flavour, frontend engine, user profile and session target.
+
+GRUB cannot switch Pygame to LÖVE inside an already running OS. The application launcher performs that selection. muOS/H700 uses its normal muxapp launcher and a reversible pre-frontend selector; it does not modify or replace the handheld bootloader.
+
+### Independent selection axes
+
+- **Installed instance:** one or more separately installed Void Desk copies with unique IDs and isolated application roots.
+- **Build flavour:** Full, Essential, Slim or Custom. These are package compositions, not renderer names.
+- **Frontend engine:** Pygame or LÖVE today; Qt 6, LVGL and Web are reserved future adapters.
+- **User profile:** a layout/preferences composition.
+- **Session target:** desktop, terminal, paired PC workstation or virtual machine.
+
+More than one installed instance may coexist. The installer must never overwrite another instance's executable tree, engine runtime or configuration. A shared data area is permitted only through versioned, explicit migrations. The exact inventory is described by schemas/qwasar-installations.schema.json; the runtime creates the real local inventory, while the repository carries only an example.
+
+### GRUB safety contract
+
+- GRUB2 support is optional and limited to compatible PC installations.
+- It may generate/preview an entry for a complete OS image/root filesystem only.
+- It must back up the current configuration, show the proposed diff and require explicit confirmation.
+- It must provide a documented rollback path.
+- Standard Void Desk .deb or .muxapp installation never edits GRUB, EFI variables, boot order or firmware boot configuration.
+- No GRUB integration is offered on muOS/H700.
+
+## 16. PC integration and virtual machines
+
+### Input Leap and QWASAR Link
+
+Input Leap is a software KVM: it shares keyboard/mouse input across machines with each participating system running a compatible endpoint. It is not a remote desktop or video-streaming protocol. QWASAR Link should provide the simple PC-side setup wizard, peer discovery, role selection, pairing state and health checks while treating Input Leap as an optional backend. See the [Input Leap project README](https://github.com/input-leap/input-leap).
+
+The wrapper must probe both endpoints and their display/input stack before offering a connect action. It must not claim clipboard support where the selected stack does not provide it. Remote display, file transfer and remote input are separately permissioned QWASAR Link channels; one must never be inferred from another.
+
+### VirtualBox
+
+VirtualBox is an optional PC-only session provider. QWASAR detects the host binary, kernel driver/module state, hardware virtualization support and available VM registrations, then presents only valid operations. The first target is Linux x86-64 PC. Oracle's VirtualBox 7.2 installation guide lists supported Linux host packages for x86-64; it does not list Linux ARM64 as a supported host package in that matrix. See [VirtualBox 7.2 installation](https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/installation.html) and [host/guest combinations](https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/Introduction.html).
+
+On H700/muOS, VirtualBox is unavailable as a native host runtime. A handheld may connect to a VM running on a paired PC through QWASAR Link, but that is remote PC access, not local virtualization.
+
