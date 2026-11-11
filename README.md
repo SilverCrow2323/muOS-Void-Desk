@@ -26,7 +26,7 @@
 
 </div>
 
-Void Desk is the classic controller-first handheld application within the QWASAR-Env ecosystem. It brings system tools, connectivity, media, diagnostics, desktop sessions and a configurable visual shell to compatible Linux handhelds.
+Void Desk is a modular controller-first handheld environment within QWASAR-Env. Its NEXUS hubs and workspace sections are composed from tools and modules that users can arrange, enable, disable, replace and eventually create/share through QWASAR Studio. It integrates native handheld capabilities with applications installed inside its optional Debian/Ubuntu desktop environment.
 
 The long-term direction is a **Symbiotic Layer**. Void Desk uses the host firmware's supported application, service, storage and theme extension points, then progressively provides a richer experience without making the original firmware unbootable or difficult to recover. It is not a replacement firmware image today.
 
@@ -34,7 +34,7 @@ The long-term direction is a **Symbiotic Layer**. Void Desk uses the host firmwa
 
 ## At a glance
 
-The product/device boundaries and cross-device roadmap are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md).
+The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md). The module format, permissions, LEGO-style composition and release flavours are specified in [Void Desk Modules](docs/MODULE_SYSTEM.md).
 
 | | |
 |---|---|
@@ -75,7 +75,7 @@ NEXUS is an animated, orbit-based hub selector designed for D-pad and controller
 | **OUTERDESK** | Extend | Standalone applications and optional integrations |
 | **END SESSION** | Configure | Exit, restart, reboot and power-off flows |
 
-The source-grounded inventory and proposed categories are in [docs/TOOL_CATALOG.md](docs/TOOL_CATALOG.md) and `data/tool_catalog.json`. Availability depends on firmware, hardware, dependencies, permissions and frontend implementation; a menu entry alone is not proof that a tool is usable.
+The source-grounded inventory and proposed categories are in [docs/TOOL_CATALOG.md](docs/TOOL_CATALOG.md) and `data/tool_catalog.json`. The future module manager will allow supported contributions to be rearranged and composed through QWASAR Studio; downloaded executable modules will require verification and explicit permissions. Availability depends on firmware, hardware, dependencies, permissions and frontend implementation; a menu entry alone is not proof that a tool is usable.
 
 ## Visual identity — the Megastructure
 
