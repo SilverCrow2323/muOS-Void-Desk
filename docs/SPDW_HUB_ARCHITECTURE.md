@@ -142,10 +142,22 @@ The module owns configuration, host detection, pairing, readiness checks,
 session status and logs. Sunshine remains the streaming engine; the Hub owns
 the operational UI and lifecycle adapter.
 
-The RT Stream repository/source and its current daemon contract were not found
-inside the inspected Void Desk tree. Do not invent its commands, package names
-or ports. Import its actual implementation and document its current listeners
-before writing the adapter.
+The public project announcement identifies the upstream source as
+[SilverCrow2323/dolphin-rt-stream](https://github.com/SilverCrow2323/dolphin-rt-stream).
+An announcement for version 4.2.1 dated 22 October 2026 describes a muOS
+handheld frontend and a Linux PC portal built around Sunshine + Moonlight.
+The announced PC-side functions include ROM-library scanning, Sunshine app
+registration, cover retrieval, fullscreen Dolphin launch, 4:3 display-mode
+switching and controller-profile management.
+
+**Source audit is still blocked:** the linked GitHub connection currently
+returns HTTP 404 for the repository metadata, branch listing and raw source
+paths. The release announcement is useful product context, not a substitute
+for code inspection. Do not infer command names, package identifiers,
+configuration keys, lifecycle semantics or listener ports from the announcement.
+Before implementing the adapter, obtain readable access to the repository and
+record the exact commit/tag, installation contract, process ownership,
+configuration files, live listener set and shutdown behavior.
 
 ### Package / App Store
 
