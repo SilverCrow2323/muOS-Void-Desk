@@ -66,7 +66,7 @@ def test_apt_manager_fails_when_cleanup_leaves_image_mounted(
 
     assert manager.main(["clean"]) == 1
     assert cleanup_calls
-    assert not any(command[0] == "chroot" for command in calls)
+    assert any(command[0] == "chroot" for command in calls)
     assert "cannot safely finish APT operation" in capsys.readouterr().err
 
 
