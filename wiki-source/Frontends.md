@@ -1,8 +1,8 @@
-# Frontends — Pygame and LÖVE
+# QWASAR Desk Frontends — Pygame and LÖVE
 
 ## Pygame (recommended)
 
-Pygame is the main and more complete VoidDesk frontend.
+Pygame is the main and more complete QWASAR Desk frontend.
 
 - Entry point: desk/main.py
 - Shared constants and menu metadata: desk/const.py
@@ -50,7 +50,7 @@ A screen can render in CI while its service action remains unavailable. Keep the
 - Shell uses a real nonblocking PTY through the local service (`shell_start`, `shell_poll`, `shell_send`, `shell_kill`).
 - External Tools reads the shared `external/tools.json` registry, reports whether each launcher is actually present, and starts only registered launchers. Missing optional submodules are shown as not installed rather than being treated as successful launches.
 - Pygame Syncthing discovery now checks the Andromeda storage configuration, defaults to the documented local API port 7070, and never spawns a second daemon on muOS. The service must be enabled in Configuration → Connectivity → Web Services → Syncthing. The panel still needs full device/folder management and hardware validation.
-- Rt:Tailscale-M is pinned as a source submodule and its upstream static/UI tests plus 21 QEMU service checks run in CI. Its service is not yet embedded as a native VoidDesk feature; the final .muxapp builder must vendor the pinned service files rather than rely on a gitlink.
+- Rt:Tailscale-M is pinned as a source submodule and its upstream static/UI tests plus 21 QEMU service checks run in CI. Its service is not yet embedded as a native QWASAR Desk feature; the final .muxapp builder must vendor the pinned service files rather than rely on a gitlink.
 - Workshop diagnostics, live monitor, logs and cleanup are incomplete.
 - Media Library and Radio flows need parity work.
 - Desktop repair is a placeholder.
@@ -58,3 +58,8 @@ A screen can render in CI while its service action remains unavailable. Keep the
 - Tool-specific UI and confirmation/error states still need validation on handheld hardware.
 
 The Settings screen can change the configured engine. The choice is applied after restarting the application. Use Pygame for normal use; switch to LÖVE only when deliberately testing the prototype.
+
+
+## Visual styles and palettes
+
+QWASAR separates visual composition from colour palettes. The direction set includes Megastructure, Manga Ink, Industrial, Terminal, Neon Noir and Minimal. Pygame remains the reference UI; LÖVE palette work is in progress and does not yet imply full style or feature parity. Read [Visual Identity](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/VISUAL_IDENTITY.md).

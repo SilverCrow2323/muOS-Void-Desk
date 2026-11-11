@@ -1,4 +1,4 @@
-# Visual capture and asset catalogue
+# QWASAR Desk — Visual capture and asset catalogue
 
 ## Capture every LÖVE scene
 

@@ -1,6 +1,6 @@
-# Hubs and features
+# QWASAR Desk — Hubs and features
 
-VoidDesk uses the NEXUS home interface to route into feature hubs. Feature availability depends on engine, firmware, installed programs, hardware and permissions.
+QWASAR Desk uses the NEXUS home interface to route into feature hubs. Feature availability depends on engine, firmware, installed programs, hardware and permissions.
 
 | Hub | Purpose | Notes |
 |---|---|---|
@@ -16,3 +16,8 @@ VoidDesk uses the NEXUS home interface to route into feature hubs. Feature avail
 | END SESSION | Close, reboot or power off | Device power-off must be tested on hardware |
 
 For troubleshooting, use the Troubleshooting page. For engine differences, see Frontends.
+
+
+## Tool taxonomy
+
+The proposed workspace/category model is documented in [Tool Catalog](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/TOOL_CATALOG.md). Tool availability is still capability- and firmware-dependent. The catalog is an inventory, not a claim that every item is enabled on every device.

@@ -1,10 +1,20 @@
-# CHANGELOG — VoidDesk
+# CHANGELOG — QWASAR Desk (formerly VoidDesk)
 
 > **Release candidate:** `v10.5.4-NEXUS`  
 > **Status:** prepared for review; not yet published as a GitHub Release  
 > **Date:** 2026-11-08
 
 This file records user-visible changes by release. The next candidate is documented separately from the previous release history. Hardware-dependent behaviour is not marked verified until it has been exercised on the target handheld.
+
+---
+
+## QWASAR brand transition — documentation update
+
+- Adopted **QWASAR Desk** as the evolving product identity of Void Desk.
+- Kept the repository slug, `Void-Desk/` package root, `mux_launch.sh`, `voiddesk.py` and existing configuration/log paths unchanged for backward compatibility.
+- Defined the reversible **Symbiotic Layer** roadmap for deeper muOS integration through documented application and extension interfaces.
+- Updated README and source-controlled Wiki pages to the new visual and product language. The live GitHub Wiki still requires its one-time initial Home page creation before the publisher can sync it.
+- This is a documentation/brand transition; it does not rename installed binaries or publish a new package.
 
 ---
 

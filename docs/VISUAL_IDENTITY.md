@@ -1,10 +1,10 @@
-# Void Desk Visual Identity System
+# QWASAR Desk Visual Identity System
 
 ## Direction
 
-Void Desk has a recognizable industrial science-fiction identity: brutalist interfaces, immense architectural scale, dense technical typography, hard silhouettes, manga-like ink contrast, restrained grain, warning markings and vivid signal colours. The intended mood is raw, mysterious and tactile rather than glossy neon-by-default.
+QWASAR Desk has a recognizable industrial science-fiction identity: brutalist interfaces, immense architectural scale, dense technical typography, hard silhouettes, manga-like ink contrast, restrained grain, warning markings and vivid signal colours. The intended mood is raw, mysterious and tactile rather than glossy neon-by-default.
 
-The visual direction may be informed by dark cyberpunk manga and architectural science fiction (including the sense of scale and materiality associated with works such as *BLAME!*), but Void Desk must use its own original compositions, symbols, layouts, illustrations and typography. Do not reproduce panels, characters, logos, page layouts or signature artwork from another work.
+The visual direction may be informed by dark cyberpunk manga and architectural science fiction (including the sense of scale and materiality associated with works such as *BLAME!*), but QWASAR Desk must use its own original compositions, symbols, layouts, illustrations and typography. Do not reproduce panels, characters, logos, page layouts or signature artwork from another work.
 
 ## Separate aesthetic from palette
 
@@ -18,7 +18,7 @@ Users must be able to combine any supported visual style with any compatible pal
 
 | ID | Display name | Visual language | Default use |
 |---|---|---|---|
-| `megastructure` | Megastructure | Monumental brutalist sci-fi, black ink, steel surfaces, sparse red/cyan signal accents, dense technical labels, architectural linework | Signature Void Desk |
+| `megastructure` | Megastructure | Monumental brutalist sci-fi, black ink, steel surfaces, sparse red/cyan signal accents, dense technical labels, architectural linework | Signature QWASAR Desk |
 | `manga_ink` | Manga Ink | High-contrast monochrome, paper/ink surfaces, halftone-like texture, bold panel framing, restrained vermilion markers | Reading-heavy tools and compact displays |
 | `industrial` | Industrial Console | Riveted-panel geometry, measurement marks, hazard striping, steel and amber/cyan indicators | Workshop, Forge, diagnostics |
 | `terminal` | Phosphor Terminal | Monospaced hierarchy, low-colour interface, phosphor green/amber/cyan, minimal motion | Shell, logs, developer tools |
