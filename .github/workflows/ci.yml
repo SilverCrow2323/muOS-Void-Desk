@@ -4,6 +4,18 @@ on:
   push:
     branches: ["main", "codex/**"]
   pull_request:
+    # Avoid rerunning CI for label, assignment, draft-conversion and review-request events.
+    types: [opened, synchronize, reopened, ready_for_review]
+    # Documentation-only changes do not need to reinstall the full native
+    # toolchain or rebuild the handheld/PC packages.
+    paths-ignore:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "docs/**"
+      - "wiki-source/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
   workflow_dispatch:
 
 permissions:
@@ -16,14 +28,20 @@ concurrency:
 jobs:
   python:
     name: Python checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: "1"
+      VOIDDESK_NOINTRO: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install test tools
-        run: python -m pip install --disable-pip-version-check pytest ruff
+      - name: Install Python test and visual tools
+        run: python -m pip install --disable-pip-version-check pytest ruff pygame==2.6.1
       - name: Compile project Python files
         run: |
           python -m compileall -q \
@@ -54,42 +72,6 @@ jobs:
               *) sh -n "$file" ;;
             esac
           done
-
-  lua:
-    name: LuaJIT syntax
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 18
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install LuaJIT (bounded mirror fallback)
-        run: bash tools/ci_apt_install.sh luajit
-      - name: Compile all LÖVE Lua files
-        run: |
-          find love -type f -name '*.lua' -print0 \
-            | xargs -0 -r -n 1 sh -c 'luajit -b "$1" /dev/null' _
-      - name: Test LÖVE scene manager and service bridge
-        run: |
-          mkdir -p "$RUNNER_TEMP/voiddesk/data/visual-captures"
-          VOIDDESK_APP_DIR="$RUNNER_TEMP/voiddesk" luajit tests/test_love_core.lua
-
-
-  pygame-visual-capture:
-    name: Pygame visual capture
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
-    env:
-      SDL_VIDEODRIVER: dummy
-      SDL_AUDIODRIVER: dummy
-      PYGAME_HIDE_SUPPORT_PROMPT: "1"
-      VOIDDESK_NOINTRO: "1"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install Pygame runtime
-        run: python -m pip install --disable-pip-version-check pygame==2.6.1
       - name: Capture supported Pygame home styles
         run: python tools/capture_pygame_screenshots.py --all-states
       - name: Upload Pygame visual captures
@@ -104,9 +86,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-  muxapp-package:
-    name: Reproducible .muxapp package
-    runs-on: ubuntu-latest
+  installable-packages:
+    name: Build .muxapp and Debian .deb
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,36 +97,66 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Build and validate the single-root package
+      - name: Build both installable packages
+        run: ./build-packages.sh --skip-submodule-update
+      - name: Verify Debian package metadata
         run: |
-          python tools/build_muxapp.py \
-            --output "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
-          python tools/validate_muxapp.py \
-            "$RUNNER_TEMP/Void-Desk-10.5.4.muxapp"
-          cd "$RUNNER_TEMP"
-          sha256sum -c Void-Desk-10.5.4.muxapp.sha256
-      - name: Upload installable package and checksum
+          dpkg-deb --info dist/voiddesk_*_all.deb
+          test "$(dpkg-deb --field dist/voiddesk_*_all.deb Architecture)" = "all"
+      - name: Upload handheld and PC packages with checksums
         uses: actions/upload-artifact@v4
         with:
-          name: voiddesk-muxapp-10.5.4
+          name: voiddesk-installers
           path: |
-            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp
-            ${{ runner.temp }}/Void-Desk-10.5.4.muxapp.sha256
+            dist/*.muxapp
+            dist/*.muxapp.sha256
+            dist/*.deb
+            dist/*.deb.sha256
+          if-no-files-found: error
           retention-days: 30
 
-  tailscale-integration:
-    name: Rt:Tailscale-M tests
-    if: ${{ !cancelled() }}
+  linux-integration:
+    name: Lua, LÖVE and Rt:Tailscale-M integration
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch the pinned Rt:Tailscale-M source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # One runner, one apt update, one dependency install. Previously Lua,
+      # LÖVE and Tailscale each created a separate runner and repeated APT work.
+      - name: Install native integration dependencies once
+        run: |
+          bash tools/ci_apt_install.sh \
+            shellcheck luajit qemu-user-static zip curl \
+            python3-pyflakes python3-qrcode python3-opencv \
+            love xvfb libgl1-mesa-dri
+      - name: Verify LÖVE runtime version
+        run: |
+          version="$(dpkg-query -W -f='${Version}' love)"
+          echo "Installed LÖVE package: ${version}"
+          [[ "${version}" == 11.5* ]]
+      - name: Compile all LÖVE Lua files
+        run: |
+          find love -type f -name '*.lua' -print0 \
+            | xargs -0 -r -n 1 sh -c 'luajit -b "$1" /dev/null' _
+      - name: Test LÖVE scene manager and service bridge
+        run: |
+          mkdir -p "$RUNNER_TEMP/voiddesk/data/visual-captures"
+          VOIDDESK_APP_DIR="$RUNNER_TEMP/voiddesk" luajit tests/test_love_core.lua
+      - name: Capture every registered LÖVE screen
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          SDL_AUDIODRIVER: "dummy"
+        run: |
+          python3 tools/capture_love_screenshots.py \
+            --timeout 300 \
+            --settle 0.85
+      - name: Fetch pinned Rt:Tailscale-M source
         run: |
           git clone https://github.com/SilverCrow2323/muOS-Rt-Tailscale.git external/rt-tailscale-m
           git -C external/rt-tailscale-m checkout d6aa05363cd5d56b07e63e2261c960a26d73cd9c
-      - name: Install Tailscale test dependencies (bounded mirror fallback)
-        run: bash tools/ci_apt_install.sh shellcheck luajit qemu-user-static zip curl python3-pyflakes python3-qrcode python3-opencv love xvfb
       - name: Run Rt:Tailscale-M static, model, QR and UI tests
         run: |
           cd external/rt-tailscale-m
@@ -159,31 +172,7 @@ jobs:
           cd external/rt-tailscale-m
           sudo env RT_BIN_DIR="$RUNNER_TEMP/rt-tailscale/RtTailscale/bin" \
             bash tests/run_integration.sh
-
-
-  love-visual-capture:
-    name: LÖVE visual capture
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 18
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install LÖVE 11.5 and virtual display (bounded mirror fallback)
-        run: bash tools/ci_apt_install.sh love xvfb libgl1-mesa-dri
-      - name: Verify LÖVE runtime version
-        run: |
-          version="$(dpkg-query -W -f='${Version}' love)"
-          echo "Installed LÖVE package: ${version}"
-          [[ "${version}" == 11.5* ]]
-      - name: Capture every registered LÖVE screen
-        env:
-          LIBGL_ALWAYS_SOFTWARE: "1"
-          SDL_AUDIODRIVER: "dummy"
-        run: |
-          python3 tools/capture_love_screenshots.py \
-            --timeout 300 \
-            --settle 0.85
-      - name: Upload screenshot set and capture diagnostics
+      - name: Upload LÖVE visual captures and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
