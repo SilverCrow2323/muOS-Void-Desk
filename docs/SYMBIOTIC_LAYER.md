@@ -1,12 +1,12 @@
 # QWASAR Desk — Symbiotic Layer
 
-**Product identity:** QWASAR Desk (formerly Void Desk)  
+**Product identity:** Void Desk, the classic handheld application in QWASAR-Env  
 **Current implementation:** a muOS-launched application with Pygame as the reference frontend and LÖVE as an experimental frontend.  
 **Long-term direction:** a deeply integrated handheld environment that remains reversible and respects the host firmware.
 
 ## Product principle
 
-QWASAR should feel like an environment growing inside the handheld, not an unrelated app. The "symbiosis" is architectural: QWASAR reuses host facilities, contributes its own tools and presentation layer, and returns control cleanly to the original firmware.
+Void Desk should feel like an environment growing inside the handheld, not an unrelated app. The "symbiosis" is architectural: Void Desk reuses host facilities, contributes its own tools and presentation layer, and returns control cleanly to the original firmware.
 
 The metaphor of parasitizing muOS describes the ambition to integrate deeply. It is not a technical instruction to compromise the host. QWASAR must never make the device unbootable, hide recovery paths, or require destructive system patches.
 
