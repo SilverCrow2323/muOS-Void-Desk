@@ -56,25 +56,11 @@ jobs:
     name: LuaJIT syntax
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
-      - name: Install LuaJIT (retry transient package mirror failures)
-        run: |
-          set -euo pipefail
-          APT_OPTIONS=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
-          for attempt in 1 2 3; do
-            if sudo apt-get update -qq "${APT_OPTIONS[@]}" &&
-               sudo apt-get install -y "${APT_OPTIONS[@]}" luajit; then
-              exit 0
-            fi
-            if [[ "$attempt" -eq 3 ]]; then
-              echo "LuaJIT installation failed after 3 attempts." >&2
-              exit 1
-            fi
-            echo "APT mirror unavailable; retrying in $((attempt * 15))s..." >&2
-            sleep "$((attempt * 15))"
-          done
+      - name: Install LuaJIT (bounded mirror fallback)
+        run: bash tools/ci_apt_install.sh luajit
       - name: Compile all LÖVE Lua files
         run: |
           find love -type f -name '*.lua' -print0 \
@@ -153,23 +139,8 @@ jobs:
         run: |
           git clone https://github.com/SilverCrow2323/muOS-Rt-Tailscale.git external/rt-tailscale-m
           git -C external/rt-tailscale-m checkout d6aa05363cd5d56b07e63e2261c960a26d73cd9c
-      - name: Install Tailscale test dependencies (retry transient package mirror failures)
-        run: |
-          set -euo pipefail
-          APT_OPTIONS=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
-          packages=(shellcheck luajit qemu-user-static zip curl python3-pyflakes python3-qrcode python3-opencv love xvfb)
-          for attempt in 1 2 3; do
-            if sudo apt-get update -qq "${APT_OPTIONS[@]}" &&
-               sudo apt-get install -y "${APT_OPTIONS[@]}" "${packages[@]}"; then
-              exit 0
-            fi
-            if [[ "$attempt" -eq 3 ]]; then
-              echo "Tailscale test dependency installation failed after 3 attempts." >&2
-              exit 1
-            fi
-            echo "APT mirror unavailable; retrying in $((attempt * 15))s..." >&2
-            sleep "$((attempt * 15))"
-          done
+      - name: Install Tailscale test dependencies (bounded mirror fallback)
+        run: bash tools/ci_apt_install.sh shellcheck luajit qemu-user-static zip curl python3-pyflakes python3-qrcode python3-opencv love xvfb
       - name: Run Rt:Tailscale-M static, model, QR and UI tests
         run: |
           cd external/rt-tailscale-m
@@ -194,23 +165,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
-      - name: Install LÖVE 11.5 and virtual display (retry transient package mirror failures)
-        run: |
-          set -euo pipefail
-          APT_OPTIONS=(-o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
-          packages=(love xvfb libgl1-mesa-dri)
-          for attempt in 1 2 3; do
-            if sudo apt-get update -qq "${APT_OPTIONS[@]}" &&
-               sudo apt-get install -y "${APT_OPTIONS[@]}" "${packages[@]}"; then
-              exit 0
-            fi
-            if [[ "$attempt" -eq 3 ]]; then
-              echo "LÖVE dependency installation failed after 3 attempts." >&2
-              exit 1
-            fi
-            echo "APT mirror unavailable; retrying in $((attempt * 15))s..." >&2
-            sleep "$((attempt * 15))"
-          done
+      - name: Install LÖVE 11.5 and virtual display (bounded mirror fallback)
+        run: bash tools/ci_apt_install.sh love xvfb libgl1-mesa-dri
       - name: Verify LÖVE runtime version
         run: |
           version="$(dpkg-query -W -f='${Version}' love)"
