@@ -75,6 +75,10 @@ except Exception:
             PYGAME_HIDE_SUPPORT_PROMPT=1 \
             python3 "$APP_DIR/desk/main.py" >>"$LOG" 2>&1
         RC=$?
+        if [ "$RC" -eq 16 ] && [ -f "$MUOS_APP" ]; then
+            echo "$(date) Pygame requested a muOS application hand-off" >>"$LOG"
+            return
+        fi
         if [ $RC -ne 0 ]; then
             echo "$(date) Pygame frontend crashed (rc=$RC) - reverting engine to LOVE for next boot" >>"$LOG"
             revert_engine_to_love
@@ -89,9 +93,83 @@ except Exception:
     fi
 }
 
+# Launch a scanned muOS application only from the two supported application
+# roots. The .muos_app marker is shared with the Pygame frontend; it is data,
+# never a command string. The child launcher runs only after LÖVE/Pygame has
+# exited and released the framebuffer.
+run_muos_app() {
+    APP_SCRIPT="$1"
+    # Pygame's existing marker stores the application directory; LÖVE uses
+    # the same format. Accept an explicit launcher path too for compatibility.
+    case "$APP_SCRIPT" in
+        */mux_launch.sh) ;;
+        *) APP_SCRIPT="${APP_SCRIPT%/}/mux_launch.sh" ;;
+    esac
+    APP_ROOT=""
+    case "$APP_SCRIPT" in
+        /mnt/mmc/MUOS/application/*/mux_launch.sh)
+            APP_ROOT="/mnt/mmc/MUOS/application"
+            ;;
+        /mnt/sdcard/MUOS/application/*/mux_launch.sh)
+            APP_ROOT="/mnt/sdcard/MUOS/application"
+            ;;
+        *)
+            echo "$(date) rejected muOS app hand-off: unsupported root" >>"$LOG"
+            return 1
+            ;;
+    esac
+
+    APP_TARGET_DIR="${APP_SCRIPT%/mux_launch.sh}"
+    APP_NAME="${APP_TARGET_DIR##*/}"
+    case "$APP_NAME" in
+        ""|"."|".."|*/*)
+            echo "$(date) rejected muOS app hand-off: invalid app name" >>"$LOG"
+            return 1
+            ;;
+    esac
+
+    if [ -L "$APP_TARGET_DIR" ] || [ -L "$APP_SCRIPT" ] || \
+       [ ! -d "$APP_TARGET_DIR" ] || [ ! -f "$APP_SCRIPT" ] || \
+       [ ! -x "$APP_SCRIPT" ]; then
+        echo "$(date) rejected muOS app hand-off: launcher missing or linked" >>"$LOG"
+        return 1
+    fi
+
+    ROOT_REAL="$(CDPATH= cd -P "$APP_ROOT" 2>/dev/null && pwd -P)"
+    APP_REAL="$(CDPATH= cd -P "$APP_TARGET_DIR" 2>/dev/null && pwd -P)"
+    if [ -z "$ROOT_REAL" ] || [ -z "$APP_REAL" ] || \
+       [ "$APP_REAL" != "$ROOT_REAL/$APP_NAME" ] || \
+       [ "$APP_REAL" = "$APP_DIR" ]; then
+        echo "$(date) rejected muOS app hand-off: path validation failed" >>"$LOG"
+        return 1
+    fi
+
+    APP_NAME_LOWER="$(printf '%s' "$APP_NAME" | tr '[:upper:]' '[:lower:]')"
+    case "$APP_NAME_LOWER" in
+        voiddesk*)
+            echo "$(date) rejected muOS app hand-off: cannot launch Void Desk recursively" >>"$LOG"
+            return 1
+            ;;
+    esac
+
+    APP_SCRIPT_REAL="$APP_REAL/mux_launch.sh"
+    if [ -L "$APP_SCRIPT_REAL" ] || [ ! -f "$APP_SCRIPT_REAL" ] || \
+       [ ! -x "$APP_SCRIPT_REAL" ]; then
+        echo "$(date) rejected muOS app hand-off: invalid launcher file" >>"$LOG"
+        return 1
+    fi
+
+    echo "$(date) launching muOS application: $APP_NAME" >>"$LOG"
+    "$APP_SCRIPT_REAL" >>"$LOG" 2>&1
+    APP_RC=$?
+    echo "$(date) muOS application returned (rc=$APP_RC): $APP_NAME" >>"$LOG"
+    return 0
+}
+
 PENDING="$DATA/.pending_session"
+MUOS_APP="$DATA/.muos_app"
 POWER_OFF="$DATA/.pending_poweroff"
-rm -f "$PENDING" "$POWER_OFF"
+rm -f "$PENDING" "$MUOS_APP" "$POWER_OFF"
 POWER_OFF_REQUESTED=0
 
 # Start Python service
@@ -112,6 +190,16 @@ while true; do
         POWER_OFF_REQUESTED=1
         echo "$(date) power-off requested by frontend" >>"$LOG"
         break
+    fi
+
+    if [ -f "$MUOS_APP" ]; then
+        MUOS_APP_SCRIPT=""
+        IFS= read -r MUOS_APP_SCRIPT < "$MUOS_APP"
+        rm -f "$MUOS_APP"
+        run_muos_app "$MUOS_APP_SCRIPT"
+        # Return to Void Desk after the selected muOS app exits, even when
+        # the child launcher reports an error.
+        continue
     fi
 
     if [ -f "$PENDING" ]; then
