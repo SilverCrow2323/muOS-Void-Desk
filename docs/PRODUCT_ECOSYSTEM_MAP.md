@@ -259,20 +259,22 @@ LÖVE is the next engineering focus. Pygame remains the behavioural reference, b
 - Palette system: `love/theme/`.
 - Python local service bridge: `love/core/bridge.lua` ↔ `service/voiddesk_service.py`.
 - Current NEXUS catalogue contains 10 visible nodes, including End Session.
-- Automated LÖVE capture covers 23 registered scenes. This proves rendering only, not that every action works or is reachable.
-- The current static action audit is focused on Session, Forge, Workshop and Toolbox. It does not yet audit all visible hubs and child actions.
+- Automated LÖVE capture currently enumerates 25 scenes. This proves that those scenes can be entered and rendered in the capture environment; it does not prove every action works or that hardware-specific behaviour is correct.
+- The current action audit checks all static scene routes and visible NEXUS destinations, checks the service registration of bridge commands, and has focused action checks for Session, Forge, Workshop, Toolbox and MUOS APPS. It is not yet a complete semantic audit of every selectable row in every hub.
+- A source-based, node-by-node status register is maintained in [LÖVE Frontend Gap Register](LOVE_FRONTEND_GAP_REGISTER.md).
 
-### Known gaps to resolve
+### Verified gaps and boundaries
 
-- MEDIA VAULT still presents Void Radio and Media Library actions marked as coming soon.
-- MUOS APPS calls app-discovery and launch bridge commands; the corresponding service handlers need verification and implementation or an honest unavailable state.
-- INFO and FORGE call the GitHub release-feed bridge command; the service path must be verified and covered by tests.
-- IPTV calls playlist and EPG bridge commands; end-to-end service coverage and failure states must be verified.
-- Some Forge, repair, Workshop, and External Tools actions need a command-by-command audit against the service allowlist.
-- The automated screenshot batch currently omits some scene files such as Diagnostics and Monitor. Add user-facing scenes to capture; do not promote the generic stub screen as a normal destination.
-- The menu must not present an operation as successful before the backend confirms it.
+- MEDIA VAULT still contains two non-functional rows: Void Radio and Media Library. Their current callbacks only publish a temporary status string; neither starts playback nor opens a library. These are the first LÖVE feature gaps to implement.
+- MUOS APPS now has service handlers for discovery and launch. Static tests verify that the scene calls both handlers and that the shell launcher validates the hand-off path. Real RG35XX-H testing is still required.
+- INFO and FORGE use the registered `gh_fetch_releases` handler. The handler performs a bounded public release lookup and returns explicit errors; network/offline behaviour still needs device testing.
+- IPTV has service handlers for playlist, EPG, play, stop and status. The LÖVE scene implements channel selection, group filtering and favourites. Playback still depends on the media player being installed and available on the target device.
+- Workshop routes to Diagnostics, Monitor, APT system maintenance and Jobs. Forge exposes APT manager, desktop install/launch, shell and package jobs. Static route and bridge-registration tests pass; privileged operations require real-image/device tests.
+- The screenshot batch currently enumerates 25 scenes, including Diagnostics and Monitor. Screenshot success is not an interaction or hardware test.
+- The static audit covers route resolution and bridge registration globally, but only selected hubs have row-level action assertions. Extend row-level coverage to every visible NEXUS node before calling LÖVE feature-complete.
+- Several INFO rows are informational status messages rather than navigable documentation pages. They should be labelled as such or connected to real content during the INFO pass.
 
-These items are an audit queue, not permission to invent backend behaviour. For every missing operation choose one of: implement a safe backend handler, route to an existing verified implementation, or disable/hide the action with an explicit reason.
+These gaps are source-verified, not hardware-certified. For every missing operation choose one of: implement a safe backend handler, route to an existing verified implementation, or disable/hide the action with an explicit reason. Never report success before the backend confirms it.
 
 ---
 
