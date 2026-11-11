@@ -87,3 +87,54 @@ def test_muos_app_handoff_is_validated_by_the_shell_launcher():
     assert 'APP_SCRIPT="${APP_SCRIPT%/}/mux_launch.sh"' in launcher
     assert 'if [ "$RC" -eq 16 ] && [ -f "$MUOS_APP" ]; then' in launcher
 
+def test_iptv_bridge_is_registered_secure_and_uses_launcher_media_handoff():
+    love_iptv = (ROOT / "love" / "core" / "iptv.lua").read_text(
+        encoding="utf-8"
+    )
+    service = (ROOT / "service" / "voiddesk_service.py").read_text(
+        encoding="utf-8"
+    )
+    player = (ROOT / "service" / "iptv_module.py").read_text(
+        encoding="utf-8"
+    )
+    scene = (ROOT / "love" / "scenes" / "hub_iptv.lua").read_text(
+        encoding="utf-8"
+    )
+    launcher = (ROOT / "mux_launch.sh").read_text(encoding="utf-8")
+    player_helper = ROOT / "bin" / "vd_media_player.py"
+
+    required = {
+        "iptv_get_config",
+        "iptv_load_playlist",
+        "iptv_load_epg",
+        "iptv_epg_for",
+        "iptv_play",
+        "iptv_stop",
+    }
+    registered = {
+        line.strip().split('"')[1]
+        for line in service.splitlines()
+        if line.strip().startswith('"') and '": h_' in line
+    }
+    called = set(re.findall(r'bridge\\.call\\(\\s*["\']([^"\']+)["\']', love_iptv))
+    assert required <= called
+    assert required <= registered
+    assert "ssl.create_default_context()" in player
+    assert "CERT_NONE" not in player
+    assert "check_hostname = False" not in player
+    assert "MAX_PLAYLIST_BYTES" in player
+    assert "MAX_EPG_BYTES" in player
+    assert 'if resp.handoff then love.event.quit() end' in scene
+    assert 'MEDIA="$DATA/.pending_media"' in launcher
+    assert 'python3 "$APP_DIR/bin/vd_media_player.py" "$MEDIA"' in launcher
+    assert player_helper.is_file()
+    assert 'args = [' in player_helper.read_text(encoding="utf-8")
+
+
+def test_iptv_handoff_returns_to_void_desk_after_mpv_exits():
+    launcher = (ROOT / "mux_launch.sh").read_text(encoding="utf-8")
+    assert 'if [ -f "$MEDIA" ]; then' in launcher
+    assert 'rm -f "$MEDIA"' in launcher
+    assert 'MPV playback ended' in launcher
+    assert 'continue' in launcher[launcher.index('if [ -f "$MEDIA" ]; then'):launcher.index('if [ -f "$MUOS_APP" ]; then')]
+
