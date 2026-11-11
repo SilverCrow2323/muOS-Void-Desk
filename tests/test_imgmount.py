@@ -113,3 +113,39 @@ def test_umount_tree_keeps_loop_when_device_still_mounted(monkeypatch, tmp_path)
 
     assert not imgmount.umount_tree(root, image)
     assert ["losetup", "-d", "/dev/loop5"] not in commands
+
+
+
+def test_mount_img_refuses_loop_already_mounted_elsewhere(monkeypatch, tmp_path):
+    image = tmp_path / "xfce.img"
+    image.write_bytes(b"image")
+    commands = []
+
+    monkeypatch.setattr(imgmount.os, "makedirs", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(imgmount, "is_mounted", lambda _path: False)
+    monkeypatch.setattr(imgmount, "loop_of", lambda _image: "/dev/loop9")
+    monkeypatch.setattr(imgmount, "loop_is_mounted", lambda _device: True)
+    monkeypatch.setattr(
+        imgmount, "_run",
+        lambda command: (commands.append(command) or None),
+    )
+
+    ok, error = imgmount.mount_img(image, tmp_path / "new-mount")
+
+    assert not ok
+    assert "/dev/loop9" in error
+    assert commands == []
+
+
+def test_cleanup_stale_reports_detach_failure(monkeypatch, tmp_path):
+    image = tmp_path / "xfce.img"
+    commands = []
+    monkeypatch.setattr(imgmount, "loop_of", lambda _image: "/dev/loop3")
+    monkeypatch.setattr(imgmount, "loop_is_mounted", lambda _device: False)
+    monkeypatch.setattr(
+        imgmount, "_call",
+        lambda command: (commands.append(command) or 1),
+    )
+
+    assert not imgmount.cleanup_stale(image)
+    assert commands == [["losetup", "-d", "/dev/loop3"]]
