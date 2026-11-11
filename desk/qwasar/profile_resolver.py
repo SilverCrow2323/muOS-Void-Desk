@@ -424,7 +424,7 @@ class QwasarProfileResolver:
             "profile": {
                 "id": profile["id"],
                 "name": profile["name"],
-                "source": str(source),
+                "source": "default" if source == self.default_profile_path else "custom",
             },
             "workspaces": workspaces,
             "globalPanels": panel_states,
