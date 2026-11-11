@@ -13,7 +13,7 @@
 ╚════════════════════════════════════════════════════════════════════╝
 </pre>
 
-# QWASAR DESK
+# VOID DESK
 
 **A symbiotic Linux handheld environment.**
 
@@ -22,21 +22,23 @@
 [![CI](https://github.com/SilverCrow2323/Void-Desk-Project/actions/workflows/ci.yml/badge.svg)](https://github.com/SilverCrow2323/Void-Desk-Project/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/SilverCrow2323/Void-Desk-Project?label=release)](https://github.com/SilverCrow2323/Void-Desk-Project/releases)
 
-**Formerly Void Desk / VoidDesk · SPDW Factory**
+**Classic handheld application within the QWASAR-Env ecosystem · SPDW Factory**
 
 </div>
 
-QWASAR Desk is the evolving identity of Void Desk: a controller-first environment that grows around Linux handheld firmware. It brings system tools, connectivity, media, diagnostics, desktop sessions and a configurable visual shell into one navigable experience.
+Void Desk is the classic controller-first handheld application within the QWASAR-Env ecosystem. It brings system tools, connectivity, media, diagnostics, desktop sessions and a configurable visual shell to compatible Linux handhelds.
 
-The long-term direction is a **Symbiotic Layer**. QWASAR should use the host firmware's supported application, service, storage and theme extension points, then progressively provide a richer experience without making the original firmware unbootable or difficult to recover. It is not a replacement firmware image today.
+The long-term direction is a **Symbiotic Layer**. Void Desk uses the host firmware's supported application, service, storage and theme extension points, then progressively provides a richer experience without making the original firmware unbootable or difficult to recover. It is not a replacement firmware image today.
 
 > **Brand transition:** QWASAR Desk is the new product name. The repository slug, installed package root (`Void-Desk/`), launcher names and existing configuration paths remain unchanged for compatibility. A coordinated package/identifier migration will be a separate, reversible change.
 
 ## At a glance
 
+The product/device boundaries and cross-device roadmap are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md).
+
 | | |
 |---|---|
-| Product identity | **QWASAR Desk** (formerly Void Desk) |
+| Product identity | **Void Desk** — classic handheld application in QWASAR-Env |
 | Development line | **10.5.4-NEXUS** release candidate |
 | Latest published handheld package | **v10.2.0** (2026-08-11); v10.5.4 is not yet a published release |
 | Primary target | Anbernic RG35XX-H / compatible Allwinner H700 handhelds |
