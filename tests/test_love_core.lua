@@ -105,12 +105,21 @@ local config = require("core.config")
 config.load()
 equal(config.set("theme", "megastructure"), true,
       "config should save a valid theme")
-local saved = read_json and nil
 local config_file = assert(io.open(config.path(), "r"))
 local saved_text = config_file:read("*a")
 config_file:close()
 local saved_data = json.decode(saved_text)
 equal(saved_data.theme, "megastructure", "saved theme should be present")
+
+-- New palette presets are registered and expose the common colour tokens.
+local themes = require("theme.loader")
+local theme_ids = {"megastructure", "manga_ink", "industrial", "terminal", "minimal"}
+for _, id in ipairs(theme_ids) do
+    local palette = themes.list()[id]
+    assert(type(palette) == "table", "missing theme palette: " .. id)
+    assert(type(palette.bg) == "table" and type(palette.accent) == "table",
+           "incomplete theme palette: " .. id)
+end
 
 local obstruction = config.path() .. ".tmp"
 os.execute("mkdir -p " .. string.format("%q", obstruction))
