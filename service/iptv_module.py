@@ -2,37 +2,86 @@
 """IPTV module for VoidDesk service.
 Parses M3U playlists and XMLTV EPG, controls mpv.
 """
-import gzip, hashlib, io, json, os, re, socket, ssl, subprocess, time, urllib.request
+import gzip, io, json, os, re, shutil, socket, ssl, subprocess, time, urllib.parse, urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 
 APP_DIR = None  # set from main service
 
-# ── HTTP ───────────────────────────────────────────────────────────────
+# ── HTTP / URL VALIDATION ──────────────────────────────────────────────
+MAX_PLAYLIST_BYTES = 8 * 1024 * 1024
+MAX_EPG_BYTES = 32 * 1024 * 1024
+MAX_CHANNELS = 2000
+FETCH_SCHEMES = {"http", "https"}
+STREAM_SCHEMES = {"http", "https", "rtmp", "rtmps", "rtsp", "rtsps"}
+
+
+def validate_url(url, *, stream=False):
+    """Validate a user-configured playlist/stream URL without shell interpretation."""
+    if not isinstance(url, str) or not url or len(url) > 4096:
+        raise ValueError("URL is empty or too long")
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in url):
+        raise ValueError("URL contains control characters")
+    parsed = urllib.parse.urlsplit(url.strip())
+    allowed = STREAM_SCHEMES if stream else FETCH_SCHEMES
+    if parsed.scheme.lower() not in allowed:
+        raise ValueError("unsupported URL scheme")
+    if not parsed.hostname or parsed.username is not None or parsed.password is not None:
+        raise ValueError("URL must contain a host and no embedded credentials")
+    try:
+        _ = parsed.port
+    except ValueError as exc:
+        raise ValueError("URL has an invalid port") from exc
+    return url.strip()
+
+
 def _opener(ua=None):
+    # Use the platform trust store and hostname verification. Never disable
+    # certificate validation for playlists or EPG sources.
     ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    h = urllib.request.HTTPSHandler(context=ctx)
-    op = urllib.request.build_opener(h)
-    op.addheaders = [("User-Agent", ua or "VoidDesk/1.0"),
-                     ("Accept-Encoding", "gzip")]
+    handler = urllib.request.HTTPSHandler(context=ctx)
+    op = urllib.request.build_opener(handler)
+    op.addheaders = [
+        ("User-Agent", ua or "VoidDesk/1.0"),
+        ("Accept-Encoding", "gzip"),
+    ]
     return op
 
-def fetch_bytes(url, ua=None, timeout=25):
+
+def fetch_bytes(url, ua=None, timeout=25, max_bytes=MAX_PLAYLIST_BYTES):
+    url = validate_url(url)
     op = _opener(ua)
-    with op.open(url, timeout=timeout) as r:
-        raw = r.read()
+    request = urllib.request.Request(url, headers={"Accept": "*/*"})
+    with op.open(request, timeout=timeout) as response:
+        validate_url(response.geturl())
+        content_length = response.headers.get("Content-Length")
+        if content_length:
+            try:
+                if int(content_length) > max_bytes:
+                    raise ValueError("remote media document exceeds size limit")
+            except ValueError as exc:
+                if "size limit" in str(exc):
+                    raise
+        raw = response.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise ValueError("remote media document exceeds size limit")
     if raw[:2] == b"\x1f\x8b":
-        try: raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
-        except OSError: pass
+        try:
+            raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read(max_bytes + 1)
+        except OSError as exc:
+            raise ValueError("invalid gzip response") from exc
+        if len(raw) > max_bytes:
+            raise ValueError("decompressed media document exceeds size limit")
     return raw
 
-def fetch_text(url, ua=None, timeout=25):
-    raw = fetch_bytes(url, ua, timeout)
+
+def fetch_text(url, ua=None, timeout=25, max_bytes=MAX_PLAYLIST_BYTES):
+    raw = fetch_bytes(url, ua, timeout, max_bytes)
     for enc in ("utf-8", "latin-1"):
-        try: return raw.decode(enc)
-        except UnicodeDecodeError: continue
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
     return raw.decode("utf-8", "replace")
 
 # ── M3U PARSER ─────────────────────────────────────────────────────────
@@ -42,53 +91,66 @@ def parse_m3u(text):
     channels = []
     epg_urls = []
     pending = None
-    idx = 0
+    if not isinstance(text, str):
+        raise ValueError("playlist must be text")
     if text.startswith("\ufeff"):
         text = text.lstrip("\ufeff")
     for line in text.splitlines():
         line = line.strip().lstrip("\ufeff")
-        if not line: continue
+        if not line:
+            continue
         if line.startswith("#EXTM3U"):
             attrs = dict(ATTR_RE.findall(line))
             for key in ("url-tvg", "x-tvg-url", "tvg-url"):
-                v = attrs.get(key, "")
-                for u in v.split(","):
-                    u = u.strip()
-                    if u and u not in epg_urls:
-                        epg_urls.append(u)
+                for candidate in attrs.get(key, "").split(","):
+                    candidate = candidate.strip()
+                    try:
+                        candidate = validate_url(candidate)
+                    except ValueError:
+                        continue
+                    if candidate not in epg_urls and len(epg_urls) < 5:
+                        epg_urls.append(candidate)
             continue
         if line.startswith("#EXTINF"):
             attrs = dict(ATTR_RE.findall(line))
             name = line.rsplit(",", 1)[1].strip() if "," in line else "?"
             pending = {
-                "name": name, "tvg_id": attrs.get("tvg-id", ""),
-                "tvg_name": attrs.get("tvg-name", ""),
-                "logo": attrs.get("tvg-logo", ""),
-                "group": attrs.get("group-title", "Uncategorized") or "Uncategorized",
+                "name": name[:120] or "?",
+                "tvg_id": attrs.get("tvg-id", "")[:120],
+                "tvg_name": attrs.get("tvg-name", "")[:120],
+                "logo": attrs.get("tvg-logo", "")[:500],
+                "group": (attrs.get("group-title", "Uncategorized") or "Uncategorized")[:80],
             }
             continue
         if line.startswith("#"):
             continue
-        if pending is not None:
-            ch = dict(pending)
-            ch["url"] = line
-            ch["index"] = idx
-            channels.append(ch)
-            idx += 1
+        try:
+            stream_url = validate_url(line, stream=True)
+        except ValueError:
             pending = None
-        elif line.startswith(("http://", "https://", "rtmp://", "rtsp://")):
-            channels.append({
-                "name": line.split("/")[-1][:40] or "?",
-                "url": line, "tvg_id": "", "tvg_name": "",
-                "logo": "", "group": "Uncategorized", "index": idx,
-            })
-            idx += 1
+            continue
+        if pending is not None:
+            channel = dict(pending)
+        else:
+            channel = {
+                "name": urllib.parse.urlsplit(stream_url).path.rsplit("/", 1)[-1][:40] or "Stream",
+                "tvg_id": "", "tvg_name": "", "logo": "",
+                "group": "Uncategorized",
+            }
+        channel["url"] = stream_url
+        channel["index"] = len(channels)
+        channels.append(channel)
+        pending = None
+        if len(channels) >= MAX_CHANNELS:
+            break
+
     groups = []
     seen = set()
-    for ch in channels:
-        g = ch.get("group", "Uncategorized")
-        if g not in seen:
-            seen.add(g); groups.append(g)
+    for channel in channels:
+        group = channel.get("group", "Uncategorized")
+        if group not in seen:
+            seen.add(group)
+            groups.append(group)
     return {"channels": channels, "groups": groups, "epg_urls": epg_urls}
 
 # ── EPG PARSER ─────────────────────────────────────────────────────────
@@ -186,60 +248,86 @@ q quit 0
         with open(path, "w") as f: f.write(conf)
     except OSError: pass
 
-def play(channel_url, channel_name, ua="VLC/3.0.20 LibVLC/3.0.20"):
+def play(channel_url, channel_name, ua="VoidDesk/10.5"):
     global _mpv_proc, _mpv_sock, _mpv_channel, _mpv_state, _mpv_error
-    stop()
-    if not channel_url:
-        _mpv_state = "error"; _mpv_error = "no URL"; return False
-    import shutil
+    try:
+        channel_url = validate_url(channel_url, stream=True)
+    except ValueError as exc:
+        _mpv_state = "error"
+        _mpv_error = str(exc)
+        return False
     if not shutil.which("mpv"):
-        _mpv_state = "error"; _mpv_error = "mpv not installed"; return False
+        _mpv_state = "error"
+        _mpv_error = "mpv not installed"
+        return False
+    stop()
     sock = "/tmp/voiddesk_mpv.sock"
-    try: os.remove(sock)
-    except OSError: pass
+    try:
+        os.remove(sock)
+    except OSError:
+        pass
     input_conf = str((APP_DIR / "data" / "mpv_input.conf")) if APP_DIR else "/tmp/mpv_input.conf"
     _write_mpv_input_conf(input_conf)
     args = [
-        "mpv", channel_url,
-        "--no-config", "--fullscreen", "--keepaspect=yes",
-        "--osd-level=1", f"--user-agent={ua}",
-        "--network-timeout=12",
-        "--cache=yes", "--cache-secs=5",
-        f"--input-ipc-server={sock}",
-        f"--input-conf={input_conf}",
+        "mpv", "--no-config", "--fullscreen", "--keepaspect=yes",
+        "--osd-level=1", "--user-agent=" + str(ua)[:120],
+        "--network-timeout=12", "--cache=yes", "--cache-secs=5",
+        "--input-ipc-server=" + sock, "--input-conf=" + input_conf,
+        "--", channel_url,
     ]
     env = dict(os.environ)
     env.pop("SDL_VIDEODRIVER", None)
     try:
-        _mpv_proc = subprocess.Popen(args,
-                                     stdout=subprocess.DEVNULL,
-                                     stderr=subprocess.DEVNULL,
-                                     env=env, start_new_session=True)
+        _mpv_proc = subprocess.Popen(
+            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            env=env, start_new_session=True,
+        )
         _mpv_sock = sock
-        _mpv_channel = {"name": channel_name, "url": channel_url}
+        _mpv_channel = {"name": str(channel_name or "Stream")[:120],
+                        "url": channel_url}
         _mpv_state = "playing"
         _mpv_error = ""
         return True
-    except Exception as e:
-        _mpv_state = "error"; _mpv_error = str(e)[:200]
+    except Exception as exc:
+        _mpv_state = "error"
+        _mpv_error = str(exc)[:200]
         return False
 
+
 def stop():
-    global _mpv_proc, _mpv_state
+    global _mpv_proc, _mpv_sock, _mpv_channel, _mpv_state, _mpv_error
     if _mpv_proc is not None:
         try:
-            _mpv_proc.terminate(); _mpv_proc.wait(timeout=3)
+            _mpv_proc.terminate()
+            _mpv_proc.wait(timeout=3)
         except Exception:
-            try: _mpv_proc.kill()
-            except Exception: pass
+            try:
+                _mpv_proc.kill()
+            except Exception:
+                pass
         _mpv_proc = None
+    if _mpv_sock:
+        try:
+            os.remove(_mpv_sock)
+        except OSError:
+            pass
+        _mpv_sock = None
     _mpv_state = "idle"
+    _mpv_channel = None
+    _mpv_error = ""
+
 
 def status():
-    global _mpv_state
+    global _mpv_proc, _mpv_state, _mpv_sock
     if _mpv_proc is not None and _mpv_proc.poll() is not None:
         _mpv_state = "idle"
         _mpv_proc = None
+        if _mpv_sock:
+            try:
+                os.remove(_mpv_sock)
+            except OSError:
+                pass
+            _mpv_sock = None
     return {
         "state": _mpv_state,
         "channel": _mpv_channel,
