@@ -75,6 +75,10 @@ except Exception:
             PYGAME_HIDE_SUPPORT_PROMPT=1 \
             python3 "$APP_DIR/desk/main.py" >>"$LOG" 2>&1
         RC=$?
+        if [ "$RC" -eq 16 ] && [ -f "$MUOS_APP" ]; then
+            echo "$(date) Pygame requested a muOS application hand-off" >>"$LOG"
+            return
+        fi
         if [ $RC -ne 0 ]; then
             echo "$(date) Pygame frontend crashed (rc=$RC) - reverting engine to LOVE for next boot" >>"$LOG"
             revert_engine_to_love
