@@ -981,6 +981,51 @@ def h_job_log(args):
     return {"ok": True, "lines": lines}
 
 
+RADIO_STATIONS = {
+    "rai-radio-1": {"name": "RAI Radio 1", "url": "http://icestreaming.rai.it/1.mp3", "category": "italia"},
+    "rai-radio-2": {"name": "RAI Radio 2", "url": "http://icestreaming.rai.it/2.mp3", "category": "italia"},
+    "radio-24": {"name": "Radio 24", "url": "http://shoutcast2.radio24.it:8000/;", "category": "italia"},
+    "radio-deejay": {"name": "Radio Deejay", "url": "https://4c4b867c89244861ac216426883d1ad0.msvdn.net/radiodeejay/radiodeejay/master_ma.m3u8", "category": "italia"},
+    "virgin-radio": {"name": "Virgin Radio Italia", "url": "http://icecast.unitedradio.it/Virgin.mp3", "category": "italia"},
+    "tekno-italia": {"name": "Tekno Italia", "url": "http://radio.teknoitalia.com:8000/stream", "category": "tekno"},
+    "hardtek-fm": {"name": "Hardtek.fm", "url": "https://stream2.radioking.com/radio/24096/stream/320kbps", "category": "tekno"},
+    "noize-fm": {"name": "Noize FM", "url": "https://relay.181.fm/stream", "category": "tekno"},
+}
+
+
+def h_radio_list(args):
+    return {"ok": True, "stations": [
+        {"id": station_id, **station}
+        for station_id, station in RADIO_STATIONS.items()
+    ]}
+
+
+def h_radio_play(args):
+    if iptv_module is None:
+        return {"ok": False, "error": "media player module unavailable"}
+    station_id = args.get("id")
+    station = RADIO_STATIONS.get(station_id) if isinstance(station_id, str) else None
+    if station is None:
+        return {"ok": False, "error": "unknown radio station"}
+    ok, error = iptv_module.play_audio(station["url"], station["name"])
+    if not ok:
+        return {"ok": False, "error": error or "radio playback failed"}
+    return {"ok": True, "state": "playing", "station": station["name"]}
+
+
+def h_radio_stop(args):
+    if iptv_module is None:
+        return {"ok": False, "error": "media player module unavailable"}
+    iptv_module.stop_audio()
+    return {"ok": True, "state": "idle"}
+
+
+def h_radio_status(args):
+    if iptv_module is None:
+        return {"ok": False, "error": "media player module unavailable"}
+    return {"ok": True, **iptv_module.audio_status()}
+
+
 def h_media_status(args):
     try:
         if IS_VISUAL_CAPTURE:
@@ -1796,6 +1841,10 @@ HANDLERS = {
     "job_cancel": h_job_cancel,
     "job_log": h_job_log,
     "media_status": h_media_status,
+    "radio_list": h_radio_list,
+    "radio_play": h_radio_play,
+    "radio_stop": h_radio_stop,
+    "radio_status": h_radio_status,
     "iptv_get_config": h_iptv_get_config,
     "iptv_load_playlist": h_iptv_load_playlist,
     "iptv_load_epg": h_iptv_load_epg,
@@ -1829,7 +1878,19 @@ HANDLERS = {
 }
 
 # ── main loop ────────────────────────────────────────────
+def _shutdown_media(signum, frame):
+    if iptv_module is not None:
+        try:
+            iptv_module.stop_audio()
+            iptv_module.stop()
+        except Exception:
+            pass
+    raise SystemExit(0)
+
+
 def main():
+    signal.signal(signal.SIGTERM, _shutdown_media)
+    signal.signal(signal.SIGINT, _shutdown_media)
     log(f"started  machine={platform.machine()}  device={IS_DEVICE}")
     log(f"req={REQ}  resp={RESP}")
     # A previous service process may have been interrupted mid-request.
