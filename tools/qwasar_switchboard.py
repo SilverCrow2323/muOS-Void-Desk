@@ -686,6 +686,16 @@ def _parser() -> argparse.ArgumentParser:
     panel = commands.add_parser("panel")
     panel.add_argument("panel_id")
     panel.add_argument("state", choices=("enabled", "disabled"))
+    menu = commands.add_parser("menu-visibility")
+    menu.add_argument("workspace_id")
+    menu.add_argument("entry_id")
+    menu.add_argument("state", choices=("show", "hide"))
+    menu.add_argument("--section", dest="section_id")
+    move_menu = commands.add_parser("move-menu")
+    move_menu.add_argument("workspace_id")
+    move_menu.add_argument("entry_id")
+    move_menu.add_argument("index", type=int)
+    move_menu.add_argument("--section", dest="section_id")
     move_workspace = commands.add_parser("move-workspace")
     move_workspace.add_argument("workspace_id")
     move_workspace.add_argument("index", type=int)
@@ -727,6 +737,16 @@ def main(argv: list[str] | None = None) -> int:
             switchboard.set_contribution_state(args.contribution_id, args.state)
         elif args.command == "panel":
             switchboard.set_global_panel_enabled(args.panel_id, args.state == "enabled")
+        elif args.command == "menu-visibility":
+            switchboard.set_menu_entry_visibility(
+                args.workspace_id, args.entry_id, args.state == "show",
+                section_id=args.section_id,
+            )
+        elif args.command == "move-menu":
+            switchboard.move_menu_entry(
+                args.workspace_id, args.entry_id, args.index,
+                section_id=args.section_id,
+            )
         elif args.command == "move-workspace":
             switchboard.move_workspace(args.workspace_id, args.index)
         elif args.command == "move-section":
