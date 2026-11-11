@@ -55,13 +55,18 @@ def test_external_tools_status_widget_uses_the_same_status_publisher():
     assert 'scene.set_status("Loading external tools...")' not in source
 
 
-def test_love_visual_capture_includes_diagnostics_and_monitor():
+def test_love_visual_capture_covers_all_declared_user_scenes():
     capture = (LOVE / "core" / "visual_capture.lua").read_text(
         encoding="utf-8"
     )
-    for scene in ("hub_diagnostics", "hub_monitor"):
-        assert f'name = "{scene}"' in capture
-        assert (LOVE / "scenes" / f"{scene}.lua").is_file()
+    scenes = re.findall(r'\{ name = "([^"]+)"', capture)
+    assert len(scenes) == 25
+    assert len(scenes) == len(set(scenes)), "duplicate LÖVE capture scene"
 
+    for scene in scenes:
+        assert (LOVE / "scenes" / f"{scene}.lua").is_file(), scene
+
+    assert "hub_diagnostics" in scenes
+    assert "hub_monitor" in scenes
     # The generic error/stub page is a fallback, not a user-facing feature.
-    assert 'name = "hub_stub"' not in capture
+    assert "hub_stub" not in scenes
