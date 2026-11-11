@@ -176,8 +176,16 @@ class QwasarProfileResolver:
             )
 
         workspace_order = profile.get("workspaceOrder")
-        if not isinstance(workspace_order, list) or len(workspace_order) != len(set(workspace_order)):
-            raise ProfileResolutionError("profile workspaceOrder must contain unique IDs")
+        if (
+            not isinstance(workspace_order, list)
+            or any(not isinstance(item, str) for item in workspace_order)
+            or len(workspace_order) != len(set(workspace_order))
+        ):
+            raise ProfileResolutionError("profile workspaceOrder must contain unique string IDs")
+        if not isinstance(profile.get("workspaceOverrides"), list):
+            raise ProfileResolutionError("profile workspaceOverrides must be an array")
+        if not isinstance(profile.get("shell"), dict):
+            raise ProfileResolutionError("profile shell overrides must be an object")
         unknown = set(workspace_order) - set(self._workspaces)
         if unknown:
             raise ProfileResolutionError(
@@ -185,6 +193,8 @@ class QwasarProfileResolver:
             )
 
         overrides = profile.get("workspaceOverrides", [])
+        if any(not isinstance(item, dict) for item in overrides):
+            raise ProfileResolutionError("workspace overrides must be objects")
         override_ids = [item.get("id") for item in overrides]
         if None in override_ids or len(override_ids) != len(set(override_ids)):
             raise ProfileResolutionError("workspace override IDs must be present and unique")
@@ -229,6 +239,12 @@ class QwasarProfileResolver:
                 section["id"]: section for section in workspace.get("sections", [])
             }
             section_overrides = override.get("sections", [])
+            if not isinstance(section_overrides, list) or any(
+                not isinstance(item, dict) for item in section_overrides
+            ):
+                raise ProfileResolutionError(
+                    f"workspace {workspace_id} section overrides must be objects"
+                )
             section_ids = [item.get("id") for item in section_overrides]
             if None in section_ids or len(section_ids) != len(set(section_ids)):
                 raise ProfileResolutionError(
@@ -461,9 +477,13 @@ class QwasarProfileResolver:
             local_warnings: list[str] = []
             self._validate_profile(profile, local_warnings)
             return self._compose(profile, requested, warnings + local_warnings)
-        except ProfileResolutionError as exc:
+        except (ProfileResolutionError, KeyError, TypeError, ValueError) as exc:
             if not fallback_to_default or requested == self.default_profile_path:
-                raise
+                if isinstance(exc, ProfileResolutionError):
+                    raise
+                raise ProfileResolutionError(
+                    f"selected QWASAR profile is structurally invalid: {exc}"
+                ) from exc
             warnings.append(
                 f"Selected profile was rejected; using the bundled H700 default: {exc}"
             )
@@ -472,7 +492,7 @@ class QwasarProfileResolver:
             profile = _read_object(self.default_profile_path, "bundled default profile")
             local_warnings = []
             self._validate_profile(profile, local_warnings)
-        except ProfileResolutionError as exc:
+        except (ProfileResolutionError, KeyError, TypeError, ValueError) as exc:
             raise ProfileResolutionError(
                 f"selected and default profiles are invalid; safe startup is blocked: {exc}"
             ) from exc
