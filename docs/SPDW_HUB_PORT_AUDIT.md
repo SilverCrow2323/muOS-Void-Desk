@@ -11,7 +11,7 @@ currently listening.
 |---|---:|---|---|---|
 | muOS handheld | TCP 8765 | SPDW Device Agent (inside existing Void Desk service process) | Binds `0.0.0.0`; public discovery/health and PIN-paired session + CSRF-protected file APIs | **Implemented on this branch**; single service-owned gateway and legacy-compatible file routes |
 | muOS handheld | TCP 8077 | Rt:Tailscale-M web panel | Config default; bind default `0.0.0.0`; PIN login, HMAC session cookie, CSRF checks and failed-login lockout | Bind to loopback and expose through the Hub module route |
-| PC | TCP 8420 | BaseStation / SPDW Hub PC daemon | Discovery at `/ping`; telemetry at `/stats`; authenticated device APIs; browser dashboard at `/` | **Implemented on this branch**; the web dashboard shares the existing PC Link listener |
+| PC | TCP 8420 | BaseStation / SPDW Hub PC daemon | HTTP discovery at `/ping`; telemetry at `/stats`; authenticated device APIs; browser dashboard at `/` | **Implemented on this branch**; optional HTTPS is provided by a trusted TLS front end, not by the built-in listener |
 | PC / handheld | TCP 22 | SSH | SSH transport, commonly also provides SFTP subsystem | Retain where enabled; use the same connection for terminal and file transfer |
 | Handheld profile default | TCP 2022 | SFTP | Separate SFTP profile default in BaseStation, not proof of a live independent listener | Detect whether SFTP is available over SSH first; keep 2022 only where the installed image really requires it |
 
@@ -56,11 +56,15 @@ The PC Link client in `desk/pcuplink.py` discovers BaseStation on port
 The BaseStation PC companion is the natural place for the PC dashboard and
 existing SSH/SFTP tools. Avoid adding a separate dashboard server.
 
-**Transport security limitation:** the current port 8420 compatibility API
-uses plain HTTP with a bearer token in a request header. Authentication is
-not encryption. Until HTTPS or an equivalent authenticated tunnel is enforced,
-use this API only on a trusted LAN or through Tailscale; do not forward it to
-the public Internet or use it on an untrusted network.
+**Transport security limitation:** the built-in port 8420 compatibility API
+still uses plain HTTP with a bearer token in a request header. Authentication
+is not encryption. The handheld client now supports manually configured HTTPS
+endpoints through a trusted TLS-terminating proxy; it verifies the certificate
+chain and hostname and rejects redirects. The proxy should forward to the
+BaseStation listener on loopback (set `uplink.daemon_bind` to
+`127.0.0.1` in the PC profile). Automatic LAN discovery remains HTTP-only.
+Do not expose the raw HTTP listener to an untrusted network or forward it
+directly to the public Internet.
 
 ## 2. Configured optional service defaults
 
