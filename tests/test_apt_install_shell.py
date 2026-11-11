@@ -28,8 +28,12 @@ def make_harness(tmp_path, *, chroot_rc=0, cleanup_rc=0,
 
     (data / ".xfce_ready").write_text("ready")
     (data / "xfce.img").write_bytes(b"fake ext4 image")
-    (bindir / "vd_apt_install.sh").write_bytes(SCRIPT.read_bytes())
-    (bindir / "vd_mount_common.sh").write_bytes(MOUNT_HELPER.read_bytes())
+    copied_installer = bindir / "vd_apt_install.sh"
+    copied_installer.write_bytes(SCRIPT.read_bytes())
+    copied_installer.chmod(0o755)
+    copied_helper = bindir / "vd_mount_common.sh"
+    copied_helper.write_bytes(MOUNT_HELPER.read_bytes())
+    copied_helper.chmod(0o755)
 
     mount_probe = make_executable(
         fakebin / "python3",
