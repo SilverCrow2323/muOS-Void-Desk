@@ -149,6 +149,7 @@ class QwasarSwitchboard:
         """Restore from the trusted bundled default, even if the target is corrupt."""
         switchboard = cls(root, default_profile_path, manifest_path)
         target = switchboard._resolve(target_profile_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
         switchboard.profile_path = target
         switchboard._loaded_digest = _digest(target) if target.exists() else None
         return switchboard.save()
