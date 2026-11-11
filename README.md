@@ -31,7 +31,7 @@ VoidDesk turns a Linux handheld into a controller-first workstation. It combines
 | PC/development launcher | voiddesk.py |
 | License | Not declared in this repository; see note below |
 
-> **Compatibility:** The declared packaging target is MustardOS / muOS 2606.0 Andromeda on compatible Allwinner H700 handhelds. This is a target, not a hardware certification: the current evidence snapshot does not yet contain a completed physical-device acceptance record. Older firmware releases and other distributions are not claimed as supported. See the [compatibility and validation matrix](wiki-source/Compatibility-list.md) for the evidence behind each status.
+> **Compatibility:** The current packaging target is MustardOS / muOS 2606.0 Andromeda on compatible Allwinner H700 handhelds. Hardware-specific behaviour still requires device-level verification on each model. Older firmware releases and other distributions are not claimed as supported.
 
 ## What VoidDesk includes
 
@@ -82,7 +82,7 @@ See [Architecture](docs/ARCHITECTURE.md) for execution flow.
 
 ## Installation on the handheld
 
-> **Release status (2026-11-09):** the latest published handheld package is `VoidDesk_v10.2.0.muxapp` (release `v10.2.0`, published 2026-08-11). The active `v10.5.4-NEXUS` development line has reproducible CI-built `.muxapp` artifacts, but no public release package has been published. The v10.2.0 download therefore does not include the newer development changes.
+> **Release status (2026-11-08):** the latest published handheld package is `VoidDesk_v10.2.0.muxapp` (release `v10.2.0`, published 2026-08-11). The `main` branch has advanced to the `v10.5.4-NEXUS` release candidate, but that candidate has **not** been published as a `.muxapp` package yet. The v10.2.0 download therefore does not include the v10.5.4 changes listed in the changelog.
 
 1. Open [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) and download the latest **published `.muxapp` asset**. Check the release tag before installing; the source-code ZIP is not a replacement for the muOS application package.
 2. Copy the `.muxapp` file to the SD1 `ARCHIVE/` folder.
@@ -160,7 +160,7 @@ python3 tools/build_muxapp.py
 
 The bundled LÖVE binary is architecture-specific; on a PC the launcher prefers the system installation.
 
-The Rt:Tailscale-M service source is pinned as a Git submodule. If you cloned without `--recurse-submodules`, run `git submodule update --init --recursive` before building or packaging Void Desk. The package builder vendors the service manager, watchdog, CLI wrapper and required panel assets into the .muxapp; the standalone upstream UI is not launched. VoidDesk's native service adapter and frontend panels call the upstream manager, which installs official arm64 binaries with upstream checksum verification. Physical-device lifecycle validation is still a release gate.
+The Rt:Tailscale-M service is included as a pinned Git submodule. If you cloned without `--recurse-submodules`, run `git submodule update --init --recursive` before building or packaging Void Desk. The builder copies only the upstream service manager, watchdog, CLI wrapper and PIN-protected panel into `Void-Desk/external/rt-tailscale-m/app/RtTailscale`; the standalone upstream UI is not launched. Tailscale's official arm64 binaries are installed on first service start with upstream checksum verification.
 
 See the [visual capture workflow](docs/visual/README.md) to capture every LÖVE scene automatically, take F12 screenshots in either frontend, and generate the asset catalogue and visual galleries.
 

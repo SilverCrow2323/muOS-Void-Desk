@@ -7,7 +7,6 @@
 ## Start here
 
 - [Installation — MustardOS 2606.0 Andromeda](Installation-muOS-Andromeda)
-- [Compatibility and validation matrix](Compatibility-list)
 - [Controls and navigation](Controls-and-navigation)
 - [Hubs and features](Hubs-and-features)
 - [Pygame and LÖVE frontends](Frontends)

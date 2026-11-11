@@ -2,7 +2,7 @@
 
 ## Test the package
 
-The development line is v10.5.4-NEXUS. Review the [compatibility and validation matrix](Compatibility-list) before installing a test build. A release must not be described as stable solely because CI is green.
+The development line is v10.5.4-NEXUS. A release must not be described as stable solely because CI is green.
 
 Before publishing a test package:
 - build the .muxapp with only one top-level Void-Desk/ folder;
