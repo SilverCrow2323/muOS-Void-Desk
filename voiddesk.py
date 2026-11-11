@@ -115,7 +115,44 @@ def which_love():
         print("     Please install PC version: sudo apt install love")
     return None
 
+def prepare_qwasar_profile():
+    """Generate the read-only shared composition snapshot before either engine starts."""
+    resolver = APP_DIR / "tools" / "qwasar_profile_resolver.py"
+    if not resolver.is_file():
+        return False
+    output = APP_DIR / "data" / "qwasar_effective_profile.json"
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(resolver),
+                "--root", str(APP_DIR),
+                "--output", str(output),
+            ],
+            cwd=str(APP_DIR),
+            env=dict(os.environ, VOIDDESK_APP_DIR=str(APP_DIR)),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        if result.stdout:
+            print(result.stdout.rstrip())
+        if result.returncode != 0:
+            print(
+                f"{Color.YELLOW}[QWASAR] Profile preflight failed "
+                f"(rc={result.returncode}); the frontend will use its safe legacy defaults."
+                f"{Color.RESET}"
+            )
+            return False
+        return output.is_file()
+    except OSError as exc:
+        print(f"{Color.YELLOW}[QWASAR] Profile preflight unavailable: {exc}{Color.RESET}")
+        return False
+
+
 def launch_love():
+    prepare_qwasar_profile()
     love = which_love()
     if not love:
         print(f"  {Color.RED}❌ LÖVE binary not found!{Color.RESET}")
@@ -310,6 +347,7 @@ def run_pygame_runtime():
 # ================================================================ LAUNCHER ==
 def launch_py():
     """Ensure VENV and run pygame runtime inside it."""
+    prepare_qwasar_profile()
     if not VENV_PY.is_file():
         print(f"  {Color.YELLOW}⚙️ Setting up Python Virtual Environment (.venv_desktop)...{Color.RESET}")
         subprocess.run([sys.executable, "-m", "venv", str(APP_DIR / ".venv_desktop")])
