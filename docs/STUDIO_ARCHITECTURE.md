@@ -148,10 +148,16 @@ Runtime version management is separate from profile management. Profiles may dec
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | /v1/catalog/plugins | Signed official plugin catalog |
-| GET | /v1/profiles/{profile_id} | Read a shared profile |
-| POST | /v1/profiles | Publish a user-approved profile |
-| POST | /v1/profiles/{profile_id}/revisions | Publish immutable revision |
+| GET | /v1/catalog/modules | Signed module index and trust state |
+| GET | /v1/modules/{module_id}/versions/{version} | Immutable module manifest/artifact metadata |
+| POST | /v1/module-submissions | Submit a module for review; never auto-publish |
+| GET | /v1/catalog/plugins | Legacy v1 official plugin index during migration |
+| GET | /v1/profiles/{profile_id} | Read a shared profile/layout |
+| POST | /v1/profiles | Publish a user-approved declarative profile |
+| POST | /v1/profiles/{profile_id}/revisions | Publish immutable profile revision |
+| GET | /v1/release-flavours | Read supported Full/Essential/Slim manifests |
+| POST | /v1/builds | Request a controlled build from an allowlisted manifest |
+| GET | /v1/builds/{build_id} | Read build status, provenance and artifact hashes |
 | GET | /v1/devices | List paired devices |
 | POST | /v1/devices/pairing-sessions | Start short-lived pairing |
 | POST | /v1/devices/{device_id}/sync-jobs | Queue a device-initiated sync |
@@ -162,7 +168,7 @@ Every write must be authenticated, authorized, size-limited, schema-validated, r
 
 - Sharing is off by default and requires preview plus explicit confirmation.
 - Export only an allowlist of portable fields; strip device identifiers and secrets.
-- Profiles are data only. Import cannot execute commands or install plugins.
+- Profiles are data only. Import cannot execute commands or install modules.
 - Plugin sharing is limited to official catalog entries. Profiles may declare dependencies but cannot bundle plugin code.
 - Show provenance, version, compatibility, permissions, digest and update date for every plugin.
 
