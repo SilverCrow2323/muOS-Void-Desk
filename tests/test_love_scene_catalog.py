@@ -31,3 +31,25 @@ def test_forge_shell_opens_existing_shell_scene():
     source = (LOVE / "scenes" / "hub_forge.lua").read_text(encoding="utf-8")
     assert 'sm.push("hub_shell", {})' in source
     assert (LOVE / "scenes" / "hub_shell.lua").is_file()
+
+
+
+def test_iptv_epg_fallback_ignores_empty_configured_list():
+    core = (LOVE / "core" / "iptv.lua").read_text(encoding="utf-8")
+    scene = (LOVE / "scenes" / "hub_iptv.lua").read_text(encoding="utf-8")
+
+    assert "function iptv.select_epg_urls(cfg_urls, playlist_urls)" in core
+    assert 'type(cfg_urls) == "table" and #cfg_urls > 0' in core
+    assert 'type(playlist_urls) == "table" and #playlist_urls > 0' in core
+    assert "cfg and cfg.epg_urls, resp and resp.epg_urls" in scene
+    assert "local urls = cfg.epg_urls or resp.epg_urls" not in scene
+
+
+def test_external_tools_status_widget_uses_the_same_status_publisher():
+    source = (LOVE / "scenes" / "hub_external.lua").read_text(encoding="utf-8")
+    assert "local function publish_status(scene, message)" in source
+    assert 'widgets.info_row(20, 148, W-40, "Status", status_msg, nc, alpha)' in source
+    assert 'publish_status(scene, "Loading external tools...")' in source
+    assert 'publish_status(scene, "Launched: " .. t.name)' in source
+    assert 'publish_status(scene, "Failed: " .. (resp.error or "unknown"))' in source
+    assert 'scene.set_status("Loading external tools...")' not in source
