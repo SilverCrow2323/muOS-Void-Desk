@@ -248,3 +248,57 @@ def test_remote_backup_rejects_invalid_chunk_size(tmp_path):
         else:
             raise AssertionError("invalid chunk size must be rejected")
     assert not archive_path.exists()
+
+
+
+def test_save_incoming_file_writes_private_files_and_avoids_overwrite(tmp_path):
+    core = load_core()
+    incoming = tmp_path / "incoming"
+
+    first = core.save_incoming_file(incoming, "handheld-01", "capture.png", b"first")
+    second = core.save_incoming_file(incoming, "handheld-01", "capture.png", b"second")
+
+    assert first.read_bytes() == b"first"
+    assert second.read_bytes() == b"second"
+    assert first != second
+    assert first.parent == incoming / "handheld-01"
+    if os.name == "posix":
+        assert stat.S_IMODE(first.stat().st_mode) == 0o600
+        assert stat.S_IMODE(first.parent.stat().st_mode) == 0o700
+    assert not list(first.parent.glob("*.partial"))
+
+
+def test_save_incoming_file_rejects_symlinked_device_directory(tmp_path):
+    core = load_core()
+    incoming = tmp_path / "incoming"
+    incoming.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = incoming / "handheld-01"
+    link.symlink_to(outside, target_is_directory=True)
+
+    try:
+        core.save_incoming_file(incoming, "handheld-01", "escape.txt", b"blocked")
+    except ValueError as exc:
+        assert "real directory" in str(exc)
+    else:
+        raise AssertionError("symlinked device inbox must be rejected")
+
+    assert not (outside / "escape.txt").exists()
+
+
+def test_save_incoming_file_rejects_symlinked_incoming_root(tmp_path):
+    core = load_core()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = tmp_path / "incoming"
+    link.symlink_to(outside, target_is_directory=True)
+
+    try:
+        core.save_incoming_file(link, "handheld-01", "escape.txt", b"blocked")
+    except ValueError as exc:
+        assert "incoming root" in str(exc)
+    else:
+        raise AssertionError("symlinked incoming root must be rejected")
+
+    assert not (outside / "handheld-01" / "escape.txt").exists()
