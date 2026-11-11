@@ -7,9 +7,11 @@ import sys
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[1]
+SERVICE_DIR = Path(__file__).resolve().parent
 DESK_DIR = APP_DIR / "desk"
-if str(DESK_DIR) not in sys.path:
-    sys.path.insert(0, str(DESK_DIR))
+for import_dir in (SERVICE_DIR, DESK_DIR):
+    if str(import_dir) not in sys.path:
+        sys.path.insert(0, str(import_dir))
 
 try:
     from const import RADIO_BUILTIN, RADIO_URL_MIGRATIONS
