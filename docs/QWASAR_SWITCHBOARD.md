@@ -18,7 +18,7 @@ QWASAR Switchboard's first executable core is a **profile-only editor** in `tool
 
 The Switchboard core reads and validates the UI manifest and profile schemas before accepting changes. It checks workspace, section and action references, and rejects imported profiles that disable the central shell or the protected END NODE/recovery surfaces.
 
-Mutations are prepared in memory first. Persistence is explicit and uses the existing atomic-write helper with a `.bak` backup. A stable sibling lock serializes writers, and a SHA-256 snapshot rejects stale edits instead of silently overwriting changes made by another process.
+Mutations are prepared in memory first. Persistence is explicit and writes a same-directory temporary file, flushes it to disk, preserves the previous profile as a `.bak` backup and commits with an atomic replacement. A stable sibling lock serializes writers, and a SHA-256 snapshot rejects stale edits instead of silently overwriting changes made by another process. The implementation uses only standard-library filesystem primitives and does not import Pygame or the graphical frontend.
 
 Module enable/disable here is only a profile state change. It does **not** install/uninstall a package, stop a provider/job, grant permissions, or execute module code. The future runtime coordinator must consume the updated profile and perform any provider lifecycle changes through the existing service/job boundary.
 
