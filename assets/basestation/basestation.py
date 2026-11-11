@@ -57,7 +57,7 @@ from pathlib import Path
 from basestation_core import (
     atomic_write_json, collect_host_stats, collect_listener_snapshot,
     create_remote_backup, drain_device_messages, enqueue_device_message,
-    generate_auth_token, safe_device_id, token_matches,
+    generate_auth_token, safe_device_id, save_incoming_file, token_matches,
 )
 from basestation_web import (
     list_received_files, load_service_registry, resolve_received_file,
@@ -712,41 +712,7 @@ class DaemonStore:
             return pending
 
     def save_incoming(self, device_id, filename, payload):
-        safe_id = self._safe_device_id(device_id)
-        name = os.path.basename(str(filename or "").replace("\\", "/"))
-        name = "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
-        name = name.strip("._")
-        if not name:
-            raise ValueError("a safe filename is required")
-        target_dir = INCOMING_DIR / safe_id
-        target_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            os.chmod(str(INCOMING_DIR), 0o700)
-            os.chmod(str(target_dir), 0o700)
-        except OSError:
-            pass
-        target = target_dir / name
-        if target.exists():
-            stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            target = target_dir / "{}_{}{}".format(target.stem, stamp, target.suffix)
-        temp = target.with_name(target.name + ".partial")
-        try:
-            with open(temp, "wb") as stream:
-                try:
-                    os.chmod(str(temp), 0o600)
-                except OSError:
-                    pass
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(str(temp), str(target))
-        except Exception:
-            try:
-                temp.unlink()
-            except OSError:
-                pass
-            raise
-        return target
+        return save_incoming_file(INCOMING_DIR, device_id, filename, payload)
 
 
 def make_daemon_handler(store):

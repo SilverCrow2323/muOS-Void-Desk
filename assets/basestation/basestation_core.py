@@ -74,6 +74,86 @@ def atomic_write_json(path, payload, mode=0o600):
         raise
 
 
+
+def save_incoming_file(incoming_dir, device_id, filename, payload):
+    """Safely store one received file beneath its per-device inbox directory.
+
+    Existing symlinked inbox roots or device directories are rejected. The
+    temporary file is created exclusively in the validated destination
+    directory and atomically renamed into place, so a pre-existing temporary
+    symlink cannot redirect the write outside the inbox.
+    """
+    safe_id = safe_device_id(device_id)
+    name = os.path.basename(str(filename or "").replace("\\", "/"))
+    name = "".join(
+        char if char.isalnum() or char in "._-" else "_" for char in name)
+    name = name.strip("._")
+    if not name:
+        raise ValueError("a safe filename is required")
+    if not isinstance(payload, (bytes, bytearray, memoryview)):
+        raise ValueError("file payload must be bytes")
+    payload = bytes(payload)
+
+    incoming_root = Path(incoming_dir)
+    incoming_root.mkdir(parents=True, exist_ok=True)
+    if incoming_root.is_symlink():
+        raise ValueError("incoming root must not be a symbolic link")
+    root = incoming_root.resolve(strict=True)
+    if not root.is_dir():
+        raise ValueError("incoming root must be a directory")
+    try:
+        os.chmod(str(root), 0o700)
+    except OSError:
+        pass
+
+    target_dir = root / safe_id
+    target_dir.mkdir(mode=0o700, exist_ok=True)
+    if target_dir.is_symlink() or not target_dir.is_dir():
+        raise ValueError("device inbox must be a real directory")
+    resolved_dir = target_dir.resolve(strict=True)
+    if resolved_dir.parent != root:
+        raise ValueError("device inbox escapes incoming root")
+    try:
+        os.chmod(str(resolved_dir), 0o700)
+    except OSError:
+        pass
+
+    target = resolved_dir / name
+    if target.exists() or target.is_symlink():
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        target = resolved_dir / "{}_{}{}".format(
+            target.stem, stamp, target.suffix)
+        suffix = 1
+        while target.exists() or target.is_symlink():
+            target = resolved_dir / "{}_{}_{:02d}{}".format(
+                Path(name).stem, stamp, suffix, Path(name).suffix)
+            suffix += 1
+
+    fd, temporary = tempfile.mkstemp(
+        prefix="." + target.name + ".", suffix=".partial",
+        dir=str(resolved_dir))
+    try:
+        try:
+            os.fchmod(fd, 0o600)
+        except OSError:
+            pass
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, str(target))
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
+    return target
+
 def _safe_component(value):
     value = str(value or "").strip()
     cleaned = "".join(c if c.isalnum() or c in "-_." else "_" for c in value)
