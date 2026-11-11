@@ -990,7 +990,7 @@ _MEDIA_NOW_PLAYING = ""
 
 
 def _media_resolve(candidate):
-    if not isinstance(candidate, str) or not candidate or "\\x00" in candidate:
+    if not isinstance(candidate, str) or not candidate or "\x00" in candidate:
         return None
     raw = Path(candidate)
     if not raw.is_absolute() or ".." in raw.parts:
