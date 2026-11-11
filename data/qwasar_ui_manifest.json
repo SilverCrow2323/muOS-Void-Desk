@@ -49,7 +49,40 @@
         "padding",
         "align"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "gap": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "padding": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "align": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "layout.row",
@@ -64,7 +97,38 @@
         "justify",
         "wrap"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gap": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "align": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "justify": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "wrap": {
+            "type": "boolean"
+          },
+          "gapToken": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "layout.column",
@@ -78,7 +142,36 @@
         "align",
         "padding"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gap": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "align": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "padding": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "layout.grid",
@@ -93,7 +186,37 @@
         "gap",
         "density"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "minChildWidth": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "gap": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "density": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "layout.scroll",
@@ -107,7 +230,26 @@
         "scrollbar",
         "overscan"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "axis": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "scrollbar": {
+            "type": "boolean"
+          },
+          "overscan": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "layout.split",
@@ -122,7 +264,28 @@
         "minPaneSize",
         "collapseAt"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ratio": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "minPaneSize": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "collapseAt": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "surface.panel",
@@ -139,7 +302,47 @@
         "padding",
         "radius"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tone": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "border": {
+            "type": [
+              "boolean",
+              "string"
+            ],
+            "maxLength": 512
+          },
+          "padding": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "radius": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "dismiss"
+      ]
     },
     {
       "id": "display.text",
@@ -152,7 +355,34 @@
         "wrap",
         "localizationKey"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "textStyle": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "maxLines": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "wrap": {
+            "type": "boolean"
+          },
+          "localizationKey": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "display.icon",
@@ -164,7 +394,26 @@
         "size",
         "tone"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "iconId": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "size": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "tone": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "display.badge",
@@ -176,7 +425,34 @@
         "tone",
         "shape"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "tone": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "shape": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "fallback": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": []
     },
     {
       "id": "widget.status-card",
@@ -193,7 +469,60 @@
         "detail",
         "status"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "compact": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.stat",
@@ -206,7 +535,58 @@
         "unit",
         "trend"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "trend": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.gauge",
@@ -219,7 +599,51 @@
         "max",
         "label"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "min": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "max": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.progress",
@@ -232,7 +656,49 @@
         "label",
         "indeterminate"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "max": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "indeterminate": {
+            "type": "boolean"
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.sparkline",
@@ -244,7 +710,45 @@
         "range",
         "label"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "series": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {}
+          },
+          "range": {
+            "type": [
+              "array",
+              "object"
+            ],
+            "maxItems": 256,
+            "items": {},
+            "maxProperties": 64
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.media-player",
@@ -260,7 +764,40 @@
         "showQueue",
         "showSeek"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "compact": {
+            "type": "boolean"
+          },
+          "showQueue": {
+            "type": "boolean"
+          },
+          "showSeek": {
+            "type": "boolean"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.quick-tile",
@@ -275,7 +812,52 @@
         "size",
         "emphasis"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "size": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "emphasis": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "route": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.item-list",
@@ -291,7 +873,49 @@
         "selection",
         "rowDensity"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "selection": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "rowDensity": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "maxItems": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "menu.list",
@@ -308,7 +932,35 @@
         "rowDensity",
         "wrapNavigation"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "orientation": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "rowDensity": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "wrapNavigation": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "select",
+        "activate",
+        "change"
+      ]
     },
     {
       "id": "menu.entry",
@@ -325,7 +977,38 @@
         "dangerous",
         "shortcut"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "dangerous": {
+            "type": "boolean"
+          },
+          "shortcut": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "select",
+        "activate",
+        "change"
+      ]
     },
     {
       "id": "navigation.breadcrumb",
@@ -338,7 +1021,29 @@
         "compact",
         "showHome"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "compact": {
+            "type": "boolean"
+          },
+          "showHome": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "navigate",
+        "select",
+        "confirm",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "navigation.drawer",
@@ -352,7 +1057,34 @@
         "modal",
         "width"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "edge": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "modal": {
+            "type": "boolean"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "navigate",
+        "select",
+        "confirm",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "input.toggle",
@@ -364,7 +1096,37 @@
         "label",
         "disabled"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "disabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "change",
+        "submit",
+        "reset"
+      ]
     },
     {
       "id": "input.slider",
@@ -378,7 +1140,49 @@
         "step",
         "unit"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "min": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "max": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "step": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "change",
+        "submit",
+        "reset"
+      ]
     },
     {
       "id": "input.select",
@@ -392,7 +1196,41 @@
         "label",
         "disabled"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "change",
+        "submit",
+        "reset"
+      ]
     },
     {
       "id": "overlay.drawer",
@@ -406,7 +1244,31 @@
         "modal",
         "dismissIntent"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "edge": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "modal": {
+            "type": "boolean"
+          },
+          "dismissIntent": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "open",
+        "close",
+        "dismiss",
+        "confirm",
+        "cancel"
+      ]
     },
     {
       "id": "overlay.dialog",
@@ -422,7 +1284,31 @@
         "modal",
         "confirmation"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tone": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "modal": {
+            "type": "boolean"
+          },
+          "confirmation": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "open",
+        "close",
+        "dismiss",
+        "confirm",
+        "cancel"
+      ]
     },
     {
       "id": "feedback.toast",
@@ -434,7 +1320,30 @@
         "tone",
         "duration"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "tone": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        }
+      },
+      "events": [
+        "dismiss",
+        "cancel"
+      ]
     },
     {
       "id": "feedback.progress",
@@ -446,7 +1355,39 @@
         "value",
         "cancelAction"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 512,
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "cancelAction": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "dismiss",
+        "cancel"
+      ]
     },
     {
       "id": "shell.header",
@@ -464,7 +1405,37 @@
         "slot-order",
         "compact-mode"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visibility": {
+            "type": "boolean"
+          },
+          "density": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "slot-order": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {}
+          },
+          "compact-mode": {
+            "type": "boolean"
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "dismiss"
+      ]
     },
     {
       "id": "shell.footer",
@@ -482,7 +1453,39 @@
         "slot-order",
         "hint-count"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visibility": {
+            "type": "boolean"
+          },
+          "density": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "slot-order": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {}
+          },
+          "hint-count": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.installation-card",
@@ -498,7 +1501,40 @@
         "show-engine",
         "show-version"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "show-flavour": {
+            "type": "boolean"
+          },
+          "show-engine": {
+            "type": "boolean"
+          },
+          "show-version": {
+            "type": "boolean"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.session-card",
@@ -513,7 +1549,37 @@
         "show-kind",
         "show-availability"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "show-kind": {
+            "type": "boolean"
+          },
+          "show-availability": {
+            "type": "boolean"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "navigation.launch-selector",
@@ -533,7 +1599,45 @@
         "remember-selection",
         "compact-mode"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "show-installation-details": {
+            "type": "boolean"
+          },
+          "default-engine": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "remember-selection": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "compact-mode": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "selectionOrder": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {}
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "navigate",
+        "select",
+        "confirm",
+        "cancel",
+        "dismiss"
+      ]
     },
     {
       "id": "surface.overlay",
@@ -549,7 +1653,34 @@
         "dismissPolicy",
         "layer"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tone": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "backdrop": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "dismissPolicy": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "layer": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "dismiss"
+      ]
     },
     {
       "id": "widget.chart",
@@ -566,7 +1697,52 @@
         "legend",
         "grid"
       ],
-      "minUiApi": "1.0"
+      "minUiApi": "1.0",
+      "propsSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "series": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {}
+          },
+          "axes": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {}
+          },
+          "range": {
+            "type": [
+              "array",
+              "object"
+            ],
+            "maxItems": 256,
+            "items": {},
+            "maxProperties": 64
+          },
+          "legend": {
+            "type": "boolean"
+          },
+          "grid": {
+            "type": "boolean"
+          }
+        }
+      },
+      "events": [
+        "focus",
+        "blur",
+        "activate",
+        "select",
+        "change",
+        "refresh",
+        "play",
+        "pause",
+        "stop",
+        "seek",
+        "cancel",
+        "dismiss"
+      ]
     }
   ],
   "shell": {
