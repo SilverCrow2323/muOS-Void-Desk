@@ -35,12 +35,23 @@ def validate_url(url, *, stream=False):
     return url.strip()
 
 
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        old_scheme = urllib.parse.urlsplit(request.full_url).scheme.lower()
+        target = validate_url(newurl)
+        target_scheme = urllib.parse.urlsplit(target).scheme.lower()
+        if old_scheme == "https" and target_scheme != "https":
+            raise ValueError("HTTPS media source attempted an insecure redirect")
+        return super().redirect_request(
+            request, fp, code, msg, headers, target)
+
+
 def _opener(ua=None):
     # Use the platform trust store and hostname verification. Never disable
     # certificate validation for playlists or EPG sources.
     ctx = ssl.create_default_context()
     handler = urllib.request.HTTPSHandler(context=ctx)
-    op = urllib.request.build_opener(handler)
+    op = urllib.request.build_opener(handler, _SafeRedirectHandler())
     op.addheaders = [
         ("User-Agent", ua or "VoidDesk/1.0"),
         ("Accept-Encoding", "gzip"),
@@ -57,11 +68,11 @@ def fetch_bytes(url, ua=None, timeout=25, max_bytes=MAX_PLAYLIST_BYTES):
         content_length = response.headers.get("Content-Length")
         if content_length:
             try:
-                if int(content_length) > max_bytes:
-                    raise ValueError("remote media document exceeds size limit")
+                announced_size = int(content_length)
             except ValueError as exc:
-                if "size limit" in str(exc):
-                    raise
+                raise ValueError("remote media source sent an invalid Content-Length") from exc
+            if announced_size < 0 or announced_size > max_bytes:
+                raise ValueError("remote media document exceeds size limit")
         raw = response.read(max_bytes + 1)
     if len(raw) > max_bytes:
         raise ValueError("remote media document exceeds size limit")
@@ -172,6 +183,11 @@ def _parse_time(s):
     return (dt - offset).replace(tzinfo=timezone.utc).timestamp()
 
 def parse_xmltv(data):
+    if not isinstance(data, (bytes, bytearray)):
+        raise ValueError("XMLTV input must be bytes")
+    upper = bytes(data).upper()
+    if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
+        raise ValueError("XMLTV document type/entity declarations are not supported")
     by_key = {}
     chan_names = {}
     try:
