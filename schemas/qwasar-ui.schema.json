@@ -14,7 +14,9 @@
     "shell",
     "workspaces",
     "actions",
-    "keymap"
+    "keymap",
+    "runtimeLaunch",
+    "featureManagement"
   ],
   "properties": {
     "schemaVersion": {
@@ -76,24 +78,14 @@
       "type": "array",
       "maxItems": 128,
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "oldId",
-          "newId"
-        ],
-        "properties": {
-          "oldId": {
-            "$ref": "#/$defs/id"
-          },
-          "newId": {
-            "$ref": "#/$defs/id"
-          },
-          "section": {
-            "$ref": "#/$defs/id"
-          }
-        }
+        "$ref": "#/$defs/legacyAlias"
       }
+    },
+    "runtimeLaunch": {
+      "$ref": "#/$defs/runtimeLaunch"
+    },
+    "featureManagement": {
+      "$ref": "#/$defs/featureManagement"
     }
   },
   "$defs": {
@@ -658,6 +650,475 @@
         },
         "default": {
           "type": "boolean"
+        }
+      }
+    },
+    "legacyAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "oldId",
+        "newId"
+      ],
+      "properties": {
+        "oldId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,95}$"
+        },
+        "newId": {
+          "$ref": "#/$defs/id"
+        },
+        "section": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "buildFlavour": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "description"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "full",
+            "essential",
+            "slim",
+            "custom"
+          ]
+        },
+        "status": {
+          "enum": [
+            "current",
+            "planned"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 240
+        }
+      }
+    },
+    "bootloaderAdapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "platform",
+        "status",
+        "scope",
+        "notes"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "muos-launcher",
+            "desktop-launcher",
+            "grub2"
+          ]
+        },
+        "platform": {
+          "enum": [
+            "handheld-h700",
+            "desktop-linux-x86_64",
+            "desktop-linux-arm64",
+            "desktop-other"
+          ]
+        },
+        "status": {
+          "enum": [
+            "current",
+            "planned"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "app-launch",
+            "os-installation-selection"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "requiresConfirmation": {
+          "type": "boolean"
+        },
+        "backupRequired": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sessionTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "status",
+        "platforms",
+        "description"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "desktop",
+            "terminal",
+            "remote-workstation",
+            "virtual-machine"
+          ]
+        },
+        "status": {
+          "enum": [
+            "current",
+            "planned",
+            "optional"
+          ]
+        },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "muos-h700",
+              "desktop-linux-x86_64",
+              "desktop-linux-arm64",
+              "desktop-other"
+            ]
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "backend": {
+          "type": "string",
+          "maxLength": 96
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        }
+      }
+    },
+    "runtimeLaunch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "buildFlavours",
+        "installPolicy",
+        "bootloaderAdapters",
+        "sessionTargets",
+        "integrations"
+      ],
+      "properties": {
+        "selector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "stage",
+            "selectionAxes",
+            "defaultEngine",
+            "engines"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "stage": {
+              "const": "before-frontend"
+            },
+            "selectionAxes": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "installed-instance",
+                  "build-flavour",
+                  "frontend-engine",
+                  "user-profile",
+                  "session-target"
+                ]
+              }
+            },
+            "defaultEngine": {
+              "enum": [
+                "pygame",
+                "love",
+                "auto"
+              ]
+            },
+            "engines": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pygame",
+                  "love",
+                  "qt6",
+                  "lvgl",
+                  "web"
+                ]
+              }
+            },
+            "allowMultipleInstances": {
+              "type": "boolean"
+            },
+            "rememberLastSelection": {
+              "type": "boolean"
+            },
+            "fallbackPolicy": {
+              "enum": [
+                "ask",
+                "configured-default",
+                "safe-engine-only"
+              ]
+            }
+          }
+        },
+        "buildFlavours": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "$ref": "#/$defs/buildFlavour"
+          }
+        },
+        "installPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sideBySideInstances",
+            "uniqueInstanceIds",
+            "isolatedApplicationRoots",
+            "versionedDataMigrations"
+          ],
+          "properties": {
+            "sideBySideInstances": {
+              "type": "boolean"
+            },
+            "uniqueInstanceIds": {
+              "type": "boolean"
+            },
+            "isolatedApplicationRoots": {
+              "type": "boolean"
+            },
+            "versionedDataMigrations": {
+              "type": "boolean"
+            },
+            "sharedUserData": {
+              "type": "boolean"
+            },
+            "notes": {
+              "type": "string",
+              "maxLength": 500
+            }
+          }
+        },
+        "bootloaderAdapters": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/bootloaderAdapter"
+          }
+        },
+        "sessionTargets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sessionTarget"
+          }
+        },
+        "integrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "status",
+              "hostRole",
+              "deviceRole",
+              "transports",
+              "notes"
+            ],
+            "properties": {
+              "id": {
+                "enum": [
+                  "input-leap",
+                  "qwasar-link",
+                  "virtualbox"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "current",
+                  "candidate",
+                  "planned"
+                ]
+              },
+              "hostRole": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "deviceRole": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "transports": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "keyboard-mouse",
+                    "clipboard",
+                    "remote-display",
+                    "vm-console",
+                    "file-transfer",
+                    "telemetry"
+                  ]
+                }
+              },
+              "requiresInstallOnBothEnds": {
+                "type": "boolean"
+              },
+              "platforms": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "muos-h700",
+                    "desktop-linux-x86_64",
+                    "desktop-linux-arm64",
+                    "desktop-other"
+                  ]
+                }
+              },
+              "notes": {
+                "type": "string",
+                "maxLength": 800
+              }
+            }
+          }
+        }
+      }
+    },
+    "featureManagement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manageableKinds",
+        "states",
+        "disableSemantics",
+        "protectedAreas",
+        "tools"
+      ],
+      "properties": {
+        "manageableKinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "workspace",
+              "section",
+              "module",
+              "widget",
+              "menu-entry",
+              "global-panel"
+            ]
+          }
+        },
+        "states": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "installed",
+              "enabled",
+              "disabled",
+              "hidden",
+              "unavailable",
+              "incompatible",
+              "running",
+              "error"
+            ]
+          }
+        },
+        "disableSemantics": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "protectedAreas": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 96
+          }
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "purpose",
+              "defaultMode",
+              "actions"
+            ],
+            "properties": {
+              "id": {
+                "enum": [
+                  "qwasar.inspector",
+                  "qwasar.switchboard"
+                ]
+              },
+              "purpose": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "defaultMode": {
+                "enum": [
+                  "read-only",
+                  "profile-edit"
+                ]
+              },
+              "actions": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "scan",
+                    "report",
+                    "preview",
+                    "enable",
+                    "disable",
+                    "reorder",
+                    "hide",
+                    "show",
+                    "reset-profile",
+                    "export-report"
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     }
