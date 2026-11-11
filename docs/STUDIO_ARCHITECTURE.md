@@ -1,5 +1,6 @@
-# Void Desk Studio — Technical Architecture
+# QWASAR Studio — Technical Architecture
 
+**Product:** QWASAR Studio, the browser companion for QWASAR Desk  
 **Status:** accepted product direction; foundation specification  
 **Scope:** browser companion, portable profiles, official plugin catalog, multi-engine readiness  
 **Initial runtime targets:** Pygame (py) and LÖVE (love). Qt 6 and LVGL are future adapters, not currently supported runtimes.
@@ -8,7 +9,7 @@
 
 - Studio is a responsive web app/PWA companion. The handheld remains usable without Studio or internet access.
 - Users can export/import and explicitly share profiles and individual official plugins.
-- Plugin publishing is restricted to official Void Desk maintainers in v1. No public plugin uploads or third-party executable packages.
+- Plugin publishing is restricted to official QWASAR Desk maintainers in v1. No public plugin uploads or third-party executable packages.
 - Profiles are declarative data: menu ordering, labels, descriptions, icons, supported feature toggles, approved plugin settings, and visibility conditions.
 - Profiles cannot contain shell commands, scripts, executable paths, arbitrary launch URLs, credentials, or privileged operations.
 - One engine-neutral profile format is consumed by all frontend adapters.
@@ -23,7 +24,7 @@ Browser / PWA --HTTPS--> Studio API (planned)
      +---- local JSON profile
                 |
                 v
-       Void Desk local service
+       QWASAR Desk local service
                 |
                 +--> validator + migration
                 +--> Configuration Engine
@@ -62,9 +63,18 @@ The engine validates and migrates a profile before applying it. It merges profil
 
 The existing data/desk_config.json remains the legacy runtime configuration during migration. Do not replace it wholesale. A future compatibility adapter maps only supported settings into the canonical model and writes through existing safe I/O helpers.
 
-### Menu and condition model
+### Version 1 compatibility identifiers
 
-Menu array order determines presentation order. Stable item IDs are independent of labels. Routes must resolve to entries registered by the installed Void Desk build.
+The public product name is **QWASAR Desk** and the browser companion is **QWASAR Studio**. Version 1 of the profile and plugin contracts deliberately keeps its original technical identifiers so existing drafts, tools and future importers do not need a silent breaking rename:
+
+- Schema filenames and profile IDs such as `voiddesk-starter` remain stable.
+- The profile compatibility property `minimumVoidDeskVersion` keeps its v1 spelling even though it refers to the minimum **QWASAR Desk** runtime version.
+- The official plugin publisher ID `voiddesk-official` and display name `Void Desk Official` remain reserved v1 compatibility values. Do not change them independently: a public publisher-identity migration requires a new manifest/schema version and an explicit migration path.
+- These identifiers are not the displayed product brand and must not be used for new user-facing copy.
+
+## Menu and condition model
+
+Menu array order determines presentation order. Stable item IDs are independent of labels. Routes must resolve to entries registered by the installed QWASAR Desk build.
 
 Visibility conditions use a closed vocabulary and are evaluated locally:
 - key_sequence: bounded sequence of known controller keys.
@@ -89,7 +99,7 @@ The manifest schema is not proof that signing/distribution already exists. Key m
 
 Profiles are engine-neutral. Each frontend adapter advertises supported routes, controls and capabilities. Pygame is the primary current frontend; LÖVE exists but is not feature-equivalent. Qt 6 and LVGL remain future adapters until implemented and tested.
 
-Runtime version management is separate from profile management. Profiles may declare a minimum Void Desk version and preferred engine, but cannot install or switch binaries. Multi-version installation, boot selection, update channels and rollback belong to a separate package/boot manager.
+Runtime version management is separate from profile management. Profiles may declare a minimum QWASAR Desk version and preferred engine, but cannot install or switch binaries. Multi-version installation, boot selection, update channels and rollback belong to a separate package/boot manager.
 
 ## Planned API contract (not deployed)
 
