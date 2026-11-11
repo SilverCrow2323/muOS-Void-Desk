@@ -38,7 +38,10 @@ PROG() {
 
 PY3="$(command -v python3)"
 
-MNTED() { grep -q " $1 " /proc/mounts 2>/dev/null; }
+MNTED() {
+    PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
+        "$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.is_mounted(sys.argv[1]) else 1)' "$1"
+}
 
 CLEANUP() {
 	BOOST_TEARDOWN
