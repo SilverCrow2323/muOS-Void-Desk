@@ -147,7 +147,9 @@ cp -R --preserve=mode,timestamps "$PC_SOURCE/." "$APP_DEST/"
 
 # The PC package is architecture-independent source. Do not ship the handheld's
 # ARM LÖVE/LuaJIT binaries or the large muOS XFCE image in an all-architecture .deb.
-rm -rf -- "$APP_DEST/data"
+rm -rf -- \
+    "$APP_DEST/data" \
+    "$APP_DEST/assets/runtime_archives"
 rm -f -- \
     "$APP_DEST/lib/love" \
     "$APP_DEST/lib/libluajit-5.1.so.2" \
