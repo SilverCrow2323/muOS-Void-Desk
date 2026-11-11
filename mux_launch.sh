@@ -168,8 +168,9 @@ run_muos_app() {
 
 PENDING="$DATA/.pending_session"
 MUOS_APP="$DATA/.muos_app"
+MEDIA="$DATA/.pending_media"
 POWER_OFF="$DATA/.pending_poweroff"
-rm -f "$PENDING" "$MUOS_APP" "$POWER_OFF"
+rm -f "$PENDING" "$MUOS_APP" "$MEDIA" "$POWER_OFF"
 POWER_OFF_REQUESTED=0
 
 # Start Python service
@@ -190,6 +191,15 @@ while true; do
         POWER_OFF_REQUESTED=1
         echo "$(date) power-off requested by frontend" >>"$LOG"
         break
+    fi
+
+    if [ -f "$MEDIA" ]; then
+        echo "$(date) media hand-off requested; starting MPV" >>"$LOG"
+        python3 "$APP_DIR/bin/vd_media_player.py" "$MEDIA" >>"$LOG" 2>&1
+        MEDIA_RC=$?
+        rm -f "$MEDIA"
+        echo "$(date) MPV playback ended (rc=$MEDIA_RC), returning to Void Desk" >>"$LOG"
+        continue
     fi
 
     if [ -f "$MUOS_APP" ]; then
