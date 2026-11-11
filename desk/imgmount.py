@@ -184,6 +184,16 @@ def mount_img(img, mnt, ro=False):
             if attached.returncode == 0:
                 dev = candidate
                 owned_loop = True
+            else:
+                # A failed attach command can still leave a device configured
+                # on unusual backends or after a partial operation. Never use
+                # the classic loop fallback while that state is ambiguous.
+                dangling = loop_of(img)
+                if dangling:
+                    return False, (
+                        "losetup ha fallito ma l'immagine risulta associata a "
+                        "%s; fallback loop annullato" % dangling
+                    )
 
     err = "nessun /dev/loop libero"
     if dev:
