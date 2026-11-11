@@ -37,6 +37,7 @@ def make_harness(tmp_path, *, chroot_rc=0, cleanup_rc=0,
 printf '%s\\n' "$2" >> "$VD_PY_CALL_LOG"
 case "$2" in
     *umount_tree*) exit "$VD_CLEANUP_RC" ;;
+    *cleanup_stale*) exit "${VD_STALE_CLEANUP_RC:-0}" ;;
     *) exit "$VD_MOUNT_PROBE_RC" ;;
 esac
 """,
@@ -74,6 +75,7 @@ exit "$VD_CHROOT_RC"
         "PY3": str(mount_probe),
         "VD_MOUNT_PROBE_RC": "0" if existing_root else "1",
         "VD_CLEANUP_RC": str(cleanup_rc),
+        "VD_STALE_CLEANUP_RC": "0",
         "VD_CHROOT_RC": str(chroot_rc),
         "VD_MOUNT_FAIL_AT": str(mount_fail_at),
         "VD_MOUNT_COUNT_FILE": str(tmp_path / "mount-count"),
@@ -142,3 +144,15 @@ def test_apt_install_leaves_preexisting_desktop_root_mounted(tmp_path):
     python_calls = Path(env["VD_PY_CALL_LOG"]).read_text()
     assert "umount_tree" not in python_calls
     assert Path(env["VD_CHROOT_CALL_LOG"]).exists()
+
+
+
+def test_apt_install_releases_stale_loop_after_root_mount_failure(tmp_path):
+    result, _data, _mountpoint, env = run_installer(
+        tmp_path, mount_fail_at=1
+    )
+
+    assert result.returncode == 1
+    assert not Path(env["VD_CHROOT_CALL_LOG"]).exists()
+    python_calls = Path(env["VD_PY_CALL_LOG"]).read_text()
+    assert "cleanup_stale" in python_calls
