@@ -178,14 +178,20 @@ def test_component_types_slots_and_ids_are_registered_and_unique():
     manifest = _load_ui()
     registry = {item["id"]: item for item in manifest["componentRegistry"]}
     assert len(registry) == len(manifest["componentRegistry"])
+    for definition in registry.values():
+        jsonschema.Draft202012Validator.check_schema(definition["propsSchema"])
     nodes = _load_component_nodes(manifest)
     for node in nodes:
         assert node["type"] in registry, (
             f"unregistered component type {node['type']} in {node['id']}"
         )
-        allowed = set(registry[node["type"]]["slots"])
+        definition = registry[node["type"]]
+        allowed = set(definition["slots"])
         assert set(node.get("slots", {})) <= allowed, (
             f"unsupported slots on {node['type']} component {node['id']}"
+        )
+        jsonschema.Draft202012Validator(definition["propsSchema"]).validate(
+            node.get("props", {})
         )
     ids = [node["id"] for node in nodes]
     assert len(ids) == len(set(ids)), "duplicate component node IDs"
