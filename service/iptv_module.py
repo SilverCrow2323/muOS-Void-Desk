@@ -393,6 +393,74 @@ def epg_now_next(by_key: dict, channel: dict, now: float | None = None):
 
 # ── mpv player ──────────────────────────────────────────────────────────
 _mpv_proc = None
+_radio_proc = None
+_radio_station = None
+_radio_error = ""
+
+
+def play_audio(stream_url: str, station_name: str) -> tuple[bool, str | None]:
+    """Start a background audio-only stream without taking over the display."""
+    global _radio_proc, _radio_station, _radio_error
+    stop_audio()
+    try:
+        safe_url = validate_stream_url(stream_url)
+    except ValueError as exc:
+        _radio_error = str(exc)
+        return False, _radio_error
+    if not shutil.which("mpv"):
+        _radio_error = "mpv not installed"
+        return False, _radio_error
+    args = [
+        "mpv", "--no-config", "--no-video", "--no-terminal",
+        "--really-quiet", "--force-window=no", "--network-timeout=12",
+        "--cache=yes", "--cache-secs=5", "--", safe_url,
+    ]
+    environment = dict(os.environ)
+    environment.pop("SDL_VIDEODRIVER", None)
+    try:
+        _radio_proc = subprocess.Popen(
+            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            env=environment,
+        )
+        _radio_station = str(station_name or "Internet radio")[:120]
+        _radio_error = ""
+        return True, None
+    except OSError as exc:
+        _radio_proc = None
+        _radio_station = None
+        _radio_error = str(exc)[:200]
+        return False, _radio_error
+
+
+def stop_audio() -> None:
+    global _radio_proc, _radio_station
+    process = _radio_proc
+    _radio_proc = None
+    _radio_station = None
+    if process is None:
+        return
+    try:
+        process.terminate()
+        process.wait(timeout=3)
+    except Exception:
+        try:
+            process.kill()
+            process.wait(timeout=2)
+        except Exception:
+            pass
+
+
+def audio_status() -> dict:
+    global _radio_proc, _radio_station
+    if _radio_proc is not None and _radio_proc.poll() is not None:
+        _radio_proc = None
+        _radio_station = None
+    return {
+        "state": "playing" if _radio_proc is not None else "idle",
+        "station": _radio_station,
+        "pid": _radio_proc.pid if _radio_proc is not None else None,
+        "error": _radio_error,
+    }
 _mpv_sock = None
 _mpv_channel = None
 _mpv_state = "idle"
