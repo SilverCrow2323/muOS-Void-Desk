@@ -63,18 +63,20 @@ The current AppBuilder scripts are the local build engine. Studio will become th
 
 Responsibilities:
 
-- Launch as a normal muOS application through the supported application runner.
-- Provide NEXUS navigation and controller-first workspaces whose sections are composed from stable module contribution slots.
-- Run the local Python service and expose typed, allowlisted capabilities to the frontends.
-- Manage connectivity, APT operations inside the optional Debian/Ubuntu XFCE image, media integrations, diagnostics, jobs, and session hand-off.
-- Keep working offline for local features; network-only functions must show an explicit offline state.
+- Launch as a normal muOS application through the supported application runner, then offer a reversible pre-frontend selector for installed Void Desk instances, Full/Essential/Slim/Custom flavour, available engine and user profile.
+- Provide NEXUS navigation and controller-first workspaces whose shell, header, footer, side panels, menus and widgets are defined by the engine-neutral QWASAR UI contract.
+- Run the local Python service and expose typed, allowlisted capabilities to Pygame/LÖVE adapters.
+- START SESSION launches separate desktop or terminal sessions; UPLINK owns online services and PC pairing; THE FORGE owns package/module lifecycle; MEDIA VAULT owns multimedia; RT:TOOLBOX owns installed tools, diagnostics and utilities.
+- RT:TOOLBOX is composed of Everyday Tools, Files & Storage, System & Diagnostics, and Developer & Terminal.
+- Keep local features working offline; network-only functions must show an explicit offline state.
+- Allow profiles to rearrange, hide or disable registered contributions without uninstalling them; use QWASAR Inspector for validation and QWASAR Switchboard for activation state.
 - Compose sections from built-in/installed modules, export/import portable layout profiles, and later pair with Studio/Link without requiring either to use the local privileged service directly.
 
 Platform boundary:
 
 - muOS is the host firmware and remains responsible for boot, recovery, and the native frontend.
 - Do not run APT against the muOS Buildroot host. APT operations belong inside the optional Debian/Ubuntu image only.
-- No bootloader replacement, destructive init modifications, or irreversible firmware changes.
+- No bootloader replacement, destructive init modifications, or irreversible firmware changes. GRUB is not used on muOS/H700; its boot selector is the muxapp launcher plus the reversible pre-frontend selector.
 - The local service remains loopback-only and privileged. It must not become an internet-facing API.
 
 **P0 acceptance:** complete Void Desk's declared LÖVE journeys and validate them on the RG35XX-H before expanding to other firmwares.
@@ -128,7 +130,7 @@ Current foundation:
 
 - `voiddesk.py` is the PC/development launcher.
 - `build-packages.sh` builds a portable muOS `.muxapp` and a Debian `.deb`.
-- The PC package currently launches the Pygame frontend and is not yet the complete QWASAR Link companion.
+- The PC package currently launches the Pygame frontend and is not yet the complete QWASAR Link companion. The future launcher selects the installed Void Desk instance/flavour/engine after Linux has booted; it is independent of any GRUB OS selection.
 
 QWASAR Link responsibilities:
 
@@ -136,11 +138,18 @@ QWASAR Link responsibilities:
 - display device status, battery, storage, connectivity and service health;
 - transfer files to explicitly selected destinations;
 - request screenshots/log bundles with user consent;
-- forward keyboard/mouse input through an authenticated, narrow command protocol;
-- provide a remote-view window with latency, resolution, bitrate and reconnect controls;
+- provide an easy setup/pairing wizard for a software-KVM backend such as Input Leap where supported; its input-sharing feature does not carry video;
+- forward remote input through an authenticated, narrow and revocable capability;
+- provide a separate remote-view window with latency, resolution, bitrate and reconnect controls;
 - manage pairing revocation and device trust.
 
+Input Leap is a candidate keyboard/mouse sharing backend, not the remote-display implementation. Its endpoint must be available on both participating machines; the QWASAR Link wizard must probe platform support and offer a QWASAR-owned fallback rather than assuming a compatible handheld binary exists.
+
 The old VOID BaseStation code is a prototype, not the security foundation for QWASAR Link. Its current defaults and SSH trust model require a full security redesign before reuse or exposure. Do not expose its embedded daemon as a production service.
+
+Optional PC-only integrations:
+- **GRUB2:** a separate bootloader adapter may preview and generate entries for complete bootable OS/rootfs installations, with mandatory backup, explicit consent and rollback. It never selects Pygame versus LÖVE inside the running Linux system and is never modified by ordinary Void Desk package installation.
+- **VirtualBox:** an optional session provider for compatible PC hosts, initially Linux x86-64. QWASAR Link may expose a VM console remotely, but the H700 does not host VirtualBox natively. Oracle's VirtualBox 7.2 guide lists Linux x86-64 host packages, not Linux ARM64 in its supported host package matrix. See [installation](https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/installation.html) and [host/guest combinations](https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/Introduction.html).
 
 ### Device G — Browser, tablet, and phone
 
@@ -199,11 +208,12 @@ Hub is optional. Void Desk remains useful without a Hub, Studio, account, or int
 
 ### Runtime layers
 
-1. **Frontend layer:** Pygame and LÖVE today; future engines must implement the same user journeys and capability contract.
-2. **Void Desk local service:** owns local jobs and narrow privileged host operations. Frontends submit typed commands; they do not construct arbitrary shell commands.
-3. **Platform adapter:** translates a capability request into the correct firmware-specific operation.
-4. **QWASAR Hub:** optional remote control plane for identity, profile/catalog distribution, and sync coordination.
-5. **QWASAR Studio / Link:** independent clients of Hub and approved device APIs; neither bypasses the trust boundary.
+1. **Boot/launch layer:** optional PC bootloader selection for complete operating systems, then QWASAR pre-frontend selection of installed Void Desk instance, build flavour, engine, profile and session target.
+2. **Frontend layer:** Pygame and LÖVE today; Qt 6, LVGL and Web are future adapters to the same QWASAR UI manifest.
+3. **Void Desk local service:** owns local jobs and narrow privileged host operations. Frontends submit typed commands; they do not construct arbitrary shell commands.
+4. **Platform adapter:** translates a capability request into the correct firmware/host-specific operation.
+5. **QWASAR Hub:** optional remote control plane for identity, profile/catalog distribution, and sync coordination.
+6. **QWASAR Studio / Link:** independent clients of Hub and approved device APIs; neither bypasses the trust boundary.
 
 ### Network and trust rules
 
@@ -338,7 +348,7 @@ All APT operations must remain inside the optional Debian/Ubuntu image. Never ru
 
 **Exit:** package operations pass in the real chroot on the H700 device; CI alone is not sufficient.
 
-### L4 — SESSION, WORKSHOP, and TOOLBOX
+### L4 — START SESSION and RT:TOOLBOX
 
 - Session launch/return hand-off for XFCE and supported desktop sessions;
 - diagnostics and system monitor refresh without blocking input/render loops;
@@ -414,3 +424,33 @@ The first implementation work after this map should stay inside `Void-Desk-Proje
 6. Start the physical H700 acceptance checklist before declaring LÖVE complete.
 
 No QWASAR Hub, Studio, Link, or runtime repository needs to be created to do this work. Keep the module contract and built-in registry in Void-Desk-Project while Void Desk LÖVE is completed.
+
+
+## 9. Definitive launch, PC and tool-management model
+
+### Boot and install selector
+
+Do not conflate bootloader selection with renderer selection:
+
+- GRUB2, when explicitly enabled on a compatible PC, chooses complete bootable OS/rootfs installations.
+- QWASAR's pre-frontend selector runs after the host OS/firmware starts and chooses an installed Void Desk instance, Full/Essential/Slim/Custom flavour, frontend engine, profile and session target.
+- muOS/H700 uses the existing muxapp launcher and never changes the handheld bootloader.
+- Multiple Void Desk instances use unique IDs and isolated executable/package roots; they may coexist without overwriting one another. User data sharing requires explicit versioned migration.
+
+### START SESSION
+
+START SESSION launches independent environments, not individual utilities: graphical desktop environments, standalone terminal sessions, a paired PC workstation through QWASAR Link, and registered VirtualBox VMs on supported PC hosts. VirtualBox dependency installation/configuration lives in THE FORGE; VM selection/launch lives here.
+
+### UPLINK and PC input
+
+UPLINK owns online and inter-device connectivity. QWASAR Link on PC supplies the easy pairing/setup surface. Input Leap may be selected as a software-KVM backend when both endpoints and the display/input stacks support it; keyboard/mouse sharing is separate from video, remote desktop, file transfer and telemetry.
+
+### THE FORGE vs RT:TOOLBOX
+
+- THE FORGE installs, updates and removes APT packages, Void Desk package instances, QMOD modules, external tools and engine runtimes.
+- RT:TOOLBOX uses and organizes tools already installed. It has exactly four categories: Everyday Tools; Files & Storage; System & Diagnostics; Developer & Terminal.
+- QWASAR Inspector validates the installed structure in read-only mode.
+- QWASAR Switchboard enables/disables modules, workspaces, sections, widgets, menu entries and global panels at profile level. Disable is not uninstall.
+
+The detailed UI tree, component slots, engine adapter contract, menu entry format and manifest are in [QWASAR GUI System](QWASAR_GUI_SYSTEM.md). The current repository has the architecture/schema baseline only; dynamic composition and Switchboard/Inspector runtime commands are future implementation work.
+
