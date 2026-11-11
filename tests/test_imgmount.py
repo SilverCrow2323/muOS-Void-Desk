@@ -286,7 +286,7 @@ def test_mount_img_falls_back_only_after_owned_loop_is_detached(
             return _fake_result()
         if command[0] == "mount" and command[-2] == "/dev/loop5":
             return _fake_result(1, stderr="explicit mount failed")
-        if command == ["mount", "-o", "loop", str(image), str(mountpoint)]:
+        if command == ["mount", "-o", "loop", image, mountpoint]:
             assert state["loop"] is None
             return _fake_result()
         raise AssertionError("unexpected command: %r" % command)
@@ -305,7 +305,7 @@ def test_mount_img_falls_back_only_after_owned_loop_is_detached(
     assert ok, error
     detach_index = commands.index(["losetup", "-d", "/dev/loop5"])
     fallback_index = commands.index(
-        ["mount", "-o", "loop", str(image), str(mountpoint)]
+        ["mount", "-o", "loop", image, mountpoint]
     )
     assert detach_index < fallback_index
 
