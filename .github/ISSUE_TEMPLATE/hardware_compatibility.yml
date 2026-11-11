@@ -1,0 +1,47 @@
+name: Hardware compatibility report
+description: Report a device-specific pass, failure or regression.
+title: "[Hardware]: "
+body:
+  - type: input
+    id: device
+    attributes:
+      label: Exact device model and hardware revision
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware name and exact version
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: VoidDesk release or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Validation result
+      options:
+        - Pass
+        - Fail
+        - Partial
+        - Not reproducible
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Test steps and observed results
+      description: Include cold boot, controls, connectivity, session launch and shutdown where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, photos or additional evidence
+      render: text
+    validations:
+      required: false
