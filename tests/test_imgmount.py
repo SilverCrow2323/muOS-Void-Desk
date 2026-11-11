@@ -149,3 +149,67 @@ def test_cleanup_stale_reports_detach_failure(monkeypatch, tmp_path):
 
     assert not imgmount.cleanup_stale(image)
     assert commands == [["losetup", "-d", "/dev/loop3"]]
+
+
+def test_umount_tree_returns_false_when_lazy_unmount_leaves_mounts(monkeypatch, tmp_path):
+    root = tmp_path / "xfce_mnt"
+    child = root / "proc"
+    image = tmp_path / "xfce.img"
+    commands = []
+
+    monkeypatch.setattr(imgmount, "submounts", lambda _root: [str(child), str(root)])
+    monkeypatch.setattr(
+        imgmount, "_call",
+        lambda command: (commands.append(command) or
+                         (1 if command[1:2] == ["umount"] else 0)),
+    )
+    monkeypatch.setattr(imgmount, "is_mounted", lambda _path: False)
+    monkeypatch.setattr(imgmount, "loop_of", lambda _image: "/dev/loop6")
+    monkeypatch.setattr(imgmount, "loop_is_mounted", lambda _device: False)
+
+    assert not imgmount.umount_tree(root, image)
+    assert ["losetup", "-d", "/dev/loop6"] not in commands
+
+
+def test_umount_tree_verifies_loop_detach_result(monkeypatch, tmp_path):
+    root = tmp_path / "xfce_mnt"
+    image = tmp_path / "xfce.img"
+    calls = []
+
+    monkeypatch.setattr(imgmount, "submounts", lambda _root: [])
+    monkeypatch.setattr(imgmount, "is_mounted", lambda _path: False)
+    monkeypatch.setattr(imgmount, "loop_of", lambda _image: "/dev/loop8")
+    monkeypatch.setattr(imgmount, "loop_is_mounted", lambda _device: False)
+    monkeypatch.setattr(
+        imgmount, "_call",
+        lambda command: (calls.append(command) or 1),
+    )
+
+    assert not imgmount.umount_tree(root, image)
+    assert calls == [["losetup", "-d", "/dev/loop8"]]
+
+
+def test_umount_tree_succeeds_only_after_mount_and_loop_are_gone(
+        monkeypatch, tmp_path):
+    root = tmp_path / "xfce_mnt"
+    image = tmp_path / "xfce.img"
+    calls = []
+    loop_state = {"attached": True}
+
+    monkeypatch.setattr(imgmount, "submounts", lambda _root: [])
+    monkeypatch.setattr(imgmount, "is_mounted", lambda _path: False)
+    monkeypatch.setattr(
+        imgmount, "loop_of",
+        lambda _image: "/dev/loop9" if loop_state["attached"] else None,
+    )
+    monkeypatch.setattr(imgmount, "loop_is_mounted", lambda _device: False)
+
+    def detach(command):
+        calls.append(command)
+        loop_state["attached"] = False
+        return 0
+
+    monkeypatch.setattr(imgmount, "_call", detach)
+
+    assert imgmount.umount_tree(root, image)
+    assert calls == [["losetup", "-d", "/dev/loop9"]]
