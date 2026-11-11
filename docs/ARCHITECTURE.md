@@ -6,7 +6,7 @@ For the wider cross-device product structure, naming rules, platform matrix, rep
 
 ## Runtime overview
 
-On the handheld, mux_launch.sh is the package entry point. It loads muOS launcher helpers, establishes the application environment, starts service/voiddesk_service.py and runs the selected frontend.
+On the handheld, mux_launch.sh is the package entry point. It loads muOS launcher helpers, establishes the application environment, starts the local service and runs the selected frontend. The target architecture adds a pre-frontend QWASAR Launch Selector to choose among installed Void Desk instances, build flavours, supported engines, profiles and session targets. It does not replace the muOS firmware bootloader.
 
 ~~~text
 muOS Apps
@@ -23,9 +23,9 @@ mux_launch.sh
                                   -> return to QWASAR Desk
 ~~~
 
-The launcher re-reads the configured engine before each run. If the Pygame runtime is not ready, it calls bin/bootstrap_lite.py. Pygame is the recommended, more complete frontend. If the Pygame process fails, the launcher can start LÖVE as an emergency fallback; that fallback is an experimental, incomplete prototype and is not feature-equivalent.
+The launcher re-reads the configured engine before each run. If the Pygame runtime is not ready, it calls bin/bootstrap_lite.py. Pygame remains the reference frontend; LÖVE is the alternative frontend being completed. An emergency fallback is an explicit configured launch policy, not proof that the two engines are feature-equivalent.
 
-The PC launcher, voiddesk.py, is a separate development convenience. It checks for a system LÖVE binary on PC and can create .venv_desktop for the Pygame path. It is not the handheld package entry point.
+The PC launcher, voiddesk.py, is currently a development convenience. The target PC launcher will provide the same pre-frontend instance/engine selector and session catalogue. Optional GRUB2 integration is separate and only selects complete bootable OS installations; it never changes the renderer inside an already running OS.
 
 ## Main subsystems
 
@@ -114,4 +114,21 @@ The long-term host integration strategy is documented in [SYMBIOTIC_LAYER.md](SY
 ## QWASAR Studio companion
 
 The browser companion, portable profile format, official-only plugin trust model, and planned device-sync boundary are specified in [QWASAR Studio — Technical Architecture](STUDIO_ARCHITECTURE.md). That document is the source of truth for profile/schema contracts and staged Studio rollout. Studio does not replace the existing handheld launcher or local service, and it does not make the local service internet-facing.
+
+
+
+## QWASAR GUI and launch contracts
+
+The engine-neutral UI composition baseline is defined by:
+- docs/QWASAR_GUI_SYSTEM.md
+- schemas/qwasar-ui.schema.json
+- data/qwasar_ui_manifest.json
+
+The local side-by-side installation inventory is defined by schemas/qwasar-installations.schema.json. The example file is not a live device inventory.
+
+Pygame and LÖVE are the first UI adapters. Qt 6, LVGL and Web are reserved future adapters. Both current frontends must progressively consume the same shell/workspace/menu/widget contracts rather than duplicating application structure.
+
+QWASAR Inspector and QWASAR Switchboard are planned host tools: Inspector audits structure without modifying it; Switchboard applies validated profile-level enable/disable, hide/show and ordering changes. Neither is a substitute for THE FORGE package installation/removal.
+
+See docs/QWASAR_BOOT_AND_SESSION_MODEL.md for the separation between GRUB/OS boot, pre-frontend engine selection, multiple installation flavours, START SESSION, Input Leap/QWASAR Link and optional PC VirtualBox support.
 
