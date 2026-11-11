@@ -23,9 +23,14 @@ def run_probe(tmp_path, *, result=0, path="/mnt/Void Desk/xfce_mnt",
     if python_available:
         fake_python = tmp_path / "python3"
         fake_python.write_text(
-            "#!/bin/sh\n"
-            "printf '%s\\n' \"$#\" \"$3\" > \"$VD_ARG_CAPTURE\"\n"
-            "exit \"$VD_MOUNT_RESULT\"\n"
+            """#!/bin/sh
+printf '%s\\n' "$#" "$3" > "$VD_ARG_CAPTURE"
+case "$VD_MOUNT_RESULT" in
+    0) printf 'mounted\\n' ;;
+    1) printf 'unmounted\\n' ;;
+    *) exit "$VD_MOUNT_RESULT" ;;
+esac
+"""
         )
         fake_python.chmod(0o755)
         env["PY3"] = str(fake_python)
@@ -79,7 +84,7 @@ def test_shared_mount_probe_fails_closed_when_imgmount_import_raises(tmp_path):
     desk = app / "desk"
     desk.mkdir(parents=True)
     (desk / "imgmount.py").write_text(
-        "raise RuntimeError('simulated imgmount import failure')\\n"
+        "raise RuntimeError('simulated imgmount import failure')\n"
     )
     env = os.environ.copy()
     env.update({
@@ -89,8 +94,8 @@ def test_shared_mount_probe_fails_closed_when_imgmount_import_raises(tmp_path):
         "HELPER_PATH": str(HELPER),
     })
     script = (
-        '. "$HELPER_PATH"\\n'
-        'vd_mount_present "$APP_DIR" "$MOUNT_PATH"\\n'
+        '. "$HELPER_PATH"\n'
+        'vd_mount_present "$APP_DIR" "$MOUNT_PATH"\n'
     )
 
     result = subprocess.run(
