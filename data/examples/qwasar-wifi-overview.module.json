@@ -1,0 +1,83 @@
+{
+  "manifestVersion": "1.0",
+  "id": "community.network.wifi-overview",
+  "name": "Wi-Fi Overview Tile",
+  "description": "A declarative status tile for the UPLINK workspace.",
+  "version": "1.0.0",
+  "kind": "declarative",
+  "publisher": {
+    "id": "community-example",
+    "displayName": "Community Example",
+    "homepage": "https://example.invalid"
+  },
+  "license": "MIT",
+  "compatibility": {
+    "minimumVoidDeskVersion": "10.5.4",
+    "minimumUiApi": "1.0",
+    "engines": [
+      "pygame",
+      "love"
+    ],
+    "platforms": [
+      "muos"
+    ],
+    "deviceFamilies": [
+      "h700"
+    ],
+    "architectures": [
+      "aarch64"
+    ]
+  },
+  "contributions": [
+    {
+      "id": "wifi-overview.tile",
+      "slot": "dashboard.widget",
+      "componentType": "widget.status-card",
+      "workspaceId": "uplink",
+      "sectionId": "uplink.local-network",
+      "label": "Wi-Fi Status",
+      "description": "Shows the host-provided Wi-Fi summary.",
+      "icon": "assets/wifi.svg",
+      "props": {
+        "title": "Wi-Fi",
+        "provider": "network.wifi.summary",
+        "compact": true
+      },
+      "capabilities": [
+        "network.read-status"
+      ],
+      "fallback": "Wi-Fi status is unavailable on this platform."
+    }
+  ],
+  "actions": [],
+  "capabilities": [
+    "network.read-status"
+  ],
+  "permissions": [
+    "read-network-status"
+  ],
+  "dependencies": [],
+  "desktopPackages": [],
+  "settingsSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sizeBytes": 256,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "artifact": {
+    "url": "https://example.invalid/wifi-overview-1.0.0.qmod",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "sizeBytes": 1024
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "community-example-placeholder",
+    "value": "NOT_A_REAL_SIGNATURE"
+  }
+}
