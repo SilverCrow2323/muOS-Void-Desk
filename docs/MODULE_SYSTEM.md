@@ -276,7 +276,7 @@ Rules:
 
 - Package names are validated against a conservative package-name grammar.
 - No `preinst`, `postinst`, arbitrary command, shell fragment or repository override is accepted from a community module.
-- On H700, APT operations are submitted through the Void Desk service job manager and executed only inside the configured Debian/Ubuntu image.
+- On H700, APT operations are submitted through the existing Void Desk service job manager and are executed only inside the configured Debian/Ubuntu image.
 - On PC, host package management is a separate, opt-in package adapter that requires an explicit host authorization/admin prompt and reports the target machine/package database before mutation.
 - The package manager serializes mutations and reports progress, exit code and bounded logs.
 - A missing desktop image is a clear dependency state. Void Desk offers the trusted desktop-image installer rather than attempting APT on muOS.
