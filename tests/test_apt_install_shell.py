@@ -16,7 +16,8 @@ def make_executable(path, body):
 
 
 def make_harness(tmp_path, *, chroot_rc=0, cleanup_rc=0,
-                 mount_fail_at=0, existing_root=False):
+                 mount_fail_at=0, existing_root=False,
+                 unknown_mount_state=False):
     app = tmp_path / "Void Desk"
     data = app / "data"
     bindir = app / "bin"
@@ -81,7 +82,10 @@ exit "$VD_CHROOT_RC"
         "PATH": str(fakebin) + os.pathsep + "/usr/bin:/bin",
         "APP_DIR": str(app),
         "PY3": str(mount_probe),
-        "VD_MOUNT_PROBE_RC": "0" if existing_root else "1",
+        "VD_MOUNT_PROBE_RC": (
+            "2" if unknown_mount_state else
+            ("0" if existing_root else "1")
+        ),
         "VD_CLEANUP_RC": str(cleanup_rc),
         "VD_STALE_CLEANUP_RC": "0",
         "VD_CHROOT_RC": str(chroot_rc),
@@ -164,3 +168,16 @@ def test_apt_install_releases_stale_loop_after_root_mount_failure(tmp_path):
     assert not Path(env["VD_CHROOT_CALL_LOG"]).exists()
     python_calls = Path(env["VD_PY_CALL_LOG"]).read_text()
     assert "cleanup_stale" in python_calls
+
+
+def test_apt_install_aborts_without_chroot_when_root_mount_state_is_unknown(
+        tmp_path):
+    result, _data, _mountpoint, env = run_installer(
+        tmp_path, unknown_mount_state=True
+    )
+
+    assert result.returncode == 1
+    assert not Path(env["VD_CHROOT_CALL_LOG"]).exists()
+    assert "unknown" in result.stderr.lower()
+    python_calls = Path(env["VD_PY_CALL_LOG"]).read_text()
+    assert "cleanup_stale" not in python_calls
