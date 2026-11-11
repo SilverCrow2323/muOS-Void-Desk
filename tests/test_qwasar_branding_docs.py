@@ -43,6 +43,10 @@ def test_pygame_user_facing_copy_uses_qwasar_brand():
     assert '"f_vdupd": "QWASAR Desk Update"' in source
     assert 'self.text("QWASAR DESK"' in source
     assert 'self.text("QWASAR OS -- READY"' in source
+    assert 'bt = "QWASAR DESK"' in source
+    assert 'intro.play(self.surface, pygame.display.flip, "QWASAR DESK"' in source
+    assert 'bt = "Void-DESK"' not in source
+    assert 'intro.play(self.surface, pygame.display.flip, "Void-DESK"' not in source
     assert '"Restart QWASAR Desk"' in source
     assert "riavvia QWASAR Desk" in source
     assert 'VoidDesk hand off and exit' not in source
