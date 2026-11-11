@@ -97,3 +97,8 @@ Both frontends support F12 screenshot capture. PNG images and JSON metadata are 
 - Keep optional external programs behind dependency checks and show clear diagnostics when unavailable.
 
 Before adding a cross-engine feature, decide whether it belongs in both frontends or is intentionally engine-specific. Document that choice and test shared logic where feasible.
+
+
+## Void Desk Studio companion
+
+The browser companion, portable profile format, official-only plugin trust model, and planned device-sync boundary are specified in [Void Desk Studio — Technical Architecture](STUDIO_ARCHITECTURE.md). That document is the source of truth for profile/schema contracts and staged Studio rollout. Studio does not replace the existing handheld launcher or local service, and it does not make the local service internet-facing.
