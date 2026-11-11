@@ -84,4 +84,6 @@ def test_muos_app_handoff_is_validated_by_the_shell_launcher():
     assert "/mnt/sdcard/MUOS/application/*/mux_launch.sh" in launcher
     assert 'APP_REAL" != "$ROOT_REAL/$APP_NAME"' in launcher
     assert 'APP_REAL" = "$APP_DIR"' in launcher
+    assert 'APP_SCRIPT="${APP_SCRIPT%/}/mux_launch.sh"' in launcher
+    assert 'if [ "$RC" -eq 16 ] && [ -f "$MUOS_APP" ]; then' in launcher
 
