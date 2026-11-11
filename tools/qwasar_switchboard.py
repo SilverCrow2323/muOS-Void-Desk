@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import fcntl
 import hashlib
 import json
 import sys
@@ -172,6 +173,37 @@ class QwasarSwitchboard:
                     f"profile binding references unknown action: {binding['actionId']}"
                 )
 
+        # Imported profiles are held to the same safety floor as UI edits.
+        # A crafted .qprofile must not be able to hide recovery or disable
+        # the central shell before the user opens Switchboard.
+        for region_name in ("header", "footer"):
+            if profile["shell"][region_name].get("enabled") is False:
+                raise SwitchboardError(f"protected shell region cannot be disabled: {region_name}")
+        for override in profile.get("workspaceOverrides", []):
+            workspace_id = override["id"]
+            if self._is_protected(workspace_id) and (
+                override.get("enabled") is False or override.get("visible") is False
+            ):
+                raise SwitchboardError(f"protected workspace cannot be disabled or hidden: {workspace_id}")
+            for section in override.get("sections", []):
+                section_id = section["id"]
+                if self._is_protected(section_id) and (
+                    section.get("enabled") is False or section.get("visible") is False
+                ):
+                    raise SwitchboardError(f"protected section cannot be disabled or hidden: {section_id}")
+                for contribution in section.get("contributions", []):
+                    contribution_id = contribution["contributionId"]
+                    if self._is_protected(contribution_id) and contribution["state"] != "enabled":
+                        raise SwitchboardError(f"protected contribution cannot be disabled or hidden: {contribution_id}")
+            for contribution in override.get("contributions", []):
+                contribution_id = contribution["contributionId"]
+                if self._is_protected(contribution_id) and contribution["state"] != "enabled":
+                    raise SwitchboardError(f"protected contribution cannot be disabled or hidden: {contribution_id}")
+        for contribution in profile.get("contributionStates", []):
+            contribution_id = contribution["contributionId"]
+            if self._is_protected(contribution_id) and contribution["state"] != "enabled":
+                raise SwitchboardError(f"protected contribution cannot be disabled or hidden: {contribution_id}")
+
         for key, id_key in (
             ("moduleStates", "moduleId"),
             ("contributionStates", "contributionId"),
@@ -193,8 +225,14 @@ class QwasarSwitchboard:
                 return item
         raise SwitchboardError(f"unknown workspace: {workspace_id}")
 
+    def _is_protected(self, item_id: str) -> bool:
+        return any(
+            item_id == protected or item_id.startswith(protected + ".")
+            for protected in self.protected_areas
+        )
+
     def _ensure_changeable(self, item_id: str, operation: str) -> None:
-        if operation in {"disabled", "hidden"} and item_id in self.protected_areas:
+        if operation in {"disabled", "hidden"} and self._is_protected(item_id):
             raise SwitchboardError(
                 f"{item_id} is protected and cannot be {operation}"
             )
@@ -400,19 +438,28 @@ class QwasarSwitchboard:
     def save(self) -> Path:
         """Validate and atomically persist; reject lost updates from another editor."""
         self._validate_profile(self.profile)
-        current = _digest(self.profile_path)
-        if current != self._loaded_digest:
-            raise ConcurrentProfileUpdate(
-                f"profile changed on disk since load; reload before saving: {self.profile_path}"
-            )
         serialized = json.dumps(
             self.profile, ensure_ascii=False, indent=2, sort_keys=False
         ) + "\n"
+        lock_path = Path(str(self.profile_path) + ".lock")
         try:
-            atomic_write_text(str(self.profile_path), serialized, backup=True)
+            # A stable sibling lock survives the atomic replacement of the
+            # profile inode, so concurrent Switchboard processes serialize.
+            with lock_path.open("a+", encoding="utf-8") as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                current = _digest(self.profile_path)
+                if current != self._loaded_digest:
+                    raise ConcurrentProfileUpdate(
+                        "profile changed on disk since load; reload before saving: "
+                        f"{self.profile_path}"
+                    )
+                atomic_write_text(str(self.profile_path), serialized, backup=True)
+                self._loaded_digest = _digest(self.profile_path)
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        except ConcurrentProfileUpdate:
+            raise
         except OSError as exc:
             raise SwitchboardError(f"cannot save profile {self.profile_path}: {exc}") from exc
-        self._loaded_digest = _digest(self.profile_path)
         return self.profile_path
 
 
