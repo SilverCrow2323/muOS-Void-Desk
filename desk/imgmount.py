@@ -44,11 +44,9 @@ def _normal_path(path):
 
 
 def mounts():
-    try:
-        with open("/proc/mounts") as stream:
-            return stream.read().splitlines()
-    except OSError:
-        return []
+    """Read the mount table or raise; unreadable state is never 'unmounted'."""
+    with open("/proc/mounts") as stream:
+        return stream.read().splitlines()
 
 
 def is_mounted(path):
@@ -86,9 +84,12 @@ def submounts(root):
 
 
 def loop_of(img):
-    """Return the loop device whose backing file exactly matches img."""
+    """Return the exact backing loop, raising if losetup state is unavailable."""
     target = _normal_path(img)
-    output = _run(["losetup", "-a"]).stdout
+    result = _run(["losetup", "-a"])
+    if result.returncode != 0:
+        raise OSError(result.stderr or "losetup -a failed")
+    output = result.stdout
     for line in output.splitlines():
         device, separator, details = line.partition(":")
         if not separator or not device.strip().startswith("/dev/loop"):
@@ -112,7 +113,7 @@ def loop_is_mounted(device):
     return False
 
 
-def umount_tree(mnt, img=None):
+def _umount_tree_impl(mnt, img=None):
     """Unmount a mount tree and verify that no mount or loop remains.
 
     A lazy unmount is only a fallback attempt, not proof of cleanup. The
@@ -142,13 +143,23 @@ def umount_tree(mnt, img=None):
     return not submounts(mnt) and not is_mounted(mnt)
 
 
+def umount_tree(mnt, img=None):
+    """Return False when cleanup cannot be verified, including I/O errors."""
+    try:
+        return _umount_tree_impl(mnt, img)
+    except OSError:
+        return False
+
+
 def free_loop():
     r = _run(["losetup", "-f"])
+    if r.returncode != 0:
+        raise OSError(r.stderr or "losetup -f failed")
     dev = r.stdout.strip()
     return dev if dev.startswith("/dev/loop") else None
 
 
-def mount_img(img, mnt, ro=False):
+def _mount_img_impl(img, mnt, ro=False):
     """Monta l'immagine. Ritorna (ok, messaggio_errore).
 
     Nota importante: dopo un'installazione il journal ext4 puo' essere
@@ -251,14 +262,25 @@ def mount_img(img, mnt, ro=False):
     return False, err
 
 
+def mount_img(img, mnt, ro=False):
+    """Mount an image, failing closed when mount/loop state cannot be read."""
+    try:
+        return _mount_img_impl(img, mnt, ro)
+    except OSError as exc:
+        return False, "impossibile verificare lo stato mount/loop: %s" % exc
+
+
 def loop_count():
     out = _run(["losetup", "-a"]).stdout
     return len([l for l in out.splitlines() if l.strip()])
 
 
 def cleanup_stale(img):
-    """Libera i loop rimasti attaccati all'immagine ma non montati."""
-    dev = loop_of(img)
-    if dev and not loop_is_mounted(dev):
-        return _call(["losetup", "-d", dev]) == 0
+    """Release an unmounted stale loop; return False if state cannot be read."""
+    try:
+        dev = loop_of(img)
+        if dev and not loop_is_mounted(dev):
+            return _call(["losetup", "-d", dev]) == 0
+    except OSError:
+        return False
     return False
