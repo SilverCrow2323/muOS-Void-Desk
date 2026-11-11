@@ -42,7 +42,7 @@ def make_harness(tmp_path, *, chroot_rc=0, cleanup_rc=0,
 printf '%s\\n' "$2" >> "$VD_PY_CALL_LOG"
 case "$2" in
     *umount_tree*) exit "$VD_CLEANUP_RC" ;;
-    *cleanup_stale*) exit "\${VD_STALE_CLEANUP_RC:-0}" ;;
+    *cleanup_stale*) exit "${VD_STALE_CLEANUP_RC:-0}" ;;
 esac
 case "$VD_MOUNT_PROBE_RC" in
     0) printf 'mounted\\n' ;;
