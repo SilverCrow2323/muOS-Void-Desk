@@ -15,7 +15,8 @@ MNT="$DATA/xfce_mnt"
 LOG="$DATA/xterm.log"
 CMD="$1"
 
-MNTED() { grep -q " $1 " /proc/mounts 2>/dev/null; }
+. "$APP_DIR/bin/vd_mount_common.sh"
+MNTED() { vd_mount_present "$APP_DIR" "$1"; }
 
 if [ ! -f "$DATA/.xfce_ready" ] || [ ! -f "$IMG" ]; then
 	echo "$(date) base XFCE non pronta: niente terminale vero senza di essa" >>"$LOG"
