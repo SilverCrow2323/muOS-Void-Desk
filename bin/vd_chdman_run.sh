@@ -82,7 +82,7 @@ UNMOUNT_OWNED() {
 	fi
 }
 
-ABORT_SETUP {
+ABORT_SETUP() {
 	echo "$(date) preparazione mount fallita; chdman annullato" >>"$LOG"
 	echo "1" >"$DONE"
 	if [ "$WE_MOUNTED" = 1 ]; then
