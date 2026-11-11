@@ -40,3 +40,12 @@ CI additionally validates selected Ruff diagnostics, shell scripts and Lua files
 - Write configuration atomically where possible.
 - Preserve the last known-good runtime if bootstrap fails.
 - Document device-only features as device-only; do not imply PC or non-muOS support without testing.
+
+
+## Issue triage and pull request workflow
+
+- Use the structured issue forms for defects, feature proposals and device-specific validation.
+- Follow [Issue Triage](docs/ISSUE_TRIAGE.md) for the repository's label dimensions and priority definitions.
+- Work on a topic branch and open a pull request against `main`; do not push routine development changes directly to `main`.
+- A green CI run is necessary but does not replace physical handheld validation. Mark device-only checks explicitly in the PR and keep hardware-dependent issues open until evidence is available.
+- Resolve review conversations and include concise test evidence before requesting integration.
