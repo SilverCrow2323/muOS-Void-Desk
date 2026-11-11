@@ -998,16 +998,15 @@ def _media_resolve(candidate):
     for configured_root in MEDIA_ROOTS:
         try:
             root = configured_root.resolve(strict=True)
-            target = raw.resolve(strict=True)
-            target.relative_to(root)
+            relative = raw.relative_to(root)
             current = root
-            safe = True
-            for part in target.relative_to(root).parts:
+            for part in relative.parts:
                 current = current / part
                 if current.is_symlink():
-                    safe = False
-                    break
-            if safe and target.exists():
+                    raise ValueError("symlink paths are not allowed")
+            target = raw.resolve(strict=True)
+            target.relative_to(root)
+            if target.exists():
                 return target
         except (OSError, ValueError, RuntimeError):
             continue
