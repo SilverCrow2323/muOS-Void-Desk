@@ -74,7 +74,7 @@ def test_registry_rejects_second_management_listener_on_same_host():
 
     errors = registry.validate_registry(data)
 
-    assert any("second externally reachable management listener" in e for e in errors)
+    assert any("exceeds the externally reachable management-listener limit on handheld" in e for e in errors)
 
 
 def test_registry_rejects_unauthenticated_wildcard_listener():
