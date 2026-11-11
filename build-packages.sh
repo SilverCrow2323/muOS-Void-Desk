@@ -87,7 +87,8 @@ fi
 
 # build_pc.py snapshots HEAD with git archive. Refuse a dirty checkout so the
 # .muxapp and .deb cannot silently contain different source revisions.
-if [[ -n "$(git -C "$ROOT" status --porcelain --untracked-files=normal)" ]]; then
+WORKTREE_STATUS="$(git -C "$ROOT" status --porcelain --untracked-files=normal | awk '$0 != "?? build-packages.sh"')"
+if [[ -n "$WORKTREE_STATUS" ]]; then
     git -C "$ROOT" status --short >&2
     die "working tree is not clean; commit or stash changes before packaging"
 fi
@@ -154,7 +155,8 @@ rm -f -- \
     "$APP_DEST/lib/love" \
     "$APP_DEST/lib/libluajit-5.1.so.2" \
     "$APP_DEST/assets/xfce.img.gz" \
-    "$APP_DEST/launch-pc.sh"
+    "$APP_DEST/launch-pc.sh" \
+    "$APP_DEST/build-packages.sh"
 
 install -m 0644 "$PC_SOURCE/resources/voiddesk.png" \
     "$DEB_ROOT/usr/share/pixmaps/voiddesk.png"
