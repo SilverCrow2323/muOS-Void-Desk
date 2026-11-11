@@ -6,6 +6,7 @@ Runs on both muOS (aarch64) and desktop x86_64.
 """
 import errno
 import fcntl
+import ipaddress
 import json
 import os
 import platform
@@ -348,6 +349,14 @@ def _radio_clean_station(item):
             return None
         if parsed.hostname.lower() in ("localhost", "localhost.localdomain"):
             return None
+        if parsed.port is not None and not (1 <= parsed.port <= 65535):
+            return None
+        try:
+            address = ipaddress.ip_address(parsed.hostname)
+            if not address.is_global:
+                return None
+        except ValueError:
+            pass
     except ValueError:
         return None
     try:
@@ -474,8 +483,13 @@ def h_radio_play(args):
     player = _radio_player()
     if player is None:
         return {"ok": False, "error": "MPV controller is unavailable"}
-    ok, error = player.start(station["url"])
+    try:
+        ok, error = player.start(station["url"])
+    except Exception as exc:
+        player.stop()
+        return {"ok": False, "error": "MPV launch failed: " + str(exc)[:120]}
     if not ok:
+        player.stop()
         return {"ok": False, "error": str(error or "stream could not be started")[:140]}
     return {"ok": True, "playing": station["name"], "stationuuid": station_id}
 
