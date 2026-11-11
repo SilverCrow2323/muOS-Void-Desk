@@ -1207,7 +1207,8 @@
           "id": "media.library",
           "kind": "route",
           "label": "Media Library",
-          "actionId": "route.media.library"
+          "actionId": "route.media.library",
+          "description": "Browse and play supported local audio/video files from validated SD/data roots."
         }
       ],
       "capabilities": [
@@ -1667,8 +1668,8 @@
     {
       "id": "route.media.library",
       "kind": "route",
-      "target": "hub_media_library",
-      "status": "planned"
+      "target": "media_library",
+      "status": "implemented"
     },
     {
       "id": "route.toolbox.diagnostics",
