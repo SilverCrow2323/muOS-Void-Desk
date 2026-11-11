@@ -108,11 +108,15 @@ A module may declare one or more supported contributions:
 
 | Slot | Purpose | Example |
 |---|---|---|
-| `nexus.node` | A visible top-level NEXUS destination | MEDIA VAULT |
-| `workspace.section` | A category within a workspace | Developer Tools |
-| `hub.panel` | A panel or page inside a stable hub | Tailscale status |
-| `menu.tile` | A selectable tool/action tile | Calculator |
-| `dashboard.widget` | A bounded status/graph widget | Battery and storage |
+| nexus.node | A visible top-level NEXUS destination | MEDIA VAULT |
+| workspace.section | A category within a workspace | RT:TOOLBOX / Files & Storage |
+| shell.header.* / shell.footer.* | A composable global header/footer slot | Battery, profile and controller hints |
+| home.left / home.right | A panel on either side of the NEXUS home | Favourites and telemetry |
+| overlay.media | The global media panel opened with M | Shared now-playing controls |
+| hub.panel | A panel or page inside a stable hub | Tailscale status |
+| menu.tile | A selectable tool/action tile | Calculator |
+| dashboard.widget | A bounded status/graph widget | Battery and storage |
+| session.target | A standalone desktop/terminal/PC/VM target | XFCE or terminal session |
 | `service.provider` | A typed capability implementation registered by the host | Media status provider |
 | `desktop.launcher` | A launcher for an installed XFCE application | Browser |
 | `theme.pack` | Palette, typography and visual assets | Manga Ink |
@@ -302,7 +306,7 @@ Permissions are granted per module and can be revoked. Destructive actions requi
 
 ## 7. APT and desktop integration contract
 
-Void Desk owns the user experience; the Debian/Ubuntu XFCE image owns the desktop package database.
+Void Desk owns the user experience; each platform package adapter owns its package database. On H700, APT operates only inside the optional Debian/Ubuntu desktop image. On a supported Linux PC, a separate host-APT adapter may operate on the PC host only after explicit user authorization. APT is never run against the muOS Buildroot host.
 
 A module may declare a package set:
 
@@ -324,9 +328,11 @@ Rules:
 
 - Package names are validated against a conservative package-name grammar.
 - No `preinst`, `postinst`, arbitrary command, shell fragment or repository override is accepted from a community module.
-- APT operations are submitted through the existing Void Desk service job manager and executed only inside the configured Debian/Ubuntu image.
+- On H700, APT operations are submitted through the Void Desk service job manager and executed only inside the configured Debian/Ubuntu image.
+- On PC, host package management is a separate, opt-in package adapter that requires an explicit host authorization/admin prompt and reports the target machine/package database before mutation.
 - The package manager serializes mutations and reports progress, exit code and bounded logs.
 - A missing desktop image is a clear dependency state. Void Desk offers the trusted desktop-image installer rather than attempting APT on muOS.
+- Package management is never exposed as an arbitrary shell command to third-party modules.
 - A desktop launcher is registered only after the application is confirmed installed.
 - Removing a module does not automatically purge APT packages that may be shared with other modules. Show an orphan/dependency report and require explicit confirmation.
 - The optional XFCE root filesystem is distributed/provisioned separately from the core `.muxapp` to avoid forcing every handheld user to download a multi-gigabyte desktop image. Full flavour includes all desktop integration modules and the installer, not necessarily the desktop image bytes.
@@ -537,4 +543,36 @@ The Studio URL is not yet deployed, so do not put a fake URL in release notes. W
 - Full/Essential/Slim are reproducible variants of one source revision and one API contract.
 - A green screenshot capture is not proof that a module action or device operation works.
 - QWASAR Studio is one web app; Module Forge, Layout Designer, Release Composer and Community Library are workbenches, not four separate products.
+
+
+
+## 15. QWASAR UI composition and engine adapters
+
+The canonical interface contract is documented in [QWASAR GUI System](QWASAR_GUI_SYSTEM.md) and versioned by schemas/qwasar-ui.schema.json with the default data/qwasar_ui_manifest.json.
+
+Pygame and LÖVE are the first rendering adapters. Qt 6, LVGL and Web are reserved future adapters. The engine adapter owns rendering and input translation only; business logic, menu definitions, widget data providers and privileged commands remain engine-neutral.
+
+The shell is composable: header, footer, NEXUS side panels and global overlays are declared regions/slots, not engine-specific screens. The M shortcut is a semantic action that opens the shared media overlay without changing the current workspace.
+
+A workspace selects a visual template. START SESSION is a session selector; THE FORGE is the package workbench; UPLINK is the network/online console; MEDIA VAULT is the media workbench; RT:TOOLBOX is a four-category tool workbench; SETTINGS is a schema-backed settings editor; INFO/COMMUNITY is a reference library; END NODE is the safe exit surface.
+
+## 16. Tool inventory, verification and activation
+
+The four RT:TOOLBOX categories are:
+
+1. **Everyday Tools** — calculator, clock/timer, calendar, notes, text editor and quick utilities.
+2. **Files & Storage** — file manager, File-GD X, archives, checksums, backup/restore and storage analysis.
+3. **System & Diagnostics** — Void Diag, Void Monitor, service health, logs, cleanup and safe repair.
+4. **Developer & Terminal** — bounded shell, Python console, builders, manifest tools and developer utilities.
+
+THE FORGE installs, updates and removes packages, Void Desk builds, modules and runtimes. RT:TOOLBOX lists, launches, arranges and monitors the tools already installed. Disabling a tool or section does not uninstall its package.
+
+Two host-owned utilities are required:
+
+- **QWASAR Inspector:** read-only structure verification for schemas, manifests, component IDs, module files, menu/action/route/provider resolution, dependencies, engine/platform compatibility, permissions, assets, and package integrity. It produces a report and repair suggestions; no automatic destructive repair.
+- **QWASAR Switchboard:** activate/deactivate modules, workspaces, sections, widgets, menu entries and global panels in the user profile. It previews the change, validates required dependencies, writes atomically and offers rollback to the last valid profile.
+
+The state model distinguishes installed, enabled, visible, available, running, unavailable, incompatible and error. A profile may hide a contribution without disabling its provider. A disabled module must stop providers/jobs owned only by that module; shared dependencies remain active while still referenced. Core shell, launch selector and recovery surfaces are protected from user disablement.
+
+The future CLI may expose read-only verification and profile-level controls, such as “voiddesk verify --all”, “voiddesk doctor” and “voiddesk feature enable/disable stable-id”. These are design targets, not existing command contracts until implemented and tested.
 
