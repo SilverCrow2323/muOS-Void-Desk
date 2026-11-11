@@ -5,14 +5,14 @@ local nodes     = require("core.nodes")
 local widgets   = require("core.widgets")
 local ext       = require("core.external")
 
-local state = { volume = 0, library_count = 0, recordings = 0 }
+local state = { volume = 0, root_count = 0, now_playing = nil }
 
 local function refresh(scene, silent)
     bridge.call("media_status", {}, function(resp)
         if resp.ok and resp.media then
             state.volume = resp.media.volume or 0
-            state.library_count = resp.media.library_count or 0
-            state.recordings = resp.media.recordings or 0
+            state.root_count = resp.media.root_count or 0
+            state.now_playing = resp.media.now_playing
             if not silent then scene.set_status("Ready") end
         end
     end)
@@ -36,11 +36,11 @@ return dashboard.new({
         local nc = nodes.color_for(2)
         widgets.stat_bar(12, 72, W - 24, 20, "Volume",
                          string.format("%d%%", state.volume), state.volume, nc, alpha)
-        widgets.info_row(20, 110, W-40, "Library",
-                         string.format("%d files", state.library_count), nc, alpha)
-        widgets.info_row(20, 130, W-40, "Recordings",
-                         string.format("%d files", state.recordings),
-                         {0.4,0.85,0.5}, alpha)
+        widgets.info_row(20, 110, W-40, "Storage",
+                         string.format("%d locations", state.root_count), nc, alpha)
+        widgets.info_row(20, 130, W-40, "Player",
+                         state.now_playing or "Idle",
+                         state.now_playing and {0.4,0.9,0.5} or {0.55,0.60,0.65}, alpha)
     end,
 
     items = {
