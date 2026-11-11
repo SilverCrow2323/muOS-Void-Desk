@@ -76,8 +76,8 @@ def build_archive(output: str | Path, version: str) -> Path:
                         continue
                     if member.issym() or member.islnk() or not (member.isfile() or member.isdir()):
                         raise RuntimeError("unsupported archive member: " + member.name)
-                    member.name = "VoidDesk-PC/" + member.name
                     stream = source.extractfile(member) if member.isfile() else None
+                    member.name = "VoidDesk-PC/" + member.name
                     dest.addfile(member, stream)
                 data_dir = tarfile.TarInfo("VoidDesk-PC/data/")
                 data_dir.type = tarfile.DIRTYPE
@@ -95,7 +95,9 @@ def build_archive(output: str | Path, version: str) -> Path:
                 launch_info.mode = 0o755
                 dest.addfile(launch_info, io.BytesIO(launch_data))
 
-    digest.update(output.read_bytes())
+    with output.open("rb") as package:
+        for chunk in iter(lambda: package.read(1024 * 1024), b""):
+            digest.update(chunk)
     checksum = output.with_suffix(output.suffix + ".sha256")
     checksum.write_text(
         digest.hexdigest() + "  " + output.name + "\n", encoding="ascii"
