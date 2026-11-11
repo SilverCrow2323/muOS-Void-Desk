@@ -9,7 +9,7 @@
 
 - Studio is a responsive web app/PWA companion. The handheld remains usable without Studio or internet access.
 - Users can export/import and explicitly share profiles and individual official plugins.
-- Plugin publishing is restricted to official QWASAR Desk maintainers in v1. No public plugin uploads or third-party executable packages.
+- Plugin publishing is restricted to official Void Desk maintainers in v1. No public plugin uploads or third-party executable packages.
 - Profiles are declarative data: menu ordering, labels, descriptions, icons, supported feature toggles, approved plugin settings, and visibility conditions.
 - Profiles cannot contain shell commands, scripts, executable paths, arbitrary launch URLs, credentials, or privileged operations.
 - One engine-neutral profile format is consumed by all frontend adapters.
@@ -24,7 +24,7 @@ Browser / PWA --HTTPS--> Studio API (planned)
      +---- local JSON profile
                 |
                 v
-       QWASAR Desk local service
+       Void Desk local service
                 |
                 +--> validator + migration
                 +--> Configuration Engine
@@ -74,7 +74,7 @@ The classic handheld application is **Void Desk**, the browser companion is **QW
 
 ## Menu and condition model
 
-Menu array order determines presentation order. Stable item IDs are independent of labels. Routes must resolve to entries registered by the installed QWASAR Desk build.
+Menu array order determines presentation order. Stable item IDs are independent of labels. Routes must resolve to entries registered by the installed Void Desk build.
 
 Visibility conditions use a closed vocabulary and are evaluated locally:
 - key_sequence: bounded sequence of known controller keys.
@@ -99,7 +99,7 @@ The manifest schema is not proof that signing/distribution already exists. Key m
 
 Profiles are engine-neutral. Each frontend adapter advertises supported routes, controls and capabilities. Pygame is the primary current frontend; LÖVE exists but is not feature-equivalent. Qt 6 and LVGL remain future adapters until implemented and tested.
 
-Runtime version management is separate from profile management. Profiles may declare a minimum QWASAR Desk version and preferred engine, but cannot install or switch binaries. Multi-version installation, boot selection, update channels and rollback belong to a separate package/boot manager.
+Runtime version management is separate from profile management. Profiles may declare a minimum Void Desk version and preferred engine, but cannot install or switch binaries. Multi-version installation, boot selection, update channels and rollback belong to a separate package/boot manager.
 
 ## Planned API contract (not deployed)
 
