@@ -315,7 +315,7 @@ No UI manifest, profile or community module may inject shell strings, executable
 | Default Void Desk composition | `data/qwasar_ui_manifest.json` |
 | User arrangement/preferences | schemas/qwasar-profile.schema.json and .qprofile data |
 | Tool inventory | `data/tool_catalog.json` |
-| Module identity/capability declarations | QWASAR module manifest schema (target); legacy plugin schema retained during migration |
+| Module identity/capability declarations | schemas/qwasar-module.schema.json; legacy voiddesk-plugin schema retained during migration |
 | Runtime route/service implementations | registered frontend scenes and service handler catalogue |
 | Native rendering | Pygame/LÖVE/other engine adapter |
 
