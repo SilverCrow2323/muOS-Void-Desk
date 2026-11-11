@@ -1,4 +1,4 @@
-# Troubleshooting
+# QWASAR Desk — Troubleshooting
 
 ## Black screen or immediate exit
 
