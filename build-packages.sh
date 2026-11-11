@@ -73,7 +73,7 @@ python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1
 [[ -f "$ROOT/tools/validate_muxapp.py" ]] || die "tools/validate_muxapp.py is missing"
 
 if [[ -z "$VERSION" ]]; then
-    VERSION="$(sed -nE 's/^VOIDDESK NEXUS v([0-9][A-Za-z0-9.+~_-]*).*/\1/p' "$ROOT/voiddesk.py" | head -n 1)"
+    VERSION="$(sed -nE 's/.*VOIDDESK NEXUS v([0-9][A-Za-z0-9.+~_-]*).*/\1/p' "$ROOT/voiddesk.py" | head -n 1)"
 fi
 [[ -n "$VERSION" ]] || die "cannot detect the version from voiddesk.py; pass --version"
 [[ "$VERSION" =~ ^[0-9][A-Za-z0-9.+~_-]{0,39}$ ]] \
