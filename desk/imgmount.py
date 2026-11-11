@@ -157,6 +157,8 @@ def mount_img(img, mnt, ro=False):
     # 1) loop esplicito (riuso quello gia' associato, se c'e')
     dev = loop_of(img)
     detach = False
+    if dev and loop_is_mounted(dev):
+        return False, "immagine gia' montata tramite %s; chiudere la sessione esistente" % dev
     if dev is None:
         dev = free_loop()
         if dev:
@@ -192,6 +194,5 @@ def cleanup_stale(img):
     """Libera i loop rimasti attaccati all'immagine ma non montati."""
     dev = loop_of(img)
     if dev and not loop_is_mounted(dev):
-        _call(["losetup", "-d", dev])
-        return True
+        return _call(["losetup", "-d", dev]) == 0
     return False
