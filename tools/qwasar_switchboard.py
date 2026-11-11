@@ -46,6 +46,14 @@ class ConcurrentProfileUpdate(SwitchboardError):
     """The profile changed on disk after this Switchboard instance loaded it."""
 
 
+def _menu_ids(entries: list[dict[str, Any]]) -> set[str]:
+    found: set[str] = set()
+    for entry in entries:
+        found.add(entry["id"])
+        found.update(_menu_ids(entry.get("children", [])))
+    return found
+
+
 def _read_json(path: Path, label: str) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -206,7 +214,17 @@ class QwasarSwitchboard:
                 item["id"]
                 for item in workspace_map[workspace_id].get("sections", [])
             }
+            base_workspace = workspace_map[workspace_id]
+            workspace_menu = base_workspace.get("menu", [])
+            workspace_menu_ids = {item["id"] for item in workspace_menu}
+            workspace_menu_all_ids = _menu_ids(workspace_menu)
+            if not set(override.get("menuOrder", [])) <= workspace_menu_ids:
+                raise SwitchboardError(f"profile menuOrder references unknown workspace menu entry in {workspace_id}")
+            if not set(override.get("hiddenMenuEntries", [])) <= workspace_menu_all_ids:
+                raise SwitchboardError(f"profile hiddenMenuEntries references unknown workspace menu entry in {workspace_id}")
+
             seen_sections: set[str] = set()
+            base_sections = {item["id"]: item for item in base_workspace.get("sections", [])}
             for section in override.get("sections", []):
                 section_id = section["id"]
                 if section_id not in known_sections:
@@ -218,6 +236,13 @@ class QwasarSwitchboard:
                         f"profile has duplicate section override {section_id} in {workspace_id}"
                     )
                 seen_sections.add(section_id)
+                base_menu = base_sections[section_id].get("menu", [])
+                direct_ids = {item["id"] for item in base_menu}
+                all_ids = _menu_ids(base_menu)
+                if not set(section.get("menuOrder", [])) <= direct_ids:
+                    raise SwitchboardError(f"profile menuOrder references unknown entry in section {section_id}")
+                if not set(section.get("hiddenMenuEntries", [])) <= all_ids:
+                    raise SwitchboardError(f"profile hiddenMenuEntries references unknown entry in section {section_id}")
 
         for binding in profile.get("bindings", []):
             if binding["actionId"] not in known_actions:
@@ -378,6 +403,97 @@ class QwasarSwitchboard:
 
         return self._edit(mutate)
 
+    def _menu_scope(
+        self, workspace_id: str, section_id: str | None = None
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+        workspace = self._workspace(workspace_id)
+        if section_id is None:
+            return workspace.get("menu", []), None
+        section = next(
+            (item for item in workspace.get("sections", []) if item["id"] == section_id),
+            None,
+        )
+        if section is None:
+            raise SwitchboardError(
+                f"unknown section {section_id} in workspace {workspace_id}"
+            )
+        return section.get("menu", []), {"sectionId": section_id}
+
+    @staticmethod
+    def _find_menu_entry(
+        entries: list[dict[str, Any]], entry_id: str
+    ) -> dict[str, Any] | None:
+        for entry in entries:
+            if entry["id"] == entry_id:
+                return entry
+            found = QwasarSwitchboard._find_menu_entry(
+                entry.get("children", []), entry_id
+            )
+            if found is not None:
+                return found
+        return None
+
+    def set_menu_entry_visibility(
+        self,
+        workspace_id: str,
+        entry_id: str,
+        visible: bool,
+        section_id: str | None = None,
+    ) -> dict[str, Any]:
+        entries, _ = self._menu_scope(workspace_id, section_id)
+        entry = self._find_menu_entry(entries, entry_id)
+        if entry is None:
+            raise SwitchboardError(f"unknown menu entry {entry_id} in {workspace_id}")
+        if not isinstance(visible, bool):
+            raise SwitchboardError("menu visibility must be a boolean")
+        if not visible:
+            self._ensure_changeable(workspace_id, "hidden")
+            self._ensure_changeable(entry_id, "hidden")
+            if entry.get("actionId"):
+                self._ensure_changeable(entry["actionId"], "hidden")
+
+        def mutate(profile: dict[str, Any]) -> None:
+            if section_id is None:
+                override = self._workspace_override(profile, workspace_id)
+            else:
+                override = self._section_override(profile, workspace_id, section_id)
+            hidden = override.setdefault("hiddenMenuEntries", [])
+            if visible and entry_id in hidden:
+                hidden.remove(entry_id)
+            elif not visible and entry_id not in hidden:
+                hidden.append(entry_id)
+
+        return self._edit(mutate)
+
+    def move_menu_entry(
+        self,
+        workspace_id: str,
+        entry_id: str,
+        new_index: int,
+        section_id: str | None = None,
+    ) -> dict[str, Any]:
+        entries, _ = self._menu_scope(workspace_id, section_id)
+        entry_ids = [item["id"] for item in entries]
+        if entry_id not in entry_ids:
+            raise SwitchboardError(
+                f"only registered top-level menu entries can be reordered: {entry_id}"
+            )
+        if not isinstance(new_index, int) or isinstance(new_index, bool):
+            raise SwitchboardError("menu order index must be an integer")
+        if not 0 <= new_index < len(entry_ids):
+            raise SwitchboardError(f"menu order index must be 0..{len(entry_ids) - 1}")
+        entry_ids.remove(entry_id)
+        entry_ids.insert(new_index, entry_id)
+
+        def mutate(profile: dict[str, Any]) -> None:
+            if section_id is None:
+                override = self._workspace_override(profile, workspace_id)
+            else:
+                override = self._section_override(profile, workspace_id, section_id)
+            override["menuOrder"] = entry_ids
+
+        return self._edit(mutate)
+
     def set_global_panel_enabled(
         self, panel_id: str, enabled: bool
     ) -> dict[str, Any]:
@@ -437,6 +553,35 @@ class QwasarSwitchboard:
         defaults = _read_json(self._resolve(default_profile_path), "default QWASAR profile")
         return self._edit(lambda profile: (profile.clear(), profile.update(copy.deepcopy(defaults))))
 
+    @staticmethod
+    def _preview_menu(
+        entries: list[dict[str, Any]], override: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        order = override.get("menuOrder", [])
+        rank = {entry_id: index for index, entry_id in enumerate(order)}
+        hidden = set(override.get("hiddenMenuEntries", []))
+        indexed = list(enumerate(entries))
+        indexed.sort(
+            key=lambda pair: (
+                rank.get(pair[1]["id"], len(rank) + pair[0]),
+                pair[0],
+            )
+        )
+        return [
+            {
+                "id": entry["id"],
+                "label": entry["label"],
+                "kind": entry["kind"],
+                "actionId": entry.get("actionId"),
+                "enabled": entry.get("enabled", True),
+                "visible": entry["id"] not in hidden,
+                "children": QwasarSwitchboard._preview_menu(
+                    entry.get("children", []), override
+                ),
+            }
+            for _, entry in indexed
+        ]
+
     def preview(self) -> dict[str, Any]:
         profile = self.profile
         workspace_order = self._complete_workspace_order()
@@ -459,6 +604,7 @@ class QwasarSwitchboard:
                     "enabled": change.get("enabled", True),
                     "visible": change.get("visible", True),
                     "order": change.get("order", section_index),
+                    "menu": self._preview_menu(section.get("menu", []), change),
                 })
             sections.sort(key=lambda item: (item["order"], item["id"]))
             workspaces.append({
@@ -467,6 +613,7 @@ class QwasarSwitchboard:
                 "enabled": override.get("enabled", True),
                 "visible": override.get("visible", True),
                 "order": index,
+                "menu": self._preview_menu(base.get("menu", []), override),
                 "sections": sections,
             })
         global_panels = {}
