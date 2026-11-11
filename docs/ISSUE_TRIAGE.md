@@ -77,11 +77,17 @@ Do not use a status label as a substitute for closing a resolved issue.
 - Suggested additions: `[Area] Browser`, `[Priority] P2 Normal`, `[Status] Needs Info`.
 - Reason: the report only says “output input error”; browser identity, launch path and logs are still missing.
 
-### #2 — RG35XXSP: Bluetooth stutter and incomplete power-off
+### #2 — RG35XXSP: power-off leaves device running after LED extinguishes
 
 - Existing labels: `[Type] Bug`, `[Scope] muOS`.
-- Suggested additions: `[Area] Bluetooth`, `[Area] Power Management`, `[Priority] P1 High`, `[Status] Needs Hardware Test`.
-- Reason: the Bluetooth responsiveness fix and shutdown hand-off have been merged, but the reporter's RG35XXSP still needs a physical cold-boot, input-responsiveness and full power-off check.
+- Suggested additions: `[Area] Power Management`, `[Priority] P1 High`, `[Status] Needs Hardware Test`.
+- Reason: the shutdown hand-off has been merged, but the reporter's RG35XXSP still needs a physical full power-off check.
+
+### #42 — RG35XXSP: verify Bluetooth responsiveness after background-probe fix
+
+- Existing labels: `[Type] Bug`, `[Scope] muOS`.
+- Suggested additions: `[Area] Bluetooth`, `[Priority] P2 Normal`, `[Status] Needs Hardware Test`.
+- Reason: PR #5 moved Bluetooth status probes off the UI path; verify smooth NEXUS animation and D-pad response on the actual RG35XXSP with Bluetooth initially enabled and disabled.
 
 ## Provisioning
 
