@@ -123,6 +123,21 @@ class QwasarSwitchboard:
         self._validate_profile(self.profile)
         self._loaded_digest = _digest(self.profile_path)
 
+    @classmethod
+    def restore_default(
+        cls,
+        root: Path,
+        target_profile_path: str | Path,
+        manifest_path: str = DEFAULT_MANIFEST,
+        default_profile_path: str = DEFAULT_PROFILE,
+    ) -> Path:
+        """Restore from the trusted bundled default, even if the target is corrupt."""
+        switchboard = cls(root, default_profile_path, manifest_path)
+        target = switchboard._resolve(target_profile_path)
+        switchboard.profile_path = target
+        switchboard._loaded_digest = _digest(target) if target.exists() else None
+        return switchboard.save()
+
     def _resolve(self, path: str | Path) -> Path:
         value = Path(path).expanduser()
         return value.resolve() if value.is_absolute() else (self.root / value).resolve()
@@ -477,7 +492,7 @@ class QwasarSwitchboard:
             # profile inode, so concurrent Switchboard processes serialize.
             with lock_path.open("a+", encoding="utf-8") as lock_file:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-                current = _digest(self.profile_path)
+                current = _digest(self.profile_path) if self.profile_path.exists() else None
                 if current != self._loaded_digest:
                     raise ConcurrentProfileUpdate(
                         "profile changed on disk since load; reload before saving: "
@@ -538,6 +553,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     profile_path = args.profile or DEFAULT_PROFILE
     try:
+        if args.command == "reset-profile":
+            saved = QwasarSwitchboard.restore_default(
+                args.root, profile_path, args.manifest
+            )
+            print(f"[QWASAR Switchboard] OK — default profile restored atomically: {saved}")
+            return 0
         switchboard = QwasarSwitchboard(args.root, profile_path, args.manifest)
         if args.command == "preview":
             print(json.dumps(switchboard.preview(), ensure_ascii=False, indent=2))
@@ -556,8 +577,6 @@ def main(argv: list[str] | None = None) -> int:
             switchboard.move_workspace(args.workspace_id, args.index)
         elif args.command == "move-section":
             switchboard.move_section(args.workspace_id, args.section_id, args.index)
-        elif args.command == "reset-profile":
-            switchboard.reset_profile()
         saved = switchboard.save()
         print(f"[QWASAR Switchboard] OK — profile saved atomically: {saved}")
         return 0
