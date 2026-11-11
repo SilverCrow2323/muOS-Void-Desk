@@ -6,6 +6,7 @@ Runs on both muOS (aarch64) and desktop x86_64.
 """
 import errno
 import fcntl
+import ipaddress
 import json
 import os
 import platform
@@ -22,6 +23,7 @@ import termios
 import time
 import traceback
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -72,6 +74,11 @@ try:
     iptv_module.APP_DIR = APP_DIR
 except Exception:
     iptv_module = None
+
+try:
+    from mpvctl import MpvController
+except Exception:
+    MpvController = None
 
 _IPTV_CHANNELS = []
 _IPTV_EPG = {}
@@ -318,6 +325,207 @@ def h_launch_muos_app(args):
         "name": match["name"],
         "note": "Returning to muOS launcher to start " + match["name"],
     }
+
+
+# Void Radio: catalogue, favourites and playback use only station entries
+# returned by Radio Browser; the LÖVE client never supplies a stream URL.
+_RADIO_BROWSER = "https://de1.api.radio-browser.info/json/stations/search"
+_RADIO_STATIONS = {}
+_RADIO_PLAYER = None
+_RADIO_FAVORITES_FILE = DATA / "radio_favorites.json"
+
+
+def _radio_clean_station(item):
+    if not isinstance(item, dict):
+        return None
+    station_id = str(item.get("stationuuid") or "")
+    if not re.fullmatch(r"[0-9a-fA-F-]{36}", station_id):
+        return None
+    stream_url = str(item.get("url_resolved") or item.get("url") or "")
+    try:
+        parsed = urllib.parse.urlsplit(stream_url)
+        if (parsed.scheme not in ("http", "https") or not parsed.hostname
+                or parsed.username or parsed.password):
+            return None
+        if parsed.hostname.lower() in ("localhost", "localhost.localdomain"):
+            return None
+        if parsed.port is not None and not (1 <= parsed.port <= 65535):
+            return None
+        try:
+            address = ipaddress.ip_address(parsed.hostname)
+            if not address.is_global:
+                return None
+        except ValueError:
+            pass
+    except ValueError:
+        return None
+    try:
+        bitrate = max(0, min(100000, int(item.get("bitrate") or 0)))
+    except (TypeError, ValueError):
+        bitrate = 0
+    return {
+        "stationuuid": station_id,
+        "name": str(item.get("name") or "Unknown station").strip()[:100] or "Unknown station",
+        "url": stream_url[:1000],
+        "country": str(item.get("country") or "")[:80],
+        "language": str(item.get("language") or "")[:80],
+        "tags": str(item.get("tags") or "")[:180],
+        "codec": str(item.get("codec") or "")[:24],
+        "bitrate": bitrate,
+        "favicon": str(item.get("favicon") or "")[:300],
+    }
+
+
+def _radio_favorites_load():
+    try:
+        raw = json.loads(_RADIO_FAVORITES_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return []
+    if not isinstance(raw, list):
+        return []
+    stations = []
+    for item in raw[:200]:
+        station = _radio_clean_station(item)
+        if station:
+            stations.append(station)
+    return stations
+
+
+def _radio_favorites_save(items):
+    _RADIO_FAVORITES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = _RADIO_FAVORITES_FILE.with_suffix(".tmp")
+    temporary.write_text(json.dumps(items[:200], ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+    os.replace(temporary, _RADIO_FAVORITES_FILE)
+
+
+def h_radio_search(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "stations": [], "count": 0, "source": "visual capture"}
+    name = str(args.get("name") or "").strip()[:80]
+    country = str(args.get("country") or "").strip()[:80]
+    tag = str(args.get("tag") or "").strip()[:60]
+    try:
+        limit = max(1, min(50, int(args.get("limit", 30))))
+    except (TypeError, ValueError):
+        limit = 30
+    query = {"limit": limit, "hidebroken": "true",
+             "order": "clickcount", "reverse": "true"}
+    if name:
+        query["name"] = name
+    if country:
+        query["country"] = country
+    if tag:
+        query["tag"] = tag
+    url = _RADIO_BROWSER + "?" + urllib.parse.urlencode(query)
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "VoidDesk-Radio/1.0",
+                      "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        return {"ok": False, "error": "Radio Browser unavailable: " + str(exc)[:120]}
+    if not isinstance(payload, list):
+        return {"ok": False, "error": "Radio Browser returned an invalid catalogue"}
+    stations = []
+    for item in payload:
+        station = _radio_clean_station(item)
+        if station:
+            _RADIO_STATIONS[station["stationuuid"]] = station
+            stations.append(station)
+    return {"ok": True, "stations": stations, "count": len(stations),
+            "source": "Radio Browser"}
+
+
+def h_radio_favorites(args):
+    stations = _radio_favorites_load()
+    for station in stations:
+        _RADIO_STATIONS[station["stationuuid"]] = station
+    return {"ok": True, "stations": stations, "count": len(stations)}
+
+
+def h_radio_favorite_toggle(args):
+    station_id = str(args.get("stationuuid") or "")
+    if not re.fullmatch(r"[0-9a-fA-F-]{36}", station_id):
+        return {"ok": False, "error": "invalid station id"}
+    stations = _radio_favorites_load()
+    if any(item["stationuuid"] == station_id for item in stations):
+        stations = [item for item in stations if item["stationuuid"] != station_id]
+        _radio_favorites_save(stations)
+        return {"ok": True, "favorite": False, "count": len(stations)}
+    station = _RADIO_STATIONS.get(station_id)
+    if station is None:
+        return {"ok": False, "error": "station must be loaded from the catalogue first"}
+    stations.append(station)
+    _radio_favorites_save(stations)
+    return {"ok": True, "favorite": True, "count": len(stations)}
+
+
+def _radio_player():
+    global _RADIO_PLAYER
+    if MpvController is None:
+        return None
+    if _RADIO_PLAYER is None:
+        _RADIO_PLAYER = MpvController(
+            sock_path="/tmp/voiddesk_radio_%d.sock" % os.getpid())
+    return _RADIO_PLAYER
+
+
+def h_radio_play(args):
+    station_id = str(args.get("stationuuid") or "")
+    station = _RADIO_STATIONS.get(station_id)
+    if station is None:
+        station = next((item for item in _radio_favorites_load()
+                        if item["stationuuid"] == station_id), None)
+    if station is None:
+        return {"ok": False, "error": "station not found; refresh the catalogue"}
+    player = _radio_player()
+    if player is None:
+        return {"ok": False, "error": "MPV controller is unavailable"}
+    try:
+        ok, error = player.start(station["url"])
+    except Exception as exc:
+        player.stop()
+        return {"ok": False, "error": "MPV launch failed: " + str(exc)[:120]}
+    if not ok:
+        player.stop()
+        return {"ok": False, "error": str(error or "stream could not be started")[:140]}
+    return {"ok": True, "playing": station["name"], "stationuuid": station_id}
+
+
+def h_radio_action(args):
+    action = str(args.get("action") or "")
+    player = _radio_player()
+    if player is None:
+        return {"ok": False, "error": "MPV controller is unavailable"}
+    if action == "stop":
+        player.stop()
+        return {"ok": True, "running": False}
+    if not player.is_running():
+        return {"ok": False, "error": "no radio stream is running"}
+    if action == "toggle_pause":
+        paused = player.toggle_pause()
+        return {"ok": True, "pause": bool(paused)}
+    if action == "volume":
+        try:
+            volume = max(0, min(100, int(args.get("value"))))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "volume must be between 0 and 100"}
+        player.set_volume(volume)
+        return {"ok": True, "volume": volume}
+    return {"ok": False, "error": "unsupported radio action"}
+
+
+def h_radio_status(args):
+    player = _radio_player()
+    if player is None:
+        return {"ok": False, "error": "MPV controller is unavailable"}
+    try:
+        return {"ok": True, "status": player.status()}
+    except Exception as exc:
+        return {"ok": False, "error": "cannot read radio status: " + str(exc)[:100]}
+
 
 # ── system / network / media status ─────────────────────────
 # These were referenced in HANDLERS below but never defined: the whole
@@ -981,6 +1189,125 @@ def h_job_log(args):
     return {"ok": True, "lines": lines}
 
 
+# Local media browser: fixed roots, no caller-supplied root and no symlink traversal.
+MEDIA_ROOTS = (Path("/mnt/mmc"), Path("/mnt/sdcard"))
+MEDIA_AUDIO_EXTS = {".mp3", ".ogg", ".oga", ".opus", ".flac", ".wav", ".m4a", ".aac"}
+MEDIA_VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v"}
+_MEDIA_PLAYER_PROC = None
+_MEDIA_NOW_PLAYING = ""
+
+
+def _media_resolve(candidate):
+    if not isinstance(candidate, str) or not candidate or "\x00" in candidate:
+        return None
+    raw = Path(candidate)
+    if not raw.is_absolute() or ".." in raw.parts:
+        return None
+    for configured_root in MEDIA_ROOTS:
+        try:
+            root = configured_root.resolve(strict=True)
+            relative = raw.relative_to(root)
+            current = root
+            for part in relative.parts:
+                current = current / part
+                if current.is_symlink():
+                    raise ValueError("symlink paths are not allowed")
+            target = raw.resolve(strict=True)
+            target.relative_to(root)
+            if target.exists():
+                return target
+        except (OSError, ValueError, RuntimeError):
+            continue
+    return None
+
+
+def h_media_list(args):
+    requested = args.get("path")
+    if requested in (None, ""):
+        roots = []
+        for configured_root in MEDIA_ROOTS:
+            try:
+                root = configured_root.resolve(strict=True)
+                if root.is_dir():
+                    roots.append({"name": root.name or str(root), "path": str(root),
+                                  "is_dir": True, "size": 0})
+            except OSError:
+                continue
+        return {"ok": True, "path": "", "items": roots, "root": True}
+    directory = _media_resolve(requested)
+    if directory is None or not directory.is_dir():
+        return {"ok": False, "error": "directory is unavailable or outside media roots"}
+    items = []
+    try:
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if entry.is_symlink():
+                    continue
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        items.append({"name": entry.name[:160], "path": entry.path,
+                                      "is_dir": True, "size": 0})
+                    elif entry.is_file(follow_symlinks=False):
+                        suffix = Path(entry.name).suffix.lower()
+                        if suffix in MEDIA_AUDIO_EXTS or suffix in MEDIA_VIDEO_EXTS:
+                            items.append({"name": entry.name[:160], "path": entry.path,
+                                          "is_dir": False, "size": entry.stat(
+                                              follow_symlinks=False).st_size})
+                except OSError:
+                    continue
+    except OSError as exc:
+        return {"ok": False, "error": "cannot read media directory: " + str(exc)[:100]}
+    items.sort(key=lambda item: (not item["is_dir"], item["name"].casefold()))
+    return {"ok": True, "path": str(directory), "items": items[:200], "root": False}
+
+
+def h_media_play(args):
+    global _MEDIA_PLAYER_PROC, _MEDIA_NOW_PLAYING
+    target = _media_resolve(args.get("path"))
+    if target is None or not target.is_file():
+        return {"ok": False, "error": "media file is unavailable or outside media roots"}
+    if target.suffix.lower() not in MEDIA_AUDIO_EXTS | MEDIA_VIDEO_EXTS:
+        return {"ok": False, "error": "unsupported media file type"}
+    player = shutil.which("mpv")
+    if not player:
+        return {"ok": False, "error": "mpv is not installed"}
+    h_media_stop({})
+    try:
+        video = target.suffix.lower() in MEDIA_VIDEO_EXTS
+        player_args = [player, "--no-terminal"]
+        player_args.append("--force-window=yes" if video else "--no-video")
+        player_args.append(str(target))
+        _MEDIA_PLAYER_PROC = subprocess.Popen(
+            player_args, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+        _MEDIA_NOW_PLAYING = target.name
+        return {"ok": True, "playing": _MEDIA_NOW_PLAYING,
+                "pid": _MEDIA_PLAYER_PROC.pid}
+    except OSError as exc:
+        _MEDIA_PLAYER_PROC = None
+        _MEDIA_NOW_PLAYING = ""
+        return {"ok": False, "error": "cannot start mpv: " + str(exc)[:120]}
+
+
+def h_media_stop(args):
+    global _MEDIA_PLAYER_PROC, _MEDIA_NOW_PLAYING
+    process = _MEDIA_PLAYER_PROC
+    if process is not None and process.poll() is None:
+        try:
+            process.terminate()
+            process.wait(timeout=2)
+        except Exception:
+            try:
+                process.kill()
+            except OSError:
+                pass
+    _MEDIA_PLAYER_PROC = None
+    _MEDIA_NOW_PLAYING = ""
+    return {"ok": True}
+
+
 def h_media_status(args):
     try:
         if IS_VISUAL_CAPTURE:
@@ -991,9 +1318,12 @@ def h_media_status(args):
                 "recordings": 0,
             }}
         vol = deskinfo.volume() if deskinfo is not None else None
+        playing = None
+        if _MEDIA_PLAYER_PROC is not None and _MEDIA_PLAYER_PROC.poll() is None:
+            playing = _MEDIA_NOW_PLAYING or "Media"
         return {"ok": True, "media": {
             "volume": vol if vol is not None else 0,
-            "now_playing": None,
+            "now_playing": playing,
             "library_count": 0,
             "recordings": 0,
         }}
@@ -1796,6 +2126,15 @@ HANDLERS = {
     "job_cancel": h_job_cancel,
     "job_log": h_job_log,
     "media_status": h_media_status,
+    "media_list": h_media_list,
+    "media_play": h_media_play,
+    "media_stop": h_media_stop,
+    "radio_search": h_radio_search,
+    "radio_favorites": h_radio_favorites,
+    "radio_favorite_toggle": h_radio_favorite_toggle,
+    "radio_play": h_radio_play,
+    "radio_action": h_radio_action,
+    "radio_status": h_radio_status,
     "iptv_get_config": h_iptv_get_config,
     "iptv_load_playlist": h_iptv_load_playlist,
     "iptv_load_epg": h_iptv_load_epg,
