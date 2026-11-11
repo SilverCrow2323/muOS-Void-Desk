@@ -362,7 +362,7 @@ def test_mount_img_cleans_loop_left_by_failed_classic_fallback(
 
     def run(command):
         commands.append(command)
-        if command == ["mount", "-o", "loop", str(image), str(mountpoint)]:
+        if command == ["mount", "-o", "loop", image, mountpoint]:
             state["loop"] = "/dev/loop8"
             return _fake_result(1, stderr="classic mount failed")
         raise AssertionError("unexpected command: %r" % command)
