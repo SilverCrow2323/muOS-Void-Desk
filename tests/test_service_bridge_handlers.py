@@ -133,3 +133,83 @@ def test_github_release_handler_reports_empty_release_catalog(monkeypatch):
 def test_github_release_command_is_registered():
     service = load_service()
     assert service.HANDLERS["gh_fetch_releases"] is service.h_gh_fetch_releases
+
+
+def _prepare_muos_app_roots(tmp_path, monkeypatch):
+    service = load_service()
+    sd1 = tmp_path / "sd1" / "MUOS" / "application"
+    sd2 = tmp_path / "sd2" / "MUOS" / "application"
+    sd1.mkdir(parents=True)
+    sd2.mkdir(parents=True)
+    monkeypatch.setattr(service, "IS_DEVICE", True)
+    monkeypatch.setattr(service, "IS_VISUAL_CAPTURE", False)
+    monkeypatch.setattr(service, "APP_DIR", tmp_path / "VoidDesk")
+    monkeypatch.setattr(service, "MUOS_APP_ROOTS", (sd1, sd2))
+    monkeypatch.setattr(service, "DATA", tmp_path / "VoidDesk" / "data")
+    return service, sd1, sd2
+
+
+def _make_muos_app(root, name, *, executable=True):
+    app_dir = root / name
+    app_dir.mkdir()
+    launcher = app_dir / "mux_launch.sh"
+    launcher.write_text("#!/bin/sh\n# HELP: Test application\nexit 0\n")
+    launcher.chmod(0o755 if executable else 0o644)
+    return app_dir
+
+
+def test_muos_app_discovery_only_returns_direct_launchable_apps(tmp_path, monkeypatch):
+    service, sd1, sd2 = _prepare_muos_app_roots(tmp_path, monkeypatch)
+    app1 = _make_muos_app(sd1, "Example App")
+    app2 = _make_muos_app(sd2, "Another_Tool")
+    _make_muos_app(sd1, "NotExecutable", executable=False)
+    outside = _make_muos_app(tmp_path, "OutsideRoot")
+    (sd1 / "LinkedApp").symlink_to(outside, target_is_directory=True)
+    nested = sd1 / "Group"
+    nested.mkdir()
+    (nested / "NestedApp").mkdir()
+
+    result = service.h_list_muos_apps({})
+    assert result["ok"] is True
+    assert [app["name"] for app in result["apps"]] == [
+        "Example App", "Another_Tool"
+    ]
+    assert result["apps"][0]["path"] == str(app1.resolve())
+    assert result["apps"][0]["sd"] == "SD1"
+    assert result["apps"][0]["help"] == "Test application"
+    assert result["apps"][1]["path"] == str(app2.resolve())
+    assert result["apps"][1]["sd"] == "SD2"
+
+
+def test_muos_app_launch_writes_shared_pygame_handoff_marker(tmp_path, monkeypatch):
+    service, sd1, _sd2 = _prepare_muos_app_roots(tmp_path, monkeypatch)
+    app_dir = _make_muos_app(sd1, "Example App")
+
+    scanned = service.h_list_muos_apps({})
+    assert scanned["ok"] is True
+    app = scanned["apps"][0]
+    result = service.h_launch_muos_app({"path": app["path"]})
+
+    assert result["ok"] is True
+    assert result["handoff"] is True
+    marker = service.DATA / ".muos_app"
+    assert marker.read_text(encoding="utf-8").splitlines() == [
+        str(app_dir.resolve()), "Example App"
+    ]
+
+
+def test_muos_app_launch_rejects_paths_not_returned_by_the_scanner(
+    tmp_path, monkeypatch
+):
+    service, _sd1, _sd2 = _prepare_muos_app_roots(tmp_path, monkeypatch)
+    outside = _make_muos_app(tmp_path, "OutsideRoot")
+
+    result = service.h_launch_muos_app({"path": str(outside.resolve())})
+    assert result["ok"] is False
+    assert not (service.DATA / ".muos_app").exists()
+
+
+def test_muos_app_handlers_are_registered():
+    service = load_service()
+    assert service.HANDLERS["list_muos_apps"] is service.h_list_muos_apps
+    assert service.HANDLERS["launch_muos_app"] is service.h_launch_muos_app
