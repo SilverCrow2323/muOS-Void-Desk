@@ -152,3 +152,64 @@ def test_service_registers_iptv_bridge_commands_and_visual_capture_is_offline(mo
     assert playlist["ok"] is True and playlist["count"] == 2
     assert epg["ok"] is True
     assert playback["ok"] is False
+
+
+
+def test_background_radio_player_is_audio_only_and_stops_cleanly(monkeypatch):
+    module = load_iptv_module()
+
+    class FakeProcess:
+        pid = 1234
+
+        def __init__(self):
+            self.stopped = False
+
+        def poll(self):
+            return None if not self.stopped else 0
+
+        def terminate(self):
+            self.stopped = True
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            self.stopped = True
+
+    process = FakeProcess()
+    captured = {}
+
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/mpv")
+    monkeypatch.setattr(
+        module.subprocess, "Popen",
+        lambda args, **kwargs: captured.update(args=args, kwargs=kwargs) or process,
+    )
+
+    ok, error = module.play_audio(
+        "https://radio.example.org/live.mp3", "Example Radio"
+    )
+    assert ok and error is None
+    assert "--no-video" in captured["args"]
+    assert "--force-window=no" in captured["args"]
+    assert captured["args"][-1] == "https://radio.example.org/live.mp3"
+    assert module.audio_status()["state"] == "playing"
+    assert module.audio_status()["station"] == "Example Radio"
+
+    module.stop_audio()
+    assert process.stopped
+    assert module.audio_status()["state"] == "idle"
+
+
+def test_background_radio_rejects_unsafe_urls_before_spawning(monkeypatch):
+    module = load_iptv_module()
+    spawned = []
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/mpv")
+    monkeypatch.setattr(
+        module.subprocess, "Popen",
+        lambda *args, **kwargs: spawned.append(args),
+    )
+
+    ok, error = module.play_audio("file:///etc/passwd", "Unsafe")
+    assert not ok
+    assert "HTTP" not in (error or "") or error
+    assert not spawned
