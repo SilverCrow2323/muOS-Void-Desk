@@ -1,0 +1,83 @@
+name: Build Void Desk
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Package target
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - muos
+          - pc
+      version:
+        description: Package version label
+        required: true
+        type: string
+        default: "10.5.4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-void-desk-${{ github.ref }}-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  build-muos:
+    name: Build muOS .muxapp
+    if: inputs.target == 'all' || inputs.target == 'muos'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source and pinned submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build .muxapp
+        run: |
+          python tools/build_muxapp.py --output "$RUNNER_TEMP/Void-Desk-${{ inputs.version }}.muxapp"
+          python tools/validate_muxapp.py "$RUNNER_TEMP/Void-Desk-${{ inputs.version }}.muxapp"
+          cd "$RUNNER_TEMP"
+          sha256sum -c "Void-Desk-${{ inputs.version }}.muxapp.sha256"
+      - name: Upload muOS package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Void-Desk-muOS-${{ inputs.version }}
+          path: |
+            ${{ runner.temp }}/Void-Desk-${{ inputs.version }}.muxapp
+            ${{ runner.temp }}/Void-Desk-${{ inputs.version }}.muxapp.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  build-pc:
+    name: Build Linux PC bundle
+    if: inputs.target == 'all' || inputs.target == 'pc'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build portable Linux bundle
+        run: |
+          python tools/build_pc.py --version "${{ inputs.version }}" \
+            --output "$RUNNER_TEMP/Void-Desk-PC-Linux-${{ inputs.version }}.tar.gz"
+          cd "$RUNNER_TEMP"
+          sha256sum -c "Void-Desk-PC-Linux-${{ inputs.version }}.tar.gz.sha256"
+      - name: Upload PC bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Void-Desk-PC-Linux-${{ inputs.version }}
+          path: |
+            ${{ runner.temp }}/Void-Desk-PC-Linux-${{ inputs.version }}.tar.gz
+            ${{ runner.temp }}/Void-Desk-PC-Linux-${{ inputs.version }}.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30

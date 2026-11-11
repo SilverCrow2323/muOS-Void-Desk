@@ -99,6 +99,40 @@ bridge.init()
 
 local root = assert(os.getenv("VOIDDESK_APP_DIR"),
                     "VOIDDESK_APP_DIR must point to a test directory")
+
+-- LÖVE configuration writes must be atomic and fail without mutating memory.
+local config = require("core.config")
+config.load()
+equal(config.set("theme", "megastructure"), true,
+      "config should save a valid theme")
+local config_file = assert(io.open(config.path(), "r"))
+local saved_text = config_file:read("*a")
+config_file:close()
+local saved_data = json.decode(saved_text)
+equal(saved_data.theme, "megastructure", "saved theme should be present")
+
+-- New palette presets are registered and expose the common colour tokens.
+local themes = require("theme.loader")
+local theme_ids = {"megastructure", "manga_ink", "industrial", "terminal", "minimal"}
+for _, id in ipairs(theme_ids) do
+    local palette = themes.list()[id]
+    assert(type(palette) == "table", "missing theme palette: " .. id)
+    assert(type(palette.bg) == "table" and type(palette.accent) == "table",
+           "incomplete theme palette: " .. id)
+end
+
+local data_dir = root .. "/data"
+local held_dir = data_dir .. ".held"
+assert(os.rename(data_dir, held_dir), "test must be able to hold the data directory")
+equal(config.set("theme", "must-not-persist"), false,
+      "config write should fail when the data directory is unavailable")
+equal(config.get("theme"), "megastructure",
+      "failed config write must preserve in-memory value")
+assert(os.rename(held_dir, data_dir), "test must restore the data directory")
+local verify_file = assert(io.open(config.path(), "r"))
+local verify_text = verify_file:read("*a")
+verify_file:close()
+equal(verify_text, saved_text, "failed config write must preserve last good file")
 local request_path = bridge.req_path()
 local processing_path = root .. "/data/.love_request.processing"
 local response_path = bridge.resp_path()

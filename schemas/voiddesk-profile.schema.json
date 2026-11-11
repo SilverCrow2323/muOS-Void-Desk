@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/schemas/voiddesk-profile.schema.json",
+  "title": "QWASAR Desk Profile",
+  "description": "Portable declarative QWASAR Desk UI and feature preferences. Profiles are data only and cannot execute commands.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "compatibility",
+    "engine",
+    "menu"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platforms",
+        "minimumVoidDeskVersion"
+      ],
+      "properties": {
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "muos",
+              "knulli",
+              "rocknix",
+              "custom",
+              "desktop",
+              "any"
+            ]
+          }
+        },
+        "models": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "minimumVoidDeskVersion": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Minimum QWASAR Desk runtime version. The property name is retained as a version 1 compatibility identifier."
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preference"
+      ],
+      "properties": {
+        "preference": {
+          "enum": [
+            "auto",
+            "py",
+            "love"
+          ]
+        },
+        "fallbackAllowed": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "menu": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/menuItem"
+      }
+    },
+    "plugins": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/pluginReference"
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+        },
+        "accent": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      }
+    },
+    "visualStyle": {
+      "type": "string",
+      "enum": [
+        "megastructure",
+        "manga_ink",
+        "industrial",
+        "terminal",
+        "neon_noir",
+        "minimal"
+      ],
+      "description": "Visual composition/rendering style, independent from the colour palette."
+    },
+    "palette": {
+      "type": "string",
+      "enum": [
+        "crimson",
+        "cyberpunk",
+        "green",
+        "stealth",
+        "amber",
+        "ice",
+        "paper",
+        "signal_red"
+      ],
+      "description": "Colour palette identifier, independent from visualStyle."
+    }
+  },
+  "$defs": {
+    "menuItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "route",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$",
+          "description": "Must resolve to a route registered by the installed QWASAR Desk build."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "icon": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "conditions": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/visibilityCondition"
+          }
+        },
+        "children": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/menuItem"
+          }
+        }
+      }
+    },
+    "visibilityCondition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "keys",
+            "timeoutMs"
+          ],
+          "properties": {
+            "type": {
+              "const": "key_sequence"
+            },
+            "keys": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 12,
+              "items": {
+                "enum": [
+                  "up",
+                  "down",
+                  "left",
+                  "right",
+                  "a",
+                  "b",
+                  "x",
+                  "y",
+                  "l1",
+                  "r1",
+                  "l2",
+                  "r2",
+                  "start",
+                  "select"
+                ]
+              }
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 500,
+              "maximum": 15000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "families"
+          ],
+          "properties": {
+            "type": {
+              "const": "device_family"
+            },
+            "families": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "h700",
+                  "other_arm64",
+                  "desktop"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "capability"
+          ],
+          "properties": {
+            "type": {
+              "const": "feature_available"
+            },
+            "capability": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+            }
+          }
+        }
+      ]
+    },
+    "pluginReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pluginId",
+        "version"
+      ],
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{2,63}$"
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "settings": {
+          "type": "object",
+          "description": "Validated against the official plugin settings schema; must not contain credentials or device-local paths.",
+          "maxProperties": 64,
+          "propertyNames": {
+            "pattern": "^(?!.*(?:password|secret|token|credential|private[_-]?key|api[_-]?key)).+$",
+            "description": "Reject obviously sensitive setting names; runtime must also reject credentials and device-local paths by policy."
+          }
+        }
+      }
+    }
+  }
+}

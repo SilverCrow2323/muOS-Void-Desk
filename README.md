@@ -99,6 +99,16 @@ See [Architecture](docs/ARCHITECTURE.md) for execution flow.
 
 **Pygame is the recommended frontend.** LÖVE is included for ongoing development and testing only; several hubs and actions remain incomplete in that engine. The Pygame frontend can bootstrap its runtime on demand. The improved bootstrap validates HTTPS certificates, verifies the published PyPI SHA-256 digest, checks archive paths and tests the import before replacing the active runtime. The desktop image bootstrap is separate.
 
+## Build Void Desk packages
+
+The **Build Void Desk** GitHub Actions workflow can be started manually from the Actions tab. Choose `all`, `muos` or `pc`, then provide a version label. The run publishes downloadable artifacts:
+- **muOS:** validated `.muxapp` package plus SHA-256 checksum.
+- **Linux PC:** portable source bundle for Linux x86_64/aarch64 plus SHA-256 checksum. It creates a Python virtual environment and installs Pygame/psutil on first launch; it is not an AppImage or statically linked binary.
+
+Artifacts are available from the workflow run for 30 days. Hardware compatibility still requires testing on the target handheld.
+
+[Build Void Desk workflow](.github/workflows/build-void-desk.yml) · [PC bundle instructions](packaging/pc/README.md)
+
 ## Web browsers on muOS
 
 VoidDesk exposes optional desktop browsers through the **XFCE environment**. NetSurf (`netsurf-gtk`), Falkon (`falkon`) and Dillo (`dillo`) are package choices for the Ubuntu desktop image; they are not browser binaries installed directly into the muOS host.
