@@ -7,10 +7,32 @@
 # ============================================================================
 import json
 import re
+import ssl
 import threading
 import time
 import urllib.request
 import urllib.error
+
+
+
+def normalize_scheme(value="http"):
+    """Return a supported PC Link transport scheme.
+
+    HTTPS uses the platform CA store and hostname verification. There is no
+    insecure-certificate fallback: a TLS endpoint must present a certificate
+    trusted by the handheld and valid for the configured hostname.
+    """
+    scheme = str(value or "http").strip().lower()
+    if scheme not in ("http", "https"):
+        raise ValueError("PC Link transport must be 'http' or 'https'")
+    return scheme
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Prevent an authenticated HTTPS request from being redirected."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def local_subnet_hosts(own_ip):
@@ -47,7 +69,7 @@ def scan_for_servers(own_ip, port=8420, timeout=0.25, max_workers=48):
                 data = json.loads(r.read().decode("utf-8",
                                                    errors="replace"))
             with found_lock:
-                found.append({"host": ip, "port": port,
+                found.append({"host": ip, "port": port, "scheme": "http",
                              "name": data.get("name", ip),
                              "version": data.get("version", "")})
         except Exception:
@@ -72,9 +94,17 @@ def scan_for_servers(own_ip, port=8420, timeout=0.25, max_workers=48):
 class PcClient:
     def __init__(self, host, port, token="", poll_s=3.0,
                 device_id=None, device_name="", stats_fn=None,
-                screenshot_fn=None):
+                screenshot_fn=None, scheme="http"):
         self.host = host
         self.port = int(port) if port else 8420
+        self.scheme = normalize_scheme(scheme)
+        self._ssl_context = (ssl.create_default_context()
+                             if self.scheme == "https" else None)
+        self._https_opener = (
+            urllib.request.build_opener(
+                urllib.request.HTTPSHandler(context=self._ssl_context),
+                _NoRedirectHandler())
+            if self.scheme == "https" else None)
         self.token = token
         self.poll_s = poll_s
         self.device_id = re.sub(
@@ -99,26 +129,39 @@ class PcClient:
         self._cycle = 0
         self._thread = None
 
+    def _url(self, path):
+        return "{}://{}:{}{}".format(
+            self.scheme, self.host, self.port, path)
+
+    def _open(self, request, timeout):
+        if self.scheme == "https":
+            # The default SSLContext verifies the certificate chain and
+            # hostname against the handheld's installed CA store. Redirects
+            # are disabled so the bearer token cannot be forwarded to a
+            # different origin or downgraded to HTTP.
+            return self._https_opener.open(request, timeout=timeout)
+        return urllib.request.urlopen(request, timeout=timeout)
+
     def _get(self, path, timeout=2.5):
-        url = "http://{}:{}{}".format(self.host, self.port, path)
-        headers = {"User-Agent": "VoidDesk-Uplink/1.0"}
+        req = urllib.request.Request(
+            self._url(path),
+            headers={"User-Agent": "VoidDesk-Uplink/1.0"})
         if self.token:
-            headers["X-VOID-Token"] = self.token
-        req = urllib.request.Request(url, headers=headers)
+            req.add_header("X-VOID-Token", self.token)
         t0 = time.time()
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with self._open(req, timeout=timeout) as r:
             data = json.loads(r.read().decode("utf-8", errors="replace"))
         return data, (time.time() - t0) * 1000.0
 
     def _post(self, path, payload, timeout=2.5):
-        url = "http://{}:{}{}".format(self.host, self.port, path)
         headers = {"Content-Type": "application/json",
                    "User-Agent": "VoidDesk-Uplink/1.0"}
         if self.token:
             headers["X-VOID-Token"] = self.token
         body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=body, headers=headers)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        req = urllib.request.Request(
+            self._url(path), data=body, headers=headers)
+        with self._open(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", errors="replace"))
 
     def start(self):
@@ -230,6 +273,7 @@ class PcClient:
                 "ping_ms": self.ping_ms,
                 "pc_name": self.pc_name,
                 "daemon_version": self.daemon_version,
+                "scheme": self.scheme,
                 "last_ok": self.last_ok,
                 "last_error": self.last_error,
             }
