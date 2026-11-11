@@ -18,6 +18,19 @@ local menu_top = chrome.HEADER_H + 92
 local menu_bottom = 480 - chrome.FOOTER_H - 36
 local row_h = 30
 local first_visible = 1
+local current_programme = nil
+local next_programme = nil
+
+local function refresh_epg_for_selection()
+    local channel = iptv.current_channel()
+    if not channel then
+        current_programme, next_programme = nil, nil
+        return
+    end
+    iptv.epg_for(channel, function(now, nxt)
+        current_programme, next_programme = now, nxt
+    end)
+end
 
 local function ensure_loaded()
     if iptv.state.loaded or iptv.state.loading then return end
@@ -34,6 +47,7 @@ local function ensure_loaded()
                     iptv.load_epg(urls, function(r)
                         if r.ok then
                             status_msg = string.format("EPG: %d channels", r.channels_with_epg or 0)
+                            refresh_epg_for_selection()
                         else
                             status_msg = "EPG: " .. (r.error or "no data")
                         end
@@ -53,6 +67,7 @@ local function play_selected()
     iptv.play(ch, function(resp)
         if resp.ok then
             status_msg = "Playing: " .. ch.name
+            if resp.handoff then love.event.quit() end
         else
             status_msg = "Failed: " .. (resp.error or "unknown")
         end
@@ -67,19 +82,24 @@ function scene.enter(args)
     ensure_loaded()
     input.on("press", function(action)
         if action == "up" then
-            iptv.move_selection(-1)
+            iptv.move_selection(-1); refresh_epg_for_selection()
         elseif action == "down" then
-            iptv.move_selection(1)
+            iptv.move_selection(1); refresh_epg_for_selection()
         elseif action == "left" then
-            iptv.move_selection(-10)
+            iptv.move_selection(-10); refresh_epg_for_selection()
         elseif action == "right" then
-            iptv.move_selection(10)
+            iptv.move_selection(10); refresh_epg_for_selection()
         elseif action == "l1" then
-            iptv.next_group(-1)
+            iptv.next_group(-1); refresh_epg_for_selection()
         elseif action == "r1" then
-            iptv.next_group(1)
+            iptv.next_group(1); refresh_epg_for_selection()
         elseif action == "a" then
             play_selected()
+        elseif action == "x" then
+            iptv.stop(function(resp)
+                status_msg = resp.ok and "Playback stopped" or
+                    ("Stop failed: " .. (resp.error or "unavailable"))
+            end)
         elseif action == "y" then
             local ch = iptv.current_channel()
             if ch then
@@ -211,7 +231,15 @@ function scene.draw()
     love.graphics.rectangle("line", 12, sy, W - 24, 24, 4)
     love.graphics.setFont(font.regular(11) or love.graphics.newFont(11))
     love.graphics.setColor(th.text[1], th.text[2], th.text[3], 0.9)
-    love.graphics.print("> " .. status_msg, 20, sy + 6)
+    local selected_epg = status_msg
+    if current_programme and current_programme.title then
+        selected_epg = "NOW: " .. tostring(current_programme.title)
+        if next_programme and next_programme.title then
+            selected_epg = selected_epg .. " | NEXT: " .. tostring(next_programme.title)
+        end
+    end
+    if #selected_epg > 94 then selected_epg = selected_epg:sub(1, 91) .. "..." end
+    love.graphics.print("> " .. selected_epg, 20, sy + 6)
 
     -- Chrome
     if t_enter > 0.2 then
@@ -225,6 +253,7 @@ function scene.draw()
                 { icon = "dpad",  label = "Navigate" },
                 { icon = "btn_a", label = "Play" },
                 { icon = "btn_y", label = "Fav" },
+                { icon = "btn_x", label = "Stop" },
                 { icon = "btn_b", label = "Back" },
             },
             right_text = "L1/R1 group",
