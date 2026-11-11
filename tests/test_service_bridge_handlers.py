@@ -404,3 +404,74 @@ def test_radio_play_uses_catalogue_id_not_client_url(monkeypatch):
     })
     assert result["ok"] is True
     assert player.url == "https://stream.example/radio"
+
+
+def test_radio_handlers_are_registered():
+    service = load_service()
+    assert service.HANDLERS["radio_search"] is service.h_radio_search
+    assert service.HANDLERS["radio_favorites"] is service.h_radio_favorites
+    assert service.HANDLERS["radio_favorite_toggle"] is service.h_radio_favorite_toggle
+    assert service.HANDLERS["radio_play"] is service.h_radio_play
+    assert service.HANDLERS["radio_action"] is service.h_radio_action
+    assert service.HANDLERS["radio_status"] is service.h_radio_status
+
+
+def test_radio_search_rejects_unsafe_stream_urls(monkeypatch):
+    service = load_service()
+    bad = [
+        {"stationuuid": "11111111-1111-1111-1111-111111111111",
+         "url_resolved": "javascript:alert(1)"},
+        {"stationuuid": "22222222-2222-2222-2222-222222222222",
+         "url_resolved": "file:///etc/passwd"},
+        {"stationuuid": "33333333-3333-3333-3333-333333333333",
+         "url_resolved": "http://user:pass@example.org/radio"},
+        {"stationuuid": "44444444-4444-4444-4444-444444444444",
+         "url_resolved": "http://localhost/radio"},
+    ]
+    assert all(service._radio_clean_station(item) is None for item in bad)
+
+
+def test_radio_favorite_file_ignores_invalid_entries(tmp_path, monkeypatch):
+    service = load_service()
+    favorite_file = tmp_path / "radio_favorites.json"
+    favorite_file.write_text(json.dumps([
+        {"stationuuid": "55555555-5555-5555-5555-555555555555",
+         "name": "Valid", "url": "https://radio.example/stream"},
+        {"stationuuid": "bad", "name": "Invalid",
+         "url": "https://radio.example/stream"},
+    ]), encoding="utf-8")
+    monkeypatch.setattr(service, "_RADIO_FAVORITES_FILE", favorite_file)
+    result = service.h_radio_favorites({})
+    assert result["ok"] is True
+    assert [item["name"] for item in result["stations"]] == ["Valid"]
+
+
+def test_radio_actions_control_pause_volume_and_stop(monkeypatch):
+    service = load_service()
+    class FakePlayer:
+        def __init__(self):
+            self.running = True
+            self.volume = None
+            self.stopped = False
+        def is_running(self):
+            return self.running
+        def toggle_pause(self):
+            return True
+        def set_volume(self, value):
+            self.volume = value
+        def stop(self):
+            self.running = False
+            self.stopped = True
+    player = FakePlayer()
+    monkeypatch.setattr(service, "_radio_player", lambda: player)
+    assert service.h_radio_action({"action": "toggle_pause"}) == {
+        "ok": True, "pause": True
+    }
+    assert service.h_radio_action({"action": "volume", "value": 150}) == {
+        "ok": True, "volume": 100
+    }
+    assert player.volume == 100
+    assert service.h_radio_action({"action": "stop"}) == {
+        "ok": True, "running": False
+    }
+    assert player.stopped is True
