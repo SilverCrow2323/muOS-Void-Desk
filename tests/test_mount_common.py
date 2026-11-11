@@ -1,6 +1,7 @@
 """Tests for the shared shell mount-state probe."""
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -24,7 +25,11 @@ def run_probe(tmp_path, *, result=0, path="/mnt/Void Desk/xfce_mnt",
         fake_python.write_text(
             "#!/bin/sh\n"
             "printf '%s\\n' \"$#\" \"$3\" > \"$VD_ARG_CAPTURE\"\n"
-            "exit \"$VD_MOUNT_RESULT\"\n"
+            "case \"$VD_MOUNT_RESULT\" in\n"
+            "    0) printf 'mounted\\n' ;;\n"
+            "    1) printf 'unmounted\\n' ;;\n"
+            "    *) exit \"$VD_MOUNT_RESULT\" ;;\n"
+            "esac\n"
         )
         fake_python.chmod(0o755)
         env["PY3"] = str(fake_python)
@@ -71,3 +76,34 @@ def test_shared_mount_probe_passes_path_with_spaces_as_one_argument(tmp_path):
 
     assert result.returncode == 0
     assert capture.read_text().splitlines() == ["3", mount_path]
+
+
+def test_shared_mount_probe_fails_closed_when_imgmount_import_fails(tmp_path):
+    app_dir = tmp_path / "app"
+    desk = app_dir / "desk"
+    desk.mkdir(parents=True)
+    (desk / "imgmount.py").write_text(
+        'raise RuntimeError("simulated parser import failure")\n',
+        encoding="utf-8",
+    )
+    python = shutil.which("python3")
+    if not python:
+        return
+
+    env = os.environ.copy()
+    env.update({
+        "APP_DIR": str(app_dir),
+        "PY3": python,
+        "HELPER_PATH": str(HELPER),
+        "MOUNT_PATH": "/mnt/xfce_mnt",
+    })
+    result = subprocess.run(
+        [
+            "/bin/sh", "-c",
+            '. "$HELPER_PATH"\nvd_mount_present "$APP_DIR" "$MOUNT_PATH"\n',
+        ],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0
+    assert "refusing to stack another mount" in result.stderr
