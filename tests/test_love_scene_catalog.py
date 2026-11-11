@@ -55,6 +55,17 @@ def test_external_tools_status_widget_uses_the_same_status_publisher():
     assert 'scene.set_status("Loading external tools...")' not in source
 
 
+def test_love_visual_capture_manifest_is_complete_and_unique():
+    capture = (LOVE / "core" / "visual_capture.lua").read_text(
+        encoding="utf-8"
+    )
+    scenes = re.findall(r'\\{ name = "([^"]+)"', capture)
+    assert len(scenes) == 27
+    assert len(scenes) == len(set(scenes)), "duplicate LÖVE capture scene"
+    for scene in scenes:
+        assert (LOVE / "scenes" / f"{scene}.lua").is_file(), scene
+
+
 def test_love_visual_capture_includes_diagnostics_and_monitor():
     capture = (LOVE / "core" / "visual_capture.lua").read_text(
         encoding="utf-8"
