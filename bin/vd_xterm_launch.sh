@@ -17,10 +17,14 @@ CMD="$1"
 
 . "$APP_DIR/bin/vd_mount_common.sh"
 MNTED() { vd_mount_present "$APP_DIR" "$1"; }
+MOUNT_CREATED=0
 MOUNT_IF_NEEDED() {
     _target=$1
     shift
     vd_mount_ensure "$APP_DIR" "$_target" "$@"
+    _mount_rc=$?
+    MOUNT_CREATED=$VD_MOUNT_CREATED
+    return "$_mount_rc"
 }
 
 if [ ! -f "$DATA/.xfce_ready" ] || [ ! -f "$IMG" ]; then
@@ -51,18 +55,27 @@ esac
 # xterm non trova nemmeno /dev/pts per aprire un pseudo-terminale
 for D in dev proc sys; do mkdir -p "$MNT/$D"; done
 WE_MOUNTED_DEV=0
+WE_MOUNTED_PROC=0
+WE_MOUNTED_SYS=0
+WE_MOUNTED_PTS=0
+WE_MOUNTED_SHM=0
+WE_MOUNTED_INPUT=0
+
 if ! MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev"; then
 	echo "$(date) stato mount /dev non valido; abort prima del chroot" >>"$LOG"
 	exit 1
 fi
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_DEV=1
 if ! MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc"; then
 	echo "$(date) stato mount /proc non valido; abort prima del chroot" >>"$LOG"
 	exit 1
 fi
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PROC=1
 if ! MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys"; then
 	echo "$(date) stato mount /sys non valido; abort prima del chroot" >>"$LOG"
 	exit 1
 fi
+[ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SYS=1
 for SUB in /dev/pts /dev/shm /dev/input; do
 	[ -e "$SUB" ] || continue
 	mkdir -p "$MNT$SUB"
@@ -70,6 +83,11 @@ for SUB in /dev/pts /dev/shm /dev/input; do
 		echo "$(date) stato mount non valido: $MNT$SUB; abort prima del chroot" >>"$LOG"
 		exit 1
 	fi
+	case "$SUB" in
+		/dev/pts) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PTS=1 ;;
+		/dev/shm) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SHM=1 ;;
+		/dev/input) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_INPUT=1 ;;
+	esac
 done
 
 mkdir -p "$MNT/root" "$MNT/tmp"
@@ -128,11 +146,11 @@ while :; do
 done
 [ -n "$HOTKEY_PID" ] && kill "$HOTKEY_PID" 2>/dev/null
 
-for P in "$MNT/dev/input" "$MNT/dev/shm" "$MNT/dev/pts"; do
-	MNTED "$P" && umount "$P" 2>/dev/null
-done
-MNTED "$MNT/proc" && umount "$MNT/proc" 2>/dev/null
-MNTED "$MNT/sys" && umount "$MNT/sys" 2>/dev/null
+[ "$WE_MOUNTED_INPUT" = 1 ] && { MNTED "$MNT/dev/input" && umount "$MNT/dev/input" 2>/dev/null; }
+[ "$WE_MOUNTED_SHM" = 1 ] && { MNTED "$MNT/dev/shm" && umount "$MNT/dev/shm" 2>/dev/null; }
+[ "$WE_MOUNTED_PTS" = 1 ] && { MNTED "$MNT/dev/pts" && umount "$MNT/dev/pts" 2>/dev/null; }
+[ "$WE_MOUNTED_PROC" = 1 ] && { MNTED "$MNT/proc" && umount "$MNT/proc" 2>/dev/null; }
+[ "$WE_MOUNTED_SYS" = 1 ] && { MNTED "$MNT/sys" && umount "$MNT/sys" 2>/dev/null; }
 [ "$WE_MOUNTED_DEV" = 1 ] && { MNTED "$MNT/dev" && umount "$MNT/dev" 2>/dev/null; }
 if [ "$WE_MOUNTED" = 1 ]; then
 	sleep 0.3
