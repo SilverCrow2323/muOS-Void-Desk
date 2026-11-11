@@ -95,11 +95,6 @@ function scene.enter(args)
             iptv.next_group(1); refresh_epg_for_selection()
         elseif action == "a" then
             play_selected()
-        elseif action == "x" then
-            iptv.stop(function(resp)
-                status_msg = resp.ok and "Playback stopped" or
-                    ("Stop failed: " .. (resp.error or "unavailable"))
-            end)
         elseif action == "y" then
             local ch = iptv.current_channel()
             if ch then
@@ -253,7 +248,6 @@ function scene.draw()
                 { icon = "dpad",  label = "Navigate" },
                 { icon = "btn_a", label = "Play" },
                 { icon = "btn_y", label = "Fav" },
-                { icon = "btn_x", label = "Stop" },
                 { icon = "btn_b", label = "Back" },
             },
             right_text = "L1/R1 group",
