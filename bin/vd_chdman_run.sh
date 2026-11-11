@@ -12,7 +12,8 @@ DONE="$DATA/.chd_done"
 shift 0
 ARGS="$*"
 
-MNTED() { grep -q " $1 " /proc/mounts 2>/dev/null; }
+. "$APP_DIR/bin/vd_mount_common.sh"
+MNTED() { vd_mount_present "$APP_DIR" "$1"; }
 
 rm -f "$DONE"
 : >"$LOG"
