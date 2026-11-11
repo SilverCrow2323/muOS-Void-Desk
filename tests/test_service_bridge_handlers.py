@@ -213,3 +213,43 @@ def test_muos_app_handlers_are_registered():
     service = load_service()
     assert service.HANDLERS["list_muos_apps"] is service.h_list_muos_apps
     assert service.HANDLERS["launch_muos_app"] is service.h_launch_muos_app
+
+
+def test_media_library_lists_only_supported_files_and_skips_symlinks(tmp_path, monkeypatch):
+    service = load_service()
+    root = tmp_path / "sd"
+    music = root / "Music"
+    music.mkdir(parents=True)
+    (music / "track.flac").write_bytes(b"audio")
+    (music / "clip.mp4").write_bytes(b"video")
+    (music / "cover.png").write_bytes(b"image")
+    (music / "folder").mkdir()
+    outside = tmp_path / "outside.mp3"
+    outside.write_bytes(b"outside")
+    (music / "linked.mp3").symlink_to(outside)
+    monkeypatch.setattr(service, "MEDIA_ROOTS", (root,))
+    result = service.h_media_list({"path": str(music)})
+    assert result["ok"] is True
+    assert [item["name"] for item in result["items"]] == [
+        "folder", "clip.mp4", "track.flac"
+    ]
+    assert all("linked.mp3" != item["name"] for item in result["items"])
+
+
+def test_media_library_rejects_path_traversal_and_external_paths(tmp_path, monkeypatch):
+    service = load_service()
+    root = tmp_path / "sd"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.setattr(service, "MEDIA_ROOTS", (root,))
+    assert service.h_media_list({"path": str(outside)})["ok"] is False
+    assert service.h_media_list({"path": str(root / ".." / "outside")})["ok"] is False
+    assert service.h_media_play({"path": str(outside / "secret.mp3")})["ok"] is False
+
+
+def test_media_library_handlers_are_registered():
+    service = load_service()
+    assert service.HANDLERS["media_list"] is service.h_media_list
+    assert service.HANDLERS["media_play"] is service.h_media_play
+    assert service.HANDLERS["media_stop"] is service.h_media_stop
