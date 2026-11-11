@@ -122,7 +122,7 @@ A module may declare one or more supported contributions:
 | `theme.pack` | Palette, typography and visual assets | Manga Ink |
 | `workflow.action` | A reviewed sequence of typed actions | Refresh package lists |
 
-A contribution must declare its slot, stable contribution ID, display metadata, target route, required capabilities, and fallback state. It may only target slot types supported by the installed Void Desk version.
+A contribution must declare its slot, stable contribution ID, display metadata, target route, required capabilities, and fallback state. UI nodes reference registered component types; each component declares a strict property schema, named child slots, state model and semantic events. A module may only contribute properties and events supported by the installed QWASAR UI API version.
 
 A profile can rearrange or hide a registered contribution. It cannot invent a new executable route or bypass the module registry.
 
