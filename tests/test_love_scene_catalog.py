@@ -59,7 +59,7 @@ def test_love_visual_capture_manifest_is_complete_and_unique():
     capture = (LOVE / "core" / "visual_capture.lua").read_text(
         encoding="utf-8"
     )
-    scenes = re.findall(r'\\{ name = "([^"]+)"', capture)
+    scenes = re.findall(r'\{ name = "([^"]+)"', capture)
     assert len(scenes) == 27
     assert len(scenes) == len(set(scenes)), "duplicate LÖVE capture scene"
     for scene in scenes:
