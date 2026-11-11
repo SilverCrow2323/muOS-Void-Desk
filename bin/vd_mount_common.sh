@@ -20,7 +20,7 @@ vd_mount_present() {
 
     PYTHONPATH="$_vd_app_dir/desk${PYTHONPATH:+:$PYTHONPATH}" \
         "$_vd_python" -c \
-        'import imgmount, sys; sys.exit(0 if imgmount.is_mounted(sys.argv[1]) else 1)' \
+        'import sys\ntry:\n import imgmount\n mounted = imgmount.is_mounted(sys.argv[1])\nexcept Exception as exc:\n print("[mount] state check failed: %s" % exc, file=sys.stderr)\n sys.exit(2)\nsys.exit(0 if mounted else 1)' \
         "$_vd_mount_path"
     _vd_status=$?
     if [ "$_vd_status" -gt 1 ]; then
