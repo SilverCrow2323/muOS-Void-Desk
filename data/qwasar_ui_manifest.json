@@ -447,15 +447,81 @@
         "cancelAction"
       ],
       "minUiApi": "1.0"
+    },
+    {
+      "id": "shell.header",
+      "kind": "surface",
+      "stateModel": "stateful",
+      "slots": [
+        "leading",
+        "context",
+        "status",
+        "trailing"
+      ],
+      "customizable": [
+        "visibility",
+        "density",
+        "slot-order",
+        "compact-mode"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "shell.footer",
+      "kind": "surface",
+      "stateModel": "stateful",
+      "slots": [
+        "navigation",
+        "context",
+        "status",
+        "shortcuts"
+      ],
+      "customizable": [
+        "visibility",
+        "density",
+        "slot-order",
+        "hint-count"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.installation-card",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [
+        "leading",
+        "details",
+        "actions"
+      ],
+      "customizable": [
+        "show-flavour",
+        "show-engine",
+        "show-version"
+      ],
+      "minUiApi": "1.0"
+    },
+    {
+      "id": "widget.session-card",
+      "kind": "widget",
+      "stateModel": "stateful",
+      "slots": [
+        "leading",
+        "details",
+        "actions"
+      ],
+      "customizable": [
+        "show-kind",
+        "show-availability"
+      ],
+      "minUiApi": "1.0"
     }
   ],
   "shell": {
     "header": {
       "id": "shell.header",
-      "type": "layout.row",
+      "type": "shell.header",
       "props": {
         "region": "header",
-        "heightToken": "shell.header.height",
         "density": "comfortable"
       },
       "slots": {
@@ -520,10 +586,9 @@
     },
     "footer": {
       "id": "shell.footer",
-      "type": "layout.row",
+      "type": "shell.footer",
       "props": {
         "region": "footer",
-        "heightToken": "shell.footer.height",
         "density": "compact"
       },
       "slots": {
@@ -558,6 +623,7 @@
         "content": {
           "id": "home.left-panel",
           "type": "surface.panel",
+          "props": {},
           "slots": {
             "body": [
               {
@@ -581,11 +647,13 @@
         "content": {
           "id": "home.right-panel",
           "type": "surface.panel",
+          "props": {},
           "slots": {
             "body": [
               {
                 "id": "home.telemetry",
                 "type": "layout.stack",
+                "props": {},
                 "children": [
                   {
                     "id": "home.network-summary",
@@ -625,6 +693,7 @@
         "content": {
           "id": "panel.media-player",
           "type": "surface.panel",
+          "props": {},
           "slots": {
             "body": [
               {
@@ -743,21 +812,77 @@
         {
           "id": "session.launch-xfce",
           "kind": "command",
-          "label": "Launch XFCE",
+          "label": "Launch XFCE Desktop",
           "actionId": "session.launch.xfce",
           "icon": "desktop"
         },
         {
           "id": "session.install-xfce",
           "kind": "command",
-          "label": "Install XFCE",
+          "label": "Install XFCE Desktop",
           "actionId": "session.install.xfce",
           "icon": "download",
           "confirmation": "host-required"
+        },
+        {
+          "id": "session.launch-terminal",
+          "kind": "command",
+          "label": "Open Terminal Session",
+          "actionId": "session.launch.terminal",
+          "icon": "terminal"
+        },
+        {
+          "id": "session.launch-python",
+          "kind": "command",
+          "label": "Open Python Console",
+          "actionId": "session.launch.python",
+          "icon": "code",
+          "capabilities": [
+            "developer.python"
+          ]
+        },
+        {
+          "id": "session.connect-pc",
+          "kind": "route",
+          "label": "Connect to PC Workstation",
+          "actionId": "session.qwasar-link.open",
+          "icon": "monitor"
+        },
+        {
+          "id": "session.virtualbox",
+          "kind": "route",
+          "label": "VirtualBox Machines (PC only)",
+          "actionId": "session.virtualbox.open",
+          "icon": "box",
+          "capabilities": [
+            "desktop.virtualization.manage"
+          ]
         }
       ],
       "capabilities": [
         "desktop.session.launch"
+      ],
+      "sections": [
+        {
+          "id": "session.desktop-environments",
+          "label": "Desktop Environments",
+          "description": "Standalone graphical environments and session hand-off."
+        },
+        {
+          "id": "session.terminal-sessions",
+          "label": "Terminal Sessions",
+          "description": "Standalone PTY, shell and developer consoles."
+        },
+        {
+          "id": "session.remote-pc",
+          "label": "PC Workstation",
+          "description": "Pair and connect to a QWASAR Link host; remote display/input are separately granted."
+        },
+        {
+          "id": "session.virtual-machines",
+          "label": "Virtual Machines",
+          "description": "Optional PC-only VirtualBox sessions when the host adapter is supported."
+        }
       ]
     },
     {
@@ -820,21 +945,60 @@
           "actionId": "route.forge.apt"
         },
         {
-          "id": "forge.desktop",
+          "id": "forge.voiddesk-builds",
           "kind": "route",
-          "label": "Desktop Image",
-          "actionId": "route.forge.desktop"
+          "label": "Void Desk Builds",
+          "actionId": "route.forge.builds"
         },
         {
-          "id": "forge.updates",
-          "kind": "command",
-          "label": "Check updates",
-          "actionId": "forge.check-updates"
+          "id": "forge.modules",
+          "kind": "route",
+          "label": "Modules & Tools",
+          "actionId": "route.forge.modules"
+        },
+        {
+          "id": "forge.runtimes",
+          "kind": "route",
+          "label": "Frontend Engines",
+          "actionId": "route.forge.runtimes"
+        },
+        {
+          "id": "forge.vm-deps",
+          "kind": "route",
+          "label": "Virtualization Support",
+          "actionId": "route.forge.virtualization"
         }
       ],
       "capabilities": [
         "desktop.apt.search",
         "desktop.apt.install"
+      ],
+      "sections": [
+        {
+          "id": "forge.apt",
+          "label": "APT & System Packages",
+          "description": "APT in the authorized Debian/Ubuntu image or supported PC host package adapter."
+        },
+        {
+          "id": "forge.voiddesk",
+          "label": "Void Desk Builds",
+          "description": "Install and update Void Desk Full, Essential, Slim or Custom instances."
+        },
+        {
+          "id": "forge.modules",
+          "label": "Modules & Tools",
+          "description": "Install, update and remove QMOD modules and registered external tools."
+        },
+        {
+          "id": "forge.runtimes",
+          "label": "Runtimes & Engines",
+          "description": "Manage Pygame/LÖVE runtimes and future compatible engine adapters."
+        },
+        {
+          "id": "forge.virtualization",
+          "label": "Virtualization",
+          "description": "Install and verify PC-only virtualization dependencies and host support."
+        }
       ]
     },
     {
@@ -898,7 +1062,7 @@
         {
           "id": "uplink.wifi-open",
           "kind": "route",
-          "label": "Wi-Fi",
+          "label": "Wi-Fi & Bluetooth",
           "actionId": "route.uplink.wifi"
         },
         {
@@ -912,10 +1076,55 @@
           "kind": "route",
           "label": "Syncthing",
           "actionId": "route.uplink.syncthing"
+        },
+        {
+          "id": "uplink.pc-link",
+          "kind": "route",
+          "label": "QWASAR Link",
+          "actionId": "route.uplink.pc-link"
+        },
+        {
+          "id": "uplink.input-leap",
+          "kind": "route",
+          "label": "Input Leap / PC KVM",
+          "actionId": "route.uplink.input-leap"
+        },
+        {
+          "id": "uplink.catalogue",
+          "kind": "route",
+          "label": "Online Store & Community",
+          "actionId": "route.uplink.catalogue"
         }
       ],
       "capabilities": [
         "network.read-status"
+      ],
+      "sections": [
+        {
+          "id": "uplink.local-network",
+          "label": "Network & Wireless",
+          "description": "Wi-Fi, Bluetooth, hotspot and LAN health."
+        },
+        {
+          "id": "uplink.remote-access",
+          "label": "Remote Access",
+          "description": "Tailscale, secure pairing and QWASAR Link."
+        },
+        {
+          "id": "uplink.sync",
+          "label": "Sync & Transfers",
+          "description": "Syncthing and approved transfer methods."
+        },
+        {
+          "id": "uplink.pc-kvm",
+          "label": "PC Input Bridge",
+          "description": "Input Leap compatibility adapter or QWASAR Link remote input."
+        },
+        {
+          "id": "uplink.online-services",
+          "label": "Online Services",
+          "description": "Release feeds, community catalogue and optional cloud endpoints."
+        }
       ]
     },
     {
@@ -1066,67 +1275,149 @@
       },
       "sections": [
         {
-          "id": "toolbox.quick-access-section",
-          "label": "Quick Access"
+          "id": "toolbox.everyday",
+          "label": "Everyday Tools",
+          "description": "Calculator, clock, calendar, notes, text editor, screenshots and pinned quick utilities.",
+          "menu": [
+            {
+              "id": "toolbox.calculator",
+              "kind": "route",
+              "label": "Calculator",
+              "actionId": "route.toolbox.calculator"
+            },
+            {
+              "id": "toolbox.clock",
+              "kind": "route",
+              "label": "Clock & Timer",
+              "actionId": "route.toolbox.clock"
+            },
+            {
+              "id": "toolbox.calendar",
+              "kind": "route",
+              "label": "Calendar",
+              "actionId": "route.toolbox.calendar"
+            },
+            {
+              "id": "toolbox.notes",
+              "kind": "route",
+              "label": "Notes & Editor",
+              "actionId": "route.toolbox.editor"
+            }
+          ]
         },
         {
-          "id": "toolbox.files",
-          "label": "Files"
+          "id": "toolbox.files-storage",
+          "label": "Files & Storage",
+          "description": "File manager, archives, checksums, duplicate detection, backup and storage browsing.",
+          "menu": [
+            {
+              "id": "toolbox.files-open",
+              "kind": "route",
+              "label": "File Manager",
+              "actionId": "route.toolbox.files"
+            },
+            {
+              "id": "toolbox.archives",
+              "kind": "route",
+              "label": "Archives & Checksums",
+              "actionId": "route.toolbox.archives"
+            },
+            {
+              "id": "toolbox.backup",
+              "kind": "route",
+              "label": "Backup & Restore",
+              "actionId": "route.toolbox.backup"
+            }
+          ]
         },
         {
-          "id": "toolbox.diagnostics-section",
-          "label": "Diagnostics"
+          "id": "toolbox.system-health",
+          "label": "System & Diagnostics",
+          "description": "Void Diag, Void Monitor, hardware/service health, logs, cleanup and safe repair utilities.",
+          "menu": [
+            {
+              "id": "toolbox.diagnostics-open",
+              "kind": "route",
+              "label": "Void Diag",
+              "actionId": "route.toolbox.diagnostics"
+            },
+            {
+              "id": "toolbox.monitor-open",
+              "kind": "route",
+              "label": "Void Monitor",
+              "actionId": "route.toolbox.monitor"
+            },
+            {
+              "id": "toolbox.logs",
+              "kind": "route",
+              "label": "Logs & Service Health",
+              "actionId": "route.toolbox.logs"
+            }
+          ]
         },
         {
-          "id": "toolbox.monitor-section",
-          "label": "Monitor"
-        },
-        {
-          "id": "toolbox.maintenance",
-          "label": "Maintenance"
-        },
-        {
-          "id": "toolbox.developer",
-          "label": "Developer"
+          "id": "toolbox.developer-terminal",
+          "label": "Developer & Terminal",
+          "description": "Bounded shell, Python console, builders, manifest tools and QWASAR validation.",
+          "menu": [
+            {
+              "id": "toolbox.editor-open",
+              "kind": "route",
+              "label": "Text Editor",
+              "actionId": "route.toolbox.editor"
+            },
+            {
+              "id": "toolbox.shell-open",
+              "kind": "route",
+              "label": "Shell",
+              "actionId": "route.toolbox.shell",
+              "capabilities": [
+                "device.shell.pty"
+              ]
+            },
+            {
+              "id": "toolbox.inspector",
+              "kind": "route",
+              "label": "QWASAR Inspector",
+              "actionId": "route.toolbox.inspector"
+            },
+            {
+              "id": "toolbox.switchboard",
+              "kind": "route",
+              "label": "QWASAR Switchboard",
+              "actionId": "route.toolbox.switchboard"
+            }
+          ]
         }
       ],
       "menu": [
         {
-          "id": "toolbox.diagnostics-open",
+          "id": "toolbox.installed-modules",
           "kind": "route",
-          "label": "Void Diag",
-          "actionId": "route.toolbox.diagnostics"
+          "label": "Installed Void Desk Tools",
+          "actionId": "route.toolbox.installed-modules"
         },
         {
-          "id": "toolbox.monitor-open",
+          "id": "toolbox.inspector",
           "kind": "route",
-          "label": "Void Monitor",
-          "actionId": "route.toolbox.monitor"
+          "label": "Verify Void Desk Structure",
+          "actionId": "route.toolbox.inspector"
         },
         {
-          "id": "toolbox.files-open",
+          "id": "toolbox.switchboard",
           "kind": "route",
-          "label": "File Manager",
-          "actionId": "route.toolbox.files"
-        },
-        {
-          "id": "toolbox.editor-open",
-          "kind": "route",
-          "label": "Text Editor",
-          "actionId": "route.toolbox.editor"
-        },
-        {
-          "id": "toolbox.shell-open",
-          "kind": "route",
-          "label": "Shell",
-          "actionId": "route.toolbox.shell",
-          "capabilities": [
-            "device.shell.pty"
-          ]
+          "label": "Enable / Disable Sections & Tools",
+          "actionId": "route.toolbox.switchboard"
         }
       ],
       "capabilities": [
         "device.read-status"
+      ],
+      "legacyRoutes": [
+        "hub_toolbox",
+        "hub_workshop",
+        "hub_diagnostics",
+        "hub_monitor"
       ]
     },
     {
@@ -1461,6 +1752,130 @@
       "kind": "overlay",
       "target": "shell.globalPanels.jobCenter",
       "status": "planned"
+    },
+    {
+      "id": "session.launch.terminal",
+      "kind": "command",
+      "target": "shell_start",
+      "capability": "device.shell.pty",
+      "permission": "shell-session",
+      "status": "implemented"
+    },
+    {
+      "id": "session.launch.python",
+      "kind": "command",
+      "target": "python-console",
+      "capability": "developer.python",
+      "permission": "developer-console",
+      "status": "planned"
+    },
+    {
+      "id": "session.qwasar-link.open",
+      "kind": "route",
+      "target": "qwasar-link.launch",
+      "status": "planned"
+    },
+    {
+      "id": "session.virtualbox.open",
+      "kind": "route",
+      "target": "virtualbox.vm-list",
+      "status": "planned"
+    },
+    {
+      "id": "route.forge.builds",
+      "kind": "route",
+      "target": "forge.instances",
+      "status": "planned"
+    },
+    {
+      "id": "route.forge.modules",
+      "kind": "route",
+      "target": "forge.modules",
+      "status": "planned"
+    },
+    {
+      "id": "route.forge.runtimes",
+      "kind": "route",
+      "target": "forge.engines",
+      "status": "planned"
+    },
+    {
+      "id": "route.forge.virtualization",
+      "kind": "route",
+      "target": "forge.virtualization",
+      "status": "planned"
+    },
+    {
+      "id": "route.uplink.pc-link",
+      "kind": "route",
+      "target": "qwasar-link.pair",
+      "status": "planned"
+    },
+    {
+      "id": "route.uplink.input-leap",
+      "kind": "route",
+      "target": "input-leap.configure",
+      "status": "planned"
+    },
+    {
+      "id": "route.uplink.catalogue",
+      "kind": "route",
+      "target": "qwasar-online.catalogue",
+      "status": "planned"
+    },
+    {
+      "id": "route.toolbox.calculator",
+      "kind": "route",
+      "target": "tool_calc",
+      "status": "implemented"
+    },
+    {
+      "id": "route.toolbox.clock",
+      "kind": "route",
+      "target": "tool_clock",
+      "status": "implemented"
+    },
+    {
+      "id": "route.toolbox.calendar",
+      "kind": "route",
+      "target": "hub_calendar",
+      "status": "implemented"
+    },
+    {
+      "id": "route.toolbox.archives",
+      "kind": "route",
+      "target": "tool.archives",
+      "status": "planned"
+    },
+    {
+      "id": "route.toolbox.backup",
+      "kind": "route",
+      "target": "tool.backup",
+      "status": "planned"
+    },
+    {
+      "id": "route.toolbox.logs",
+      "kind": "route",
+      "target": "tool.logs",
+      "status": "planned"
+    },
+    {
+      "id": "route.toolbox.inspector",
+      "kind": "route",
+      "target": "qwasar.inspector",
+      "status": "planned"
+    },
+    {
+      "id": "route.toolbox.switchboard",
+      "kind": "route",
+      "target": "qwasar.switchboard",
+      "status": "planned"
+    },
+    {
+      "id": "route.toolbox.installed-modules",
+      "kind": "route",
+      "target": "qwasar.switchboard",
+      "status": "planned"
     }
   ],
   "keymap": [
@@ -1483,32 +1898,316 @@
     {
       "oldId": "hub_toolbox",
       "newId": "rt-toolbox",
-      "section": "toolbox.quick-access-section"
+      "section": "toolbox.everyday"
     },
     {
       "oldId": "hub_workshop",
       "newId": "rt-toolbox",
-      "section": "toolbox.diagnostics-section"
+      "section": "toolbox.system-health"
     },
     {
       "oldId": "hub_diagnostics",
       "newId": "rt-toolbox",
-      "section": "toolbox.diagnostics-section"
+      "section": "toolbox.system-health"
     },
     {
       "oldId": "hub_monitor",
       "newId": "rt-toolbox",
-      "section": "toolbox.monitor-section"
+      "section": "toolbox.system-health"
     },
     {
       "oldId": "WORKSHOP",
       "newId": "rt-toolbox",
-      "section": "toolbox.diagnostics-section"
+      "section": "toolbox.system-health"
     },
     {
       "oldId": "TOOLBOX",
       "newId": "rt-toolbox",
-      "section": "toolbox.quick-access-section"
+      "section": "toolbox.everyday"
     }
-  ]
+  ],
+  "runtimeLaunch": {
+    "selector": {
+      "enabled": true,
+      "stage": "before-frontend",
+      "selectionAxes": [
+        "installed-instance",
+        "build-flavour",
+        "frontend-engine",
+        "user-profile",
+        "session-target"
+      ],
+      "defaultEngine": "pygame",
+      "engines": [
+        "pygame",
+        "love"
+      ],
+      "allowMultipleInstances": true,
+      "rememberLastSelection": true,
+      "fallbackPolicy": "ask"
+    },
+    "buildFlavours": [
+      {
+        "id": "full",
+        "status": "planned",
+        "description": "All official Void Desk modules, frontends and integrations selected for the target device."
+      },
+      {
+        "id": "essential",
+        "status": "planned",
+        "description": "Core shell, required services and essential tools; optional integrations remain installable from THE FORGE."
+      },
+      {
+        "id": "slim",
+        "status": "planned",
+        "description": "Minimal footprint: core launcher, selected engine and essential maintenance/recovery tools."
+      },
+      {
+        "id": "custom",
+        "status": "planned",
+        "description": "A reproducible, validated selection of official modules and dependencies composed by AppBuilder/Studio."
+      }
+    ],
+    "installPolicy": {
+      "sideBySideInstances": true,
+      "uniqueInstanceIds": true,
+      "isolatedApplicationRoots": true,
+      "versionedDataMigrations": true,
+      "sharedUserData": true,
+      "notes": "Multiple installations use unique instance IDs and isolated executable/package roots. User data is shared only through versioned, explicitly compatible namespaces. Never overwrite a different instance's engine, config or package files."
+    },
+    "bootloaderAdapters": [
+      {
+        "id": "muos-launcher",
+        "platform": "handheld-h700",
+        "status": "current",
+        "scope": "app-launch",
+        "notes": "The muOS application launcher starts the installed muxapp. A QWASAR pre-frontend selector can choose an installed Void Desk instance and available engine; it does not replace or modify the handheld bootloader.",
+        "requiresConfirmation": false,
+        "backupRequired": false
+      },
+      {
+        "id": "desktop-launcher",
+        "platform": "desktop-linux-x86_64",
+        "status": "current",
+        "scope": "app-launch",
+        "notes": "A desktop application launcher starts the QWASAR pre-frontend selector inside the already booted host OS.",
+        "requiresConfirmation": false,
+        "backupRequired": false
+      },
+      {
+        "id": "grub2",
+        "platform": "desktop-linux-x86_64",
+        "status": "planned",
+        "scope": "os-installation-selection",
+        "notes": "Optional integration for selecting complete bootable OS/root filesystem installations only. GRUB does not select Pygame versus LÖVE inside an already running OS. Any generated entry requires explicit opt-in, backup, preview and rollback; never rewrite GRUB automatically during an ordinary app package install.",
+        "requiresConfirmation": true,
+        "backupRequired": true
+      }
+    ],
+    "sessionTargets": [
+      {
+        "id": "session.xfce",
+        "kind": "desktop",
+        "status": "current",
+        "platforms": [
+          "muos-h700",
+          "desktop-linux-x86_64"
+        ],
+        "capabilities": [
+          "desktop.session.launch"
+        ],
+        "backend": "debian-image.xfce",
+        "description": "Launch the optional Debian/Ubuntu XFCE desktop image on H700 or a supported desktop session on PC."
+      },
+      {
+        "id": "session.icewm",
+        "kind": "desktop",
+        "status": "current",
+        "platforms": [
+          "muos-h700"
+        ],
+        "capabilities": [
+          "desktop.session.launch"
+        ],
+        "backend": "debian-image.icewm",
+        "description": "Lightweight window-manager session inside the optional Debian/Ubuntu image."
+      },
+      {
+        "id": "session.lxde",
+        "kind": "desktop",
+        "status": "current",
+        "platforms": [
+          "muos-h700"
+        ],
+        "capabilities": [
+          "desktop.session.launch"
+        ],
+        "backend": "debian-image.lxde",
+        "description": "Lightweight LXDE session inside the optional Debian/Ubuntu image."
+      },
+      {
+        "id": "session.shell",
+        "kind": "terminal",
+        "status": "current",
+        "platforms": [
+          "muos-h700",
+          "desktop-linux-x86_64"
+        ],
+        "capabilities": [
+          "device.shell.pty"
+        ],
+        "backend": "bounded-pty",
+        "description": "Standalone bounded terminal session, separate from the in-app command palette."
+      },
+      {
+        "id": "session.python",
+        "kind": "terminal",
+        "status": "planned",
+        "platforms": [
+          "muos-h700",
+          "desktop-linux-x86_64"
+        ],
+        "capabilities": [
+          "developer.python"
+        ],
+        "backend": "python-console",
+        "description": "Standalone Python console with a restricted working directory and explicit environment."
+      },
+      {
+        "id": "session.qwasar-link",
+        "kind": "remote-workstation",
+        "status": "planned",
+        "platforms": [
+          "muos-h700",
+          "desktop-linux-x86_64"
+        ],
+        "capabilities": [
+          "link.device.pair"
+        ],
+        "backend": "qwasar-link",
+        "description": "Connect to a paired PC workstation; remote display and remote input are separate, explicit capabilities."
+      },
+      {
+        "id": "session.virtualbox",
+        "kind": "virtual-machine",
+        "status": "planned",
+        "platforms": [
+          "desktop-linux-x86_64"
+        ],
+        "capabilities": [
+          "desktop.virtualization.manage"
+        ],
+        "backend": "virtualbox-vboxmanage",
+        "description": "Browse and launch existing VirtualBox VMs on a compatible PC host. Never offered as native H700 virtualization."
+      }
+    ],
+    "integrations": [
+      {
+        "id": "input-leap",
+        "status": "candidate",
+        "hostRole": "PC keyboard/mouse server",
+        "deviceRole": "handheld or PC client when a supported client build exists",
+        "transports": [
+          "keyboard-mouse",
+          "clipboard"
+        ],
+        "requiresInstallOnBothEnds": true,
+        "platforms": [
+          "muos-h700",
+          "desktop-linux-x86_64",
+          "desktop-other"
+        ],
+        "notes": "Optional software-KVM adapter. It shares keyboard/mouse control between machines and is not a remote-display or video-stream protocol. The runtime must probe binary/platform support on both ends; if unavailable, offer the QWASAR Link remote-input adapter instead. Clipboard support depends on the host/display stack."
+      },
+      {
+        "id": "qwasar-link",
+        "status": "planned",
+        "hostRole": "PC companion/paired workstation",
+        "deviceRole": "handheld device agent/client",
+        "transports": [
+          "keyboard-mouse",
+          "clipboard",
+          "remote-display",
+          "file-transfer",
+          "telemetry"
+        ],
+        "requiresInstallOnBothEnds": true,
+        "platforms": [
+          "muos-h700",
+          "desktop-linux-x86_64",
+          "desktop-other"
+        ],
+        "notes": "QWASAR-owned integration layer. InputLeap may be an optional backend for keyboard/mouse only; remote display and file transfer use separate authenticated channels."
+      },
+      {
+        "id": "virtualbox",
+        "status": "planned",
+        "hostRole": "Linux x86_64 PC host",
+        "deviceRole": "QWASAR session client/VM console",
+        "transports": [
+          "vm-console"
+        ],
+        "requiresInstallOnBothEnds": false,
+        "platforms": [
+          "desktop-linux-x86_64"
+        ],
+        "notes": "Optional PC-only virtualization backend, detected through VBoxManage and host capability checks. VirtualBox 7.2 documentation lists Linux x86_64 hosts; do not advertise this on H700/muOS."
+      }
+    ]
+  },
+  "featureManagement": {
+    "manageableKinds": [
+      "workspace",
+      "section",
+      "module",
+      "widget",
+      "menu-entry",
+      "global-panel"
+    ],
+    "states": [
+      "installed",
+      "enabled",
+      "disabled",
+      "hidden",
+      "unavailable",
+      "incompatible",
+      "running",
+      "error"
+    ],
+    "disableSemantics": "Disable removes a contribution from the active UI/profile but does not uninstall its files. Providers and background jobs owned solely by the disabled module must stop cleanly; shared dependencies remain active while referenced. Hidden affects presentation only. Installed, enabled, visible, available and running are separate states.",
+    "protectedAreas": [
+      "shell.core",
+      "boot.selector",
+      "safe-recovery",
+      "capability-broker",
+      "end-node.recovery"
+    ],
+    "tools": [
+      {
+        "id": "qwasar.inspector",
+        "purpose": "Read-only audit of UI schemas, manifests, module inventory, duplicate/orphan IDs, unresolved routes/actions/providers, missing assets, dependency graphs, engine/platform compatibility, permissions, package manifests and profile validity.",
+        "defaultMode": "read-only",
+        "actions": [
+          "scan",
+          "report",
+          "export-report"
+        ]
+      },
+      {
+        "id": "qwasar.switchboard",
+        "purpose": "Profile-level control center to enable/disable modules, workspaces, sections, widgets, menu entries and global panels; preview, reorder, hide/show and restore defaults without uninstalling packages.",
+        "defaultMode": "profile-edit",
+        "actions": [
+          "preview",
+          "enable",
+          "disable",
+          "reorder",
+          "hide",
+          "show",
+          "reset-profile"
+        ]
+      }
+    ]
+  }
 }
