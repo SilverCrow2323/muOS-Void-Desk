@@ -315,3 +315,92 @@ def test_media_play_uses_video_window_for_video_files(tmp_path, monkeypatch):
     assert result["ok"] is True
     assert "--force-window=yes" in spawned["args"]
     assert "--no-video" not in spawned["args"]
+
+
+def test_radio_search_sanitizes_catalogue_and_bounds_results(monkeypatch):
+    service = load_service()
+    station_id = "12345678-1234-1234-1234-123456789abc"
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self):
+            return json.dumps([
+                {"stationuuid": station_id, "name": "Radio One",
+                 "url_resolved": "https://stream.example/radio",
+                 "country": "Italy", "codec": "MP3", "bitrate": "128"},
+                {"stationuuid": "bad", "name": "Bad",
+                 "url_resolved": "javascript:alert(1)"},
+                {"stationuuid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                 "name": "Local", "url_resolved": "http://localhost/stream"},
+            ]).encode()
+
+    requested = {}
+    def fake_urlopen(request, timeout):
+        requested["url"] = request.full_url
+        requested["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(service.urllib.request, "urlopen", fake_urlopen)
+    result = service.h_radio_search({"name": "Radio", "country": "Italy",
+                                     "tag": "jazz", "limit": 999})
+    assert result["ok"] is True
+    assert result["count"] == 1
+    assert result["stations"][0]["stationuuid"] == station_id
+    assert "name=Radio" in requested["url"]
+    assert "country=Italy" in requested["url"]
+    assert "tag=jazz" in requested["url"]
+    assert "limit=50" in requested["url"]
+    assert requested["timeout"] == 10
+
+
+def test_radio_favorites_persist_and_toggle(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    monkeypatch.setattr(service, "_RADIO_FAVORITES_FILE",
+                        tmp_path / "radio_favorites.json")
+    station_id = "12345678-1234-1234-1234-123456789abc"
+    service._RADIO_STATIONS[station_id] = {
+        "stationuuid": station_id, "name": "Radio One",
+        "url": "https://stream.example/radio", "country": "Italy",
+        "language": "Italian", "tags": "jazz", "codec": "MP3",
+        "bitrate": 128, "favicon": "",
+    }
+    added = service.h_radio_favorite_toggle({"stationuuid": station_id})
+    assert added == {"ok": True, "favorite": True, "count": 1}
+    assert service.h_radio_favorites({})["stations"][0]["name"] == "Radio One"
+    removed = service.h_radio_favorite_toggle({"stationuuid": station_id})
+    assert removed == {"ok": True, "favorite": False, "count": 0}
+
+
+def test_radio_favorite_rejects_unknown_station_and_invalid_id():
+    service = load_service()
+    assert service.h_radio_favorite_toggle({"stationuuid": "bad"})["ok"] is False
+    assert service.h_radio_favorite_toggle({
+        "stationuuid": "12345678-1234-1234-1234-123456789abc"
+    })["ok"] is False
+
+
+def test_radio_play_uses_catalogue_id_not_client_url(monkeypatch):
+    service = load_service()
+    station_id = "12345678-1234-1234-1234-123456789abc"
+    service._RADIO_STATIONS[station_id] = {
+        "stationuuid": station_id, "name": "Radio One",
+        "url": "https://stream.example/radio",
+    }
+    class FakePlayer:
+        def __init__(self):
+            self.url = None
+        def start(self, url):
+            self.url = url
+            return True, ""
+    player = FakePlayer()
+    monkeypatch.setattr(service, "_radio_player", lambda: player)
+    result = service.h_radio_play({
+        "stationuuid": station_id,
+        "url": "https://attacker.example/evil",
+    })
+    assert result["ok"] is True
+    assert player.url == "https://stream.example/radio"
