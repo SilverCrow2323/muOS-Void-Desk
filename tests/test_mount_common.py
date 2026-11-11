@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,3 +72,32 @@ def test_shared_mount_probe_passes_path_with_spaces_as_one_argument(tmp_path):
 
     assert result.returncode == 0
     assert capture.read_text().splitlines() == ["3", mount_path]
+
+
+def test_shared_mount_probe_fails_closed_when_imgmount_import_raises(tmp_path):
+    app = tmp_path / "broken-app"
+    desk = app / "desk"
+    desk.mkdir(parents=True)
+    (desk / "imgmount.py").write_text(
+        "raise RuntimeError('simulated imgmount import failure')\\n"
+    )
+    env = os.environ.copy()
+    env.update({
+        "APP_DIR": str(app),
+        "MOUNT_PATH": "/mnt/Void Desk/xfce_mnt",
+        "PY3": sys.executable,
+        "HELPER_PATH": str(HELPER),
+    })
+    script = (
+        '. "$HELPER_PATH"\\n'
+        'vd_mount_present "$APP_DIR" "$MOUNT_PATH"\\n'
+    )
+
+    result = subprocess.run(
+        ["/bin/sh", "-c", script],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0
+    assert "state check failed" in result.stderr
+    assert "simulated imgmount import failure" in result.stderr
