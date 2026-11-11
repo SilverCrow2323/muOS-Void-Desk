@@ -1,8 +1,12 @@
-# QWASAR Desk Frontends — Pygame and LÖVE
+# Void Desk Frontends — Pygame and LÖVE
+
+The handheld application is **Void Desk**, part of the wider **QWASAR-Env** ecosystem. See [the product and device map](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/PRODUCT_ECOSYSTEM_MAP.md) for the cross-device architecture and LÖVE completion gates.
+
+Void Desk is planned as a modular environment: profiles arrange registered contributions, modules provide tools/widgets/panels, and APT packages belong to the optional XFCE image. See [the module and package contract](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/MODULE_SYSTEM.md). QWASAR Studio will provide Module Forge, Layout Designer, Release Composer and Community Library in one web app.
 
 ## Pygame (recommended)
 
-Pygame is the main and more complete QWASAR Desk frontend.
+Pygame is the main and more complete Void Desk frontend.
 
 - Entry point: desk/main.py
 - Shared constants and menu metadata: desk/const.py

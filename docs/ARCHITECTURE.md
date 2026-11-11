@@ -1,6 +1,8 @@
-# QWASAR Desk architecture
+# Void Desk architecture
 
-This note maps the source tree and main runtime paths. It does not imply that every optional integration is available on every firmware.
+This note maps the Void Desk source tree and main runtime paths. It does not imply that every optional integration is available on every firmware.
+
+For the wider cross-device product structure, naming rules, platform matrix, repository boundaries and LÖVE completion plan, see [QWASAR-Env Product Ecosystem Map](PRODUCT_ECOSYSTEM_MAP.md).
 
 ## Runtime overview
 

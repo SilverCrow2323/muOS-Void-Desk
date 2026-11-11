@@ -9,11 +9,73 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_qwasar_branding_keeps_legacy_package_identifiers_documented():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "# QWASAR DESK" in readme
+    assert "# VOID DESK" in readme
+    assert "QWASAR-Env" in readme
     assert "Symbiotic Layer" in readme
     assert "`Void-Desk/`" in readme
     assert "`mux_launch.sh`" in readme
     assert "not a replacement firmware image today" in readme
+
+
+def test_qwasar_env_product_map_documents_device_boundaries_and_love_gates():
+    doc = (ROOT / "docs" / "PRODUCT_ECOSYSTEM_MAP.md").read_text(
+        encoding="utf-8"
+    )
+    for term in (
+        "QWASAR-Env",
+        "Void Desk",
+        "QWASAR Hub",
+        "QWASAR Studio",
+        "QWASAR Link",
+        "Device A — H700 handheld",
+        "LÖVE completion plan",
+        "No QWASAR Hub, Studio, Link, or runtime repository needs to be created",
+    ):
+        assert term in doc
+
+
+def test_studio_unifies_module_layout_and_release_workbenches():
+    studio = (ROOT / "docs" / "STUDIO_ARCHITECTURE.md").read_text(
+        encoding="utf-8"
+    )
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    for term in (
+        "Module Forge",
+        "Layout Designer",
+        "Release Composer",
+        "Community Library",
+        "Full",
+        "Essential",
+        "Slim",
+        "/v1/catalog/modules",
+        "/v1/builds",
+    ):
+        assert term in studio
+    assert "QWASAR Studio" in readme
+    assert "one web app" in readme
+    assert "APT package recipes target only the optional Debian/Ubuntu desktop image" in readme
+
+
+def test_void_desk_module_contract_covers_composition_security_and_flavours():
+    doc = (ROOT / "docs" / "MODULE_SYSTEM.md").read_text(encoding="utf-8")
+    for term in (
+        "The LEGO rule",
+        "Profiles and layouts",
+        "Desktop APT packages",
+        "module.json",
+        "hub.panel",
+        "capabilities",
+        "sandboxing",
+        "Module Forge",
+        "Layout Designer",
+        "Release Composer",
+        "Community Library",
+        "Full",
+        "Essential",
+        "Slim",
+        "APT operations are submitted through the existing Void Desk service job manager",
+    ):
+        assert term in doc
 
 
 def test_symbiotic_layer_has_recovery_and_reversibility_constraints():

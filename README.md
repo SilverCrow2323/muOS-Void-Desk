@@ -13,7 +13,7 @@
 ╚════════════════════════════════════════════════════════════════════╝
 </pre>
 
-# QWASAR DESK
+# VOID DESK
 
 **A symbiotic Linux handheld environment.**
 
@@ -22,21 +22,23 @@
 [![CI](https://github.com/SilverCrow2323/Void-Desk-Project/actions/workflows/ci.yml/badge.svg)](https://github.com/SilverCrow2323/Void-Desk-Project/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/SilverCrow2323/Void-Desk-Project?label=release)](https://github.com/SilverCrow2323/Void-Desk-Project/releases)
 
-**Formerly Void Desk / VoidDesk · SPDW Factory**
+**Classic handheld application within the QWASAR-Env ecosystem · SPDW Factory**
 
 </div>
 
-QWASAR Desk is the evolving identity of Void Desk: a controller-first environment that grows around Linux handheld firmware. It brings system tools, connectivity, media, diagnostics, desktop sessions and a configurable visual shell into one navigable experience.
+Void Desk is a modular controller-first handheld environment within QWASAR-Env. Its NEXUS hubs and workspace sections are composed from tools and modules that users can arrange, enable, disable, replace and eventually create/share through QWASAR Studio. It integrates native handheld capabilities with applications installed inside its optional Debian/Ubuntu desktop environment.
 
-The long-term direction is a **Symbiotic Layer**. QWASAR should use the host firmware's supported application, service, storage and theme extension points, then progressively provide a richer experience without making the original firmware unbootable or difficult to recover. It is not a replacement firmware image today.
+The long-term direction is a **Symbiotic Layer**. Void Desk uses the host firmware's supported application, service, storage and theme extension points, then progressively provides a richer experience without making the original firmware unbootable or difficult to recover. It is not a replacement firmware image today.
 
-> **Brand transition:** QWASAR Desk is the new product name. The repository slug, installed package root (`Void-Desk/`), launcher names and existing configuration paths remain unchanged for compatibility. A coordinated package/identifier migration will be a separate, reversible change.
+> **Naming:** Void Desk is the classic handheld application; QWASAR-Env is the cross-device ecosystem. The repository slug, installed package root (`Void-Desk/`), launcher names and existing configuration paths remain unchanged for compatibility.
 
 ## At a glance
 
+The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md). The module format, permissions, LEGO-style composition and release flavours are specified in [Void Desk Modules](docs/MODULE_SYSTEM.md).
+
 | | |
 |---|---|
-| Product identity | **QWASAR Desk** (formerly Void Desk) |
+| Product identity | **Void Desk** — classic handheld application in QWASAR-Env |
 | Development line | **10.5.4-NEXUS** release candidate |
 | Latest published handheld package | **v10.2.0** (2026-08-11); v10.5.4 is not yet a published release |
 | Primary target | Anbernic RG35XX-H / compatible Allwinner H700 handhelds |
@@ -55,7 +57,7 @@ Compatibility is evidence-based. muOS Andromeda on compatible H700 devices is th
 
 NEXUS is an animated, orbit-based hub selector designed for D-pad and controller navigation.
 
-<img src="resources/nexus-menu.png" alt="QWASAR Desk NEXUS interface (legacy Void Desk artwork)" width="720">
+<img src="resources/nexus-menu.png" alt="Void Desk NEXUS interface (legacy Void Desk artwork)" width="720">
 
 ### Hubs and workspaces
 
@@ -73,11 +75,11 @@ NEXUS is an animated, orbit-based hub selector designed for D-pad and controller
 | **OUTERDESK** | Extend | Standalone applications and optional integrations |
 | **END SESSION** | Configure | Exit, restart, reboot and power-off flows |
 
-The source-grounded inventory and proposed categories are in [docs/TOOL_CATALOG.md](docs/TOOL_CATALOG.md) and `data/tool_catalog.json`. Availability depends on firmware, hardware, dependencies, permissions and frontend implementation; a menu entry alone is not proof that a tool is usable.
+The source-grounded inventory and proposed categories are in [docs/TOOL_CATALOG.md](docs/TOOL_CATALOG.md) and `data/tool_catalog.json`. The future module manager will allow supported contributions to be rearranged and composed through QWASAR Studio; downloaded executable modules will require verification and explicit permissions. Availability depends on firmware, hardware, dependencies, permissions and frontend implementation; a menu entry alone is not proof that a tool is usable.
 
 ## Visual identity — the Megastructure
 
-QWASAR's signature direction is raw industrial science fiction: monumental architecture, steel, deep blacks, manga-like ink contrast, technical markings and restrained signal colours. The mood may evoke dark architectural cyberpunk manga, but all QWASAR artwork, symbols and layouts must be original.
+Void Desk's signature visual direction is raw industrial science fiction: monumental architecture, steel, deep blacks, manga-like ink contrast, technical markings and restrained signal colours. The mood may evoke dark architectural cyberpunk manga, but all QWASAR artwork, symbols and layouts must be original.
 
 The visual system separates **style** (composition, typography, geometry, texture and motion) from **palette** (colour tokens). Proposed styles:
 
@@ -110,24 +112,24 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for execution flow.
 
 ## The Symbiotic Layer roadmap
 
-QWASAR's goal is deeper integration with muOS, not an unsafe firmware takeover:
+Void Desk's goal is deeper integration with muOS, not an unsafe firmware takeover:
 
 1. **Application layer:** use the official muOS application runner and lifecycle, including its storage and foreground-process handling.
 2. **Service layer:** manage QWASAR-owned services with explicit startup, health checks, permissions and clean shutdown.
 3. **Shared capability layer:** expose device, network, storage and media capabilities to Pygame, LÖVE and future frontends through typed APIs.
 4. **Experience layer:** optional QWASAR navigation, profiles, artwork, themes and dashboards, while preserving return to the native muOS frontend.
-5. **Studio and ecosystem:** browser companion, profile editor, official plugin catalog and platform adapters for KNULLI, ROCKNIX and custom systems after validation.
+5. **Studio and ecosystem:** QWASAR Studio brings together Module Forge, LEGO-style Layout Designer, Release Composer and Community Library; platform adapters for KNULLI, ROCKNIX and custom systems follow validation.
 6. **Deeper integration:** only through documented, reversible extension points with backup, rollback and a recovery path.
 
-The muOS developer documentation describes its app runner, launcher metadata, setup helpers, storage paths and extension mechanisms. QWASAR will use those interfaces rather than patching boot internals or replacing system files. See [Application Runner](https://community.muos.dev/t/application-runner/1282), [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) and [Frontend and Launching](https://muos.dev/docs/infrastructure/launching).
+The muOS developer documentation describes its app runner, launcher metadata, setup helpers, storage paths and extension mechanisms. Void Desk will use those interfaces rather than patching boot internals or replacing system files. See [Application Runner](https://community.muos.dev/t/application-runner/1282), [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) and [Frontend and Launching](https://muos.dev/docs/infrastructure/launching).
 
-**Non-negotiable:** muOS must remain bootable and recoverable if QWASAR is disabled, uninstalled or fails to start. No bootloader replacement, destructive init changes or irreversible system modifications are part of this roadmap.
+**Non-negotiable:** muOS must remain bootable and recoverable if Void Desk is disabled, uninstalled or fails to start. No bootloader replacement, destructive init changes or irreversible system modifications are part of this roadmap.
 
-## QWASAR Studio — browser companion
+## QWASAR Studio — one web app for modules, layouts and builds
 
-Studio is planned as an opt-in web/PWA companion. It will let users edit menu layouts, labels, profiles and visual choices, then import/export or sync profiles with a device. Initial sharing is limited to profiles and official plugins; third-party plugin publishing is out of scope for v1.
+QWASAR Studio is planned as one opt-in browser/PWA application with four workbenches: **Module Forge** for creating and validating tools, **Layout Designer** for assembling NEXUS/workspace sections like LEGO blocks, **Release Composer** for selecting Full/Essential/Slim or a custom permitted module set, and **Community Library** for discovering and sharing profiles and reviewed modules.
 
-The profile/plugin schemas and trust boundaries are being developed under `schemas/`. Cloud API and device pairing are planned components, not deployed services.
+Profiles are declarative data and never execute code. Executable modules require a separate manifest, capability/permission review, signature and safe runtime. APT package recipes target only the optional Debian/Ubuntu desktop image, never the muOS host. The detailed contract is in [docs/MODULE_SYSTEM.md](docs/MODULE_SYSTEM.md). Cloud API, online publishing, device pairing and remote builds are planned components, not deployed services.
 
 ## Installation on muOS
 
@@ -150,13 +152,15 @@ The installed root remains `Void-Desk/` during this branding transition.
 
 **Pygame is the recommended daily-use frontend.** LÖVE is included for development and testing only; several actions and routes remain incomplete.
 
-## Build QWASAR / Void Desk packages
+## Build Void Desk packages
 
-The **Build Void Desk** GitHub Actions workflow is available from the Actions tab. Start it manually and select:
+The **Build Void Desk** GitHub Actions workflow is available from the Actions tab. The current builder produces the default package set; Full/Essential/Slim variants will be added after the module registry and lockfile are implemented. The target release model is three reproducible `.muxapp` flavours:
 
-- `all` — build both targets.
-- `muos` — build and validate the muOS `.muxapp`.
-- `pc` — build the Linux PC bundle.
+- **Full** — all maintained and compatible first-party modules.
+- **Essential** — core daily-use hubs and tools.
+- **Slim** — minimal shell/module manager; add modules later.
+
+The existing build workflow still uses its current `all` / `muos` / `pc` inputs; flavour-specific outputs are a planned extension, not available yet.
 
 Outputs include SHA-256 checksums. Workflow artifacts are retained for 30 days. The current PC output is a portable Linux source bundle, not an AppImage or statically linked executable; its first launch creates a Python virtual environment and installs Pygame/psutil.
 
@@ -179,7 +183,7 @@ Install the generated PC package with `sudo apt install ./dist/voiddesk_VERSION_
 
 ## Web browsers on muOS
 
-QWASAR's optional desktop browsers run inside the **XFCE environment**. NetSurf (`netsurf-gtk`), Falkon (`falkon`) and Dillo (`dillo`) are package choices for the separate Ubuntu desktop image; they are not browser binaries installed directly into the muOS host.
+Void Desk's optional desktop browsers run inside the **XFCE environment**. NetSurf (`netsurf-gtk`), Falkon (`falkon`) and Dillo (`dillo`) are package choices for the separate Ubuntu desktop image; they are not browser binaries installed directly into the muOS host.
 
 To use one:
 
@@ -303,7 +307,7 @@ Bug reports should include version, device, firmware, selected engine, reproduct
 
 ### Device power-off
 
-When QWASAR Desk is started as a muOS application, the power-off action returns control to `mux_launch.sh`. The launcher stops the local companion service, syncs pending filesystem writes, then requests a forced power-off, with kernel power-off fallbacks if the first command returns. This is separate from **END SESSION → Close**, which only exits QWASAR Desk.
+When Void Desk is started as a muOS application, the power-off action returns control to `mux_launch.sh`. The launcher stops the local companion service, syncs pending filesystem writes, then requests a forced power-off, with kernel power-off fallbacks if the first command returns. This is separate from **END SESSION → Close**, which only exits Void Desk.
 
 If the device does not power off, preserve `data/voiddesk.log` and report the device model, muOS build and whether the screen/LED state changed. Avoid repeated hard resets while storage writes may still be in progress.
 
@@ -322,7 +326,7 @@ See [SECURITY.md](SECURITY.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits and licensing
 
-QWASAR Desk is the evolving product identity of Void Desk, maintained by **Sir Pips / SPDW Factory**. The repository acknowledges Pygame, LÖVE, MustardOS/muOS, Debian/Ubuntu and upstream projects listed in [THIRD-PARTY.md](THIRD-PARTY.md).
+Void Desk is the evolving product identity of Void Desk, maintained by **Sir Pips / SPDW Factory**. The repository acknowledges Pygame, LÖVE, MustardOS/muOS, Debian/Ubuntu and upstream projects listed in [THIRD-PARTY.md](THIRD-PARTY.md).
 
 There is currently no root-level LICENSE file. Do not assume a specific open-source license until the corresponding license text is published.
 

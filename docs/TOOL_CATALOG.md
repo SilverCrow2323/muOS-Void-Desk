@@ -1,6 +1,6 @@
-# QWASAR Desk Tool Catalog and Information Architecture
+# Void Desk Tool Catalog and Module Information Architecture
 
-This is an inventory of tool families and entry points found in the current source tree. It is a source-grounded map, not a promise that every item is enabled on every firmware or PC. Availability depends on host packages, device capabilities, permissions, optional downloads and frontend coverage.
+This is an inventory of tool families and entry points found in the current source tree. It is a source-grounded map, not a promise that every item is enabled on every firmware or PC. Availability depends on host packages, device capabilities, permissions, optional downloads and frontend coverage. The future module system will turn these into declared contributions that users can compose into Void Desk workspaces. See [Void Desk Modules](MODULE_SYSTEM.md) for the module manifest, contribution slots, trust and package-flavour contract.
 
 ## Navigation model
 
@@ -10,7 +10,7 @@ Use three levels:
 2. **Category** — a stable group of related tools.
 3. **Tool** — one action or screen with a stable ID, capability requirements, platform support and lifecycle status.
 
-Keep the existing NEXUS hubs as the visual top-level navigation for compatibility. The catalog can reorganize tools without renaming their internal routes. User-created profiles may reorder and relabel entries, but cannot create arbitrary executable routes.
+Keep the existing NEXUS hubs as the visual top-level navigation for compatibility. The catalog can reorganize tools without renaming their internal routes. User-created profiles may reorder, relabel, hide, group and enable/disable registered contributions, but cannot create arbitrary executable routes or install code. Modules declare which contribution slots they fill.
 
 ## Current workspace/category proposal
 
@@ -50,14 +50,14 @@ The registry is the best starting point for a future unified catalog, but it cur
 
 ### Standalone applications under outdesk/
 
-Source inventory includes BootAnimManager, Disc Crusher, EthoStore, ImageViewer, Little Mischief, MediaPlayer, Portable Forger and VoidCast. These should be separate catalog entries with explicit install source and compatibility metadata, not automatically treated as built-in QWASAR Desk features.
+Source inventory includes BootAnimManager, Disc Crusher, EthoStore, ImageViewer, Little Mischief, MediaPlayer, Portable Forger and VoidCast. These should be separate catalog entries with explicit install source and compatibility metadata, not automatically treated as built-in Void Desk features.
 
 **Security review flag:** Little Mischief contains Wi-Fi capture/scanning and attack-oriented scripts. Keep it isolated from the core catalog until its intended authorized-lab use, safeguards, permissions and packaging policy have been reviewed. Do not expose attack actions as ordinary connectivity utilities.
 
 ## Lifecycle and availability labels
 
 Use consistent status labels in the catalog:
-- `built_in`: shipped in the QWASAR Desk package.
+- `built_in`: shipped in the Void Desk package.
 - `optional_dependency`: requires a host package or runtime.
 - `external_app`: separately launched application.
 - `experimental`: incomplete or not feature-equivalent across engines.
