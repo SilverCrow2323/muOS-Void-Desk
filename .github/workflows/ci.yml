@@ -54,13 +54,13 @@ jobs:
 
   lua:
     name: LuaJIT syntax
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
-      - name: Install LuaJIT
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit
+      - name: Install LuaJIT (bounded mirror fallback)
+        run: bash tools/ci_apt_install.sh luajit
       - name: Compile all LÖVE Lua files
         run: |
           find love -type f -name '*.lua' -print0 \
@@ -130,6 +130,7 @@ jobs:
 
   tailscale-integration:
     name: Rt:Tailscale-M tests
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -138,11 +139,8 @@ jobs:
         run: |
           git clone https://github.com/SilverCrow2323/muOS-Rt-Tailscale.git external/rt-tailscale-m
           git -C external/rt-tailscale-m checkout d6aa05363cd5d56b07e63e2261c960a26d73cd9c
-      - name: Install Tailscale test dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y shellcheck luajit qemu-user-static zip curl \
-            python3-pyflakes python3-qrcode python3-opencv love xvfb
+      - name: Install Tailscale test dependencies (bounded mirror fallback)
+        run: bash tools/ci_apt_install.sh shellcheck luajit qemu-user-static zip curl python3-pyflakes python3-qrcode python3-opencv love xvfb
       - name: Run Rt:Tailscale-M static, model, QR and UI tests
         run: |
           cd external/rt-tailscale-m
@@ -162,14 +160,13 @@ jobs:
 
   love-visual-capture:
     name: LÖVE visual capture
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
-      - name: Install LÖVE 11.5 and virtual display
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y love xvfb libgl1-mesa-dri
+      - name: Install LÖVE 11.5 and virtual display (bounded mirror fallback)
+        run: bash tools/ci_apt_install.sh love xvfb libgl1-mesa-dri
       - name: Verify LÖVE runtime version
         run: |
           version="$(dpkg-query -W -f='${Version}' love)"

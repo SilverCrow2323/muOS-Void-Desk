@@ -33,13 +33,38 @@ function config.get(k, default)
     return v
 end
 
+-- Persist to a sibling temporary file and atomically rename it over the
+-- active config. A failed write leaves the last good file and memory intact.
 function config.set(k, v)
-    data[k] = v
-    local f = io.open(config.path(), "w")
-    if f then
-        f:write(json.encode(data))
-        f:close()
+    local candidate = {}
+    for key, value in pairs(data) do candidate[key] = value end
+    candidate[k] = v
+
+    local ok, encoded = pcall(json.encode, candidate)
+    if not ok or type(encoded) ~= "string" then return false end
+
+    local path = config.path()
+    local temporary = path .. ".tmp"
+    os.remove(temporary)
+    local f = io.open(temporary, "wb")
+    if not f then return false end
+
+    local wrote = f:write(encoded)
+    local flushed = wrote and f:flush()
+    local closed = f:close()
+    if not wrote or not flushed or not closed then
+        os.remove(temporary)
+        return false
     end
+
+    local renamed = os.rename(temporary, path)
+    if not renamed then
+        os.remove(temporary)
+        return false
+    end
+
+    data = candidate
+    return true
 end
 
 function config.data() return data end
