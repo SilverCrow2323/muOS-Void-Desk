@@ -24,6 +24,7 @@ def prepare_manager(tmp_path, monkeypatch, *, apt_returncode=0,
     image.write_bytes(b"fake image")
     (data / ".xfce_ready").write_text("ready")
     mountpoint = data / "xfce_mnt"
+    (mountpoint / "etc").mkdir(parents=True)
     monkeypatch.setattr(manager, "APP", tmp_path)
     monkeypatch.setattr(manager, "DATA", data)
     monkeypatch.setattr(manager, "IMAGE", image)
