@@ -2,15 +2,17 @@
 
 **Product:** QWASAR Studio, the browser companion for QWASAR-Env  
 **Status:** accepted product direction; foundation specification  
-**Scope:** browser companion, portable profiles, official plugin catalog, multi-engine readiness  
+**Scope:** unified web workbench for module authoring, LEGO-style layout composition, release building, community library, portable profiles, and device sync  
 **Initial runtime targets:** Pygame (py) and LÖVE (love). Qt 6 and LVGL are future adapters, not currently supported runtimes.
 
 ## Product decisions
 
 - Studio is a responsive web app/PWA companion. The handheld remains usable without Studio or internet access.
-- Users can export/import and explicitly share profiles and individual official plugins.
-- Plugin publishing is restricted to official Void Desk maintainers in v1. No public plugin uploads or third-party executable packages.
-- Profiles are declarative data: menu ordering, labels, descriptions, icons, supported feature toggles, approved plugin settings, and visibility conditions.
+- Users can export/import profiles and share declarative layout packs without an account.
+- Module authoring and release composition are integrated into this same Studio application; there is no separate web AppBuilder product.
+- Profile/layout sharing is data-only. Executable module publishing uses separate trust tiers and is disabled until signing, review, capability enforcement, and sandboxing are operational.
+- Official executable modules are allowlisted by the signed catalogue. Community executable modules require review and must not execute simply because they were uploaded.
+- Profiles are declarative data: NEXUS/workspace composition, menu ordering, labels, descriptions, icons, contribution references, supported feature toggles, safe module settings, and visibility conditions.
 - Profiles cannot contain shell commands, scripts, executable paths, arbitrary launch URLs, credentials, or privileged operations.
 - One engine-neutral profile format is consumed by all frontend adapters.
 
@@ -55,7 +57,44 @@ Portable JSON import/export is the v1 baseline and must work without an account 
 
 The initial client should be a static, progressively enhanced PWA. Do not place device credentials in exported profiles or browser storage without a dedicated credential design.
 
-### Profile format and Configuration Engine
+#
+## One Studio application, four workbenches
+
+QWASAR Studio is one responsive PWA. The following are workbenches inside it, not separate products or repositories:
+
+### Module Forge
+
+- Guided templates for a widget, menu tile, hub panel, service integration, desktop launcher, theme pack or APT recipe.
+- Manifest editor and strict schema/static validation.
+- Engine adapters for Pygame and LÖVE, plus platform compatibility declarations.
+- Capability and permission inspector, dependency resolver, asset/localisation manager and reproducible `.qmod` export.
+- Source/review workflow for executable community modules.
+
+### Layout Designer
+
+- LEGO-style canvas for NEXUS nodes, workspace sections, menu tiles and dashboard widgets.
+- Drag/reorder, hide/disable, rename, regroup and replace registered contributions.
+- Device/engine preview, missing-module warnings and compatibility/dependency report.
+- Export a declarative `.qprofile`; never embeds executable code or silently installs referenced modules.
+
+### Release Composer
+
+- Select Full, Essential, Slim, or a custom permitted set of first-party modules.
+- Show module closure, target platform, package-size estimate, desktop image requirements and compatibility.
+- Generate a build manifest and invoke a controlled/reproducible build pipeline.
+- Verify build provenance and SHA-256 outputs.
+- Official release signing is maintainer-controlled. A personal custom package must be visibly labelled custom and must not impersonate an official signed release.
+
+### Community Library
+
+- Search and inspect profiles, layout packs, desktop package recipes and (when enabled) executable modules.
+- Show publisher/source, licence, compatibility, capabilities, permissions, digest, signature and review state.
+- Distinguish official, reviewed community, source-only/unreviewed, incompatible and withdrawn content.
+- Publishing/review is not the same permission as sharing a data-only profile.
+
+The local Studio milestone must provide profile import/export, layout editing and module-manifest validation without login or cloud access. Hub-backed community publishing and remote builds are later, optional services.
+
+## Profile format and Configuration Engine
 
 Canonical versioned JSON Schemas live under schemas/. A profile contains stable identity and metadata, compatibility constraints, an engine preference, a declarative menu tree, typed visibility conditions, and references to official plugins with non-secret settings.
 
@@ -82,6 +121,10 @@ Visibility conditions use a closed vocabulary and are evaluated locally:
 - feature_available: registered capability identifier.
 
 Cheat-code sequences are easter-egg/discovery controls only. They are not authentication, authorization, encryption, or a security boundary. A hidden entry must never grant capabilities or bypass permission checks. Sequences have length/time bounds and reset on focus loss or timeout.
+
+### Module runtime and official/community module manager
+
+The module bundle and capability contract is defined in [Void Desk Modules](MODULE_SYSTEM.md) in the Void Desk repository. A profile can reference installed module IDs but cannot install code. The runtime verifies manifest, digest, signature, compatibility and permissions before staging/activation. Community executable modules remain disabled until a sandboxed module host, resource limits, revocation and rollback are implemented.
 
 ### Official plugin manager
 
