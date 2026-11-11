@@ -61,6 +61,15 @@ if ! MNTED "$MNT"; then
         echo "mount failed" | tee -a "$LOG" >&2
         SETUP_OK=0
         RC=1
+        # A failed loop mount can still leave an unattached-to-mount loop
+        # device. Release it only after MNTED has confirmed the root is absent.
+        PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
+          "$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.cleanup_stale(sys.argv[1]) or imgmount.loop_of(sys.argv[1]) is None else 1)' \
+          "$IMG"
+        if [ $? -ne 0 ]; then
+            echo "stale XFCE loop cleanup failed" | tee -a "$LOG" >&2
+            CLEANUP_RC=1
+        fi
     fi
 fi
 
@@ -102,7 +111,7 @@ if [ "$SETUP_OK" = 1 ] && ! MNTED "$MNT/sys"; then
         RC=1
     fi
 fi
-cp -f /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null || true
+[ "$SETUP_OK" = 1 ] && cp -f /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null || true
 
 if [ "$SETUP_OK" = 1 ]; then
     if ! mkfifo "$FIFO"; then
