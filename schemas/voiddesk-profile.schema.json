@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/schemas/voiddesk-profile.schema.json",
   "title": "QWASAR Desk Profile",
-  "description": "Portable declarative QWASAR Desk UI and feature preferences. Profiles are data only and cannot execute commands.",
+  "description": "Legacy Void Desk profile schema version 1.0 retained for compatibility imports. New portable QWASAR .qprofile documents use schemas/qwasar-profile.schema.json.",
   "type": "object",
   "additionalProperties": false,
   "required": [

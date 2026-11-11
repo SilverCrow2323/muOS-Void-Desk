@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/schemas/voiddesk-plugin.schema.json",
   "title": "QWASAR Desk Official Plugin Manifest",
-  "description": "Maintainer-published QWASAR Desk plugin manifest. Version 1 retains the legacy Void Desk publisher identity for compatibility. A valid manifest alone does not establish trust; signature and catalog allowlisting are mandatory at install time.",
+  "description": "Legacy Void Desk plugin manifest version 1.0 retained for compatibility imports. New QWASAR module packages use schemas/qwasar-module.schema.json with declared UI contributions, component-property contracts and typed actions.",
   "type": "object",
   "additionalProperties": false,
   "required": [

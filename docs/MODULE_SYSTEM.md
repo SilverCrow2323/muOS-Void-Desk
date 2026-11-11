@@ -48,7 +48,7 @@ A profile is JSON data. It cannot contain executable code, shell commands, scrip
 
 Sharing a profile never silently installs a module.
 
-Suggested portable extension: `.qprofile` (JSON document; extension is a proposal). Existing Void Desk profile JSON and schema v1 remain compatibility inputs during migration.
+Portable profiles use the .qprofile JSON format validated by schemas/qwasar-profile.schema.json. The older Void Desk profile schema remains a compatibility import path during migration. A profile is layout/activation data only: renderer preference and installed-instance paths remain local launch configuration, not shareable profile properties.
 
 ### B. Modules — functional building blocks
 
@@ -108,17 +108,21 @@ A module may declare one or more supported contributions:
 
 | Slot | Purpose | Example |
 |---|---|---|
-| `nexus.node` | A visible top-level NEXUS destination | MEDIA VAULT |
-| `workspace.section` | A category within a workspace | Developer Tools |
-| `hub.panel` | A panel or page inside a stable hub | Tailscale status |
-| `menu.tile` | A selectable tool/action tile | Calculator |
-| `dashboard.widget` | A bounded status/graph widget | Battery and storage |
+| nexus.node | A visible top-level NEXUS destination | MEDIA VAULT |
+| workspace.section | A category within a workspace | RT:TOOLBOX / Files & Storage |
+| shell.header.* / shell.footer.* | A composable global header/footer slot | Battery, profile and controller hints |
+| home.left / home.right | A panel on either side of the NEXUS home | Favourites and telemetry |
+| overlay.media | The global media panel opened with M | Shared now-playing controls |
+| hub.panel | A panel or page inside a stable hub | Tailscale status |
+| menu.tile | A selectable tool/action tile | Calculator |
+| dashboard.widget | A bounded status/graph widget | Battery and storage |
+| session.target | A standalone desktop/terminal/PC/VM target | XFCE or terminal session |
 | `service.provider` | A typed capability implementation registered by the host | Media status provider |
 | `desktop.launcher` | A launcher for an installed XFCE application | Browser |
 | `theme.pack` | Palette, typography and visual assets | Manga Ink |
 | `workflow.action` | A reviewed sequence of typed actions | Refresh package lists |
 
-A contribution must declare its slot, stable contribution ID, display metadata, target route, required capabilities, and fallback state. It may only target slot types supported by the installed Void Desk version.
+A contribution must declare its slot, stable contribution ID, display metadata, target route, required capabilities, and fallback state. UI nodes reference registered component types; each component declares a strict property schema, named child slots, state model and semantic events. A module may only contribute properties and events supported by the installed QWASAR UI API version.
 
 A profile can rearrange or hide a registered contribution. It cannot invent a new executable route or bypass the module registry.
 
@@ -189,86 +193,34 @@ Feature availability is the intersection of module compatibility, frontend adapt
 
 ## 5. Manifest contract
 
-The proposed `module.json` is the source of truth for module identity and compatibility. A future `qwasar-module.schema.json` must validate it with a strict schema and reject unknown executable fields.
+The canonical QWASAR module manifest is validated by schemas/qwasar-module.schema.json. The old schemas/voiddesk-plugin.schema.json remains a compatibility import format until installed modules can be migrated safely.
 
 Required manifest fields:
 
 | Field | Meaning |
 |---|---|
-| `manifestVersion` | Module manifest contract version |
-| `id` | Stable reverse-DNS-like identifier, e.g. `community.network.wifi-manager` |
-| `name`, `description` | Localisable display metadata |
-| `version` | Semantic version |
-| `publisher` | Stable publisher ID and display name |
-| `license` | SPDX identifier or explicit reviewed licence reference |
-| `compatibility` | Void Desk API range, engines, firmware targets, device families and architectures |
-| `contributions` | Slot type, contribution ID, entry route and display metadata |
-| `capabilities` | Typed APIs the module needs |
-| `permissions` | User-visible permission requests mapped to capabilities |
-| `dependencies` | Module IDs and compatible version ranges |
-| `desktopPackages` | Optional APT package declarations for the XFCE image |
-| `settingsSchema` | Schema for non-secret user settings |
-| `files` | Package path, size and SHA-256 for every file |
-| `entrypoints` | Approved engine-adapter entrypoints (when executable modules are enabled) |
-| `tests` | Declared contract tests and supported validation command IDs |
-| `artifact` | Immutable HTTPS artifact URI, digest and size |
-| `signature` | Detached signature algorithm, key ID and signature |
+| manifestVersion, id, name, version | Stable identity and semantic release version |
+| kind | declarative (registered components/host actions only) or executable (signed engine adapter code) |
+| publisher, license | Stable publisher identity and declared licence |
+| compatibility | Minimum Void Desk/UI API, engines, platforms, device families and architectures |
+| contributions | Stable slot, component type, workspace/section target, label, component props and optional action/provider references |
+| actions | Typed route, host-capability or signed module-handler declarations; never raw shell strings |
+| capabilities, permissions | Host APIs and user-visible grants required |
+| dependencies | Other module IDs and version constraints |
+| desktopPackages | Optional validated APT package declarations; no install scripts |
+| settingsSchema | Strict schema for non-secret module settings |
+| entrypoints | Engine-specific adapter entrypoints for executable modules only |
+| files | Relative package path, size and SHA-256 for every packaged file |
+| artifact, signature | Immutable HTTPS artifact, digest and detached Ed25519 signature |
+| provenance | Optional source repository, commit and reproducible build metadata |
 
-Example manifest (illustrative v1 shape, not a currently installable module):
+### Contribution contract
 
-~~~json
-{
-  "manifestVersion": "1.0",
-  "id": "community.network.wifi-dashboard",
-  "name": "Wi-Fi Dashboard",
-  "description": "A compact Wi-Fi status and scan panel.",
-  "version": "1.2.0",
-  "publisher": {
-    "id": "community-example",
-    "displayName": "Community Example"
-  },
-  "license": "MIT",
-  "compatibility": {
-    "minimumVoidDeskApi": "1.0",
-    "engines": ["py", "love"],
-    "platforms": ["muos"],
-    "deviceFamilies": ["h700"],
-    "architectures": ["aarch64"]
-  },
-  "contributions": [
-    {
-      "id": "wifi-dashboard.main",
-      "slot": "hub.panel",
-      "route": "community.network.wifi-dashboard.main",
-      "label": "Wi-Fi",
-      "icon": "assets/icons/wifi.svg"
-    }
-  ],
-  "capabilities": ["network.read-status", "network.wifi.scan"],
-  "permissions": ["read-network-status", "scan-wifi"],
-  "dependencies": [],
-  "desktopPackages": [],
-  "settingsSchema": "schemas/settings.schema.json",
-  "entrypoints": {
-    "pygame": "ui/pygame/main.py",
-    "love": "ui/love/main.lua"
-  },
-  "artifact": {
-    "url": "https://example.invalid/wifi-dashboard-1.2.0.qmod",
-    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-    "sizeBytes": 42000
-  },
-  "signature": {
-    "algorithm": "ed25519",
-    "keyId": "community-example-2026",
-    "value": "REPLACE_WITH_DETACHED_SIGNATURE"
-  }
-}
-~~~
+A contribution must reference a component type already registered by the installed QWASAR UI API. Its properties are checked against that component's strict propsSchema; its slot must be one supported by the API; action IDs must resolve to a declared typed action. It cannot supply a new renderer primitive or bypass the shell.
 
-The example's URL and digest are placeholders. A real module cannot be installed until the artifact exists, its digest matches, its signature chains to a trusted publisher, and every requested capability is approved.
+Declarative modules can contribute existing components and reference host-owned actions/providers. They cannot contain module-handler executable actions. Executable modules require engine entrypoints, verified signatures, reviewed capabilities and an appropriate isolation/trust tier. Until this infrastructure is implemented, third-party executable modules remain unavailable.
 
----
+An illustrative declarative example is in [data/examples/qwasar-wifi-overview.module.json](../data/examples/qwasar-wifi-overview.module.json). Its artifact URL, digest and signature are placeholders; it validates structure only and is not installable.
 
 ## 6. Capability and permission model
 
@@ -302,7 +254,7 @@ Permissions are granted per module and can be revoked. Destructive actions requi
 
 ## 7. APT and desktop integration contract
 
-Void Desk owns the user experience; the Debian/Ubuntu XFCE image owns the desktop package database.
+Void Desk owns the user experience; each platform package adapter owns its package database. On H700, APT operates only inside the optional Debian/Ubuntu desktop image. On a supported Linux PC, a separate host-APT adapter may operate on the PC host only after explicit user authorization. APT is never run against the muOS Buildroot host.
 
 A module may declare a package set:
 
@@ -324,9 +276,11 @@ Rules:
 
 - Package names are validated against a conservative package-name grammar.
 - No `preinst`, `postinst`, arbitrary command, shell fragment or repository override is accepted from a community module.
-- APT operations are submitted through the existing Void Desk service job manager and executed only inside the configured Debian/Ubuntu image.
+- On H700, APT operations are submitted through the existing Void Desk service job manager and are executed only inside the configured Debian/Ubuntu image.
+- On PC, host package management is a separate, opt-in package adapter that requires an explicit host authorization/admin prompt and reports the target machine/package database before mutation.
 - The package manager serializes mutations and reports progress, exit code and bounded logs.
 - A missing desktop image is a clear dependency state. Void Desk offers the trusted desktop-image installer rather than attempting APT on muOS.
+- Package management is never exposed as an arbitrary shell command to third-party modules.
 - A desktop launcher is registered only after the application is confirmed installed.
 - Removing a module does not automatically purge APT packages that may be shared with other modules. Show an orphan/dependency report and require explicit confirmation.
 - The optional XFCE root filesystem is distributed/provisioned separately from the core `.muxapp` to avoid forcing every handheld user to download a multi-gigabyte desktop image. Full flavour includes all desktop integration modules and the installer, not necessarily the desktop image bytes.
@@ -537,4 +491,36 @@ The Studio URL is not yet deployed, so do not put a fake URL in release notes. W
 - Full/Essential/Slim are reproducible variants of one source revision and one API contract.
 - A green screenshot capture is not proof that a module action or device operation works.
 - QWASAR Studio is one web app; Module Forge, Layout Designer, Release Composer and Community Library are workbenches, not four separate products.
+
+
+
+## 15. QWASAR UI composition and engine adapters
+
+The canonical interface contract is documented in [QWASAR GUI System](QWASAR_GUI_SYSTEM.md) and versioned by schemas/qwasar-ui.schema.json with the default data/qwasar_ui_manifest.json.
+
+Pygame and LÖVE are the first rendering adapters. Qt 6, LVGL and Web are reserved future adapters. The engine adapter owns rendering and input translation only; business logic, menu definitions, widget data providers and privileged commands remain engine-neutral.
+
+The shell is composable: header, footer, NEXUS side panels and global overlays are declared regions/slots, not engine-specific screens. The M shortcut is a semantic action that opens the shared media overlay without changing the current workspace.
+
+A workspace selects a visual template. START SESSION is a session selector; THE FORGE is the package workbench; UPLINK is the network/online console; MEDIA VAULT is the media workbench; RT:TOOLBOX is a four-category tool workbench; SETTINGS is a schema-backed settings editor; INFO/COMMUNITY is a reference library; END NODE is the safe exit surface.
+
+## 16. Tool inventory, verification and activation
+
+The four RT:TOOLBOX categories are:
+
+1. **Everyday Tools** — calculator, clock/timer, calendar, notes, text editor and quick utilities.
+2. **Files & Storage** — file manager, File-GD X, archives, checksums, backup/restore and storage analysis.
+3. **System & Diagnostics** — Void Diag, Void Monitor, service health, logs, cleanup and safe repair.
+4. **Developer & Terminal** — bounded shell, Python console, builders, manifest tools and developer utilities.
+
+THE FORGE installs, updates and removes packages, Void Desk builds, modules and runtimes. RT:TOOLBOX lists, launches, arranges and monitors the tools already installed. Disabling a tool or section does not uninstall its package.
+
+Two host-owned utilities are required:
+
+- **QWASAR Inspector:** read-only structure verification for schemas, manifests, component IDs, module files, menu/action/route/provider resolution, dependencies, engine/platform compatibility, permissions, assets, and package integrity. It produces a report and repair suggestions; no automatic destructive repair.
+- **QWASAR Switchboard:** activate/deactivate modules, workspaces, sections, widgets, menu entries and global panels in the user profile. It previews the change, validates required dependencies, writes atomically and offers rollback to the last valid profile.
+
+The state model distinguishes installed, enabled, visible, available, running, unavailable, incompatible and error. A profile may hide a contribution without disabling its provider. A disabled module must stop providers/jobs owned only by that module; shared dependencies remain active while still referenced. Core shell, launch selector and recovery surfaces are protected from user disablement.
+
+The future CLI may expose read-only verification and profile-level controls, such as “voiddesk verify --all”, “voiddesk doctor” and “voiddesk feature enable/disable stable-id”. These are design targets, not existing command contracts until implemented and tested.
 

@@ -34,7 +34,7 @@ The long-term direction is a **Symbiotic Layer**. Void Desk uses the host firmwa
 
 ## At a glance
 
-The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md). The module format, permissions, LEGO-style composition and release flavours are specified in [Void Desk Modules](docs/MODULE_SYSTEM.md).
+The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md). The engine-neutral component, menu, widget, shell and workspace contract is in [QWASAR GUI System](docs/QWASAR_GUI_SYSTEM.md); boot/instance/session selection is in [QWASAR Boot and Session Model](docs/QWASAR_BOOT_AND_SESSION_MODEL.md). The module format, permissions, LEGO-style composition and release flavours are specified in [Void Desk Modules](docs/MODULE_SYSTEM.md).
 
 | | |
 |---|---|
@@ -131,7 +131,7 @@ The planned public Store will be hosted as a static GitHub Pages workbench insid
 
 QWASAR Studio is planned as one opt-in browser/PWA application with four workbenches: **Module Forge** for creating and validating tools, **Layout Designer** for assembling NEXUS/workspace sections like LEGO blocks, **Release Composer** for selecting Full/Essential/Slim or a custom permitted module set, and **Community Library** for discovering and sharing profiles and reviewed modules.
 
-Profiles are declarative data and never execute code. Executable modules require a separate manifest, capability/permission review, signature and safe runtime. APT package recipes target only the optional Debian/Ubuntu desktop image, never the muOS host. The detailed contract is in [docs/MODULE_SYSTEM.md](docs/MODULE_SYSTEM.md). Cloud API, online publishing, device pairing and remote builds are planned components, not deployed services.
+Profiles are declarative data and never execute code. Executable modules require a separate manifest, capability/permission review, signature and safe runtime. On H700, APT package recipes target only the optional Debian/Ubuntu desktop image, never the muOS host; a future PC host-APT adapter requires explicit authorization. The UI composition and launch contracts are in [QWASAR GUI System](docs/QWASAR_GUI_SYSTEM.md) and [QWASAR Boot and Session Model](docs/QWASAR_BOOT_AND_SESSION_MODEL.md); the module contract is in [docs/MODULE_SYSTEM.md](docs/MODULE_SYSTEM.md). Cloud API, online publishing, device pairing and remote builds are planned components, not deployed services.
 
 ## Installation on muOS
 

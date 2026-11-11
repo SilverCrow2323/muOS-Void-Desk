@@ -43,7 +43,7 @@
       "id": "files-productivity",
       "name": "Files & Productivity",
       "workspace": "create",
-      "hub": "toolbox",
+      "hub": "rt-toolbox",
       "tools": [
         "file-manager",
         "text-editor",
@@ -57,7 +57,7 @@
       "id": "developer-tools",
       "name": "Developer Tools",
       "workspace": "create",
-      "hub": "develop",
+      "hub": "rt-toolbox",
       "tools": [
         "python-repl",
         "shell-terminal",
@@ -68,7 +68,7 @@
       "id": "system-health",
       "name": "System Health",
       "workspace": "maintain",
-      "hub": "workshop",
+      "hub": "rt-toolbox",
       "tools": [
         "device-check-rt",
         "diagnostics",
@@ -81,7 +81,7 @@
       "id": "packages-environments",
       "name": "Packages & Environments",
       "workspace": "maintain",
-      "hub": "forge",
+      "hub": "the-forge",
       "tools": [
         "component-installer",
         "autostart-manager",
@@ -95,7 +95,7 @@
       "id": "performance-cleanup",
       "name": "Performance & Cleanup",
       "workspace": "maintain",
-      "hub": "workshop",
+      "hub": "rt-toolbox",
       "tools": [
         "boost-controls",
         "apt-cache-cleanup",
@@ -146,7 +146,7 @@
       "id": "session-management",
       "name": "Sessions",
       "workspace": "configure",
-      "hub": "session",
+      "hub": "start-session",
       "tools": [
         "xfce-session",
         "icewm-session",
@@ -171,7 +171,7 @@
       "id": "standalone-apps",
       "name": "Standalone Applications",
       "workspace": "extend",
-      "hub": "outerdesk",
+      "hub": "the-forge",
       "tools": [
         "bootanim-manager",
         "disc-crusher",
@@ -180,6 +180,16 @@
         "little-mischief",
         "media-player",
         "portable-forger"
+      ]
+    },
+    {
+      "id": "qwasar-management",
+      "name": "QWASAR Structure & Feature Management",
+      "workspace": "maintain",
+      "hub": "rt-toolbox",
+      "tools": [
+        "qwasar-inspector",
+        "qwasar-switchboard"
       ]
     }
   ],
@@ -211,5 +221,118 @@
   ],
   "securityReview": [
     "little-mischief"
+  ],
+  "toolboxSections": [
+    {
+      "id": "everyday-tools",
+      "name": "Everyday Tools",
+      "status": "target"
+    },
+    {
+      "id": "files-storage",
+      "name": "Files & Storage",
+      "status": "target"
+    },
+    {
+      "id": "system-diagnostics",
+      "name": "System & Diagnostics",
+      "status": "target"
+    },
+    {
+      "id": "developer-terminal",
+      "name": "Developer & Terminal",
+      "status": "target"
+    }
+  ],
+  "integrations": [
+    {
+      "id": "input-leap",
+      "category": "pc-input-bridge",
+      "status": "candidate",
+      "workspace": "uplink",
+      "roles": [
+        "pc-server",
+        "client"
+      ],
+      "transports": [
+        "keyboard-mouse",
+        "clipboard"
+      ],
+      "requiresBothEndpoints": true,
+      "notes": "Optional software-KVM backend; does not transport video."
+    },
+    {
+      "id": "deskflow",
+      "category": "pc-input-bridge",
+      "status": "candidate",
+      "workspace": "uplink",
+      "roles": [
+        "pc-server",
+        "client"
+      ],
+      "transports": [
+        "keyboard-mouse",
+        "clipboard"
+      ],
+      "requiresBothEndpoints": true,
+      "notes": "Alternative software-KVM backend; capability detection required."
+    },
+    {
+      "id": "qwasar-link",
+      "category": "remote-workstation",
+      "status": "planned",
+      "workspace": "uplink",
+      "transports": [
+        "keyboard-mouse",
+        "remote-display",
+        "file-transfer",
+        "telemetry"
+      ],
+      "notes": "QWASAR-owned pairing and PC companion transport."
+    },
+    {
+      "id": "virtualbox",
+      "category": "pc-virtualization",
+      "status": "planned",
+      "workspace": "start-session",
+      "platforms": [
+        "desktop-linux-x86_64"
+      ],
+      "transports": [
+        "vm-console"
+      ],
+      "notes": "Optional PC-only VM provider."
+    },
+    {
+      "id": "grub2",
+      "category": "pc-bootloader",
+      "status": "planned",
+      "workspace": "start-session",
+      "platforms": [
+        "desktop-linux-x86_64"
+      ],
+      "transports": [
+        "os-installation-selection"
+      ],
+      "notes": "Optional OS-level boot menu adapter; not an engine selector."
+    }
+  ],
+  "builtInTools": [
+    {
+      "id": "qwasar-inspector",
+      "name": "QWASAR Inspector",
+      "hub": "rt-toolbox",
+      "engine": "shared",
+      "status": "planned",
+      "role": "read-only-validator"
+    },
+    {
+      "id": "qwasar-switchboard",
+      "name": "QWASAR Switchboard",
+      "hub": "rt-toolbox",
+      "engine": "shared",
+      "status": "planned",
+      "role": "profile-feature-manager"
+    }
   ]
 }

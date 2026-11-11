@@ -14,22 +14,33 @@ Keep the existing NEXUS hubs as the visual top-level navigation for compatibilit
 
 ## Current workspace/category proposal
 
-| Workspace | Category | Existing hub / entry point | Representative tools |
+| Workspace | Category | Primary owner | Representative tools |
 |---|---|---|---|
-| Connect | Network & wireless | UPLINK | Wi-Fi, hotspot, Bluetooth, network diagnostics, network probe |
-| Connect | Remote access & sync | UPLINK | Rt:Tailscale-M, Syncthing, FTP, PC Uplink, BaseStation |
-| Connect | Controllers & peripherals | UPLINK / MUOS APPS | Controller tools, device remapper, glyph manager |
-| Create | Files & productivity | RT:TOOLBOX | File manager, editor, notes, calendar, calculator, clock |
-| Create | Developer tools | DEVELOP / RT:TOOLBOX | Python REPL, shell, editor, package/build helpers |
-| Maintain | System health | WORKSHOP | Device Check:Rt, diagnostics, system monitor, storage, jobs/logs |
-| Maintain | Packages & environments | THE FORGE | Component installer, autostart, updates, CLI tools, APT management |
-| Maintain | Performance & cleanup | WORKSHOP / THE FORGE | Boost controls, cache cleanup, CHD utilities, duplicate-file tools |
-| Play | Handheld apps & games | MUOS APPS / GAMES | muOS app discovery, PortMaster hand-off, native .muxapp browser, collections |
-| Media | Playback & library | MEDIA VAULT | Internet radio, media library, VoidCast IPTV, BGM normalization |
-| Configure | Appearance & controls | SETTINGS | Palette/theme, font scale, language, controller bindings, status bar, VFX, boot animation |
-| Configure | Sessions | START SESSION / END SESSION | XFCE, IceWM, LXDE, session hand-off, restart/exit |
-| Discover | Documentation & community | INFO / COMMUNITY | Manual, diagnostics information, muOS forum/wiki, sharing entry points |
-| Extend | Standalone applications | OUTERDESK / External Tools | Optional portable applications and integrations |
+| START SESSION | Desktop Environments | START SESSION | XFCE, IceWM, LXDE, desktop session hand-off |
+| START SESSION | Terminal Sessions | START SESSION | standalone PTY shell, Python console, TUI sessions |
+| START SESSION | PC / Virtual Machines | START SESSION | QWASAR Link workstation, registered VirtualBox VMs on supported PC hosts |
+| THE FORGE | APT & System Packages | THE FORGE | APT in authorized desktop image or PC host adapter, package details, updates, cleanup |
+| THE FORGE | Void Desk Builds | THE FORGE | Full, Essential, Slim, Custom instances; side-by-side install/update |
+| THE FORGE | Modules & Runtimes | THE FORGE | QMOD modules, external tools, Pygame/LÖVE runtimes, future engine adapters |
+| UPLINK | Network & Wireless | UPLINK | Wi-Fi, hotspot, Bluetooth, network diagnostics |
+| UPLINK | Remote Access & Sync | UPLINK | Tailscale, Syncthing, pairing, device-to-PC connections |
+| UPLINK | PC Input Bridge | UPLINK | Input Leap compatibility backend, QWASAR Link remote input |
+| UPLINK | Online Services | UPLINK | Release feeds, online store, community catalogue, cloud profile sync |
+| MEDIA VAULT | Playback & Library | MEDIA VAULT | Audio/video players, Internet radio, IPTV, streaming, playlists, local media |
+| RT:TOOLBOX | Everyday Tools | RT:TOOLBOX / Everyday Tools | Calculator, clock, calendar, notes, editor, quick utilities |
+| RT:TOOLBOX | Files & Storage | RT:TOOLBOX / Files & Storage | File-GD X, file manager, archives, checksums, backup/restore |
+| RT:TOOLBOX | System & Diagnostics | RT:TOOLBOX / System & Diagnostics | Void Diag, Void Monitor, logs, health, safe cleanup/repair |
+| RT:TOOLBOX | Developer & Terminal | RT:TOOLBOX / Developer & Terminal | bounded shell, Python, builders, QWASAR Inspector, QWASAR Switchboard |
+| SETTINGS | Appearance & Controls | SETTINGS | Theme, palette, font scale, language, controller bindings, status bar, VFX, boot animation, shell layout |
+| INFO / COMMUNITY | Documentation & Community | INFO / COMMUNITY | Manual, release notes, credits, community and help |
+| END NODE | Exit / Recovery | END NODE | Return to firmware, quit, safe reboot and power-off |
+
+RT:TOOLBOX exposes installed tools and their runtime state. THE FORGE remains the sole owner of install/update/uninstall operations. “Disabled” means a contribution is not active in the profile; it does not mean its files are removed.
+
+## QWASAR management tools
+
+- **QWASAR Inspector** validates the installed Void Desk structure: schema and manifest validity, duplicate/orphan IDs, unresolved routes/actions/providers, missing assets, dependency graph, engine/platform compatibility, permissions, package manifests and profile consistency. It is read-only by default and exports a report.
+- **QWASAR Switchboard** enables/disables, hides/shows, pins and reorders workspaces, sections, modules, widgets, menu entries and global panels. It previews changes, checks dependencies and can revert to the last valid profile.
 
 ## Inventory by source area
 
