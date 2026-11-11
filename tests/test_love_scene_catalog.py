@@ -55,6 +55,17 @@ def test_external_tools_status_widget_uses_the_same_status_publisher():
     assert 'scene.set_status("Loading external tools...")' not in source
 
 
+def test_love_visual_capture_manifest_is_complete_and_unique():
+    capture = (LOVE / "core" / "visual_capture.lua").read_text(
+        encoding="utf-8"
+    )
+    scenes = re.findall(r'\{ name = "([^"]+)"', capture)
+    assert len(scenes) == 27
+    assert len(scenes) == len(set(scenes)), "duplicate LÖVE capture scene"
+    for scene in scenes:
+        assert (LOVE / "scenes" / f"{scene}.lua").is_file(), scene
+
+
 def test_love_visual_capture_includes_diagnostics_and_monitor():
     capture = (LOVE / "core" / "visual_capture.lua").read_text(
         encoding="utf-8"
@@ -85,3 +96,18 @@ def test_all_love_bridge_commands_are_registered_by_the_service():
         ))
     missing = sorted(called - registered)
     assert not missing, "LÖVE bridge commands without service handlers: " + ", ".join(missing)
+
+
+
+def test_media_vault_routes_to_real_radio_and_media_library_scenes():
+    source = (LOVE / "scenes" / "hub_media.lua").read_text(encoding="utf-8")
+    for scene in ("hub_radio", "hub_media_library"):
+        assert f'sm.push("{scene}", {{}})' in source
+        assert (LOVE / "scenes" / f"{scene}.lua").is_file()
+        capture = (LOVE / "core" / "visual_capture.lua").read_text(
+            encoding="utf-8"
+        )
+        assert f'name = "{scene}"' in capture
+
+    assert "Radio: soon" not in source
+    assert "Library: soon" not in source
