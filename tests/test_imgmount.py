@@ -483,3 +483,94 @@ def test_mount_img_refuses_fallback_after_partial_losetup_attach_failure(
     assert not ok
     assert "/dev/loop12" in error
     assert not any(command[0] == "mount" for command in commands)
+
+
+def test_mounts_propagates_unreadable_proc_mounts(monkeypatch):
+    def unreadable(_path, *_args, **_kwargs):
+        raise PermissionError("simulated /proc/mounts read failure")
+
+    monkeypatch.setattr("builtins.open", unreadable)
+    try:
+        imgmount.mounts()
+    except OSError as exc:
+        assert "simulated /proc/mounts read failure" in str(exc)
+    else:
+        raise AssertionError("unreadable mount state must not become an empty table")
+
+
+def test_mount_img_refuses_when_proc_mount_table_is_unreadable(
+        monkeypatch, tmp_path):
+    image = tmp_path / "xfce.img"
+    image.write_bytes(b"image")
+    commands = []
+
+    monkeypatch.setattr(imgmount.os, "makedirs", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        imgmount, "mounts",
+        lambda: (_ for _ in ()).throw(PermissionError("mount table denied")),
+    )
+    monkeypatch.setattr(
+        imgmount, "_run",
+        lambda command: (commands.append(command) or _fake_result()),
+    )
+
+    ok, error = imgmount.mount_img(image, tmp_path / "xfce_mnt")
+
+    assert not ok
+    assert "mount table denied" in error
+    assert commands == []
+
+
+def test_umount_tree_reports_false_when_mount_table_is_unreadable(
+        monkeypatch, tmp_path):
+    root = tmp_path / "xfce_mnt"
+    image = tmp_path / "xfce.img"
+    commands = []
+
+    monkeypatch.setattr(
+        imgmount, "mounts",
+        lambda: (_ for _ in ()).throw(PermissionError("mount table denied")),
+    )
+    monkeypatch.setattr(
+        imgmount, "_call",
+        lambda command: (commands.append(command) or 0),
+    )
+
+    assert not imgmount.umount_tree(root, image)
+    assert commands == []
+
+
+def test_loop_of_raises_when_losetup_state_is_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        imgmount, "_run",
+        lambda _command: _fake_result(1, stderr="losetup unavailable"),
+    )
+    try:
+        imgmount.loop_of("/tmp/xfce.img")
+    except OSError as exc:
+        assert "losetup unavailable" in str(exc)
+    else:
+        raise AssertionError("losetup failure must not mean no loop is attached")
+
+
+def test_mount_img_refuses_fallback_when_losetup_state_is_unavailable(
+        monkeypatch, tmp_path):
+    image = tmp_path / "xfce.img"
+    image.write_bytes(b"image")
+    commands = []
+
+    monkeypatch.setattr(imgmount.os, "makedirs", lambda *_a, **_k: None)
+    monkeypatch.setattr(imgmount, "mounts", lambda: [])
+    def run(command):
+        commands.append(command)
+        if command == ["losetup", "-a"]:
+            return _fake_result(1, stderr="losetup unavailable")
+        raise AssertionError("mount fallback must not run after losetup failure")
+
+    monkeypatch.setattr(imgmount, "_run", run)
+
+    ok, error = imgmount.mount_img(image, tmp_path / "xfce_mnt")
+
+    assert not ok
+    assert "losetup unavailable" in error
+    assert commands == [["losetup", "-a"]]
