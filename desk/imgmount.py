@@ -10,6 +10,7 @@
 # gia' associato all'immagine.
 
 import os
+import re
 import subprocess
 
 
@@ -29,54 +30,101 @@ def _call(cmd):
     return _run(cmd).returncode
 
 
+def _decode_mount_field(value):
+    """Decode the octal escapes used by /proc/mounts and losetup output."""
+    return re.sub(
+        r"\\\\([0-7]{3})",
+        lambda match: chr(int(match.group(1), 8)),
+        value,
+    )
+
+
+def _normal_path(path):
+    return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
+
 def mounts():
     try:
-        return open("/proc/mounts").read().splitlines()
+        with open("/proc/mounts") as stream:
+            return stream.read().splitlines()
     except OSError:
         return []
 
 
 def is_mounted(path):
-    p = os.path.abspath(path)
-    for ln in mounts():
-        f = ln.split()
-        if len(f) > 1 and f[1] == p:
+    target = _normal_path(path)
+    for line in mounts():
+        fields = line.split()
+        if len(fields) > 1 and _normal_path(_decode_mount_field(fields[1])) == target:
             return True
     return False
 
 
 def is_mounted_rw(path):
-    """Come is_mounted(), ma dice anche SE è scrivibile -- is_mounted()
-    da sola non lo sa, e un mount rimasto in sola lettura da un
-    controllo precedente farebbe fallire una scrittura in silenzio."""
-    p = os.path.abspath(path)
-    for ln in mounts():
-        f = ln.split()
-        if len(f) > 3 and f[1] == p:
-            return "rw" in f[3].split(",")
+    """Return whether the exact mountpoint is mounted read/write."""
+    target = _normal_path(path)
+    for line in mounts():
+        fields = line.split()
+        if len(fields) > 3 and _normal_path(_decode_mount_field(fields[1])) == target:
+            return "rw" in fields[3].split(",")
     return False
 
 
 def submounts(root):
-    """Tutti i punti di mount sotto root, dal piu' profondo al piu' alto."""
-    r = os.path.abspath(root)
+    """Return all mountpoints below root, deepest first."""
+    target = _normal_path(root)
     out = []
-    for ln in mounts():
-        f = ln.split()
-        if len(f) > 1 and (f[1] == r or f[1].startswith(r + "/")):
-            out.append(f[1])
+    for line in mounts():
+        fields = line.split()
+        if len(fields) < 2:
+            continue
+        mountpoint = _normal_path(_decode_mount_field(fields[1]))
+        if mountpoint == target or mountpoint.startswith(target + os.sep):
+            out.append(mountpoint)
     out.sort(key=len, reverse=True)
     return out
 
 
 def loop_of(img):
-    """/dev/loopN gia' associato all'immagine, se c'e'."""
-    img = os.path.abspath(img)
-    out = _run(["losetup", "-a"]).stdout
-    for ln in out.splitlines():
-        if img in ln:
-            return ln.split(":")[0].strip()
+    """Return the loop device whose backing file exactly matches img."""
+    target = _normal_path(img)
+    output = _run(["losetup", "-a"]).stdout
+    for line in output.splitlines():
+        device, separator, details = line.partition(":")
+        if not separator or not device.strip().startswith("/dev/loop"):
+            continue
+        opening = details.find("(")
+        closing = details.rfind(")")
+        if opening < 0 or closing <= opening:
+            continue
+        backing_file = _decode_mount_field(details[opening + 1:closing])
+        if _normal_path(backing_file) == target:
+            return device.strip()
     return None
+
+
+def loop_is_mounted(device):
+    """Check the mount source field exactly, avoiding loop1/loop10 matches."""
+    for line in mounts():
+        fields = line.split()
+        if fields and fields[0] == device:
+            return True
+    return False
+
+
+def umount_tree(mnt, img=None):
+    """Unmount all mounts below mnt and release its loop when possible.
+
+    Returns True only when the root mountpoint is no longer mounted.
+    """
+    for path in submounts(mnt):
+        if _call(["umount", path]) != 0:
+            _call(["umount", "-l", path])
+    if img:
+        device = loop_of(img)
+        if device and not loop_is_mounted(device):
+            _call(["losetup", "-d", device])
+    return not is_mounted(mnt)
 
 
 def free_loop():
@@ -156,7 +204,7 @@ def loop_count():
 def cleanup_stale(img):
     """Libera i loop rimasti attaccati all'immagine ma non montati."""
     dev = loop_of(img)
-    if dev and not any(dev in ln for ln in mounts()):
+    if dev and not loop_is_mounted(dev):
         _call(["losetup", "-d", dev])
         return True
     return False
