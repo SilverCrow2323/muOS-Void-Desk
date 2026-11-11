@@ -60,7 +60,7 @@ mounted = imgmount.is_mounted
 
 
 def umount_all():
-    imgmount.umount_tree(MNT, IMG)
+    return imgmount.umount_tree(MNT, IMG)
 
 
 def bind_all():
@@ -139,8 +139,9 @@ def main():
         open(MARKER + ".img", "w").close()
 
     log("   monto l'immagine in loopback...")
-    umount_all()
-    imgmount.cleanup_stale(IMG)
+    if not umount_all():
+        log("FATAL: mount XFCE ancora attivi; rifiuto il remount")
+        return 1
     os.makedirs(MNT, exist_ok=True)
     sh("modprobe loop 2>/dev/null || true")
     ok, err = imgmount.mount_img(IMG, MNT)
@@ -232,7 +233,9 @@ def main():
         log("Avvialo da VOIDDESK -> DESKTOP XFCE")
         return 0
     finally:
-        umount_all()
+        if not umount_all():
+            log("FATAL: cleanup XFCE incompleto; mount o loop ancora attivi")
+            return 1
 
 
 if __name__ == "__main__":
