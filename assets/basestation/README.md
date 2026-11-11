@@ -67,13 +67,36 @@ placed in URLs. Use the dashboard only on trusted LAN or Tailscale networks.
 1. Start BaseStation.
 2. Open **Tools → PC Link Pairing**.
 3. Copy the PC address and private authentication token.
-4. On the handheld, open **UPLINK → PC UPLINK → Add manually** and enter the
-   address, port and token.
+4. On the handheld, open **UPLINK → PC UPLINK → Add manually**, enter the
+   address and port, select **HTTP** or **HTTPS**, then enter the token.
 5. Open **Tools → Linked Handhelds** to view incoming telemetry.
 
 The default PC Link port is TCP `8420`, matching the discovery client already
 included in Void Desk. Legacy BaseStation profiles using the previous default
 port `31337` are migrated automatically.
+
+### HTTPS PC Link through a trusted TLS endpoint
+
+The handheld PC Uplink client can connect to a manually configured HTTPS
+endpoint. It uses the operating system CA store, verifies the certificate
+chain and hostname, and refuses redirects. It never disables certificate
+verification or falls back from HTTPS to HTTP.
+
+Use a DNS name covered by the certificate's Subject Alternative Name and
+ensure the handheld has the issuing CA certificate installed. A private or
+self-signed certificate is not trusted automatically.
+
+The built-in BaseStation PC Link daemon still speaks HTTP. HTTPS therefore
+requires a TLS-terminating reverse proxy or another trusted HTTPS gateway in
+front of it. When using a reverse proxy on the same PC, set
+`uplink.daemon_bind` to `127.0.0.1` in
+`~/.config/void_basestation/profiles.json`, restart BaseStation, and configure
+the proxy to forward to `http://127.0.0.1:8420`. Do not expose the raw HTTP
+listener to an untrusted network.
+
+Automatic LAN discovery continues to probe HTTP on TCP 8420. Add HTTPS
+endpoints manually and select HTTPS; use the proxy's HTTPS hostname and port
+(typically 443). HTTP remains the default for existing local installations.
 
 ## Data and security
 

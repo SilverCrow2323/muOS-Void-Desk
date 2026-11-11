@@ -2376,6 +2376,7 @@ class App(object):
         self.pcup_notify_buf = ""
         self.pc_servers = self.cfg.get("pc_servers_manual", [])
         for s in self.pc_servers:
+            s.setdefault("scheme", "http")
             s["client"] = None
             s["auto"] = False
         self.pc_srv_sel = 0
@@ -5328,15 +5329,17 @@ class App(object):
 
 # --- [P7] Boot Animation Toggle // HUB: SETTINGS ---
     def pcup_setup(self):
-        """Aggiunge un server PC manualmente -- ripiego per quando la
-        scansione automatica non trova qualcosa (network diversa, PC
-        off durante la scansione, eccetera)."""
+        """Add a PC Link endpoint manually, including an optional TLS URL."""
         it = (self.lang == "it")
         cur = {}
-        steps = [("HOST PC", "pcup_host", "192.168.1."),
-                 ("PORTA" if it else "PORT", "pcup_port", "8420"),
-                 ("TOKEN (opzionale)" if it else "TOKEN (optional)",
-                 "pcup_token", "")]
+        steps = [
+            ("HOST PC", "pcup_host", "192.168.1."),
+            ("PORTA" if it else "PORT", "pcup_port", "8420"),
+            ("TRASPORTO (http/https)" if it else "TRANSPORT (http/https)",
+             "pcup_scheme", "http"),
+            ("TOKEN (opzionale)" if it else "TOKEN (optional)",
+             "pcup_token", ""),
+        ]
 
         def ask(i):
             if i >= len(steps):
@@ -5345,10 +5348,28 @@ class App(object):
                         port = int(cur.get("pcup_port") or 8420)
                     except ValueError:
                         port = 8420
-                    entry = {"host": cur["pcup_host"], "port": port,
-                            "token": cur.get("pcup_token", ""),
-                            "name": cur["pcup_host"], "auto": False,
-                            "client": None}
+                    try:
+                        scheme = pcuplink.normalize_scheme(
+                            cur.get("pcup_scheme", "http"))
+                    except ValueError:
+                        self.info_title = "PC UPLINK"
+                        message = ("Trasporto non valido: usa http oppure https."
+                                   if it else
+                                   "Invalid transport: enter http or https.")
+                        self.info_lines = self.stub_lines(
+                            "PC UPLINK", [message])
+                        self.scroll = 0
+                        self.push("info")
+                        return
+                    entry = {
+                        "host": cur["pcup_host"],
+                        "port": port,
+                        "scheme": scheme,
+                        "token": cur.get("pcup_token", ""),
+                        "name": cur["pcup_host"],
+                        "auto": False,
+                        "client": None,
+                    }
                     self.pc_servers.append(entry)
                     self.pcup_save_manual()
                     self.pc_srv_sel = len(self.pc_servers) - 1
@@ -5356,16 +5377,20 @@ class App(object):
                 return
             title, key, init = steps[i]
 
-            def done(v, i=i, key=key):
-                cur[key] = v.strip()
+            def done(value, i=i, key=key):
+                cur[key] = value.strip()
                 ask(i + 1)
             self.osk_open(title, init, done)
         ask(0)
 
     def pcup_save_manual(self):
-        manual = [{"host": s["host"], "port": s["port"],
-                  "token": s.get("token", ""), "name": s["name"]}
-                 for s in self.pc_servers if not s.get("auto")]
+        manual = [{
+            "host": s["host"],
+            "port": s["port"],
+            "scheme": pcuplink.normalize_scheme(s.get("scheme", "http")),
+            "token": s.get("token", ""),
+            "name": s["name"],
+        } for s in self.pc_servers if not s.get("auto")]
         self.cfg["pc_servers_manual"] = manual
         save_cfg(self.cfg)
 
@@ -5395,8 +5420,8 @@ class App(object):
             found_keys.add(key)
             prev = existing_auto.get(key)
             auto_new.append({"host": f["host"], "port": f["port"],
-                            "token": "", "name": f["name"],
-                            "auto": True,
+                            "scheme": "http", "token": "",
+                            "name": f["name"], "auto": True,
                             "client": prev["client"] if prev
                             else None})
         # un auto-scoperto che non risponde piu' ed era collegato:
@@ -5425,7 +5450,8 @@ class App(object):
             s["host"], s["port"], s.get("token", ""),
             device_id=dev_id, device_name=dev_name,
             stats_fn=self.uplink_device_stats,
-            screenshot_fn=self.uplink_device_screenshot)
+            screenshot_fn=self.uplink_device_screenshot,
+            scheme=s.get("scheme", "http"))
         s["client"].start()
         self.pcup_auto_upload(s["client"], dev_id)
         return s["client"]
@@ -5443,7 +5469,8 @@ class App(object):
         if last:
             for s in self.pc_servers:
                 if s["host"] == last.get("host") and \
-                        s["port"] == last.get("port"):
+                        s["port"] == last.get("port") and \
+                        s.get("scheme", "http") == last.get("scheme", "http"):
                     target = s
                     break
         if target is None and len(self.pc_servers) == 1:
@@ -6577,8 +6604,11 @@ class App(object):
     def pcup_open_detail(self, idx):
         s = self.pc_servers[idx]
         self.pc_link_ensure_client(s)
-        self.cfg["pc_last_server"] = {"host": s["host"],
-                                      "port": s["port"]}
+        self.cfg["pc_last_server"] = {
+            "host": s["host"],
+            "port": s["port"],
+            "scheme": pcuplink.normalize_scheme(s.get("scheme", "http")),
+        }
         save_cfg(self.cfg)
         self.pc_active_idx = idx
         self.push("pcuplink")
@@ -20957,8 +20987,12 @@ class App(object):
                     tw = self.f_tiny.size(tag)[0]
                     self.text(tag, (W - 26 - tw, y + 10), self.f_tiny,
                               FAINT)
-                    self.text("%s:%d" % (s["host"], s["port"]),
-                              (40, y + 22), self.f_tiny, FAINT)
+                    scheme = pcuplink.normalize_scheme(
+                        s.get("scheme", "http"))
+                    self.text("%s://%s:%d" % (
+                        scheme, s["host"], s["port"]),
+                        (40, y + 22), self.f_tiny, FAINT,
+                        maxw=W - 70)
                     y += 44
             self.footer([("A", self.t("open")),
                         ("X", "aggiungi" if it else "add"),
