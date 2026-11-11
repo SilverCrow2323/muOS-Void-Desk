@@ -18,14 +18,39 @@ vd_mount_present() {
         return 0
     fi
 
-    PYTHONPATH="$_vd_app_dir/desk${PYTHONPATH:+:$PYTHONPATH}" \
-        "$_vd_python" -c \
-        'import sys\ntry:\n import imgmount\n mounted = imgmount.is_mounted(sys.argv[1])\nexcept Exception as exc:\n print("[mount] state check failed: %s" % exc, file=sys.stderr)\n sys.exit(2)\nsys.exit(0 if mounted else 1)' \
-        "$_vd_mount_path"
+    _vd_result=$(
+        PYTHONPATH="$_vd_app_dir/desk\${PYTHONPATH:+:$PYTHONPATH}" \
+            "$_vd_python" -c \
+            'import sys
+try:
+    with open("/proc/mounts", "r") as stream:
+        mount_table = stream.read()
+    if not mount_table.strip():
+        raise RuntimeError("/proc/mounts is empty")
+    import imgmount
+    mounted = imgmount.is_mounted(sys.argv[1])
+except Exception as exc:
+    print("[mount] state check failed: {}".format(exc), file=sys.stderr)
+    sys.exit(2)
+print("mounted" if mounted else "unmounted")' \
+            "$_vd_mount_path"
+    )
     _vd_status=$?
-    if [ "$_vd_status" -gt 1 ]; then
+    if [ "$_vd_status" -ne 0 ]; then
         echo "[mount] state check failed; refusing to stack another mount" >&2
         return 0
     fi
-    return "$_vd_status"
+
+    case "$_vd_result" in
+        mounted)
+            return 0
+            ;;
+        unmounted)
+            return 1
+            ;;
+        *)
+            echo "[mount] unexpected state-check output; refusing to stack another mount" >&2
+            return 0
+            ;;
+    esac
 }
