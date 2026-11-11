@@ -135,7 +135,9 @@
         "kind",
         "stateModel",
         "slots",
-        "customizable"
+        "customizable",
+        "propsSchema",
+        "events"
       ],
       "properties": {
         "id": {
@@ -183,6 +185,35 @@
         "fallback": {
           "type": "string",
           "maxLength": 96
+        },
+        "propsSchema": {
+          "type": "object"
+        },
+        "events": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "focus",
+              "blur",
+              "activate",
+              "select",
+              "change",
+              "refresh",
+              "play",
+              "pause",
+              "stop",
+              "seek",
+              "cancel",
+              "dismiss",
+              "open",
+              "close",
+              "navigate",
+              "confirm",
+              "submit",
+              "reset"
+            ]
+          }
         }
       }
     },
