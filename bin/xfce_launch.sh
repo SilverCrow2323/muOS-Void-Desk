@@ -38,10 +38,8 @@ PROG() {
 
 PY3="$(command -v python3)"
 
-MNTED() {
-    PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
-        "$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.is_mounted(sys.argv[1]) else 1)' "$1"
-}
+. "$APP_DIR/bin/vd_mount_common.sh"
+MNTED() { vd_mount_present "$APP_DIR" "$1"; }
 
 CLEANUP() {
 	BOOST_TEARDOWN
