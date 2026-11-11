@@ -99,6 +99,30 @@ bridge.init()
 
 local root = assert(os.getenv("VOIDDESK_APP_DIR"),
                     "VOIDDESK_APP_DIR must point to a test directory")
+
+-- LÖVE configuration writes must be atomic and fail without mutating memory.
+local config = require("core.config")
+config.load()
+equal(config.set("theme", "megastructure"), true,
+      "config should save a valid theme")
+local saved = read_json and nil
+local config_file = assert(io.open(config.path(), "r"))
+local saved_text = config_file:read("*a")
+config_file:close()
+local saved_data = json.decode(saved_text)
+equal(saved_data.theme, "megastructure", "saved theme should be present")
+
+local obstruction = config.path() .. ".tmp"
+os.execute("mkdir -p " .. string.format("%q", obstruction))
+equal(config.set("theme", "must-not-persist"), false,
+      "config write should fail when temp path is blocked")
+equal(config.get("theme"), "megastructure",
+      "failed config write must preserve in-memory value")
+local verify_file = assert(io.open(config.path(), "r"))
+local verify_text = verify_file:read("*a")
+verify_file:close()
+equal(verify_text, saved_text, "failed config write must preserve last good file")
+os.execute("rmdir " .. string.format("%q", obstruction))
 local request_path = bridge.req_path()
 local processing_path = root .. "/data/.love_request.processing"
 local response_path = bridge.resp_path()
