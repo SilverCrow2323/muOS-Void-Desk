@@ -127,6 +127,8 @@ The muOS developer documentation describes its app runner, launcher metadata, se
 
 ## QWASAR Studio — one web app for modules, layouts and builds
 
+The planned public Store will be hosted as a static GitHub Pages workbench inside Studio; downloadable binaries will remain on GitHub Releases. Accounts, uploads, moderation, device sync and remote builds require the future QWASAR Hub. See [the Store portal architecture](docs/QWASAR_STORE_PORTAL.md).
+
 QWASAR Studio is planned as one opt-in browser/PWA application with four workbenches: **Module Forge** for creating and validating tools, **Layout Designer** for assembling NEXUS/workspace sections like LEGO blocks, **Release Composer** for selecting Full/Essential/Slim or a custom permitted module set, and **Community Library** for discovering and sharing profiles and reviewed modules.
 
 Profiles are declarative data and never execute code. Executable modules require a separate manifest, capability/permission review, signature and safe runtime. APT package recipes target only the optional Debian/Ubuntu desktop image, never the muOS host. The detailed contract is in [docs/MODULE_SYSTEM.md](docs/MODULE_SYSTEM.md). Cloud API, online publishing, device pairing and remote builds are planned components, not deployed services.

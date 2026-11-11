@@ -57,6 +57,8 @@ Portable JSON import/export is the v1 baseline and must work without an account 
 
 The initial client should be a static, progressively enhanced PWA. Do not place device credentials in exported profiles or browser storage without a dedicated credential design.
 
+The public Store hosting decision and Pages/Hub trust boundary are specified in [QWASAR Store Portal Architecture](QWASAR_STORE_PORTAL.md). GitHub Pages hosts the static Studio PWA and public catalogue; immutable binary assets live in GitHub Releases.
+
 ## One Studio application, four workbenches
 
 QWASAR Studio is one responsive PWA. The following are workbenches inside it, not separate products or repositories:
