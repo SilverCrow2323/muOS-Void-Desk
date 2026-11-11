@@ -427,6 +427,8 @@ def test_radio_search_rejects_unsafe_stream_urls(monkeypatch):
          "url_resolved": "http://user:pass@example.org/radio"},
         {"stationuuid": "44444444-4444-4444-4444-444444444444",
          "url_resolved": "http://localhost/radio"},
+        {"stationuuid": "66666666-6666-6666-6666-666666666666",
+         "url_resolved": "http://192.168.1.1/radio"},
     ]
     assert all(service._radio_clean_station(item) is None for item in bad)
 
