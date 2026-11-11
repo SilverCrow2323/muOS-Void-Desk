@@ -102,6 +102,10 @@ def main():
         return 0
 
     log("==== VOIDDESK %s install ====" % spec["title"], screen)
+    if imgmount.is_mounted(MNT):
+        log("FATAL: XFCE desktop is already mounted; close the session first",
+            screen)
+        return 1
     log("mounting desktop image...", screen)
     os.makedirs(MNT, exist_ok=True)
     ok, err = imgmount.mount_img(IMG, MNT)
@@ -144,7 +148,11 @@ def main():
         return 0
     finally:
         log("unmounting...", screen)
-        imgmount.umount_tree(MNT, IMG)
+        cleanup_ok = imgmount.umount_tree(MNT, IMG)
+        if not cleanup_ok:
+            log("FATAL: XFCE cleanup incomplete; mounts or loop still active",
+                screen)
+            return 1
 
 
 if __name__ == "__main__":
