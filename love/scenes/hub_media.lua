@@ -45,7 +45,7 @@ return dashboard.new({
 
     items = {
         { icon = "music", label = "Void Radio", desc = "Internet radio stations",
-          action = function(scene) scene.set_status("Radio: soon"); return "Radio" end },
+          action = function() sm.push("hub_radio", {}) end },
         { icon = "video", label = "VoidCast IPTV", value = "LIVE",
           desc = "TV streams and EPG guide (LÖVE prototype)",
           action = function() sm.push("hub_iptv", {}) end },
