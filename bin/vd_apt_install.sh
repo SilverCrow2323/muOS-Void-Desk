@@ -34,6 +34,7 @@ PROC_MOUNTED=0
 SYS_MOUNTED=0
 SETUP_OK=1
 RC=0
+CLEANUP_RC=0
 FIFO="$DATA/.apt-install.$$"
 TEE_PID=""
 
@@ -41,6 +42,17 @@ cleanup_fifo() {
     [ -n "$FIFO" ] && rm -f "$FIFO"
 }
 trap cleanup_fifo 0
+
+unmount_owned() {
+    TARGET=$1
+    if ! umount "$TARGET" 2>/dev/null; then
+        umount -l "$TARGET" 2>/dev/null || true
+    fi
+    if MNTED "$TARGET"; then
+        echo "mount remains active: $TARGET" | tee -a "$LOG" >&2
+        CLEANUP_RC=1
+    fi
+}
 
 if ! MNTED "$MNT"; then
     if mount -o loop "$IMG" "$MNT" 2>>"$LOG"; then
@@ -119,21 +131,8 @@ if [ "$SETUP_OK" = 1 ]; then
     fi
 fi
 
-CLEANUP_RC=0
-unmount_owned() {
-    TARGET=$1
-    if ! umount "$TARGET" 2>/dev/null; then
-        umount -l "$TARGET" 2>/dev/null || true
-    fi
-    if MNTED "$TARGET"; then
-        echo "mount remains active: $TARGET" | tee -a "$LOG" >&2
-        CLEANUP_RC=1
-    fi
-}
-
 if [ "$WE_MOUNTED" = 1 ]; then
-    # This helper owns the root image, so it can safely tear down and verify
-    # every bind below it and release the loop device.
+    # This installer owns the root image: verify and release the complete tree.
     PYTHONPATH="$APP_DIR/desk${PYTHONPATH:+:$PYTHONPATH}" \
       "$PY3" -c 'import imgmount, sys; sys.exit(0 if imgmount.umount_tree(sys.argv[1], sys.argv[2]) else 1)' \
       "$MNT" "$IMG"
@@ -144,7 +143,7 @@ if [ "$WE_MOUNTED" = 1 ]; then
     fi
 else
     # The root image belongs to an existing desktop session; unmount only
-    # bind mounts this installer created.
+    # bind mounts that this installer created.
     [ "$SYS_MOUNTED" = 1 ] && unmount_owned "$MNT/sys"
     [ "$PROC_MOUNTED" = 1 ] && unmount_owned "$MNT/proc"
     [ "$DEV_MOUNTED" = 1 ] && unmount_owned "$MNT/dev"
