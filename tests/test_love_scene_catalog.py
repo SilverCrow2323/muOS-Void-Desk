@@ -85,3 +85,18 @@ def test_all_love_bridge_commands_are_registered_by_the_service():
         ))
     missing = sorted(called - registered)
     assert not missing, "LÖVE bridge commands without service handlers: " + ", ".join(missing)
+
+
+
+def test_media_vault_routes_to_real_radio_and_media_library_scenes():
+    source = (LOVE / "scenes" / "hub_media.lua").read_text(encoding="utf-8")
+    for scene in ("hub_radio", "hub_media_library"):
+        assert f'sm.push("{scene}", {{}})' in source
+        assert (LOVE / "scenes" / f"{scene}.lua").is_file()
+        capture = (LOVE / "core" / "visual_capture.lua").read_text(
+            encoding="utf-8"
+        )
+        assert f'name = "{scene}"' in capture
+
+    assert "Radio: soon" not in source
+    assert "Library: soon" not in source
