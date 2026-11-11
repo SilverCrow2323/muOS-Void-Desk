@@ -1,8 +1,10 @@
-# QWASAR Desk Frontends — Pygame and LÖVE
+# Void Desk Frontends — Pygame and LÖVE
+
+The handheld application is **Void Desk**, part of the wider **QWASAR-Env** ecosystem. See [the product and device map](../docs/PRODUCT_ECOSYSTEM_MAP.md) for the cross-device architecture and LÖVE completion gates.
 
 ## Pygame (recommended)
 
-Pygame is the main and more complete QWASAR Desk frontend.
+Pygame is the main and more complete Void Desk frontend.
 
 - Entry point: desk/main.py
 - Shared constants and menu metadata: desk/const.py
