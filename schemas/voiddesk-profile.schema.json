@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/schemas/voiddesk-profile.schema.json",
-  "title": "Void Desk Studio Profile",
-  "description": "Portable declarative UI and feature preferences. Profiles are data only and cannot execute commands.",
+  "title": "QWASAR Desk Profile",
+  "description": "Portable declarative QWASAR Desk UI and feature preferences. Profiles are data only and cannot execute commands.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -75,7 +75,8 @@
         },
         "minimumVoidDeskVersion": {
           "type": "string",
-          "maxLength": 32
+          "maxLength": 32,
+          "description": "Minimum QWASAR Desk runtime version. The property name is retained as a version 1 compatibility identifier."
         }
       }
     },
@@ -171,7 +172,7 @@
         "route": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$",
-          "description": "Must resolve to a route registered by the installed Void Desk build."
+          "description": "Must resolve to a route registered by the installed QWASAR Desk build."
         },
         "label": {
           "type": "string",
