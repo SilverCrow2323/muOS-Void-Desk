@@ -59,6 +59,7 @@ print("mounted" if mounted else "unmounted")' \
 # Ensure a path is mounted, but invoke the mount command only when the parser
 # positively reports it as unmounted. Unknown state is a hard stop.
 vd_mount_ensure() {
+    VD_MOUNT_CREATED=0
     _vd_app_dir=$1
     _vd_mount_path=$2
     shift 2
@@ -75,7 +76,11 @@ vd_mount_ensure() {
                 return 2
             fi
             "$@"
-            return $?
+            _vd_mount_rc=$?
+            if [ "$_vd_mount_rc" -eq 0 ]; then
+                VD_MOUNT_CREATED=1
+            fi
+            return "$_vd_mount_rc"
             ;;
         *)
             echo "[mount] refusing mount because state is unknown: $_vd_mount_path" >&2
