@@ -34,6 +34,28 @@ def test_qwasar_env_product_map_documents_device_boundaries_and_love_gates():
         assert term in doc
 
 
+def test_void_desk_module_contract_covers_composition_security_and_flavours():
+    doc = (ROOT / "docs" / "MODULE_SYSTEM.md").read_text(encoding="utf-8")
+    for term in (
+        "The LEGO rule",
+        "Profiles and layouts",
+        "Desktop APT packages",
+        "module.json",
+        "hub.panel",
+        "capabilities",
+        "sandboxing",
+        "Module Forge",
+        "Layout Designer",
+        "Release Composer",
+        "Community Library",
+        "Full",
+        "Essential",
+        "Slim",
+        "APT operations are submitted through the existing Void Desk service job manager",
+    ):
+        assert term in doc
+
+
 def test_symbiotic_layer_has_recovery_and_reversibility_constraints():
     doc = (ROOT / "docs" / "SYMBIOTIC_LAYER.md").read_text(encoding="utf-8")
     assert "Application lifecycle" in doc
