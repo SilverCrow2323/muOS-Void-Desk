@@ -1896,6 +1896,13 @@
       "kind": "route",
       "target": "qwasar.switchboard",
       "status": "planned"
+    },
+    {
+      "id": "launch.confirm",
+      "kind": "system",
+      "target": "runtime-launcher.confirm-selection",
+      "status": "planned",
+      "description": "Validate installation, engine, profile and session combination, then invoke the approved launcher adapter."
     }
   ],
   "keymap": [
@@ -2029,9 +2036,9 @@
               "id": "launch.continue",
               "type": "menu.entry",
               "props": {
-                "label": "Continue",
-                "actionId": "launch.confirm"
-              }
+                "label": "Continue"
+              },
+              "actionId": "launch.confirm"
             }
           ]
         }
@@ -2261,6 +2268,41 @@
           "desktop-other"
         ],
         "notes": "Alternative software-KVM backend to probe alongside Input Leap. Select only after both endpoints, session type, encryption and input permissions pass compatibility checks. It does not provide remote display."
+      }
+    ],
+    "packageAdapters": [
+      {
+        "id": "apt.desktop-image",
+        "status": "current",
+        "platforms": [
+          "muos-h700"
+        ],
+        "target": "optional-debian-ubuntu-image",
+        "hostMutation": false,
+        "requiresExplicitApproval": true,
+        "notes": "APT is confined to the optional Debian/Ubuntu image. If the image is not mounted/available, offer the trusted image installer or report unavailable."
+      },
+      {
+        "id": "apt.desktop-host",
+        "status": "planned",
+        "platforms": [
+          "desktop-linux-x86_64"
+        ],
+        "target": "host-linux-package-database",
+        "hostMutation": true,
+        "requiresExplicitApproval": true,
+        "notes": "Separate PC-only adapter. It requires an explicit user/admin prompt, names the host package database and exact packages, serializes operations and never runs arbitrary module commands."
+      },
+      {
+        "id": "muos-buildroot",
+        "status": "forbidden",
+        "platforms": [
+          "muos-h700"
+        ],
+        "target": "muos-buildroot-host",
+        "hostMutation": true,
+        "requiresExplicitApproval": false,
+        "notes": "APT must never target the muOS Buildroot host. Use firmware packages and the muOS application lifecycle instead."
       }
     ]
   },
