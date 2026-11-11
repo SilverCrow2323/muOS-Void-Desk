@@ -1,5 +1,5 @@
 # ============================================================================
-#  VOID DESK 10-NEXUS — INDEX
+#  QWASAR DESK 10-NEXUS — INDEX
 #  Navigation Map: every section tagged by Hub + NEXUS subsystem
 #  Legend: [CODE] Title  //  HUB: Name  |  NEXUS subsystem
 # ============================================================================
@@ -160,7 +160,7 @@
 # ============================================================================
 # -*- coding: utf-8 -*-
 # ============================================================================
-#  VOIDDESK v10.0.0 "NEXUS" — pannello di controllo della suite Void per muOS
+#  QWASAR DESK v10.5.4-NEXUS — handheld environment for muOS
 #  Estetica SPDW FACTORY: cyberpunk manga grezzo, megastruttura alla BLAME!
 # ============================================================================
 
@@ -674,7 +674,7 @@ MENU_DEST_COLORS = [
 # click: il suono anticipa il carattere del luogo prima del suo bootanim.
 MENU_ENTRY_SOUNDS = ["nexus", "snap", "charge", "charge2", "lid_click",
                      "charge3", "charge4", "click", "page_flip"]
-GITHUB_REPO = "SilverCrow2323/muOS-Void-Desk"
+GITHUB_REPO = "SilverCrow2323/Void-Desk-Project"
 # gruppi tematici del Rt:Toolbox: (titolo IT, titolo EN, icona sezione,
 # quante voci ci stanno, stile del widget) -- l'ordine deve combaciare
 # con l'ordine delle voci in HUBS["toolbox"]
@@ -1673,7 +1673,7 @@ TR = {
   "f_inst": "Void Installer", "f_inst_s": "install e rimuovi (L1: tab)",
   "f_auto": "Avvio al boot", "f_auto_s": "app che partono col desktop",
   "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
-  "f_vdupd": "Void-Desk Update", "f_vdupd_s": "update l'app da GitHub",
+  "f_vdupd": "QWASAR Desk Update", "f_vdupd_s": "update l'app da GitHub",
   "f_cli": "CLI Shooter", "f_cli_s": "roba simpatica da terminale",
   "w_stats": "Device Stats", "w_stats_s": "il quadro completo del system",
   "w_diag": "Void Diag", "w_diag_s": "salute di immagine e sessioni",
@@ -1739,7 +1739,7 @@ TR = {
   "i_man": "Manuale tecnico", "i_man_s": "capitoli, tutto spiegato",
   "i_guide": "Guida rapida", "i_guide_s": "i comandi essenziali",
   "i_manifesto": "Manifesto", "i_manifesto_s": "un segnale dal VOID",
-  "i_update": "Void Desk Update", "i_update_s": "versione, novità, release",
+  "i_update": "QWASAR Desk Update", "i_update_s": "versione, novità, release",
   "installed": "installed", "notinst": "non installed - A: install",
   "opens_desk": "si apre nel desktop: la trovi nel menu applicazioni",
   "tab_inst": "TAB: INSTALLA", "tab_rm": "TAB: RIMUOVI",
@@ -1853,7 +1853,7 @@ TR = {
   "f_inst": "Void Installer", "f_inst_s": "install & remove (L1: tab)",
   "f_auto": "Startup apps", "f_auto_s": "apps that boot with the desktop",
   "f_upd": "Update Environments", "f_upd_s": "apt update + upgrade",
-  "f_vdupd": "Void-Desk Update", "f_vdupd_s": "update the app from GitHub",
+  "f_vdupd": "QWASAR Desk Update", "f_vdupd_s": "update the app from GitHub",
   "f_cli": "CLI Shooter", "f_cli_s": "fun stuff for the terminal",
   "w_stats": "Device Stats", "w_stats_s": "the full system picture",
   "w_diag": "Void Diag", "w_diag_s": "image and session health",
@@ -1919,7 +1919,7 @@ TR = {
   "i_man": "Technical manual", "i_man_s": "chapters, everything explained",
   "i_guide": "Quick guide", "i_guide_s": "the essential controls",
   "i_manifesto": "Manifesto", "i_manifesto_s": "a signal from the VOID",
-  "i_update": "Void Desk Update", "i_update_s": "version, news, releases",
+  "i_update": "QWASAR Desk Update", "i_update_s": "version, news, releases",
   "installed": "installed", "notinst": "not installed - A: install",
   "opens_desk": "opens in the desktop: find it in the app menu",
   "tab_inst": "TAB: INSTALL", "tab_rm": "TAB: REMOVE",
@@ -5725,7 +5725,7 @@ class App(object):
         if s.get("client") is not None:
             return s["client"]
         dev_id = self.cfg.get("termid_id") or "voiddesk-unknown"
-        dev_name = self.cfg.get("termid_name") or "VoidDesk"
+        dev_name = self.cfg.get("termid_name") or "QWASAR Desk"
         s["client"] = pcuplink.PcClient(
             s["host"], s["port"], s.get("token", ""),
             device_id=dev_id, device_name=dev_name,
@@ -5777,8 +5777,8 @@ class App(object):
              "updates + source link integrity"),
             ("autocheck", "bool",
              "AUTOMATIC CHECK" if it else "AUTO-CHECK",
-             "verify all'avvio di Void Desk" if it else
-             "check on Void Desk startup"),
+             "verify all'avvio di QWASAR Desk" if it else
+             "check on QWASAR Desk startup"),
             ("autoinstall", "bool",
              "INSTALLAZIONE AUTOMATICA" if it else "AUTO-INSTALL",
              "install da sola se trova un aggiornamento" if it else
@@ -6163,7 +6163,7 @@ class App(object):
 
     def ctrl_exec_command(self, command):
         """Esegue davvero un comando assegnato -- verso la console
-        (VoidDesk stesso) o verso il PC (Basestation), a seconda del
+        (QWASAR Desk stesso) o verso il PC (Basestation), a seconda del
         prefisso. Restituisce (ok, messaggio) per un riscontro reale
         all'utente, mai un fallimento silenzioso."""
         if not command or command == "custom:none":
@@ -7405,7 +7405,7 @@ class App(object):
         import urllib.request
         import json as jsonmod
         url = ("https://api.github.com/repos/SilverCrow2323/"
-              "muOS-Void-Desk/releases")
+              "Void-Desk-Project/releases")
         try:
             req = urllib.request.Request(
                 url, headers={"User-Agent": "VoidDesk/1.0 Updater",
@@ -8660,7 +8660,7 @@ class App(object):
                 ["Rt:Tailscale-M non e' incluso nel pacchetto / submodule "
                  "non inizializzato." if it else
                  "Rt:Tailscale-M service bundle is missing; initialize the "
-                 "project submodule and rebuild VoidDesk."])
+                 "project submodule and rebuild QWASAR Desk."])
             self.scroll = 0
             self.info_title = "TAILSCALE"
             self.push("info")
@@ -10134,8 +10134,8 @@ class App(object):
 
     def check_alarms(self):
         """Chiamata a ogni giro del loop principale: suona finche' sei
-        dentro il menu di VoidDesk. Se lanci un gioco o un desktop
-        VoidDesk cede il posto e chiude -- una sveglia vera in
+        dentro i menu di QWASAR Desk. Se lanci un gioco o un desktop
+        QWASAR Desk cede il posto e chiude -- una sveglia vera in
         background non e' possibile con questa architettura, e non
         prometto quello che non posso mantenere: qui suona finche'
         resti nei nostri menu, non oltre."""
@@ -10360,7 +10360,7 @@ class App(object):
                                     else "inside the image"),
                       "%s / %s" % (human(used), human(self.img_total)),
                       DIM))
-        L.append(("kv", "VoidDesk data",
+        L.append(("kv", "QWASAR data",
                   human(self.app_size(DATA)), FG))
         for root in MUOS_APP_ROOTS:
             if os.path.isdir(root):
@@ -10412,7 +10412,7 @@ class App(object):
     def manual_lines(self, idx):
         it = (self.lang == "it")
         key, icon = MANUAL[idx]
-        T = {"intro": ("VOID-DESK", [
+        T = {"intro": ("QWASAR DESK", [
             ("Extensive Desktop Experience // muOS", FG),
             ("__sec__", "COS'E'" if it else "WHAT IT IS", "info"),
             ("Un ambiente Linux completo (Ubuntu, chroot) dentro la tua "
@@ -10432,11 +10432,11 @@ class App(object):
              "ambienti desktop." if it else "Everything lives in one "
              "4GB ext4 image: xfce.img. One shared image, one apt, for "
              "all three desktop environments.", DIM),
-            ("Quando avvii un ambiente o un'app muOS, VoidDesk cede il "
+            ("Quando avvii un ambiente o un'app muOS, QWASAR Desk cede il "
              "posto e chiude (mai un doppio processo che si contende "
              "screen e input): e' per questo che il menu e' cosi' "
              "leggero." if it else "Launching an environment or a muOS "
-             "app makes VoidDesk hand off and exit (never a double "
+             "app makes QWASAR Desk hand off and exit (never a double "
              "process fighting over screen and input): that's why the "
              "menu is this light.", DIM),
             ("__sec__", "PRIMO AVVIO" if it else "FIRST LAUNCH", "start"),
@@ -10519,14 +10519,14 @@ class App(object):
              "the chroot, with a real progress bar. On completion it "
              "writes a timestamp marker: that's what the START SESSION "
              "box shows as 'last checked'.", DIM),
-            ("__sec__", "VOID-DESK UPDATE", "forge"),
-            ("Diverso dal precedente: qui si update VoidDesk stesso, "
+            ("__sec__", "QWASAR DESK UPDATE", "forge"),
+            ("Diverso dal precedente: qui si aggiorna QWASAR Desk stesso, "
              "non il desktop. Controlla l'ultima release su GitHub, "
              "confronta la versione, scarica e sostituisce solo se il "
              "pacchetto e' valido -- data/ (le tue configurazioni) non "
              "viene mai toccata, nemmeno se il pacchetto scaricato ne "
              "contenesse una." if it else "Different from the one "
-             "above: this updates VoidDesk itself, not the desktop. "
+             "above: this updates QWASAR Desk itself, not the desktop. "
              "Checks the latest GitHub release, compares the version, "
              "downloads and replaces only if the package is valid -- "
              "data/ (your configuration) is never touched, even if the "
@@ -10616,10 +10616,10 @@ class App(object):
              "and turn off just the swap, or the other way round.",
              DIM),
             ("__sec__", "REGISTRO LOG" if it else "LOG REGISTRY", "doc"),
-            ("Ogni diario, raggruppato per area: VoidDesk, sessioni "
+            ("Ogni diario, raggruppato per area: QWASAR Desk, sessioni "
              "per ambiente (xfce/icewm/lxde separati), installer, "
              "media." if it else "Every diary, grouped by area: "
-             "VoidDesk, per-environment sessions (xfce/icewm/lxde "
+             "QWASAR Desk, per-environment sessions (xfce/icewm/lxde "
              "separate), installer, media.", DIM),
             ("R1 nel visualizzatore active la modalita' LIVE: il file "
              "si ricarica da solo, perfetto per guardare una sessione "
@@ -10636,9 +10636,9 @@ class App(object):
              "restore with confirmation (writes to a temp file, swaps "
              "in only on success).", DIM),
             ("Serve l'immagine smontata: se un desktop e' opened da "
-             "qualche parte, VoidDesk te lo dice invece di rischiare."
+             "qualche parte, QWASAR Desk te lo dice invece di rischiare."
              if it else "Needs the image unmounted: if a desktop is "
-             "open somewhere, VoidDesk tells you instead of risking "
+             "open somewhere, QWASAR Desk tells you instead of risking "
              "it.", DIM)]),
           "uplink": ("UPLINK", [
             ("__sec__", "LINGUA E TASTIERE" if it else
@@ -10687,12 +10687,12 @@ class App(object):
              "ans).", DIM),
             ("Clock: digitale in 3 stili o analogico con lancette vere, "
              "X apre data/ora/fuso, A le sveglie con suono a scelta -- "
-             "suonano finche' resti nei menu di VoidDesk, non oltre "
+             "suonano finche' resti nei menu di QWASAR Desk, non oltre "
              "(lanciare un gioco cede il posto e chiude l'app)." if it
              else "Clock: digital in 3 styles or analog with real "
              "hands, X opens date/time/zone, A opens alarms with a "
              "sound of your choice -- they ring while you stay in "
-             "VoidDesk's own menus, not beyond (launching a game hands "
+             "QWASAR Desk's own menus, not beyond (launching a game hands "
              "off and exits the app).", DIM),
             ("Calendario (vista mese/settimana/giorno, priorita' "
              "colorate) e Note a bacheca stile post-it, con puntine "
@@ -10795,10 +10795,10 @@ class App(object):
             ("__sec__", "I LIMITI ONESTI" if it else "HONEST LIMITS",
              "info"),
             ("Le sveglie di Clock suonano solo mentre stai nei menu di "
-             "VoidDesk: lanciare un gioco o un desktop chiude l'app "
+             "QWASAR Desk: lanciare un gioco o un desktop chiude l'app "
              "(e' il patto di consegna pulito che tiene tutto "
              "leggero)." if it else "Clock alarms only ring while "
-             "you're inside VoidDesk's own menus: launching a game or "
+             "you're inside QWASAR Desk's own menus: launching a game or "
              "a desktop exits the app (that's the clean hand-off deal "
              "that keeps everything light).", DIM)])}
         title, rows = T[key]
@@ -12304,11 +12304,11 @@ class App(object):
                 self.surface.blit(sym, (10, 8))
                 tx0 = 10 + sym.get_width() + 6
             # ghost cromatici sfalsati: la firma SPDW
-            self.text("Void-DESK", (tx0, 9), self.f_big, (150, 30, 30))
-            self.text("Void-DESK", (tx0 + 2, 7), self.f_big,
+            self.text("QWASAR DESK", (tx0, 9), self.f_big, (150, 30, 30))
+            self.text("QWASAR DESK", (tx0 + 2, 7), self.f_big,
                       (25, 90, 100))
-            self.text("Void-", (tx0 + 1, 8), self.f_big, FG)
-            bw = self.f_big.size("Void-")[0]
+            self.text("QWASAR", (tx0 + 1, 8), self.f_big, FG)
+            bw = self.f_big.size("QWASAR ")[0]
             self.text("DESK", (tx0 + 1 + bw, 8), self.f_big, acc)
         else:
             tx0 = 14
@@ -12918,8 +12918,8 @@ class App(object):
 
     def about_lines(self):
         it = (self.lang == "it")
-        L = [("sec", "info", "VOID SUITE")]
-        L.append(("kv", "VOIDDESK", "v%s  -  %s" % (VERSION,
+        L = [("sec", "info", "QWASAR DESK")]
+        L.append(("kv", "QWASAR DESK", "v%s  -  %s" % (VERSION,
                   ("pannello di check + desktop XFCE" if it
                    else "control panel + XFCE desktop")), FG))
         L.append(("kv", "VOIDCAST", "v2.2  -  %s" %
@@ -13123,7 +13123,7 @@ class App(object):
         H = lambda t_: ("hdr", t_)
         E = lambda n, p: (n, p)
         return [
-            H("VOID DESK"),
+            H("QWASAR DESK"),
             E("voiddesk.log", LOG),
             E("vd_hotkey.log", os.path.join(LOGS_DIR, "vd_hotkey.log")),
             E("deps_check.log", os.path.join(LOGS_DIR, "deps_check.log")),
@@ -13166,7 +13166,7 @@ class App(object):
                  "firmware nascosto su una consolina che nessuno "
                  "guardava pi\u00f9 -- allora forse sei uno di noi."),
                 ("gap", ""),
-                ("msg", "VoidDesk non \u00e8 nato per essere perfetto. "
+                ("msg", "QWASAR Desk non \u00e8 nato per essere perfetto. "
                  "\u00e8 nato perch\u00e9 il firmware di fabbrica non "
                  "bastava, e perch\u00e9 \"non si pu\u00f2 fare\" non "
                  "\u00e8 mai stata una risposta che ci ha convinto."),
@@ -13197,7 +13197,7 @@ class App(object):
              "nobody looked at twice anymore -- then maybe you're "
              "one of us."),
             ("gap", ""),
-            ("msg", "VoidDesk wasn't built to be perfect. it was "
+            ("msg", "QWASAR Desk wasn't built to be perfect. it was "
              "built because the factory firmware wasn't enough, and "
              "because \"you can't do that\" was never an answer "
              "that convinced us."),
@@ -15477,11 +15477,11 @@ class App(object):
                         self.scroll = 0
                         self.push("info")
                     self.confirm = ((
-                        "Scaricare e installare %s? VoidDesk andrà "
+                        "Scaricare e installare %s? QWASAR Desk andrà "
                         "riavviato a mano dopo." %
                         latest.get("tag_name", "?") if it else
                         "Download and install %s? You'll need to "
-                        "restart VoidDesk afterwards." %
+                        "restart QWASAR Desk afterwards." %
                         latest.get("tag_name", "?")),
                         go_install, "AGGIORNAMENTO" if it else
                         "UPDATE", "gear")
@@ -15515,10 +15515,10 @@ class App(object):
                     self.scroll = 0
                     self.push("info")
                 self.confirm = ((
-                    "Installare v%s found su SD? VoidDesk andrà "
+                    "Installare v%s found su SD? QWASAR Desk andrà "
                     "riavviato a mano dopo." % ver if it else
                     "Install v%s found on SD? You'll need to "
-                    "restart VoidDesk afterwards." % ver),
+                    "restart QWASAR Desk afterwards." % ver),
                     go_local_install, "AGGIORNAMENTO LOCALE" if it
                     else "LOCAL UPDATE", "gear")
                 self.push("confirm")
@@ -16508,7 +16508,7 @@ class App(object):
             shutil.rmtree(stage, ignore_errors=True)
             return False, "copia failed: %s" % str(e)[:100]
         shutil.rmtree(stage, ignore_errors=True)
-        return True, "aggiornato: restart VoidDesk per applicarlo"
+        return True, "aggiornato: riavvia QWASAR Desk per applicarlo"
 
     def update_download_install(self, url, progress_cb=None):
         """Scarica da un URL, poi affida verify+installazione vera
@@ -16574,10 +16574,10 @@ class App(object):
         it = (self.lang == "it")
         L = [("sec", "info", "CLI SHOOTER -- HELP & ABOUT")]
         L.append(("kv", "", "Un angolo di terminale retro dentro "
-                  "VoidDesk: tool CLI simpatici e utili, lanciati in "
+                  "QWASAR Desk: tool CLI simpatici e utili, lanciati in "
                   "un terminale VERO (xterm su X, non la shell finta "
                   "in pygame)." if it else
-                  "A retro terminal corner inside VoidDesk: fun and "
+                  "A retro terminal corner inside QWASAR Desk: fun and "
                   "useful CLI Shooter tools, launched in a REAL terminal "
                   "(xterm on X, not the fake pygame shell).", FG))
         L.append(("sec", "terminal", "CLI ARSENAL"))
@@ -16684,7 +16684,7 @@ class App(object):
         """Terminale VERO (xterm su X, niente window manager): per i
         CLI tools interattivi/continui, che nella shell finta in
         pygame andrebbero sempre in timeout o non disegnerebbero
-        nulla. Esce da VoidDesk con EXIT_XTERM; mux_launch.sh lancia
+        nulla. Esce da QWASAR Desk con EXIT_XTERM; mux_launch.sh lancia
         vd_xterm_launch.sh e ci rilancia al ritorno."""
         if not self.deps_dialog_open("real_terminal", "terminal",
                                      "xterm"):
@@ -17062,7 +17062,7 @@ class App(object):
         """Terminal retrocomputing: fosforo verde, elenco numerato,
         cursore che lampeggia, scanline sempre attive."""
         self.surface.fill((3, 8, 4))
-        self.text("VOID-DESK OS -- READY", (12, 8), self.f_small_b, GRN)
+        self.text("QWASAR OS -- READY", (12, 8), self.f_small_b, GRN)
         led_on = int(time.time() * 1.4) % 2 == 0
         pygame.draw.circle(self.surface, GRN if led_on else DGRN,
                            (W - 16, 14), 4)
@@ -17084,7 +17084,7 @@ class App(object):
             pygame.draw.line(self.surface, (0, 0, 0, 40), (0, sy),
                              (W, sy))
         blink2 = int(time.time() * 2) % 2 == 0
-        self.text("root@voiddesk:~$ " + ("_" if blink2 else ""),
+        self.text("root@qwasar:~$ " + ("_" if blink2 else ""),
                   (12, H - 44), self.f_small, GRN)
         self.footer([("Y", self.t("view")), ("A", self.t("open")),
                      ("M", "MEDIA"), ("R2", "USER ID")])
@@ -18552,7 +18552,7 @@ class App(object):
                     self.text(lab, (54, y + 3), self.f_med,
                               FG if i == self.map_sel else DIM)
                     if key == "kbd":
-                        self.text("watcher VoidDesk", (54, y + 25),
+                        self.text("watcher QWASAR", (54, y + 25),
                                   self.f_tiny, FAINT)
                     val = self.btn_names(self.cur_map().get(key, []))
                 vw = self.f_med.size(val)[0]
@@ -21054,12 +21054,12 @@ class App(object):
             icons.draw(self.surface, "globe", 20, sy + 12, 22, FG)
             self.text("SilverCrow2323", (48, sy + 14), self.f_small,
                       FG)
-            self.text(("progetto: muOS-Void-Desk" if it else
-                      "project: muOS-Void-Desk"), (48, sy + 34),
+            self.text(("progetto: QWASAR Desk" if it else
+                      "project: QWASAR Desk"), (48, sy + 34),
                       self.f_tiny, FAINT)
             qr_box = 3
             qr_mod = qrgen.encode(
-                "https://github.com/SilverCrow2323/muOS-Void-Desk")
+                "https://github.com/SilverCrow2323/Void-Desk-Project")
             qr_total = (len(qr_mod) + 4) * qr_box
             self.draw_qr(W - qr_total - 16, sy + 10, qr_box, qr_mod,
                         (10, 10, 10))
@@ -21535,8 +21535,8 @@ class App(object):
             labels = {
                 "close": ("Close (torna a muOS)" if it else
                          "Close (return to muOS)"),
-                "restart_app": ("Restart VoidDesk" if it else
-                               "Restart VoidDesk"),
+                "restart_app": ("Restart QWASAR Desk" if it else
+                               "Restart QWASAR Desk"),
                 "reboot": ("Restart console" if it else
                           "Reboot console"),
                 "poweroff": ("Spegni console" if it else
@@ -21549,7 +21549,7 @@ class App(object):
             panel_y = (H - panel_h) // 2
             self.npanel(40, panel_y, W - 80, panel_h,
                        border=self.accent, fill=(10, 11, 14), cut=14)
-            title = "VOID DESK" if it else "VOID DESK"
+            title = "QWASAR DESK" if it else "QWASAR DESK"
             tw2 = self.f_med.size(title)[0]
             self.text(title, ((W - tw2) // 2, panel_y + 8),
                      self.f_med, self.accent)
@@ -22412,7 +22412,7 @@ class App(object):
                          ("B", self.t("back"))])
         else:
             # stato senza schermata: meglio dirlo che congelarsi
-            self.header("VOID-DESK")
+            self.header("QWASAR DESK")
             self.npanel(60, 180, W - 120, 100, border=NO_R, fill=INK)
             self.text("stato sconosciuto: %s" % top, (84, 210), self.f_med,
                       NO_R)
@@ -22731,8 +22731,8 @@ class App(object):
                                     "disattivata" if it else
                                     "auto-install disabled"))
                 else:
-                    push_status(("VOID Desk aggiornato" if it else
-                                "VOID Desk up to date"))
+                    push_status(("QWASAR Desk aggiornato" if it else
+                                "QWASAR Desk up to date"))
             push_status(("sequenza completed" if it else
                         "sequence complete"))
             for i in range(10):
