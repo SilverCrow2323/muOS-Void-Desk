@@ -17,7 +17,7 @@ local filters = {
     {label = "CLASSIC", args = {tag = "classical"}},
     {label = "FAVS", favorites = true},
 }
-local keyboard = {"QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM", "0123456789"}
+local keyboard = {"QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM", " 0123456789"}
 local filter_index, entries, selected = 1, {}, 1
 local query, status, now_playing, icy_title = "", "Connecting to Radio Browser...", "", ""
 local keyboard_mode, key_row, key_col = false, 1, 1
@@ -287,7 +287,8 @@ function scene.draw()
                     love.graphics.rectangle("fill", xx, y, char_w - 2, 22, 2)
                 end
                 love.graphics.setColor(th.text[1], th.text[2], th.text[3], 1)
-                love.graphics.printf(row:sub(col, col), xx, y + 3, char_w - 2, "center")
+                local key_label = (r == 4 and col == 1) and "SPC" or row:sub(col, col)
+                love.graphics.printf(key_label, xx, y + 3, char_w - 2, "center")
             end
         end
         love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
