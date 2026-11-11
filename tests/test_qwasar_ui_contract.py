@@ -302,3 +302,35 @@ def test_executable_module_entrypoints_must_be_relative_and_cannot_traverse():
     forged["kind"] = "executable"
     forged["entrypoints"] = {"love": "../outside.lua"}
     assert not jsonschema.Draft202012Validator(schema).is_valid(forged)
+
+
+def test_sample_profile_references_only_registered_workspaces_and_sections():
+    ui = _load_ui()
+    profile_path = ROOT / "data" / "profiles" / "voiddesk-handheld-default.qprofile.json"
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    workspaces = {item["id"]: item for item in ui["workspaces"]}
+    assert set(profile["workspaceOrder"]) <= set(workspaces)
+    for override in profile["workspaceOverrides"]:
+        assert override["id"] in workspaces
+        sections = {item["id"] for item in workspaces[override["id"]].get("sections", [])}
+        assert all(item["id"] in sections for item in override.get("sections", []))
+
+
+def test_sample_module_contributions_resolve_workspace_section_and_actions():
+    ui = _load_ui()
+    module_path = ROOT / "data" / "examples" / "qwasar-wifi-overview.module.json"
+    module = json.loads(module_path.read_text(encoding="utf-8"))
+    workspaces = {item["id"]: item for item in ui["workspaces"]}
+    module_actions = {item["id"] for item in module["actions"]}
+    component_types = {item["id"] for item in ui["componentRegistry"]}
+    for contribution in module["contributions"]:
+        assert contribution["componentType"] in component_types
+        if contribution.get("workspaceId"):
+            assert contribution["workspaceId"] in workspaces
+        if contribution.get("sectionId"):
+            assert any(
+                section["id"] == contribution["sectionId"]
+                for workspace in workspaces.values()
+                for section in workspace.get("sections", [])
+            )
+        assert set(contribution.get("actionIds", [])) <= module_actions
