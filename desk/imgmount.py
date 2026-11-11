@@ -33,7 +33,7 @@ def _call(cmd):
 def _decode_mount_field(value):
     """Decode the octal escapes used by /proc/mounts and losetup output."""
     return re.sub(
-        r"\\\\([0-7]{3})",
+        r"\\([0-7]{3})",
         lambda match: chr(int(match.group(1), 8)),
         value,
     )
@@ -131,19 +131,6 @@ def free_loop():
     r = _run(["losetup", "-f"])
     dev = r.stdout.strip()
     return dev if dev.startswith("/dev/loop") else None
-
-
-def umount_tree(mnt, img=None):
-    """Smonta TUTTO quello che sta sotto mnt (bind del desktop compresi)
-    e libera il loop. Ritorna True se alla fine mnt e' libero."""
-    for p in submounts(mnt):
-        if _call(["umount", p]) != 0:
-            _call(["umount", "-l", p])      # lazy: meglio che restare bloccati
-    if img:
-        dev = loop_of(img)
-        if dev:
-            _call(["losetup", "-d", dev])
-    return not is_mounted(mnt)
 
 
 def mount_img(img, mnt, ro=False):
