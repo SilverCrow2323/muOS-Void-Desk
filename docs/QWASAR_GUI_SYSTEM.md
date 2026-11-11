@@ -62,7 +62,7 @@ An adapter must not own business logic or privileged host operations. The servic
 
 ### Compatibility rule
 
-A UI manifest can target multiple engines. Each component declares a minimum UI API and optional engine capabilities. If an adapter cannot render a component, the resolver must use its declared fallback or show an explicit unavailable state. It must never silently omit a destructive action or claim feature parity.
+A UI manifest can target multiple engines. Each component declares a minimum UI API, allowed child slots, a strict propsSchema, semantic events, a customizable-property allowlist and an optional fallback. The renderer validates each node's properties against that component's propsSchema; the Inspector also checks the schema itself and rejects unknown properties/slots. If an adapter cannot render a component, the resolver must use its declared fallback or show an explicit unavailable state. It must never silently omit a destructive action or claim feature parity.
 
 ## 3. Interface tree and LEGO model
 
@@ -149,7 +149,7 @@ The panel is capability-driven. If there is no media backend, the shortcut can o
 
 ## 6. Component catalogue
 
-The initial component registry is engine-neutral. Each component defines a stable type ID, property contract, child slots, supported states, events and fallback.
+The initial component registry is engine-neutral. Every component definition contains a stable type ID, kind, state model, allowed child slots, strict JSON Schema for its properties, semantic event names, customizable-property allowlist and fallback. Component property schemas use additionalProperties=false: adding a new property requires updating the component contract and its compatibility tests.
 
 ### Layout and surfaces
 
