@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import hashlib
 import json
 import os
@@ -85,9 +86,15 @@ def _clean_station(station: dict) -> dict | None:
 
 def _catalog_sources(config: dict) -> tuple[list[dict], list[dict], list[dict]]:
     builtins = [entry for raw in RADIO_BUILTIN if (entry := _clean_station(raw))]
-    favorites = [entry for raw in config.get("radio_favorites", [])[:100]
+    raw_favorites = config.get("radio_favorites", [])
+    raw_recent = config.get("radio_recent", [])
+    if not isinstance(raw_favorites, list):
+        raw_favorites = []
+    if not isinstance(raw_recent, list):
+        raw_recent = []
+    favorites = [entry for raw in raw_favorites[:100]
                  if (entry := _clean_station(raw))]
-    recent = [entry for raw in config.get("radio_recent", [])[:30]
+    recent = [entry for raw in raw_recent[:30]
               if (entry := _clean_station(raw))]
     return builtins, favorites, recent
 
@@ -133,7 +140,10 @@ def toggle_favorite(station_id: str) -> dict:
     if station is None:
         return {"ok": False, "error": "unknown radio station"}
     config = _load_config()
-    favorites = [entry for raw in config.get("radio_favorites", [])
+    raw_favorites = config.get("radio_favorites", [])
+    if not isinstance(raw_favorites, list):
+        raw_favorites = []
+    favorites = [entry for raw in raw_favorites
                  if (entry := _clean_station(raw))]
     exists = any(entry["id"] == station_id for entry in favorites)
     if exists:
@@ -168,7 +178,10 @@ def play_radio(station_id: str) -> dict:
         return {"ok": False, "error": str(error or "mpv could not start")[:160]}
     _CURRENT = {"kind": "radio", "id": station["id"], "name": station["name"]}
     config = _load_config()
-    recent = [entry for raw in config.get("radio_recent", [])
+    raw_recent = config.get("radio_recent", [])
+    if not isinstance(raw_recent, list):
+        raw_recent = []
+    recent = [entry for raw in raw_recent
               if (entry := _clean_station(raw)) and entry["id"] != station["id"]]
     recent.insert(0, station)
     config["radio_recent"] = [
@@ -218,3 +231,6 @@ def status() -> dict:
         "buffering": bool(info.get("paused_for_cache")),
         "volume": int(info.get("volume") or 0),
     }
+
+
+atexit.register(stop)
