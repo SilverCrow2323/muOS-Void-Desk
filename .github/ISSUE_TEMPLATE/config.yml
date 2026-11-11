@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and community discussion
+    url: https://github.com/SilverCrow2323/Void-Desk-Project/discussions
+    about: Use Discussions for usage questions, ideas and general project conversation.
+  - name: Security policy
+    url: https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/SECURITY.md
+    about: Read the security policy before reporting a potential vulnerability.
