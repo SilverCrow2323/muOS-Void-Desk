@@ -82,7 +82,7 @@ UNMOUNT_OWNED() {
 	fi
 }
 
-ABORT_SETUP() {
+ABORT_SETUP {
 	echo "$(date) preparazione mount fallita; chdman annullato" >>"$LOG"
 	echo "1" >"$DONE"
 	if [ "$WE_MOUNTED" = 1 ]; then
@@ -102,17 +102,17 @@ ABORT_SETUP() {
 
 if ! MOUNT_IF_NEEDED "$MNT/dev" mount -o bind /dev "$MNT/dev"; then
 	echo "$(date) stato mount /dev non valido; chdman annullato" >>"$LOG"
-	ABORT_SETUP()
+	ABORT_SETUP
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_DEV=1
 if ! MOUNT_IF_NEEDED "$MNT/proc" mount -t proc proc "$MNT/proc"; then
 	echo "$(date) stato mount /proc non valido; chdman annullato" >>"$LOG"
-	ABORT_SETUP()
+	ABORT_SETUP
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_PROC=1
 if ! MOUNT_IF_NEEDED "$MNT/sys" mount -t sysfs sys "$MNT/sys"; then
 	echo "$(date) stato mount /sys non valido; chdman annullato" >>"$LOG"
-	ABORT_SETUP()
+	ABORT_SETUP
 fi
 [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_SYS=1
 
@@ -123,7 +123,7 @@ for D in /mnt/mmc /mnt/sdcard; do
 	mkdir -p "$MNT$D"
 	MOUNT_IF_NEEDED "$MNT$D" mount -o bind "$D" "$MNT$D" || {
 		echo "$(date) stato mount non valido: $MNT$D; chdman annullato" >>"$LOG"
-		ABORT_SETUP()
+		ABORT_SETUP
 	}
 	case "$D" in
 		/mnt/mmc) [ "$MOUNT_CREATED" = 1 ] && WE_MOUNTED_MMC=1 ;;
