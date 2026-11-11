@@ -40,6 +40,12 @@ IS_DEVICE = platform.machine().lower() in ("aarch64", "armv7l", "arm64")
 # the service; normal device and desktop sessions keep real system probes.
 IS_VISUAL_CAPTURE = os.environ.get("VOIDDESK_VISUAL_CAPTURE") == "1"
 
+# Supported muOS application roots. The service never accepts a caller-provided root.
+MUOS_APP_ROOTS = (
+    Path("/mnt/mmc/MUOS/application"),
+    Path("/mnt/sdcard/MUOS/application"),
+)
+
 # Reuse the existing, already-battle-tested device probing code from the
 # pygame engine instead of duplicating wifi/bt detection logic here.
 sys.path.insert(0, str(APP_DIR / "desk"))
@@ -185,6 +191,117 @@ def device_only(cmd):
     if not IS_DEVICE:
         return {"ok": False, "reason": "device-only", "command": cmd}
     return None
+
+
+
+def _muos_app_entries():
+    """Discover direct-child muOS applications from the two supported SD roots."""
+    entries = []
+    current_app = APP_DIR.resolve()
+    for root_index, root in enumerate(MUOS_APP_ROOTS, start=1):
+        try:
+            root_real = root.resolve(strict=True)
+            if not root_real.is_dir():
+                continue
+            children = sorted(root_real.iterdir(), key=lambda item: item.name.casefold())
+        except OSError:
+            continue
+
+        for child in children:
+            try:
+                if child.is_symlink() or not child.is_dir():
+                    continue
+                app_dir = child.resolve(strict=True)
+                if app_dir.parent != root_real or app_dir == current_app:
+                    continue
+                if child.name.lower().startswith("voiddesk"):
+                    continue
+                launcher = app_dir / "mux_launch.sh"
+                if launcher.is_symlink() or not launcher.is_file():
+                    continue
+                if not os.access(str(launcher), os.X_OK):
+                    continue
+
+                help_text = ""
+                try:
+                    with launcher.open("r", encoding="utf-8", errors="replace") as handle:
+                        for line in handle.read(800).splitlines():
+                            if line.strip().upper().startswith("# HELP:"):
+                                help_text = line.split(":", 1)[1].strip()[:80]
+                                break
+                except OSError:
+                    pass
+
+                entries.append({
+                    "name": child.name,
+                    "path": str(app_dir),
+                    "sd": "SD%d" % root_index,
+                    "help": help_text,
+                })
+            except OSError:
+                continue
+    return entries
+
+
+def h_list_muos_apps(args):
+    """List only launchable applications from the fixed SD1/SD2 muOS roots."""
+    blocked = device_only("list_muos_apps")
+    if blocked:
+        return blocked
+    if IS_VISUAL_CAPTURE:
+        return {
+            "ok": True, "apps": [], "source": "visual capture fixture",
+        }
+    apps = _muos_app_entries()
+    return {
+        "ok": True,
+        "apps": apps,
+        "source": "SD1 + SD2",
+        "count": len(apps),
+    }
+
+
+def h_launch_muos_app(args):
+    """Request a launcher hand-off for one app rediscovered from fixed roots."""
+    blocked = device_only("launch_muos_app")
+    if blocked:
+        return blocked
+    requested_path = args.get("path")
+    if not isinstance(requested_path, str) or not requested_path:
+        return {"ok": False, "error": "an application path from the scan is required"}
+
+    match = next(
+        (entry for entry in _muos_app_entries()
+         if entry["path"] == requested_path),
+        None,
+    )
+    if not match:
+        return {"ok": False, "error": "application is no longer available or is outside supported roots"}
+
+    marker = DATA / ".muos_app"
+    if marker.exists():
+        return {"ok": False, "error": "another application hand-off is already pending"}
+    temporary = DATA / ".muos_app.tmp"
+    try:
+        DATA.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(
+            match["path"] + "\n" + match["name"] + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, marker)
+    except OSError as exc:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {"ok": False, "error": "cannot queue application hand-off: " + str(exc)}
+
+    return {
+        "ok": True,
+        "handoff": True,
+        "name": match["name"],
+        "note": "Returning to muOS launcher to start " + match["name"],
+    }
 
 # ── system / network / media status ─────────────────────────
 # These were referenced in HANDLERS below but never defined: the whole
@@ -1493,6 +1610,8 @@ HANDLERS = {
     "session_launch": h_session_launch,
     "wifi_scan": h_wifi_scan,
     "bt_scan": h_bt_scan,
+    "list_muos_apps": h_list_muos_apps,
+    "launch_muos_app": h_launch_muos_app,
 
     "list_files": h_list_files,
     "xfce_install": h_xfce_install,
