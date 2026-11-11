@@ -185,8 +185,8 @@ The Debian package starts the Pygame PC frontend; handheld-only muOS features
 
 On first launch, Void Desk creates a private Python virtual environment and
 installs pygame and psutil. An Internet connection is required for this setup.
-User configuration, logs and the virtual environment are stored separately
-under ~/.local/share/voiddesk (or $XDG_DATA_HOME/voiddesk).
+User configuration, logs and the virtual environment are stored in
+~/.local/share/voiddesk/app (or $XDG_DATA_HOME/voiddesk/app).
 
 These per-user files survive package upgrades and apt remove voiddesk. To remove
 all personal state as well, delete the voiddesk folder from your own account
@@ -246,9 +246,6 @@ case "$DATA_HOME" in
 esac
 USER_ROOT="$DATA_HOME/voiddesk"
 APP_HOME="$USER_ROOT/app"
-PERSISTENT_DATA="$USER_ROOT/data"
-PERSISTENT_VENV="$USER_ROOT/venv"
-PERSISTENT_RUNTIME="$USER_ROOT/runtime"
 VERSION_FILE="$APP_HOME/.voiddesk-package-version"
 
 [ -d "$SOURCE_APP" ] || {
@@ -256,53 +253,47 @@ VERSION_FILE="$APP_HOME/.voiddesk-package-version"
     exit 1
 }
 
-mkdir -p "$USER_ROOT" "$PERSISTENT_DATA" "$PERSISTENT_VENV" "$PERSISTENT_RUNTIME"
+mkdir -p "$USER_ROOT"
 chmod 700 "$USER_ROOT" 2>/dev/null || true
 
-# Migrate configuration from an earlier portable install in this same location.
-if [ -d "$APP_HOME/data" ] && [ ! -L "$APP_HOME/data" ]; then
-    cp -R --preserve=mode,timestamps "$APP_HOME/data/." "$PERSISTENT_DATA/"
-fi
+# Keep all writable state inside this user's real app directory. Python's venv
+# creator cannot initialize an environment through a symlinked directory.
+[ ! -L "$APP_HOME" ] || {
+    echo "Void Desk: refusing a symbolic-link application directory: $APP_HOME" >&2
+    exit 1
+}
+mkdir -p "$APP_HOME"
+
+for persistent in data .venv_desktop runtime; do
+    if [ -L "$APP_HOME/$persistent" ]; then
+        echo "Void Desk: refusing a symbolic link for persistent path $APP_HOME/$persistent" >&2
+        exit 1
+    fi
+done
 
 CURRENT_VERSION=""
 if [ -f "$VERSION_FILE" ]; then
     CURRENT_VERSION="$(cat "$VERSION_FILE")"
 fi
 
-if [ ! -d "$APP_HOME" ] || [ "$CURRENT_VERSION" != "$PACKAGE_VERSION" ]; then
-    STAGE="$USER_ROOT/.app-stage.$$"
-    PREVIOUS="$USER_ROOT/.app-previous.$$"
-    rm -rf -- "$STAGE" "$PREVIOUS"
-    mkdir -p "$STAGE"
+if [ "$CURRENT_VERSION" != "$PACKAGE_VERSION" ]; then
+    # Preserve user data, logs, the first-run virtualenv and generated runtime,
+    # while replacing stale application code on package upgrades.
+    find "$APP_HOME" -mindepth 1 -maxdepth 1 \
+        ! -name data \
+        ! -name .venv_desktop \
+        ! -name runtime \
+        -exec rm -rf -- {} +
 
-    if ! cp -R --preserve=mode,timestamps "$SOURCE_APP/." "$STAGE/"; then
-        rm -rf -- "$STAGE"
-        echo "Void Desk: could not stage the installed application files." >&2
-        exit 1
-    fi
-
-    rm -rf -- "$STAGE/data" "$STAGE/.venv_desktop" "$STAGE/runtime"
-    ln -s "$PERSISTENT_DATA" "$STAGE/data"
-    ln -s "$PERSISTENT_VENV" "$STAGE/.venv_desktop"
-    ln -s "$PERSISTENT_RUNTIME" "$STAGE/runtime"
-    printf '%s\n' "$PACKAGE_VERSION" > "$STAGE/.voiddesk-package-version"
-
-    if [ -e "$APP_HOME" ] || [ -L "$APP_HOME" ]; then
-        mv "$APP_HOME" "$PREVIOUS"
-    fi
-    if mv "$STAGE" "$APP_HOME"; then
-        rm -rf -- "$PREVIOUS"
-    else
-        [ ! -e "$PREVIOUS" ] || mv "$PREVIOUS" "$APP_HOME"
-        rm -rf -- "$STAGE"
-        echo "Void Desk: could not activate the updated application." >&2
-        exit 1
-    fi
+    cp -R --preserve=mode,timestamps "$SOURCE_APP/." "$APP_HOME/"
+    mkdir -p "$APP_HOME/data" "$APP_HOME/runtime"
+    printf '%s\n' "$PACKAGE_VERSION" > "$VERSION_FILE"
 fi
 
 export VOIDDESK_PC=1
 export VOIDDESK_APP_DIR="$APP_HOME"
 exec python3 "$APP_HOME/voiddesk.py" --py "$@"
+
 VOIDDESK_LAUNCHER
 
 sed -i "s/@PACKAGE_VERSION@/$VERSION/g" "$DEB_ROOT/usr/bin/voiddesk"
