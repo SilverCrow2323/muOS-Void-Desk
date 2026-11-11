@@ -22,6 +22,7 @@ import termios
 import time
 import traceback
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -72,6 +73,11 @@ try:
     iptv_module.APP_DIR = APP_DIR
 except Exception:
     iptv_module = None
+
+try:
+    from mpvctl import MpvController
+except Exception:
+    MpvController = None
 
 _IPTV_CHANNELS = []
 _IPTV_EPG = {}
@@ -318,6 +324,194 @@ def h_launch_muos_app(args):
         "name": match["name"],
         "note": "Returning to muOS launcher to start " + match["name"],
     }
+
+
+# Void Radio: catalogue, favourites and playback use only station entries
+# returned by Radio Browser; the LÖVE client never supplies a stream URL.
+_RADIO_BROWSER = "https://de1.api.radio-browser.info/json/stations/search"
+_RADIO_STATIONS = {}
+_RADIO_PLAYER = None
+_RADIO_FAVORITES_FILE = DATA / "radio_favorites.json"
+
+
+def _radio_clean_station(item):
+    if not isinstance(item, dict):
+        return None
+    station_id = str(item.get("stationuuid") or "")
+    if not re.fullmatch(r"[0-9a-fA-F-]{36}", station_id):
+        return None
+    stream_url = str(item.get("url_resolved") or item.get("url") or "")
+    try:
+        parsed = urllib.parse.urlsplit(stream_url)
+        if (parsed.scheme not in ("http", "https") or not parsed.hostname
+                or parsed.username or parsed.password):
+            return None
+        if parsed.hostname.lower() in ("localhost", "localhost.localdomain"):
+            return None
+    except ValueError:
+        return None
+    try:
+        bitrate = max(0, min(100000, int(item.get("bitrate") or 0)))
+    except (TypeError, ValueError):
+        bitrate = 0
+    return {
+        "stationuuid": station_id,
+        "name": str(item.get("name") or "Unknown station").strip()[:100] or "Unknown station",
+        "url": stream_url[:1000],
+        "country": str(item.get("country") or "")[:80],
+        "language": str(item.get("language") or "")[:80],
+        "tags": str(item.get("tags") or "")[:180],
+        "codec": str(item.get("codec") or "")[:24],
+        "bitrate": bitrate,
+        "favicon": str(item.get("favicon") or "")[:300],
+    }
+
+
+def _radio_favorites_load():
+    try:
+        raw = json.loads(_RADIO_FAVORITES_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return []
+    if not isinstance(raw, list):
+        return []
+    stations = []
+    for item in raw[:200]:
+        station = _radio_clean_station(item)
+        if station:
+            stations.append(station)
+    return stations
+
+
+def _radio_favorites_save(items):
+    _RADIO_FAVORITES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = _RADIO_FAVORITES_FILE.with_suffix(".tmp")
+    temporary.write_text(json.dumps(items[:200], ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+    os.replace(temporary, _RADIO_FAVORITES_FILE)
+
+
+def h_radio_search(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "stations": [], "count": 0, "source": "visual capture"}
+    name = str(args.get("name") or "").strip()[:80]
+    country = str(args.get("country") or "").strip()[:80]
+    tag = str(args.get("tag") or "").strip()[:60]
+    try:
+        limit = max(1, min(50, int(args.get("limit", 30))))
+    except (TypeError, ValueError):
+        limit = 30
+    query = {"limit": limit, "hidebroken": "true",
+             "order": "clickcount", "reverse": "true"}
+    if name:
+        query["name"] = name
+    if country:
+        query["country"] = country
+    if tag:
+        query["tag"] = tag
+    url = _RADIO_BROWSER + "?" + urllib.parse.urlencode(query)
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "VoidDesk-Radio/1.0",
+                      "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        return {"ok": False, "error": "Radio Browser unavailable: " + str(exc)[:120]}
+    if not isinstance(payload, list):
+        return {"ok": False, "error": "Radio Browser returned an invalid catalogue"}
+    stations = []
+    for item in payload:
+        station = _radio_clean_station(item)
+        if station:
+            _RADIO_STATIONS[station["stationuuid"]] = station
+            stations.append(station)
+    return {"ok": True, "stations": stations, "count": len(stations),
+            "source": "Radio Browser"}
+
+
+def h_radio_favorites(args):
+    stations = _radio_favorites_load()
+    for station in stations:
+        _RADIO_STATIONS[station["stationuuid"]] = station
+    return {"ok": True, "stations": stations, "count": len(stations)}
+
+
+def h_radio_favorite_toggle(args):
+    station_id = str(args.get("stationuuid") or "")
+    if not re.fullmatch(r"[0-9a-fA-F-]{36}", station_id):
+        return {"ok": False, "error": "invalid station id"}
+    stations = _radio_favorites_load()
+    if any(item["stationuuid"] == station_id for item in stations):
+        stations = [item for item in stations if item["stationuuid"] != station_id]
+        _radio_favorites_save(stations)
+        return {"ok": True, "favorite": False, "count": len(stations)}
+    station = _RADIO_STATIONS.get(station_id)
+    if station is None:
+        return {"ok": False, "error": "station must be loaded from the catalogue first"}
+    stations.append(station)
+    _radio_favorites_save(stations)
+    return {"ok": True, "favorite": True, "count": len(stations)}
+
+
+def _radio_player():
+    global _RADIO_PLAYER
+    if MpvController is None:
+        return None
+    if _RADIO_PLAYER is None:
+        _RADIO_PLAYER = MpvController(
+            sock_path="/tmp/voiddesk_radio_%d.sock" % os.getpid())
+    return _RADIO_PLAYER
+
+
+def h_radio_play(args):
+    station_id = str(args.get("stationuuid") or "")
+    station = _RADIO_STATIONS.get(station_id)
+    if station is None:
+        station = next((item for item in _radio_favorites_load()
+                        if item["stationuuid"] == station_id), None)
+    if station is None:
+        return {"ok": False, "error": "station not found; refresh the catalogue"}
+    player = _radio_player()
+    if player is None:
+        return {"ok": False, "error": "MPV controller is unavailable"}
+    ok, error = player.start(station["url"])
+    if not ok:
+        return {"ok": False, "error": str(error or "stream could not be started")[:140]}
+    return {"ok": True, "playing": station["name"], "stationuuid": station_id}
+
+
+def h_radio_action(args):
+    action = str(args.get("action") or "")
+    player = _radio_player()
+    if player is None:
+        return {"ok": False, "error": "MPV controller is unavailable"}
+    if action == "stop":
+        player.stop()
+        return {"ok": True, "running": False}
+    if not player.is_running():
+        return {"ok": False, "error": "no radio stream is running"}
+    if action == "toggle_pause":
+        paused = player.toggle_pause()
+        return {"ok": True, "pause": bool(paused)}
+    if action == "volume":
+        try:
+            volume = max(0, min(100, int(args.get("value"))))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "volume must be between 0 and 100"}
+        player.set_volume(volume)
+        return {"ok": True, "volume": volume}
+    return {"ok": False, "error": "unsupported radio action"}
+
+
+def h_radio_status(args):
+    player = _radio_player()
+    if player is None:
+        return {"ok": False, "error": "MPV controller is unavailable"}
+    try:
+        return {"ok": True, "status": player.status()}
+    except Exception as exc:
+        return {"ok": False, "error": "cannot read radio status: " + str(exc)[:100]}
+
 
 # ── system / network / media status ─────────────────────────
 # These were referenced in HANDLERS below but never defined: the whole
@@ -1921,6 +2115,12 @@ HANDLERS = {
     "media_list": h_media_list,
     "media_play": h_media_play,
     "media_stop": h_media_stop,
+    "radio_search": h_radio_search,
+    "radio_favorites": h_radio_favorites,
+    "radio_favorite_toggle": h_radio_favorite_toggle,
+    "radio_play": h_radio_play,
+    "radio_action": h_radio_action,
+    "radio_status": h_radio_status,
     "iptv_get_config": h_iptv_get_config,
     "iptv_load_playlist": h_iptv_load_playlist,
     "iptv_load_epg": h_iptv_load_epg,
