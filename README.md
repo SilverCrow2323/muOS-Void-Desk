@@ -65,9 +65,6 @@ The interface uses a dark industrial aesthetic, custom artwork, planet-like hub 
 <img src="resources/forge-menu.png" alt="The Forge" width="48%">
 <img src="resources/uplink-hub.png" alt="Uplink" width="48%">
 
-<img src="resources/media_vault.png" alt="Media Vault" width="48%">
-<img src="resources/workshop.png" alt="Workshop" width="48%">
-
 ## Components and entry points
 
 - **Python frontend:** main implementation in desk/; entry point is desk/main.py.
