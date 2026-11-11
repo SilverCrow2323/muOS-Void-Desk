@@ -50,7 +50,7 @@ return dashboard.new({
           desc = "TV streams and EPG guide (LÖVE prototype)",
           action = function() sm.push("hub_iptv", {}) end },
         { icon = "folder", label = "Media Library", desc = "Browse local audio/video on SD",
-          action = function(scene) scene.set_status("Library: soon"); return "Library" end },
+          action = function() sm.push("media_library", {}) end },
         { icon = "music", label = "BGM Normalizer", value = "PY",
           desc = "LUFS-normalize music to OGG",
           action = function(scene)
