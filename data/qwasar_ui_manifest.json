@@ -3541,7 +3541,8 @@
       "boot.selector",
       "safe-recovery",
       "capability-broker",
-      "end-node.recovery"
+      "end-node.recovery",
+      "end-node"
     ],
     "tools": [
       {
