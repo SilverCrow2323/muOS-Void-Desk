@@ -49,11 +49,11 @@ Portable JSON import/export is the v1 baseline and must work without an account 
 
 ### Studio web companion
 
-- Profile editor: reorder menu entries; edit labels, descriptions and icons; enable/disable supported entries; preview changes.
-- Profile library: local profiles, import/export, validation, migration and duplicate detection.
-- Official plugin catalog: discover, inspect capabilities/permissions, install/update/remove supported plugins.
+- Layout Designer: compose NEXUS nodes, workspaces, sections, tiles and widgets; reorder/hide/replace registered contributions and preview controller navigation.
+- Profile library: local profiles/layout packs, import/export, validation, migration and duplicate detection.
+- Module Library: inspect module manifests, source, dependencies, compatibility, permissions, licence, digest and trust state.
 - Device view: display paired-device metadata and supported engines only after explicit pairing.
-- Sharing: publish one profile or one official plugin reference/package after preview and confirmation.
+- Sharing: publish declarative profiles independently from executable module packages; the latter require the separate review/signing policy.
 
 The initial client should be a static, progressively enhanced PWA. Do not place device credentials in exported profiles or browser storage without a dedicated credential design.
 
@@ -96,7 +96,7 @@ The local Studio milestone must provide profile import/export, layout editing an
 
 ## Profile format and Configuration Engine
 
-Canonical versioned JSON Schemas live under schemas/. A profile contains stable identity and metadata, compatibility constraints, an engine preference, a declarative menu tree, typed visibility conditions, and references to official plugins with non-secret settings.
+Canonical versioned JSON Schemas live under schemas/. A profile contains stable identity and metadata, compatibility constraints, an engine preference, a declarative menu/workspace composition, typed visibility conditions, and references to installed module contributions with non-secret settings.
 
 The engine validates and migrates a profile before applying it. It merges profile overrides with built-in defaults and does not rewrite the user's base configuration. Activation is transactional: validate, stage, back up the current selection, atomically activate, and retain rollback. Unknown executable/action fields are rejected.
 
@@ -126,7 +126,7 @@ Cheat-code sequences are easter-egg/discovery controls only. They are not authen
 
 The module bundle and capability contract is defined in [Void Desk Modules](MODULE_SYSTEM.md) in the Void Desk repository. A profile can reference installed module IDs but cannot install code. The runtime verifies manifest, digest, signature, compatibility and permissions before staging/activation. Community executable modules remain disabled until a sandboxed module host, resource limits, revocation and rollback are implemented.
 
-### Official plugin manager
+### Module manager
 
 Plugins are separately versioned packages with a manifest, compatibility range, declared capabilities, immutable artifact digest and detached signature. In v1:
 - Only maintainer-controlled publisher IDs are accepted.
@@ -134,7 +134,7 @@ Plugins are separately versioned packages with a manifest, compatibility range, 
 - Verify signature, digest, schema, compatibility and permissions before installation.
 - No arbitrary shell execution. Privileged integrations require reviewed host-side capabilities with narrow typed APIs.
 - Install, update, disable and remove are explicit actions. Updates are staged and rollback-capable.
-- Profiles may reference official plugin IDs and configure schema-approved non-secret options. Sharing a profile never silently installs a plugin.
+- Profiles may reference module IDs and configure schema-approved non-secret options. Sharing a profile never silently installs a module. Missing modules are reported and can be resolved separately through the module library.
 
 The manifest schema is not proof that signing/distribution already exists. Key management, rotation, revocation and publisher allowlisting must be implemented before plugin installation is enabled.
 
@@ -168,12 +168,12 @@ Every write must be authenticated, authorized, size-limited, schema-validated, r
 
 ## Rollout
 
-1. Foundation: architecture, profile schema, plugin manifest schema and sample profile.
-2. Local engine: validator/migration library and read-only compatibility report; no cloud dependency.
-3. Web editor: local import/export, menu editing, preview and schema validation.
-4. Device bridge: explicit pairing and safe apply/rollback through a narrow local-service API.
-5. Official catalog: signing, key rotation/revocation, capability enforcement and staged install/update.
-6. Sharing service: opt-in profile publishing and individual official plugin sharing.
+1. Foundation: module manifest, contribution-slot, capability/permission contracts, profile schema and sample layout.
+2. Local engine: module registry, schema validator/migration, profile composer and read-only compatibility report; no cloud dependency.
+3. Web workbenches: Module Forge, Layout Designer and local import/export/preview.
+4. Release Composer: reproducible Full/Essential/Slim build manifests and controlled package pipeline.
+5. Device bridge: explicit pairing and safe profile apply/rollback through a narrow local-service API.
+6. Community Library: profile sharing first; executable module publishing only after review, signing, sandboxing, revocation and staged rollback.
 7. Additional adapters/platforms after feature and hardware evidence exists.
 
 ## Foundation acceptance criteria
