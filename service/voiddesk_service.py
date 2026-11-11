@@ -977,6 +977,209 @@ def h_job_log(args):
     return {"ok": True, "lines": lines}
 
 
+
+
+def _iptv_fixture():
+    return [{
+        "name": "Void Desk Test Channel",
+        "url": "https://example.invalid/live.m3u8",
+        "tvg_id": "voiddesk.test",
+        "tvg_name": "Void Desk Test Channel",
+        "logo": "",
+        "group": "Test",
+        "index": 0,
+    }]
+
+
+def h_iptv_get_config(args):
+    """Return only the safe IPTV playlist and EPG source settings."""
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "config": {
+            "playlist_url": "https://example.invalid/voiddesk-test.m3u",
+            "epg_urls": [],
+        }}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV parser/player adapter unavailable"}
+    config_path = DATA / "iptv_config.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        config = {}
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": "cannot read IPTV config: " + str(exc)[:120]}
+    if not isinstance(config, dict):
+        config = {}
+    playlist_url = str(config.get("playlist_url") or
+                       "https://iptv-org.github.io/iptv/countries/it.m3u")
+    epg_urls = config.get("epg_urls") if isinstance(config.get("epg_urls"), list) else []
+    try:
+        playlist_url = iptv_module.validate_url(playlist_url)
+        safe_epg_urls = []
+        for url in epg_urls[:5]:
+            try:
+                safe_epg_urls.append(iptv_module.validate_url(url))
+            except ValueError:
+                continue
+    except ValueError as exc:
+        return {"ok": False, "error": "invalid IPTV config: " + str(exc)}
+    return {
+        "ok": True,
+        "config": {"playlist_url": playlist_url, "epg_urls": safe_epg_urls},
+    }
+
+
+def h_iptv_load_playlist(args):
+    """Fetch and parse a bounded M3U playlist using verified TLS certificates."""
+    global _IPTV_CHANNELS, _IPTV_EPG
+    if IS_VISUAL_CAPTURE:
+        _IPTV_CHANNELS = _iptv_fixture()
+        _IPTV_EPG = {}
+        return {
+            "ok": True, "count": len(_IPTV_CHANNELS),
+            "channels": _IPTV_CHANNELS, "groups": ["Test"],
+            "epg_urls": [], "source": "visual fixture",
+        }
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV parser unavailable"}
+    try:
+        url = iptv_module.validate_url(args.get("url"))
+        text = iptv_module.fetch_text(
+            url, timeout=15, max_bytes=iptv_module.MAX_PLAYLIST_BYTES)
+        parsed = iptv_module.parse_m3u(text)
+        _IPTV_CHANNELS = parsed["channels"][:iptv_module.MAX_CHANNELS]
+        _IPTV_EPG = {}
+        return {
+            "ok": True,
+            "count": len(_IPTV_CHANNELS),
+            "channels": _IPTV_CHANNELS,
+            "groups": parsed["groups"],
+            "epg_urls": parsed["epg_urls"][:5],
+            "source": urllib.parse.urlsplit(url).hostname or "playlist",
+        }
+    except Exception as exc:
+        return {"ok": False, "error": "playlist load failed: " + str(exc)[:160]}
+
+
+def h_iptv_load_epg(args):
+    """Load up to three bounded XMLTV documents and keep their index in memory."""
+    global _IPTV_EPG
+    if IS_VISUAL_CAPTURE:
+        _IPTV_EPG = {
+            "voiddesk.test": [{
+                "start": time.time() - 60, "stop": time.time() + 1800,
+                "title": "Visual fixture programme", "desc": "No live EPG data",
+            }]
+        }
+        return {"ok": True, "channels_with_epg": 1, "sources": 1}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV parser unavailable"}
+    urls = args.get("urls")
+    if not isinstance(urls, list):
+        return {"ok": False, "error": "EPG sources must be a list"}
+    safe_urls = []
+    for url in urls[:3]:
+        try:
+            safe_urls.append(iptv_module.validate_url(url))
+        except ValueError:
+            continue
+    if not safe_urls:
+        _IPTV_EPG = {}
+        return {"ok": True, "channels_with_epg": 0, "sources": 0}
+    merged = {}
+    errors = []
+    loaded = 0
+    for url in safe_urls:
+        try:
+            payload = iptv_module.fetch_bytes(
+                url, timeout=20, max_bytes=iptv_module.MAX_EPG_BYTES)
+            parsed = iptv_module.parse_xmltv(payload)
+            for key, programmes in parsed.items():
+                bucket = merged.setdefault(key, [])
+                bucket.extend(programmes)
+                bucket.sort(key=lambda item: item["start"])
+                del bucket[500:]
+            loaded += 1
+        except Exception as exc:
+            errors.append(str(exc)[:100])
+    _IPTV_EPG = merged
+    if loaded == 0 and errors:
+        return {"ok": False, "error": "EPG load failed: " + "; ".join(errors[:2])}
+    return {
+        "ok": True, "channels_with_epg": len(merged), "sources": loaded,
+        "warning": "; ".join(errors[:2]) if errors else "",
+    }
+
+
+def h_iptv_epg_for(args):
+    """Return now/next only for a channel from the active playlist."""
+    if IS_VISUAL_CAPTURE:
+        return {
+            "ok": True,
+            "now": {"title": "Visual fixture programme", "start": 0, "stop": 0},
+            "next": None,
+        }
+    channel = args.get("channel")
+    if not isinstance(channel, dict) or not any(
+        item.get("url") == channel.get("url") for item in _IPTV_CHANNELS
+    ):
+        return {"ok": False, "error": "channel is not part of the active playlist"}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV parser unavailable"}
+    now, nxt = iptv_module.epg_now_next(_IPTV_EPG, channel)
+    return {"ok": True, "now": now, "next": nxt}
+
+
+def h_iptv_play(args):
+    """Play only a channel in the active playlist; handheld playback is a shell hand-off."""
+    if IS_VISUAL_CAPTURE:
+        return {"ok": True, "handoff": False, "note": "Playback disabled in visual capture"}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV player unavailable"}
+    url = args.get("url")
+    channel = next((item for item in _IPTV_CHANNELS if item.get("url") == url), None)
+    if channel is None:
+        return {"ok": False, "error": "channel is not part of the active playlist"}
+    try:
+        stream_url = iptv_module.validate_url(channel.get("url"), stream=True)
+    except ValueError as exc:
+        return {"ok": False, "error": "invalid stream URL: " + str(exc)}
+    name = str(channel.get("name") or args.get("name") or "IPTV stream")[:120]
+
+    if IS_DEVICE:
+        marker = DATA / ".pending_media"
+        if marker.exists():
+            return {"ok": False, "error": "another media hand-off is already pending"}
+        temporary = DATA / ".pending_media.tmp"
+        try:
+            DATA.mkdir(parents=True, exist_ok=True)
+            fd = os.open(str(temporary), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump({"url": stream_url, "name": name}, handle)
+                handle.write("\n")
+            os.replace(temporary, marker)
+        except OSError as exc:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return {"ok": False, "error": "cannot queue media hand-off: " + str(exc)}
+        return {"ok": True, "handoff": True, "note": "Returning to launcher for MPV playback"}
+
+    if not iptv_module.play(stream_url, name):
+        return {"ok": False, "error": iptv_module.status().get("error") or "MPV launch failed"}
+    return {"ok": True, "handoff": False, "note": "MPV player launched"}
+
+
+def h_iptv_stop(args):
+    """Stop the desktop-owned MPV process; handheld MPV runs as a launcher child."""
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "Playback is disabled in visual capture"}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV player unavailable"}
+    iptv_module.stop()
+    return {"ok": True}
+
+
 def h_media_status(args):
     try:
         if IS_VISUAL_CAPTURE:
@@ -1608,6 +1811,12 @@ HANDLERS = {
     "job_cancel": h_job_cancel,
     "job_log": h_job_log,
     "media_status": h_media_status,
+    "iptv_get_config": h_iptv_get_config,
+    "iptv_load_playlist": h_iptv_load_playlist,
+    "iptv_load_epg": h_iptv_load_epg,
+    "iptv_epg_for": h_iptv_epg_for,
+    "iptv_play": h_iptv_play,
+    "iptv_stop": h_iptv_stop,
     "list_external": h_list_external,
     "launch_external": h_launch_external,
     "toolbox_stats": h_toolbox_stats,
