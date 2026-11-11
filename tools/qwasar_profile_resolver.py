@@ -65,9 +65,20 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--output must remain inside --root")
 
     try:
+        selected_profile = args.profile
+        if selected_profile is None and not os.environ.get("QWASAR_PROFILE"):
+            config_path = root / "data" / "desk_config.json"
+            try:
+                config_data = json.loads(config_path.read_text(encoding="utf-8"))
+                configured = config_data.get("qwasar_profile") if isinstance(config_data, dict) else None
+                if isinstance(configured, str) and configured.strip():
+                    selected_profile = configured
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                pass
+
         resolver = QwasarProfileResolver(root, manifest_path=args.manifest)
         composition = resolver.resolve(
-            args.profile,
+            selected_profile,
             fallback_to_default=not args.strict,
         )
         if args.stdout:
