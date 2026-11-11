@@ -156,3 +156,26 @@ def test_reset_profile_restores_bundled_default_in_memory(tmp_path: Path):
     toolbox = next(item for item in switchboard.preview()["workspaces"] if item["id"] == "rt-toolbox")
     assert toolbox["enabled"] is True
     assert toolbox["visible"] is True
+
+def test_imported_profile_cannot_disable_recovery_workspace(tmp_path: Path):
+    root, profile_path = _fixture(tmp_path)
+    profile = _profile(profile_path)
+    profile["workspaceOverrides"].append({
+        "id": "end-node",
+        "enabled": False,
+        "visible": False,
+    })
+    profile_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SwitchboardError, match="protected workspace"):
+        QwasarSwitchboard(root, profile_path)
+
+
+def test_imported_profile_cannot_disable_the_central_shell(tmp_path: Path):
+    root, profile_path = _fixture(tmp_path)
+    profile = _profile(profile_path)
+    profile["shell"]["header"]["enabled"] = False
+    profile_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SwitchboardError, match="protected shell region"):
+        QwasarSwitchboard(root, profile_path)
