@@ -213,3 +213,145 @@ def test_muos_app_handlers_are_registered():
     service = load_service()
     assert service.HANDLERS["list_muos_apps"] is service.h_list_muos_apps
     assert service.HANDLERS["launch_muos_app"] is service.h_launch_muos_app
+
+
+
+def test_iptv_get_config_returns_only_http_sources(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    (tmp_path / "iptv_config.json").write_text(json.dumps({
+        "playlist_url": "https://playlist.example.test/list.m3u",
+        "epg_urls": [
+            "https://epg.example.test/guide.xml",
+            "file:///etc/passwd",
+            "https://epg2.example.test/guide.xml",
+        ],
+        "private_note": "must not be returned",
+    }), encoding="utf-8")
+    result = service.h_iptv_get_config({})
+    assert result["ok"] is True
+    assert result["config"] == {
+        "playlist_url": "https://playlist.example.test/list.m3u",
+        "epg_urls": [
+            "https://epg.example.test/guide.xml",
+            "https://epg2.example.test/guide.xml",
+        ],
+    }
+
+
+def test_iptv_playlist_handler_parses_bounded_channels_and_epg_sources(
+    tmp_path, monkeypatch
+):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    monkeypatch.setattr(service, "IS_DEVICE", False)
+    monkeypatch.setattr(service, "IS_VISUAL_CAPTURE", False)
+    playlist = """#EXTM3U url-tvg="https://epg.example.test/guide.xml"
+#EXTINF:-1 tvg-id="news.1" group-title="News",Example News
+https://stream.example.test/news.m3u8
+#EXTINF:-1 group-title="Broken",Unsafe local path
+file:///etc/passwd
+"""
+    monkeypatch.setattr(service.iptv_module, "fetch_text", lambda *_args, **_kwargs: playlist)
+    result = service.h_iptv_load_playlist({
+        "url": "https://playlist.example.test/list.m3u"
+    })
+    assert result["ok"] is True
+    assert result["count"] == 1
+    assert result["groups"] == ["News"]
+    assert result["epg_urls"] == ["https://epg.example.test/guide.xml"]
+    assert result["channels"][0]["url"] == "https://stream.example.test/news.m3u8"
+
+
+def test_iptv_playlist_handler_rejects_non_http_playlist_urls(monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "IS_VISUAL_CAPTURE", False)
+    result = service.h_iptv_load_playlist({"url": "file:///etc/passwd"})
+    assert result["ok"] is False
+    assert "unsupported URL scheme" in result["error"]
+
+
+def test_iptv_epg_handler_returns_now_next_for_playlist_channel(monkeypatch):
+    import time
+    from datetime import datetime, timedelta, timezone
+
+    service = load_service()
+    monkeypatch.setattr(service, "IS_VISUAL_CAPTURE", False)
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(minutes=5)).strftime("%Y%m%d%H%M%S +0000")
+    stop = (now + timedelta(minutes=25)).strftime("%Y%m%d%H%M%S +0000")
+    nxt_start = (now + timedelta(minutes=25)).strftime("%Y%m%d%H%M%S +0000")
+    nxt_stop = (now + timedelta(minutes=55)).strftime("%Y%m%d%H%M%S +0000")
+    xml = f"""<tv>
+      <channel id="news.1"><display-name>Example News</display-name></channel>
+      <programme channel="news.1" start="{start}" stop="{stop}">
+        <title>Current bulletin</title>
+      </programme>
+      <programme channel="news.1" start="{nxt_start}" stop="{nxt_stop}">
+        <title>Next bulletin</title>
+      </programme>
+    </tv>""".encode()
+    monkeypatch.setattr(service.iptv_module, "fetch_bytes", lambda *_args, **_kwargs: xml)
+    service._IPTV_CHANNELS = [{
+        "name": "Example News", "url": "https://stream.example.test/news",
+        "tvg_id": "news.1", "tvg_name": "Example News",
+    }]
+    loaded = service.h_iptv_load_epg({"urls": ["https://epg.example.test/guide.xml"]})
+    assert loaded["ok"] is True
+    result = service.h_iptv_epg_for({"channel": service._IPTV_CHANNELS[0]})
+    assert result["ok"] is True
+    assert result["now"]["title"] == "Current bulletin"
+    assert result["next"]["title"] == "Next bulletin"
+
+
+def test_iptv_play_requires_active_playlist_channel_and_writes_device_handoff(
+    tmp_path, monkeypatch
+):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    monkeypatch.setattr(service, "IS_DEVICE", True)
+    monkeypatch.setattr(service, "IS_VISUAL_CAPTURE", False)
+    service._IPTV_CHANNELS = [{
+        "name": "Example News", "url": "https://stream.example.test/news",
+        "group": "News",
+    }]
+    rejected = service.h_iptv_play({"url": "https://elsewhere.example.test/stream"})
+    assert rejected["ok"] is False
+    assert not (tmp_path / ".pending_media").exists()
+
+    result = service.h_iptv_play({"url": "https://stream.example.test/news"})
+    assert result["ok"] is True
+    assert result["handoff"] is True
+    payload = json.loads((tmp_path / ".pending_media").read_text(encoding="utf-8"))
+    assert payload == {
+        "url": "https://stream.example.test/news",
+        "name": "Example News",
+    }
+
+
+def test_iptv_play_starts_desktop_mpv_for_selected_channel(monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "IS_DEVICE", False)
+    monkeypatch.setattr(service, "IS_VISUAL_CAPTURE", False)
+    service._IPTV_CHANNELS = [{
+        "name": "Example News", "url": "https://stream.example.test/news",
+    }]
+    monkeypatch.setattr(service.iptv_module, "play", lambda url, name: True)
+    result = service.h_iptv_play({"url": "https://stream.example.test/news"})
+    assert result == {
+        "ok": True, "handoff": False, "note": "MPV player launched"
+    }
+
+
+def test_iptv_commands_are_registered():
+    service = load_service()
+    expected = {
+        "iptv_get_config": service.h_iptv_get_config,
+        "iptv_load_playlist": service.h_iptv_load_playlist,
+        "iptv_load_epg": service.h_iptv_load_epg,
+        "iptv_epg_for": service.h_iptv_epg_for,
+        "iptv_play": service.h_iptv_play,
+        "iptv_stop": service.h_iptv_stop,
+    }
+    for command, handler in expected.items():
+        assert service.HANDLERS[command] is handler
