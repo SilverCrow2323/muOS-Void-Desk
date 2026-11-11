@@ -71,13 +71,13 @@ Do not use a status label as a substitute for closing a resolved issue.
 
 ## Current open issue triage
 
-### #1 — internet browser not working
+### #1 — Browser launch fails with an Input/output error on muOS
 
 - Existing labels: `[Type] Bug`, `[Scope] muOS`.
 - Suggested additions: `[Area] Browser`, `[Priority] P2 Normal`, `[Status] Needs Info`.
 - Reason: the report only says “output input error”; browser identity, launch path and logs are still missing.
 
-### #2 — Stutters and hangs
+### #2 — RG35XXSP: Bluetooth stutter and incomplete power-off
 
 - Existing labels: `[Type] Bug`, `[Scope] muOS`.
 - Suggested additions: `[Area] Bluetooth`, `[Area] Power Management`, `[Priority] P1 High`, `[Status] Needs Hardware Test`.
