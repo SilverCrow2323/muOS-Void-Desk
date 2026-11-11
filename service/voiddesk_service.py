@@ -245,13 +245,13 @@ def _muos_app_entries():
 
 def h_list_muos_apps(args):
     """List only launchable applications from the fixed SD1/SD2 muOS roots."""
-    blocked = device_only("list_muos_apps")
-    if blocked:
-        return blocked
     if IS_VISUAL_CAPTURE:
         return {
             "ok": True, "apps": [], "source": "visual capture fixture",
         }
+    blocked = device_only("list_muos_apps")
+    if blocked:
+        return blocked
     apps = _muos_app_entries()
     return {
         "ok": True,
