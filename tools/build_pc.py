@@ -113,8 +113,8 @@ def main() -> int:
     result = build_archive(args.output, args.version)
     print("[pc-build] created %s (%s, %s)" %
           (result, platform.system(), platform.machine()))
-    print("[pc-build] sha256: %s" %
-          hashlib.sha256(result.read_bytes()).hexdigest())
+    checksum = result.with_suffix(result.suffix + ".sha256")
+    print("[pc-build] sha256: %s" % checksum.read_text(encoding="ascii").split()[0])
     return 0
 
 
