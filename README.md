@@ -108,6 +108,7 @@ Pygame contains the main industrial visual language and several home styles. LÖ
 - **LÖVE:** experimental frontend in `love/`; entry point `love/main.lua`.
 - **Local service:** `service/voiddesk_service.py` provides the bridge for host status, jobs and selected device actions.
 - **Device launcher:** `mux_launch.sh` uses the muOS application lifecycle, launches the local service and selects the frontend.
+- **muOS default:** Pygame is the reference handheld frontend. The first launch extracts the bundled CPython 3.11/aarch64 runtime from `assets/runtime_archives/` offline; LÖVE remains experimental and cannot be selected on muOS until its complete ARM64 shared-library runtime is bundled.
 - **PC launcher:** `voiddesk.py` provides development and desktop launch modes.
 - **QWASAR profile pipeline:** `tools/qwasar_profile_resolver.py` validates the selected portable profile and writes the generated engine-neutral composition before either frontend starts; Pygame and LÖVE apply workspace order, visibility and enabled state to NEXUS while preserving legacy routes. LÖVE applies top-level NEXUS workspace state; Pygame exposes profile selection and reads the snapshot, while its legacy NEXUS menu migration remains in progress.
 - **Standalone tools:** `outdesk/` and `external/tools.json` describe optional applications and integrations.
