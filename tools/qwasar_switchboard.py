@@ -621,20 +621,18 @@ class QwasarSwitchboard:
                 pair[0],
             )
         )
-        return [
-            {
-                "id": entry["id"],
-                "label": entry["label"],
-                "kind": entry["kind"],
-                "actionId": entry.get("actionId"),
-                "enabled": entry.get("enabled", True),
-                "visible": entry["id"] not in hidden,
-                "children": QwasarSwitchboard._preview_menu(
-                    entry.get("children", []), override
-                ),
-            }
-            for _, entry in indexed
-        ]
+        result = []
+        for _, entry in indexed:
+            effective = copy.deepcopy(entry)
+            effective["enabled"] = entry.get("enabled", True)
+            effective["visible"] = (
+                entry.get("visible", True) and entry["id"] not in hidden
+            )
+            effective["children"] = QwasarSwitchboard._preview_menu(
+                entry.get("children", []), override
+            )
+            result.append(effective)
+        return result
 
     def preview(self) -> dict[str, Any]:
         profile = self.profile
