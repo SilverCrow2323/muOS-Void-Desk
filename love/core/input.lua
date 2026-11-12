@@ -73,10 +73,9 @@ input.GAMEPAD_NAMES = {
 
 input.JOYBTN_FALLBACK = {
     [0] = "a", [1] = "b", [2] = "x", [3] = "y",
-    [4] = "l1", [5] = "r1",
-    [6] = "select", [7] = "start",
-    [8] = "l3", [9] = "r3",
-    [10] = "menu",
+    [4] = "l1", [5] = "r1", [6] = "l2", [7] = "r2",
+    [8] = "select", [9] = "start", [10] = "menu",
+    [11] = "l3", [12] = "r3",
 }
 
 input.DEADZONE = 0.5
