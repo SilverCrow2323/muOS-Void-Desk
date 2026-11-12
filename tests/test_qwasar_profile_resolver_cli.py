@@ -24,6 +24,10 @@ def _copy_inputs(tmp_path: Path) -> None:
         ROOT / DEFAULT_PROFILE,
         tmp_path / DEFAULT_PROFILE,
     )
+    shutil.copy2(
+        ROOT / "data/profiles/voiddesk-desktop-default.qprofile.json",
+        tmp_path / "data/profiles/voiddesk-desktop-default.qprofile.json",
+    )
 
 
 def test_runtime_cli_writes_shared_effective_composition_atomically(tmp_path: Path):
@@ -70,3 +74,20 @@ def test_runtime_cli_strict_mode_does_not_overwrite_on_invalid_profile(tmp_path:
 
     assert rc == 1
     assert not output.exists()
+
+
+
+def test_runtime_cli_selects_desktop_fallback_profile(tmp_path: Path):
+    _copy_inputs(tmp_path)
+    output = tmp_path / "data/qwasar_effective_profile.json"
+
+    rc = main([
+        "--root", str(tmp_path),
+        "--platform", "desktop",
+        "--default-profile", "data/profiles/voiddesk-desktop-default.qprofile.json",
+        "--output", "data/qwasar_effective_profile.json",
+    ])
+
+    assert rc == 0
+    value = json.loads(output.read_text(encoding="utf-8"))
+    assert value["profile"]["id"] == "qwasar.profile.voiddesk.desktop-default"
