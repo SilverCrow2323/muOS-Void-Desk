@@ -3,6 +3,8 @@
 The repository is the canonical editing location. The live GitHub Wiki is the practical reading surface for FAQs, short guides, manuals and troubleshooting.
 
 ## Page model
+
+Use the reusable [Wiki page template](../docs/WIKI_PAGE_TEMPLATE.md) when creating a new guide; remove sections that do not fit the topic.
 - Give every distinct topic its own page.
 - Start with a short explanation of what the topic is and when it is useful.
 - Use one concept per bullet; keep bullets short and scannable.
