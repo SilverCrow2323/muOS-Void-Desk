@@ -25,7 +25,7 @@ Void Desk is a controller-first handheld environment in the wider **QWASAR-Env**
 
 | I want to… | Go to |
 |---|---|
-| Explore the visual documentation portal | [QWASAR Field Portal](site/index.html) · [Interactive Asset Atlas](site/asset-atlas.html) |
+| Explore the visual documentation portal | [QWASAR Field Portal](site/index.html) · [Interactive Asset Atlas](site/asset-atlas.html) · [QWASAR Studio concept](site/studio.html) |
 | Understand the project | [Documentation home](docs/README.md) |
 | Install the latest published package | [Installation guide](wiki-source/Installation-muOS-Andromeda.md) · [Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) |
 | Explore the v12 direction | [v12 blueprint](docs/V12_BLUEPRINT.md) |
