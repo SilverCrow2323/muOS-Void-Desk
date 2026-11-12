@@ -25,3 +25,14 @@ def test_controller_keycap_width_is_stable_for_face_and_shoulder_labels():
     assert icons.button_keycap_width("A", 20) == 20
     assert icons.button_keycap_width("L1", 20) > icons.button_keycap_width("A", 20)
     assert icons.button_keycap_width("START", 20) > icons.button_keycap_width("L1", 20)
+
+def test_controls_guide_uses_keycaps_and_current_desktop_bindings():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "desk" / "main.py").read_text(encoding="utf-8")
+
+    assert 'control_guide = self.info_title in (' in source
+    assert 'self.draw_info_keycaps(' in source
+    assert 'self.btn_names(self.cur_map().get(action, []))' in source
+    assert "physical positions depend on the active firmware" in source
