@@ -50,7 +50,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=APP_ROOT)
     parser.add_argument("--manifest", default="data/qwasar_ui_manifest.json")
-    parser.add_argument("--profile", help="selected .qprofile; defaults to QWASAR_PROFILE or H700 default")
+    parser.add_argument("--profile", help="selected .qprofile; defaults to QWASAR_PROFILE or desk_config.json")
+    parser.add_argument("--default-profile", default="data/profiles/voiddesk-handheld-default.qprofile.json",
+                        help="platform-specific safe fallback profile")
+    parser.add_argument("--platform", choices=("muos", "knulli", "rocknix", "desktop", "custom"),
+                        help="host platform used for compatibility checks")
+    parser.add_argument("--model", help="optional device model compatibility check")
     parser.add_argument("--output", type=Path, default=Path("data/qwasar_effective_profile.json"))
     parser.add_argument("--strict", action="store_true", help="reject selected-profile errors instead of falling back")
     parser.add_argument("--stdout", action="store_true", help="print the resolved JSON instead of writing the output file")
@@ -76,10 +81,21 @@ def main(argv: list[str] | None = None) -> int:
             except (OSError, UnicodeError, json.JSONDecodeError):
                 pass
 
-        resolver = QwasarProfileResolver(root, manifest_path=args.manifest)
+        default_profile = args.default_profile
+        if Path(default_profile).is_absolute():
+            default_profile = str(Path(default_profile).resolve())
+        resolver = QwasarProfileResolver(
+            root,
+            manifest_path=args.manifest,
+            default_profile_path=default_profile,
+        )
+        target_platform = args.platform or os.environ.get("VOIDDESK_PLATFORM")
+        target_model = args.model or os.environ.get("VOIDDESK_MODEL")
         composition = resolver.resolve(
             selected_profile,
             fallback_to_default=not args.strict,
+            target_platform=target_platform,
+            target_model=target_model,
         )
         if args.stdout:
             print(json.dumps(composition, ensure_ascii=False, indent=2))
