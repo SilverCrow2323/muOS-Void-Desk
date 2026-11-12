@@ -47,7 +47,7 @@ jobs:
           PACKAGE_VERSION: ${{ inputs.version }}
         run: |
           case "$PACKAGE_VERSION" in
-            ""|*[!A-Za-z0-9.+_-]*)
+            ""|*[!A-Za-z0-9.+_~-]*)
               echo "Invalid version label: $PACKAGE_VERSION" >&2
               exit 1
               ;;
