@@ -7,6 +7,9 @@ Void Desk is designed for controller-first navigation. The exact physical button
 
 ## Semantic controls
 
+Use the matching button artwork in the active UI footer as the visual reference. The same semantic action can map to different physical controls on another device or firmware build.
+
+
 | Logical action | Purpose |
 |---|---|
 | `CONFIRM` | Activate the selected item |
