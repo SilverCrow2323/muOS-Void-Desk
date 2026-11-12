@@ -40,6 +40,15 @@ def draw(surf, key, x, y, sz, col):
         pygame.draw.arc(surf, col, box, math.radians(a0), math.radians(a1),
                         max(1, int(w * u)))
 
+    # Official Void Desk mark: circular ring, open triangle and lower stem.
+    if key in ("voiddesk", "brand"):
+        weight = max(1, int(2.2 * u + 0.5))
+        pygame.draw.circle(surf, col, p(12, 12), max(2, int(10.8 * u + 0.5)), weight)
+        pygame.draw.lines(surf, col, True,
+                          [p(12, 3.6), p(4.25, 15.8), p(19.75, 15.8)], weight)
+        pygame.draw.line(surf, col, p(12, 15.8), p(12, 22.35), weight)
+        return
+
     # ---- icone di sezione v6.0 ------------------------------------
     if key == "forge":                     # incudine: software
         rect(3, 8, 18, 4, 0)
