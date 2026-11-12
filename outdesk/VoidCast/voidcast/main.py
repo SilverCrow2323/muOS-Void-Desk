@@ -1010,6 +1010,7 @@ class SettingsScreen(Screen):
             ("ADDONS",         "%d active" % len(self.app.addons.addons), ""),
             ("LOG",            i18n.t("tools.log_sub"), ""),
             ("ABOUT",          "VOIDCAST %s" % C.APP_VERSION, "ℹ"),
+            ("MUOS INPUT",     "Auto / Andromeda (=) / Non-Andromeda (!=)", cfg.get("muos_profile", "auto").upper()),
         ]
 
     def on_button(self, btn):
@@ -1070,6 +1071,14 @@ class SettingsScreen(Screen):
                 self.app.push(LogScreen(self.app))
             elif i == 14 and btn == "A":
                 self.app.push(InfoScreen(self.app))
+            elif i == 15:
+                opts = ["auto", "andromeda", "not_andromeda"]
+                current = cfg.get("muos_profile", "auto")
+                cur = opts.index(current) if current in opts else 0
+                selected = opts[(cur + step) % len(opts)]
+                cfg.set("muos_profile", selected)
+                evinput.set_profile(selected)
+                self.app.toast("muOS input: " + evinput.resolve_profile(selected).upper())
 
     def draw(self, surf):
         self.t.header(surf, i18n.t("set.title"), i18n.t("set.sub"))
@@ -1442,6 +1451,7 @@ class App(object):
                    j.get_numhats(), j.get_numaxes()))
         if not self.joysticks:
             log("input: NESSUN joystick rilevato (SDL)")
+        evinput.set_profile(self.cfg.get("muos_profile", "auto"))
         if os.environ.get("VOIDCAST_FB") == "1":
             if evinput.start():
                 log("input: lettore evdev attivo su %d device"
