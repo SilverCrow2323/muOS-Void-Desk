@@ -36,7 +36,7 @@ def test_profile_reorders_hides_and_disables_only_mapped_workspaces():
 
     assert rings[0] == (0,)
     # UPLINK moves before THE FORGE; hidden MEDIA VAULT disappears;
-    # WORKSHOP remains in its legacy slot after the current workspaces.
+    # WORKSHOP remains after MEDIA VAULT; MUOS APPS stays between TOOLBOX and SETTINGS.
     assert rings[1] == (5, 3, 6)
     assert rings[2] == (7, 1, 4, 8)
     assert rings[3] == (9,)
