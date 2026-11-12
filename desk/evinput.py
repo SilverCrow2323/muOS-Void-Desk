@@ -50,20 +50,26 @@ def resolve_profile(selection="auto"):
         return detect_muos_release()
     return "andromeda" if selection == "andromeda" else "not_andromeda"
 
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "desk_config.json")
+_PROFILE_MTIME = None
+
 def set_profile(selection=None):
-    global KEYMAP
+    global KEYMAP, _PROFILE_MTIME
     if selection is None:
         selection = os.environ.get("VOID_MUOS_PROFILE")
     if not selection:
         try:
             import json
-            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            with open(os.path.join(root, "data", "desk_config.json"), encoding="utf-8") as stream:
+            with open(CONFIG_PATH, encoding="utf-8") as stream:
                 selection = json.load(stream).get("muos_profile", "auto")
         except (OSError, ValueError, TypeError):
             selection = "auto"
     KEYMAP = dict(KEYMAP_ANDROMEDA if resolve_profile(selection) == "andromeda"
                   else KEYMAP_NON_ANDROMEDA)
+    try:
+        _PROFILE_MTIME = os.stat(CONFIG_PATH).st_mtime_ns
+    except OSError:
+        _PROFILE_MTIME = None
     return resolve_profile(selection)
 
 
