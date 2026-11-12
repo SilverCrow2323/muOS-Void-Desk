@@ -13,6 +13,8 @@ REQUIRED_FILES = (
     "Void-Desk/mux_launch.sh",
     "Void-Desk/voiddesk.py",
     "Void-Desk/love/main.lua",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py",
 )
 
 
@@ -65,6 +67,8 @@ def validate_archive(archive: str | Path) -> list[str]:
                     errors.append("symbolic links are not allowed: %s" % name)
                 if not info.is_dir():
                     files.add(normalized)
+                    if normalized == "Void-Desk/mux_launch.sh" and not (mode & 0o111):
+                        errors.append("muOS launcher is not executable: %s" % normalized)
 
             if top_levels != {"Void-Desk"}:
                 errors.append(
@@ -74,6 +78,22 @@ def validate_archive(archive: str | Path) -> list[str]:
             for required in REQUIRED_FILES:
                 if required not in files:
                     errors.append("required file missing: %s" % required)
+
+            config_name = "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf"
+            if config_name in files:
+                try:
+                    config = package.read(config_name).decode("utf-8")
+                    required_settings = (
+                        "PANEL=0", "PANEL_BIND=127.0.0.1", "WATCHDOG=1",
+                        "TAILDROP=1", "TS_MODE=auto", "WIFI_WAIT=120",
+                    )
+                    for setting in required_settings:
+                        if setting not in config.splitlines():
+                            errors.append("Rt:Tailscale-M config missing setting: %s" % setting)
+                    if "\\\\n" in config:
+                        errors.append("Rt:Tailscale-M config contains literal escaped newlines")
+                except (UnicodeDecodeError, KeyError) as exc:
+                    errors.append("cannot read Rt:Tailscale-M config: %s" % exc)
     except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
         errors.append("cannot read archive: %s" % exc)
 
