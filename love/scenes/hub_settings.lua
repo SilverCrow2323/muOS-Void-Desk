@@ -12,7 +12,7 @@ local function set(k, v) config.set(k, v) end
 return dashboard.new({
     title = "SETTINGS",
     node_idx = 7,
-    widget_height = 176,
+    widget_height = 200,
     status = "Configuration",
 
     widgets_draw = function(scene, alpha)
