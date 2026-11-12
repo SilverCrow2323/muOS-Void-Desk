@@ -11,7 +11,7 @@
 <header class="topbar">
 <a class="brand" href="index.html" aria-label="QWASAR Void Desk home"><span class="brand-mark"><img src="assets/voiddesk_symbol.png" alt=""></span><span class="brand-copy"><strong>QWASAR</strong><small>VOID DESK / FIELD PORTAL</small></span></a>
 <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-menu-toggle><span></span><span></span><span></span><b class="sr-only">Open navigation</b></button>
-<nav class="nav" id="primary-nav" aria-label="Main navigation"><a class="active" href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="field-manual.html">Field manual</a><a href="asset-atlas.html">Asset atlas</a><a href="blueprint.html">V12 blueprint</a><a class="nav-github" href="https://github.com/SilverCrow2323/Void-Desk-Project" target="_blank" rel="noreferrer">Source ↗</a></nav>
+<nav class="nav" id="primary-nav" aria-label="Main navigation"><a class="active" href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="field-manual.html">Field manual</a><a href="asset-atlas.html">Asset atlas</a><a href="blueprint.html">V12 blueprint</a><button class="command-open" type="button" data-command-open aria-haspopup="dialog" aria-keyshortcuts="Control+K"><span class="command-glyph" aria-hidden="true">⌕</span><span>Jump to</span><kbd>CTRL K</kbd></button><a class="nav-github" href="https://github.com/SilverCrow2323/Void-Desk-Project" target="_blank" rel="noreferrer">Source ↗</a></nav>
 </header>
 <main id="main">
 <section class="hero wrap">
@@ -51,5 +51,14 @@
 <a class="library-item" data-search-item data-search="asset atlas navigation icons png forge screenshot visual inventory" href="asset-atlas.html"><span class="library-index">Q—07</span><span><b>Asset atlas</b><small>NEXUS icons and the real FORGE screen capture</small></span><strong>↗</strong></a></div><p class="no-results" id="no-results" hidden>No matching guide. Try another term.</p></section>
 <section class="closing-band"><div class="wrap closing-inner"><div><div class="eyebrow">THE NEXT LAYER IS YOURS TO SHAPE</div><h2>The void is not empty.<br><em>It is infrastructure.</em></h2></div><div class="closing-actions"><a class="button button-primary" href="https://github.com/SilverCrow2323/Void-Desk-Project">Explore the repository ↗</a><a class="button button-quiet" href="https://github.com/SilverCrow2323/Void-Desk-Project/issues">Report / discuss an issue</a></div></div></section>
 </main>
+
+<dialog class="command-dialog" id="command-dialog" aria-labelledby="command-title">
+  <div class="command-shell">
+    <div class="command-heading"><div><span class="eyebrow">QWASAR / QUICK NAVIGATION</span><h2 id="command-title">Where do you want to go?</h2></div><form method="dialog"><button type="submit" aria-label="Close command palette">ESC</button></form></div>
+    <label class="command-search"><span aria-hidden="true">⌕</span><input id="command-search-input" type="search" placeholder="Search pages, guides and actions…" autocomplete="off"></label>
+    <div class="command-results" id="command-results" role="list" aria-label="Navigation results"></div>
+    <p class="command-help"><kbd>CTRL</kbd> + <kbd>K</kbd> OPEN <span>·</span> <kbd>↑</kbd> <kbd>↓</kbd> NAVIGATE <span>·</span> <kbd>ENTER</kbd> OPEN <span>·</span> <kbd>ESC</kbd> CLOSE</p>
+  </div>
+</dialog>
 <footer class="footer wrap"><a class="footer-brand" href="index.html">QWASAR <span>/</span> VOID DESK</a><p>FIELD PORTAL · A living map of the project, not a substitute for tested release notes.</p><div><a href="architecture.html">Architecture</a><a href="field-manual.html">Manual</a><a href="asset-atlas.html">Asset atlas</a><a href="blueprint.html">Blueprint</a><a href="https://github.com/SilverCrow2323/Void-Desk-Project">GitHub ↗</a></div><small>© <span data-year></span> QWASAR-Env / Void Desk</small></footer>
 </body></html>
