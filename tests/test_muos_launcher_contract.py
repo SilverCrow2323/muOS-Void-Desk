@@ -14,6 +14,8 @@ def test_muos_launcher_defaults_to_pygame_and_recovers_to_pygame():
     assert "falling back to LOVE engine" not in launcher
     assert "Pygame frontend failed" in launcher
     assert 'PYTHONPATH="$APP_DIR:$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}"' in launcher
+    assert "export SDL_VIDEODRIVER=fbcon" in launcher
+    assert "export SDL_FBDEV=/dev/fb0" in launcher
 
 
 def test_muos_launcher_refuses_incomplete_love_runtime():
