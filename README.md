@@ -106,7 +106,7 @@ Pygame contains the main industrial visual language and several home styles. LÖ
 - **Local service:** `service/voiddesk_service.py` provides the bridge for host status, jobs and selected device actions.
 - **Device launcher:** `mux_launch.sh` uses the muOS application lifecycle, launches the local service and selects the frontend.
 - **PC launcher:** `voiddesk.py` provides development and desktop launch modes.
-- **QWASAR profile pipeline:** `tools/qwasar_profile_resolver.py` validates the selected portable profile and writes the generated engine-neutral composition before either frontend starts. LÖVE applies top-level NEXUS workspace state; Pygame exposes profile selection and reads the snapshot, while its legacy NEXUS menu migration remains in progress.
+- **QWASAR profile pipeline:** `tools/qwasar_profile_resolver.py` validates the selected portable profile and writes the generated engine-neutral composition before either frontend starts; Pygame and LÖVE apply workspace order, visibility and enabled state to NEXUS while preserving legacy routes. LÖVE applies top-level NEXUS workspace state; Pygame exposes profile selection and reads the snapshot, while its legacy NEXUS menu migration remains in progress.
 - **Standalone tools:** `outdesk/` and `external/tools.json` describe optional applications and integrations.
 
 The local service is a privileged boundary and must remain local by default. Future Studio sync must be device-initiated and authenticated; it must not expose the existing host-control service to the internet.
