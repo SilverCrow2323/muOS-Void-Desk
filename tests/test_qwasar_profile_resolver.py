@@ -238,7 +238,11 @@ def test_platform_compatibility_selects_the_matching_safe_default(tmp_path: Path
         )
 
     desktop_default = tmp_path / "data/profiles/voiddesk-desktop-default.qprofile.json"
-    composition = resolver.resolve(
+    desktop_resolver = QwasarProfileResolver(
+        tmp_path,
+        default_profile_path="data/profiles/voiddesk-desktop-default.qprofile.json",
+    )
+    composition = desktop_resolver.resolve(
         h700_profile,
         target_platform="desktop",
     )
