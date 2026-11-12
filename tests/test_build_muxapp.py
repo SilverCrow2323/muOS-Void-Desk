@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+import stat
 from pathlib import Path
 import zipfile
 from types import SimpleNamespace
