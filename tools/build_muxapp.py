@@ -177,6 +177,11 @@ def build_archive(repo_root: Path, output: Path):
 
         _copy_tailscale_service(repo_root, package_root)
 
+        # muOS invokes mux_launch.sh as an application entry point. Git checkouts
+        # may store it without the executable bit; normalize it in the package.
+        launcher = package_root / "mux_launch.sh"
+        launcher.chmod(0o755)
+
         output.parent.mkdir(parents=True, exist_ok=True)
         timestamp = _zip_datetime()
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED,
