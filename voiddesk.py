@@ -234,8 +234,9 @@ def run_pygame_runtime():
         K.K_ESCAPE: "MENU", K.K_m: "MENU",
         K.K_MINUS: "VOL-", K.K_EQUALS: "VOL+",
     }
-    RAW = {"A": 304, "B": 305, "Y": 306, "X": 307, "L1": 308, "R1": 309,
-           "L2": 314, "R2": 315, "SELECT": 310, "START": 311, "MENU": 312,
+    RAW = {"A": 304, "B": 305, "Y": 306, "X": 307,
+           "L1": 310, "R1": 311, "L2": 312, "R2": 313,
+           "SELECT": 314, "START": 315, "MENU": 316,
            "VOL-": 114, "VOL+": 115}
 
     _q, _held = [], set()

@@ -13,10 +13,12 @@ _EV_KEY = 1
 _EV_ABS = 3
 _EVSZ = struct.calcsize("llHHi")
 
+# muOS Andromeda / H700 Linux EV_KEY gamepad mapping:
+# 310 L1, 311 R1, 312 L2, 313 R2, 314 SELECT, 315 START, 316 MENU.
 KEYMAP = {
     304: "A", 305: "B", 306: "Y", 307: "X",
-    308: "L1", 309: "R1", 314: "L2", 315: "R2",
-    310: "SELECT", 311: "START", 312: "MENU",
+    310: "L1", 311: "R1", 312: "L2", 313: "R2",
+    314: "SELECT", 315: "START", 316: "MENU",
     114: "VOL-", 115: "VOL+",
     88: "SCREENSHOT",  # Linux input KEY_F12
 }

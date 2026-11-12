@@ -13,9 +13,10 @@ DATA = os.path.join(APP, "data")
 sys.path.insert(0, os.path.join(APP, "desk"))
 import jsmap  # noqa: E402
 
-# nomi confermati sul pad muOS / RG35XX-H
-KNOWN = {304: "A", 305: "B", 306: "Y", 307: "X", 308: "L1", 309: "R1",
-         310: "SELECT", 311: "START", 312: "MENU", 314: "L2", 315: "R2"}
+# Codici EV_KEY del gamepad muOS Andromeda / H700.
+KNOWN = {304: "A", 305: "B", 306: "Y", 307: "X",
+         310: "L1", 311: "R1", 312: "L2", 313: "R2",
+         314: "SELECT", 315: "START", 316: "MENU"}
 EXTRA_ORDER = ["L3", "R3"]      # nomi per i codici extra, in ordine
 
 # azioni QJoyPad
