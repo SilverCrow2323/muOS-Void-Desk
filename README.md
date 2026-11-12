@@ -32,7 +32,7 @@ Void Desk is a controller-first handheld environment in the wider **QWASAR-Env**
 | Check firmware and controller compatibility | [muOS compatibility matrix](docs/MUOS_FIRMWARE_COMPATIBILITY.md) |
 | Understand runtime and source layout | [Architecture](docs/ARCHITECTURE.md) |
 | Develop or contribute | [Development guide](docs/DEVELOPMENT.md) · [Contributing](CONTRIBUTING.md) |
-| Open the GitHub Wiki | [Wiki home](https://github.com/SilverCrow2323/Void-Desk-Project/wiki) · [source pages](wiki-source/README.md) |
+| Browse technical source docs | [Documentation index](docs/README.md) · [Wiki source archive](wiki-source/README.md) |
 
 ## 🌌 One ecosystem, clear boundaries
 
@@ -158,7 +158,7 @@ python3 voiddesk.py --help
 | [Visual capture workflow](docs/visual/README.md) | PNG capture, asset inventory and privacy review |
 | [Security policy](SECURITY.md) | Security reporting and safe-operation boundaries |
 
-The [Wiki source](wiki-source/README.md) is version-controlled. The live GitHub Wiki needs its first **Home** page created once before the publisher can push the remaining pages and diagrams.
+The **QWASAR Field Portal** in `site/` is the intended visual reading experience. The technical source remains version-controlled in `docs/` and `wiki-source/`; the live GitHub Wiki is optional and is not required to use or publish the site.
 
 ## 🧪 Testing and release evidence
 
