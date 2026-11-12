@@ -13,7 +13,7 @@
 
 <!-- # VOID DESK: keep the legacy project heading discoverable to repository tooling. -->
 
-Void Desk is a controller-first handheld environment in the wider **QWASAR-Env** ecosystem. It brings navigation, system tools, connectivity, media, diagnostics and optional desktop sessions into one interface while keeping the host firmware's native boot and recovery paths intact. The **Symbiotic Layer** is the architectural direction: integrate with the host firmware through supported interfaces while keeping boot, recovery and uninstall paths reversible.
+Void Desk is a controller-first handheld environment in the wider **QWASAR-Env** ecosystem. It brings navigation, system tools, connectivity, media, diagnostics and optional desktop sessions into one interface while keeping the host firmware's native boot and recovery paths intact. The **Symbiotic Layer** is the architectural direction: integrate with the host firmware through supported interfaces while keeping boot, recovery and uninstall paths reversible. Void Desk remains an application-level integration, not a replacement firmware image today. The installed handheld application directory remains `Void-Desk/`, and the muOS launcher entry point remains `mux_launch.sh` for compatibility with existing installs.
 
 > [!IMPORTANT]
 > **This repository contains active development, not a v12 release.** The latest published handheld package is **v10.2.0** (11 August 2026). The v10.5.4-NEXUS development line remains under review; [PR #66](https://github.com/SilverCrow2323/Void-Desk-Project/pull/66) is a draft. **v12 is a product and architecture blueprint**, not an installable package.
