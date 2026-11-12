@@ -1,25 +1,49 @@
-# Void Desk — Linux PC bundle
+# Void Desk — Linux PC test bundle
 
-This package is a portable source distribution for Linux desktop systems, not an AppImage or statically linked executable.
+The PC bundle is primarily for development, UI checks and workflow testing on a Linux computer. It is not the handheld package and is not a replacement for muOS.
+
+## Install location
+
+**Keep the complete extracted folder in your user's Home directory.**
+
+1. Download the Linux PC archive from [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases).
+2. Open your Home folder.
+3. Extract the archive there. It creates VoidDesk-PC/.
+4. Open VoidDesk-PC/ and run launch-pc.sh.
+
+Expected location:
+
+~~~text
+$HOME/VoidDesk-PC/
+~~~
+
+Do not scatter the bundle files across system folders. Keeping the project in one folder makes updates, logs, test assets and its virtual environment easy to manage.
 
 ## Requirements
-
 - Linux x86_64 or aarch64
 - Python 3.10+
 - A graphical desktop session and SDL2 runtime libraries
 - Internet access for first-run Python dependency installation
 
 ## Start
-
-```sh
-tar -xzf Void-Desk-PC-Linux-*.tar.gz
-cd VoidDesk-PC
-chmod +x launch-pc.sh
+~~~bash
+cd "$HOME/VoidDesk-PC"
 ./launch-pc.sh
-```
+~~~
 
-The launcher invokes the existing `voiddesk.py --py` path. On first run, Void Desk creates `.venv_desktop` and installs Pygame and psutil from PyPI. LÖVE mode is optional and requires a system LÖVE installation.
+The launcher invokes voiddesk.py --py. On first run, Void Desk creates .venv_desktop/ inside this folder and installs Pygame and psutil. LÖVE mode is optional and requires a system LÖVE installation.
 
-muOS-specific operations (framebuffer integration, package management and the optional XFCE image lifecycle) are not available on a normal PC. Hardware-specific features remain disabled or unavailable where the host does not provide the required capabilities.
+## PC and handheld differences
+| PC test build | muOS handheld |
+|---|---|
+| UI and navigation checks | Physical controller and device checks |
+| Desktop-safe tools | Device/firmware capabilities |
+| Linux desktop session | muOS application lifecycle |
+| PC screenshots and logs | Handheld screenshots and logs |
+| No muOS package manager | .muxapp installation |
 
-Verify the adjacent `.sha256` file before use. Keep your personal configuration and backups outside the extracted application directory when replacing builds.
+> [!IMPORTANT]
+> Passing a PC test does not certify a handheld. Test the exact device and muOS release before describing a feature as working on hardware.
+
+## Keep data safe
+Back up personal test data before replacing the folder. Do not copy .venv_desktop/ into the muOS package.
