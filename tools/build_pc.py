@@ -25,11 +25,16 @@ Requirements:
 - Python 3.10 or newer
 - A working graphical session and SDL2 runtime libraries
 
+Install:
+  Extract the archive directly into your Home folder. It creates:
+    $HOME/VoidDesk-PC/
+
 Run:
+  cd "$HOME/VoidDesk-PC"
   chmod +x launch-pc.sh
   ./launch-pc.sh
 
-The launcher uses the existing voiddesk.py --py path. On first launch it creates
+Keep the complete PC test bundle in that one Home folder. The launcher uses the existing voiddesk.py --py path. On first launch it creates
 .venv_desktop and installs Pygame and psutil from PyPI. Internet access is needed
 for that first dependency installation. You can also run:
   python3 voiddesk.py --help
