@@ -1,6 +1,6 @@
 # QWASAR Profile Resolver
 
-**Status:** implemented as a shared resolver and launcher preflight; frontend adoption is in progress. The LÖVE NEXUS adapter applies top-level workspace order, visibility and enabled state. Pygame exposes profile selection and loads the generated snapshot, but its legacy NEXUS arrangement and RT:TOOLBOX section migration are not yet profile-driven.
+**Status:** implemented as a shared resolver and launcher preflight. Both LÖVE and Pygame NEXUS adapters apply top-level workspace order, visibility and enabled state while retaining stable legacy node IDs. Pygame's NEXUS workspace composition is profile-driven; RT:TOOLBOX section migration and shared shell/global-panel overrides remain follow-up work.
 
 ## 1. Purpose and boundaries
 
@@ -125,15 +125,16 @@ Profiles and the generated snapshot are never executed as code. Signature verifi
 - The Pygame Settings screen lists compatible `.qprofile.json` files.
 - Saving a selection stores `qwasar_profile` in `data/desk_config.json`; a restart is required for the launcher to regenerate the snapshot.
 - Pygame reads and caches the generated composition at startup.
-- The NEXUS adapter maps QWASAR workspace IDs to stable legacy node IDs. It applies per-orbit workspace order, removes hidden workspaces, keeps disabled workspaces visible but muted and blocks their activation.
-- All non-QWASAR legacy NEXUS nodes remain in their original rings: MUOS APPS, WORKSHOP, GAMES, DEVELOP, COMMUNITY and OUTERDESK. They are not aliased to unrelated QWASAR workspace IDs.
-- This phase applies workspace-level NEXUS state only. Header/footer and side/global panels, non-NEXUS home styles, and migration of the legacy TOOLBOX/WORKSHOP destinations into the four QWASAR RT:TOOLBOX sections remain follow-up work.
+- The NEXUS adapter maps QWASAR workspace IDs to stable legacy node IDs and applies per-orbit order, visibility and enabled state.
+- Hidden workspaces are removed; disabled workspaces remain visible but muted and cannot be activated. START SESSION and END NODE remain protected recovery anchors.
+- All six non-QWASAR legacy destinations remain in their original orbits and retain their own routes: MUOS APPS, WORKSHOP, GAMES, DEVELOP, COMMUNITY and OUTERDESK.
+- The 14 active NEXUS destinations are represented by the Pygame menu and activation dispatcher. Non-NEXUS home styles, header/footer and side/global panel overrides, and migration of legacy TOOLBOX/WORKSHOP destinations into the four QWASAR RT:TOOLBOX sections remain follow-up work.
 
 ### Shared pending work
 
 - Consume shell region, home-panel and global-panel overrides in both frontends.
 - Apply profile-driven RT:TOOLBOX section/menu order and contributions.
-- Map every old Pygame destination and action to stable manifest IDs, including explicit aliases and unsupported-route states.
+- Map the remaining non-NEXUS Pygame destinations and actions to stable manifest IDs, including explicit aliases and unsupported-route states.
 - Add profile import/export UX and profile migration from the previous configuration format.
 - Verify the full flow on a physical H700 device and a Linux PC.
 
