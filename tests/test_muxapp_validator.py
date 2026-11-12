@@ -1,4 +1,5 @@
 import importlib.util
+import stat
 import zipfile
 from pathlib import Path
 
@@ -18,7 +19,10 @@ def load_validator():
 def make_archive(path: Path, members: dict[str, bytes]):
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name, payload in members.items():
-            archive.writestr(name, payload)
+            info = zipfile.ZipInfo(name)
+            mode = 0o755 if name == "Void-Desk/mux_launch.sh" else 0o644
+            info.external_attr = (stat.S_IFREG | mode) << 16
+            archive.writestr(info, payload)
 
 
 def valid_members():
@@ -26,6 +30,13 @@ def valid_members():
         "Void-Desk/mux_launch.sh": b"#!/bin/sh\n",
         "Void-Desk/voiddesk.py": b"print('VoidDesk')\n",
         "Void-Desk/love/main.lua": b"function love.load() end\n",
+        "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf": (
+            b"PANEL=0\nPANEL_BIND=127.0.0.1\nWATCHDOG=1\n"
+            b"TAILDROP=1\nTS_MODE=auto\nWIFI_WAIT=120\n"
+        ),
+        "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py": (
+            b"# Rt:Tailscale-M panel fixture\n"
+        ),
     }
 
 
@@ -33,6 +44,18 @@ def test_muxapp_accepts_single_void_desk_root(tmp_path):
     archive = tmp_path / "valid.muxapp"
     make_archive(archive, valid_members())
     assert load_validator().validate_archive(archive) == []
+
+
+def test_muxapp_rejects_non_executable_muos_launcher(tmp_path):
+    archive = tmp_path / "non-executable.muxapp"
+    members = valid_members()
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as package:
+        for name, payload in members.items():
+            info = zipfile.ZipInfo(name)
+            info.external_attr = (stat.S_IFREG | 0o644) << 16
+            package.writestr(info, payload)
+    errors = load_validator().validate_archive(archive)
+    assert any("muOS launcher is not executable" in error for error in errors)
 
 
 def test_muxapp_rejects_extra_top_level_directory(tmp_path):
