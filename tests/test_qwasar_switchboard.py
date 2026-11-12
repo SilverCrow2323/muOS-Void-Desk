@@ -17,7 +17,7 @@ DEFAULT_PROFILE = "data/profiles/voiddesk-handheld-default.qprofile.json"
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path]:
-    for folder in ("schemas", "data/profiles"):
+    for folder in ("schemas", "data/profiles", "data/profiles/templates"):
         (tmp_path / folder).mkdir(parents=True, exist_ok=True)
     for name in ("qwasar-ui.schema.json", "qwasar-profile.schema.json"):
         shutil.copy2(ROOT / "schemas" / name, tmp_path / "schemas" / name)
@@ -25,6 +25,10 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path]:
     profile_path = tmp_path / DEFAULT_PROFILE
     profile_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / DEFAULT_PROFILE, profile_path)
+    shutil.copy2(
+        ROOT / "data/profiles/templates/voiddesk-handheld-default.qprofile.json",
+        tmp_path / "data/profiles/templates/voiddesk-handheld-default.qprofile.json",
+    )
     return tmp_path, profile_path
 
 

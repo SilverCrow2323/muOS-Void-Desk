@@ -165,7 +165,7 @@ def test_resolver_merges_module_contribution_and_keymap_states(tmp_path: Path):
 
     composition = resolver.resolve()
     assert composition["modules"]["community.network.wifi-overview"] is False
-    assert composition["contributions"]["wifi-overview.tile"] == "hidden"
+    assert composition["contributions"]["wifi-overview.tile"]["state"] == "hidden"
     media_binding = next(
         item for item in composition["keymap"]
         if item["actionId"] == "panel.media.toggle"
