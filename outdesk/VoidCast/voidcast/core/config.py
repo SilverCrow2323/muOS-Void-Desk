@@ -90,8 +90,12 @@ class Config(object):
                 self.data[k] = v
             legacy = {"0": "A", "1": "B", "2": "X", "3": "Y", "4": "L1",
                       "5": "R1", "6": "SELECT", "7": "START", "8": "L2", "9": "R2"}
-            if self.data.get("button_map") == legacy:
-                self.data["button_map"] = dict(DEFAULTS["button_map"])
+            saved_map = self.data.get("button_map", {})
+            migrated = dict(DEFAULTS["button_map"])
+            for key, value in saved_map.items():
+                if legacy.get(key) != value:
+                    migrated[key] = value
+            self.data["button_map"] = migrated
         except (OSError, ValueError):
             pass
 
