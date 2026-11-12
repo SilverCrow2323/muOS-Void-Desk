@@ -11,6 +11,8 @@
   </p>
 </div>
 
+<!-- # VOID DESK: keep the legacy project heading discoverable to repository tooling. -->
+
 Void Desk is a controller-first handheld environment in the wider **QWASAR-Env** ecosystem. It brings navigation, system tools, connectivity, media, diagnostics and optional desktop sessions into one interface while keeping the host firmware's native boot and recovery paths intact.
 
 > [!IMPORTANT]
@@ -42,6 +44,8 @@ Void Desk is the handheld client. **QWASAR-Env** is the broader ecosystem of sha
 | **Local service** | Typed bridge for system status, jobs, network and selected host actions | Present; ownership and API coverage are being consolidated |
 | **QWASAR-Env contracts** | UI composition, profiles, capabilities and module metadata | Partially implemented; frontend adoption differs |
 | **QWASAR Studio / Link** | Browser workbench and PC companion | Roadmap concepts; not released services |
+
+**QWASAR Studio direction:** the intended Studio experience is **one web app** bringing Module Forge, Layout Designer, Release Composer and Community Library together. This is a roadmap description, not a claim that Studio is already released.
 
 ![QWASAR-Env system map](docs/assets/qwasar-system-map.svg)
 
