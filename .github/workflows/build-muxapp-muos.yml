@@ -1,0 +1,105 @@
+name: Build muxapp for muOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version label for the generated package
+        required: true
+        type: string
+        default: "10.5.4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-muxapp-muos-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-muxapp:
+    name: Build and validate muOS package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source and pinned submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: false
+
+      - name: Verify build tools and source syntax
+        run: |
+          python -m py_compile tools/build_muxapp.py tools/validate_muxapp.py
+          sh -n mux_launch.sh
+          test -f external/rt-tailscale-m/app/RtTailscale/rt
+          test -f external/rt-tailscale-m/app/RtTailscale/ts
+          test -f external/rt-tailscale-m/app/RtTailscale/panel/server.py
+
+      - name: Build .muxapp
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: |
+          case "$PACKAGE_VERSION" in
+            ""|*[!A-Za-z0-9.+_-]*)
+              echo "Invalid version label: $PACKAGE_VERSION" >&2
+              exit 1
+              ;;
+          esac
+          mkdir -p dist
+          python tools/build_muxapp.py --output "dist/Void-Desk-${PACKAGE_VERSION}.muxapp"
+
+      - name: Validate package and checksum
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: |
+          PACKAGE="dist/Void-Desk-${PACKAGE_VERSION}.muxapp"
+          python tools/validate_muxapp.py "$PACKAGE"
+          (cd dist && sha256sum -c "Void-Desk-${PACKAGE_VERSION}.muxapp.sha256")
+          python - "$PACKAGE" <<'PY'
+          import sys, zipfile
+          from pathlib import PurePosixPath
+          path = sys.argv[1]
+          with zipfile.ZipFile(path) as archive:
+              names = set(archive.namelist())
+              launcher = "Void-Desk/mux_launch.sh"
+              info = archive.getinfo(launcher)
+              mode = (info.external_attr >> 16) & 0o777
+              assert mode & 0o111, "mux_launch.sh lost executable permission"
+              assert "Void-Desk/desk/main.py" in names, "Pygame frontend missing"
+              assert "Void-Desk/love/main.lua" in names, "LÖVE frontend missing"
+              assert "Void-Desk/bin/bootstrap_lite.py" in names, "Pygame bootstrap missing"
+              assert all(PurePosixPath(name).parts[0] == "Void-Desk" for name in names)
+          print("muOS package smoke checks passed")
+          PY
+
+      - name: Publish package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Void-Desk-muOS-${{ inputs.version }}
+          path: |
+            dist/Void-Desk-${{ inputs.version }}.muxapp
+            dist/Void-Desk-${{ inputs.version }}.muxapp.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Write build summary
+        if: success()
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: |
+          echo "## Void Desk for muOS — build complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Package:** `Void-Desk-${PACKAGE_VERSION}.muxapp`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Target:** muOS / compatible H700 handhelds" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Validation:** archive layout, required launchers, executable bit and SHA-256" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Artifact:** download the package and checksum from this workflow run" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Copy the `.muxapp` to SD1/ARCHIVE/ and install it with muOS Archive Manager." >> "$GITHUB_STEP_SUMMARY"
