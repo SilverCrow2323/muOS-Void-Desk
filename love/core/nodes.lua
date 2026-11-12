@@ -63,13 +63,13 @@ nodes.LIST = {
       type="planet", size=15, surface="icy", rot_speed=0.6 },
     { idx=14, name="LEGACY", icon="legacy", ring=4, hidden=true,
       type="planet", size=10, surface="volcanic", rot_speed=0.5 },
-} 
-
-for (base_position, node) in ipairs(nodes.LIST) do
-    node.base_order = base_position
-end
+}
 
 function nodes.color_for(idx) return nodes.COLOR[idx] or {0.5,0.5,0.5} end
+
+for base_position, node in ipairs(nodes.LIST) do
+    node.base_order = base_position
+end
 
 -- Stable adapter from QWASAR workspace IDs to legacy NEXUS node identities.
 -- Node indices, routes and orbital rings remain unchanged; only profile
