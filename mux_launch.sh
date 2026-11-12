@@ -82,8 +82,13 @@ except Exception:
     # assets/runtime_archives and bootstraps locally without Internet.
     if [ "$ENGINE" = "py" ]; then
         MARKER="$DATA/.pygame_ready"
-        if [ ! -f "$MARKER" ] || [ ! -d "$APP_DIR/runtime" ]; then
-            echo "$(date) pygame runtime not ready, bootstrapping..." >>"$LOG"
+        PY_ENV_PATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}"
+        PY_ENV_LIBS="$APP_DIR/runtime/pygame.libs:$APP_DIR/lib:${LD_LIBRARY_PATH:-}"
+        PYTHONPATH="$PY_ENV_PATH" LD_LIBRARY_PATH="$PY_ENV_LIBS" \
+            python3 -c 'import pygame' >/dev/null 2>&1
+        RUNTIME_RC=$?
+        if [ ! -f "$MARKER" ] || [ ! -d "$APP_DIR/runtime" ] || [ "$RUNTIME_RC" -ne 0 ]; then
+            echo "$(date) Pygame runtime missing or unusable (import rc=$RUNTIME_RC); bootstrapping offline-first..." >>"$LOG"
             python3 "$APP_DIR/bin/bootstrap_lite.py" >>"$LOG" 2>&1
             BOOT_RC=$?
             if [ $BOOT_RC -ne 0 ] || [ ! -f "$MARKER" ]; then
@@ -97,6 +102,7 @@ except Exception:
     if [ "$ENGINE" = "py" ]; then
         echo "$(date) launching Pygame frontend" >>"$LOG"
         PYTHONPATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" \
+            LD_LIBRARY_PATH="$APP_DIR/runtime/pygame.libs:$APP_DIR/lib:${LD_LIBRARY_PATH:-}" \
             PYGAME_HIDE_SUPPORT_PROMPT=1 \
             python3 "$APP_DIR/desk/main.py" >>"$LOG" 2>&1
         RC=$?
