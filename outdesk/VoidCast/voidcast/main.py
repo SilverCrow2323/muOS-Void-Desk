@@ -1677,7 +1677,7 @@ class App(object):
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT:
                     self.running = False
-                elif ev.type == pygame.JOYBUTTONDOWN:
+                elif ev.type == pygame.JOYBUTTONDOWN and not evinput.active():
                     scr = self.top()
                     if isinstance(scr, RemapScreen):
                         scr.on_raw_button(ev.button)
