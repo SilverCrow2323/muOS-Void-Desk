@@ -81,10 +81,10 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf" in names
     assert "PANEL=0" in tailscale_config
     assert "PANEL_BIND=127.0.0.1" in tailscale_config
+    assert tailscale_config.splitlines()[0] == "PANEL=0"
+    assert r"\n" not in tailscale_config
     assert launcher_mode & 0o111 == 0o111
     assert all(mode & 0o111 == 0o111 for mode in service_modes.values())
-    assert "PANEL=0\\n" in tailscale_config
-    assert "\\\\n" not in tailscale_config
     assert not any(name.startswith("Void-Desk/tests/") for name in names)
     assert "Void-Desk/.env" not in names
     assert "Void-Desk/data/user-config.json" not in names
