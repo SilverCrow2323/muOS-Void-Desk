@@ -13,7 +13,7 @@
 
 <!-- # VOID DESK: keep the legacy project heading discoverable to repository tooling. -->
 
-Void Desk is a controller-first handheld environment in the wider **QWASAR-Env** ecosystem. It brings navigation, system tools, connectivity, media, diagnostics and optional desktop sessions into one interface while keeping the host firmware's native boot and recovery paths intact.
+Void Desk is a controller-first handheld environment in the wider **QWASAR-Env** ecosystem. It brings navigation, system tools, connectivity, media, diagnostics and optional desktop sessions into one interface while keeping the host firmware's native boot and recovery paths intact. The **Symbiotic Layer** is the architectural direction: integrate with the host firmware through supported interfaces while keeping boot, recovery and uninstall paths reversible.
 
 > [!IMPORTANT]
 > **This repository contains active development, not a v12 release.** The latest published handheld package is **v10.2.0** (11 August 2026). The v10.5.4-NEXUS development line remains under review; [PR #66](https://github.com/SilverCrow2323/Void-Desk-Project/pull/66) is a draft. **v12 is a product and architecture blueprint**, not an installable package.
@@ -45,7 +45,7 @@ Void Desk is the handheld client. **QWASAR-Env** is the broader ecosystem of sha
 | **QWASAR-Env contracts** | UI composition, profiles, capabilities and module metadata | Partially implemented; frontend adoption differs |
 | **QWASAR Studio / Link** | Browser workbench and PC companion | Roadmap concepts; not released services |
 
-**QWASAR Studio direction:** the intended Studio experience is **one web app** bringing Module Forge, Layout Designer, Release Composer and Community Library together. This is a roadmap description, not a claim that Studio is already released.
+**QWASAR Studio direction:** the intended Studio experience is **one web app** bringing Module Forge, Layout Designer, Release Composer and Community Library together. This is a roadmap description, not a claim that Studio is already released. APT package recipes target only the optional Debian/Ubuntu desktop image; the muOS handheld package does not run APT or install Debian desktop packages on the host firmware.
 
 ![QWASAR-Env system map](docs/assets/qwasar-system-map.svg)
 
