@@ -52,6 +52,30 @@ def test_preview_reads_effective_state_without_mutating_profile(tmp_path: Path):
     assert profile_path.read_bytes() == before
 
 
+def test_preview_preserves_manifest_menu_metadata(tmp_path: Path):
+    switchboard, _ = _switchboard(tmp_path)
+    workspaces = switchboard.preview()["workspaces"]
+
+    session = next(item for item in workspaces if item["id"] == "start-session")
+    install = next(
+        item for item in session["menu"]
+        if item["id"] == "session.install-xfce"
+    )
+    assert install["icon"] == "download"
+    assert install["confirmation"] == "host-required"
+
+    toolbox = next(item for item in workspaces if item["id"] == "rt-toolbox")
+    developer = next(
+        item for item in toolbox["sections"]
+        if item["id"] == "toolbox.developer-terminal"
+    )
+    shell = next(
+        item for item in developer["menu"]
+        if item["id"] == "toolbox.shell-open"
+    )
+    assert shell["capabilities"] == ["device.shell.pty"]
+
+
 def test_workspace_disabled_and_hidden_have_distinct_semantics(tmp_path: Path):
     switchboard, profile_path = _switchboard(tmp_path)
 
