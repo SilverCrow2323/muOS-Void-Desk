@@ -85,3 +85,35 @@ def test_all_love_bridge_commands_are_registered_by_the_service():
         ))
     missing = sorted(called - registered)
     assert not missing, "LÖVE bridge commands without service handlers: " + ", ".join(missing)
+
+
+def test_media_vault_subroutes_resolve_and_use_the_registered_mainline_contract():
+    home = (LOVE / "scenes" / "hub_media.lua").read_text(encoding="utf-8")
+    contracts = {
+        "void_radio": {
+            "radio_search", "radio_favorites", "radio_favorite_toggle",
+            "radio_play", "radio_action", "radio_status",
+        },
+        "media_library": {"media_list", "media_play", "media_stop"},
+    }
+    legacy = {
+        "radio_list", "radio_toggle_favorite", "radio_stop",
+        "media_roots", "media_play_file", "media_playback_status",
+    }
+    for scene_name, expected in contracts.items():
+        assert f'sm.push("{scene_name}", {{}})' in home
+        scene_path = LOVE / "scenes" / f"{scene_name}.lua"
+        assert scene_path.is_file(), f"MEDIA VAULT route has no scene: {scene_name}"
+        source = scene_path.read_text(encoding="utf-8")
+        called = set(re.findall(
+            r'bridge\\.call\\(\\s*["\\']([a-z0-9_]+)["\\']',
+            source,
+        ))
+        assert expected <= called, (
+            f"{scene_name} is missing mainline bridge calls: "
+            + ", ".join(sorted(expected - called))
+        )
+        assert not (called & legacy), (
+            f"{scene_name} uses obsolete bridge API names: "
+            + ", ".join(sorted(called & legacy))
+        )
