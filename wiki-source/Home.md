@@ -76,7 +76,7 @@ The small PNGs below are **menu/hub icons from `resources/`**, not screenshots o
 
 
 
-<div align="center"><img src="assets/brand/voiddesk_symbol.png" width="84" alt="Void Desk logo" /></div>
+<div align="center"><img src="assets/brand/voiddesk_symbol.svg" width="84" alt="Void Desk logo" /></div>
 
 <details>
 <summary>🖥️ Actual screen reference — THE FORGE</summary>
