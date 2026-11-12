@@ -346,9 +346,9 @@
     studioRoot.querySelector("[data-reset-layout]")?.addEventListener("click",()=>{
       if(!canvas)return;
       const original=[
-        {id:"start-session",label:"Start Session",type:"tile",route:"session.launch",symbol:"▶",hint:"session.launch / registered route"},
-        {id:"the-forge",label:"THE FORGE",type:"tile",route:"forge.home",symbol:"⌘",hint:"forge.home / registered route"},
-        {id:"media-vault",label:"MEDIA VAULT",type:"tile",route:"media.home",symbol:"▣",hint:"media.home / registered route"}
+        {id:"start-session",label:"Start Session",type:"tile",route:"session.launch.xfce",symbol:"▶",hint:"session.launch / registered route"},
+        {id:"the-forge",label:"THE FORGE",type:"tile",route:"route.forge.apt",symbol:"⌘",hint:"forge.home / registered route"},
+        {id:"media-vault",label:"MEDIA VAULT",type:"tile",route:"route.media.library",symbol:"▣",hint:"media.home / registered route"}
       ];
       canvas.querySelectorAll("[data-layout-node]").forEach(n=>n.remove());
       original.forEach(spec=>{
