@@ -5,6 +5,8 @@
 **A controller-first Linux handheld environment.**  
 *BORN IN THE VOID. BUILT BEYOND THE FIRMWARE.*
 
+> **Naming note:** QWASAR Desk is the evolving identity of Void Desk within QWASAR-Env. The repository name and installed `Void-Desk/` path remain unchanged for compatibility.
+
 > [!IMPORTANT]
 > **v12 is a blueprint, not a published release.** The latest published package is v10.2.0 (11 August 2026). PR #66 remains a draft. Install from [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases), not from the source ZIP.
 
@@ -21,7 +23,7 @@
 | Compare frontends | [Pygame and LÖVE](Frontends) |
 | Explore the v12 architecture | [Void Desk v12 blueprint](Void-Desk-v12-Blueprint) |
 | Check firmware/controller mappings | [muOS firmware compatibility](muOS-Firmware-Compatibility) |
-| Understand host integration | [Symbiotic Layer](Symbiotic-Layer) |
+| Understand host integration | [Symbiotic Layer roadmap](Symbiotic-Layer) |
 | Fix a problem | [Troubleshooting](Troubleshooting) |
 | Develop and test | [Development](Development) |
 | Write or review docs | [Documentation style](Documentation-Style-Guide) |
