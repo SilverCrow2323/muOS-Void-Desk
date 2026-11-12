@@ -101,6 +101,36 @@ def test_resolver_applies_workspace_section_menu_and_panel_overrides(tmp_path: P
     assert composition["globalPanels"]["mediaPlayer"]["enabled"] is False
 
 
+def test_resolver_preserves_manifest_menu_metadata(tmp_path: Path):
+    resolver, _ = _resolver(tmp_path)
+
+    composition = resolver.resolve()
+    session = next(
+        item for item in composition["workspaces"]
+        if item["id"] == "start-session"
+    )
+    install_desktop = next(
+        item for item in session["menu"]
+        if item["id"] == "session.install-xfce"
+    )
+    assert install_desktop["icon"] == "download"
+    assert install_desktop["confirmation"] == "host-required"
+
+    toolbox = next(
+        item for item in composition["workspaces"]
+        if item["id"] == "rt-toolbox"
+    )
+    developer = next(
+        item for item in toolbox["sections"]
+        if item["id"] == "toolbox.developer-terminal"
+    )
+    shell = next(
+        item for item in developer["menu"]
+        if item["id"] == "toolbox.shell-open"
+    )
+    assert shell["capabilities"] == ["device.shell.pty"]
+
+
 def test_disabled_and_hidden_workspace_states_are_not_collapsed(tmp_path: Path):
     resolver, profile_path = _resolver(tmp_path)
     profile = _read(profile_path)

@@ -5001,7 +5001,8 @@ class App(object):
                                      nodes[a], nodes[b], 2)
                 pulse = nodes[i % len(nodes)]
                 pygame.draw.circle(self.surface, (255, 170, 160),
-                                   pulse, 13, 2)                for nx, ny in nodes:
+                                   pulse, 13, 2)
+                for nx, ny in nodes:
                     pygame.draw.circle(self.surface, ts_red,
                                        (nx, ny), 8)
                 real_flip()
@@ -10000,7 +10001,8 @@ class App(object):
         for d in dests:
             try:
                 os.makedirs(d, exist_ok=True)
-                dst = os.path.join(d, app["name"] + "_backup.muxapp")                with zipfile.ZipFile(dst, "w", zipfile.ZIP_STORED) as z:
+                dst = os.path.join(d, app["name"] + "_backup.muxapp")
+                with zipfile.ZipFile(dst, "w", zipfile.ZIP_STORED) as z:
                     base = os.path.dirname(app["dir"])
                     for r, _dd, ff in os.walk(app["dir"]):
                         for f in ff:
@@ -15073,7 +15075,8 @@ class App(object):
                 cats = self.rss_present_cats()
                 order = [None] + cats
                 cur = order.index(self.rss_cat_filter) if \
-                    self.rss_cat_filter in order else 0                self.rss_cat_filter = order[(cur + 1) % len(order)]
+                    self.rss_cat_filter in order else 0
+                self.rss_cat_filter = order[(cur + 1) % len(order)]
                 self.rss_sel = 0
             elif btn == "R1":
                 self.run_busy(self.t("rss_upd"), self.rss_refresh)
@@ -20078,7 +20081,8 @@ class App(object):
             v = self.cal_view
             if v == "month":
                 self.header("%s %d" % (mesi[m0 - 1], y0),
-                            icon="clock")                cw2 = (W - 22) // 7
+                            icon="clock")
+                cw2 = (W - 22) // 7
                 for c in range(7):
                     self.text(gg[c], (14 + c * cw2 + (cw2 - 28) // 2,
                                       46), self.f_tiny, FAINT)

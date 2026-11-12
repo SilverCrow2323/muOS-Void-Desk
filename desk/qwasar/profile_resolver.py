@@ -392,19 +392,15 @@ class QwasarProfileResolver:
         )
         result = []
         for index, entry in ordered:
-            result.append({
-                "id": entry["id"],
-                "label": entry["label"],
-                "kind": entry["kind"],
-                "actionId": entry.get("actionId"),
-                "providerId": entry.get("providerId"),
-                "enabled": entry.get("enabled", True),
-                "visible": entry["id"] not in hidden,
-                "description": entry.get("description", ""),
-                "children": QwasarProfileResolver._menu_composition(
-                    entry.get("children", []), override
-                ),
-            })
+            effective = copy.deepcopy(entry)
+            effective["enabled"] = entry.get("enabled", True)
+            effective["visible"] = (
+                entry.get("visible", True) and entry["id"] not in hidden
+            )
+            effective["children"] = QwasarProfileResolver._menu_composition(
+                entry.get("children", []), override
+            )
+            result.append(effective)
         return result
 
     @staticmethod
@@ -574,7 +570,7 @@ class QwasarProfileResolver:
                     f"selected QWASAR profile is structurally invalid: {exc}"
                 ) from exc
             warnings.append(
-                f"Selected profile was rejected; using the bundled H700 default: {exc}"
+                f"Selected profile was rejected; using the bundled platform default: {exc}"
             )
 
         try:
