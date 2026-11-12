@@ -63,6 +63,12 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
         names = archive.namelist()
         launcher_info = archive.getinfo("Void-Desk/mux_launch.sh")
         launcher_mode = (launcher_info.external_attr >> 16) & 0o777
+        service_modes = {
+            name: (archive.getinfo(
+                "Void-Desk/external/rt-tailscale-m/app/RtTailscale/" + name
+            ).external_attr >> 16) & 0o777
+            for name in ("rt", "ts", "watchdog")
+        }
         tailscale_config = archive.read(
             "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf"
         ).decode("utf-8")
@@ -76,6 +82,7 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
     assert "PANEL=0" in tailscale_config
     assert "PANEL_BIND=127.0.0.1" in tailscale_config
     assert launcher_mode & 0o111 == 0o111
+    assert all(mode & 0o111 == 0o111 for mode in service_modes.values())
     assert "PANEL=0\\n" in tailscale_config
     assert "\\\\n" not in tailscale_config
     assert not any(name.startswith("Void-Desk/tests/") for name in names)
