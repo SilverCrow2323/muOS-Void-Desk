@@ -227,37 +227,212 @@ def _check_manifest(manifest: dict[str, Any], report: InspectionReport) -> None:
     })
 
 
+def _is_protected(item_id: str, protected_areas: set[str]) -> bool:
+    return any(
+        item_id == protected or item_id.startswith(protected + ".")
+        for protected in protected_areas
+    )
+
+
+def _menu_index(
+    entries: list[dict[str, Any]],
+) -> tuple[set[str], dict[str, dict[str, Any]]]:
+    """Return direct child IDs and all recursively registered menu entries."""
+    direct = {entry["id"] for entry in entries}
+    all_entries: dict[str, dict[str, Any]] = {}
+
+    def walk(items: list[dict[str, Any]]) -> None:
+        for item in items:
+            all_entries[item["id"]] = item
+            walk(item.get("children", []))
+
+    walk(entries)
+    return direct, all_entries
+
+
 def _check_profile(
     profile: dict[str, Any], label: str, manifest: dict[str, Any], report: InspectionReport
 ) -> None:
     workspaces = {item["id"]: item for item in manifest["workspaces"]}
     actions = {item["id"] for item in manifest["actions"]}
+    protected = set(manifest.get("featureManagement", {}).get("protectedAreas", []))
+
+    def protected_item(item_id: str) -> bool:
+        return _is_protected(item_id, protected)
+
     for workspace_id in profile.get("workspaceOrder", []):
         if workspace_id not in workspaces:
-            report.errors.append(f"{label}: workspaceOrder references unknown workspace {workspace_id}")
+            report.errors.append(
+                f"{label}: workspaceOrder references unknown workspace {workspace_id}"
+            )
+
+    # The central shell and recovery surfaces cannot be removed by an imported
+    # profile. Switchboard applies the same boundary before saving edits.
+    for region_name in ("header", "footer"):
+        if profile.get("shell", {}).get(region_name, {}).get("enabled") is False:
+            report.errors.append(
+                f"{label}: protected shell region cannot be disabled: {region_name}"
+            )
+
+    known_global_panels = set(manifest.get("shell", {}).get("globalPanels", {}))
+    global_panel_overrides = profile.get("shell", {}).get("globalPanels", {})
+    for panel_id, override in global_panel_overrides.items():
+        if panel_id not in known_global_panels:
+            report.errors.append(
+                f"{label}: shell references unknown global panel {panel_id}"
+            )
+        if protected_item(panel_id) and override.get("enabled") is False:
+            report.errors.append(
+                f"{label}: protected global panel cannot be disabled: {panel_id}"
+            )
+
     seen_overrides: set[str] = set()
     for override in profile.get("workspaceOverrides", []):
         workspace_id = override["id"]
         if workspace_id not in workspaces:
-            report.errors.append(f"{label}: override references unknown workspace {workspace_id}")
+            report.errors.append(
+                f"{label}: override references unknown workspace {workspace_id}"
+            )
             continue
         if workspace_id in seen_overrides:
             report.errors.append(f"{label}: duplicate workspace override {workspace_id}")
+            continue
         seen_overrides.add(workspace_id)
-        known_sections = {
-            section["id"] for section in workspaces[workspace_id].get("sections", [])
-        }
-        for section in override.get("sections", []):
-            if section["id"] not in known_sections:
+
+        base_workspace = workspaces[workspace_id]
+        direct_ids, all_entries = _menu_index(base_workspace.get("menu", []))
+        for entry_id in override.get("menuOrder", []):
+            if entry_id not in direct_ids:
                 report.errors.append(
-                    f"{label}: section {section['id']} is not registered in {workspace_id}"
+                    f"{label}: menuOrder references unknown top-level entry "
+                    f"{entry_id} in {workspace_id}"
                 )
+        for entry_id in override.get("hiddenMenuEntries", []):
+            entry = all_entries.get(entry_id)
+            if entry is None:
+                report.errors.append(
+                    f"{label}: hiddenMenuEntries references unknown entry "
+                    f"{entry_id} in {workspace_id}"
+                )
+            elif (
+                protected_item(workspace_id)
+                or protected_item(entry_id)
+                or protected_item(entry.get("actionId", ""))
+            ):
+                report.errors.append(
+                    f"{label}: protected menu entry cannot be hidden: "
+                    f"{entry_id} in {workspace_id}"
+                )
+
+        if protected_item(workspace_id) and (
+            override.get("enabled") is False or override.get("visible") is False
+        ):
+            report.errors.append(
+                f"{label}: protected workspace cannot be disabled or hidden: {workspace_id}"
+            )
+
+        known_sections = {
+            item["id"]: item for item in base_workspace.get("sections", [])
+        }
+        seen_sections: set[str] = set()
+        for section in override.get("sections", []):
+            section_id = section["id"]
+            if section_id not in known_sections:
+                report.errors.append(
+                    f"{label}: section {section_id} is not registered in {workspace_id}"
+                )
+                continue
+            if section_id in seen_sections:
+                report.errors.append(
+                    f"{label}: duplicate section override {section_id} in {workspace_id}"
+                )
+                continue
+            seen_sections.add(section_id)
+
+            section_menu = known_sections[section_id].get("menu", [])
+            section_direct, section_all = _menu_index(section_menu)
+            for entry_id in section.get("menuOrder", []):
+                if entry_id not in section_direct:
+                    report.errors.append(
+                        f"{label}: menuOrder references unknown top-level entry "
+                        f"{entry_id} in section {section_id}"
+                    )
+            for entry_id in section.get("hiddenMenuEntries", []):
+                entry = section_all.get(entry_id)
+                if entry is None:
+                    report.errors.append(
+                        f"{label}: hiddenMenuEntries references unknown entry "
+                        f"{entry_id} in section {section_id}"
+                    )
+                elif (
+                    protected_item(workspace_id)
+                    or protected_item(section_id)
+                    or protected_item(entry_id)
+                    or protected_item(entry.get("actionId", ""))
+                ):
+                    report.errors.append(
+                        f"{label}: protected menu entry cannot be hidden: "
+                        f"{entry_id} in section {section_id}"
+                    )
+
+            if protected_item(section_id) and (
+                section.get("enabled") is False or section.get("visible") is False
+            ):
+                report.errors.append(
+                    f"{label}: protected section cannot be disabled or hidden: {section_id}"
+                )
+            _check_protected_contributions(
+                section.get("contributions", []), label, protected, report
+            )
+
+        _check_protected_contributions(
+            override.get("contributions", []), label, protected, report
+        )
+
     for binding in profile.get("bindings", []):
         if binding["actionId"] not in actions:
             report.errors.append(
                 f"{label}: binding references unknown action {binding['actionId']}"
             )
 
+    seen_modules: set[str] = set()
+    for module in profile.get("moduleStates", []):
+        module_id = module["moduleId"]
+        if module_id in seen_modules:
+            report.errors.append(f"{label}: duplicate module state {module_id}")
+        seen_modules.add(module_id)
+        if protected_item(module_id) and module["enabled"] is False:
+            report.errors.append(
+                f"{label}: protected module cannot be disabled: {module_id}"
+            )
+
+    _check_protected_contributions(
+        profile.get("contributionStates", []), label, protected, report
+    )
+
+
+def _check_protected_contributions(
+    entries: list[dict[str, Any]],
+    label: str,
+    protected_areas: set[str],
+    report: InspectionReport,
+) -> None:
+    seen: set[str] = set()
+    for entry in entries:
+        contribution_id = entry["contributionId"]
+        if contribution_id in seen:
+            report.errors.append(
+                f"{label}: duplicate contribution state {contribution_id}"
+            )
+        seen.add(contribution_id)
+        if (
+            _is_protected(contribution_id, protected_areas)
+            and entry["state"] != "enabled"
+        ):
+            report.errors.append(
+                f"{label}: protected contribution cannot be disabled or hidden: "
+                f"{contribution_id}"
+            )
 
 def _check_module(
     module: dict[str, Any], label: str, manifest: dict[str, Any], report: InspectionReport
@@ -267,6 +442,11 @@ def _check_module(
     module_actions = [item["id"] for item in module.get("actions", [])]
     for duplicate in sorted(_duplicates(module_actions)):
         report.errors.append(f"{label}: duplicate action ID {duplicate}")
+    contribution_ids = [
+        item["id"] for item in module.get("contributions", [])
+    ]
+    for duplicate in sorted(_duplicates(contribution_ids)):
+        report.errors.append(f"{label}: duplicate contribution ID {duplicate}")
     known_module_actions = set(module_actions)
     for contribution in module.get("contributions", []):
         component_type = contribution["componentType"]
@@ -292,15 +472,26 @@ def _check_module(
                 f"{workspace_id}"
             )
         section_id = contribution.get("sectionId")
-        if section_id and not any(
-            section["id"] == section_id
-            for workspace in workspaces.values()
-            for section in workspace.get("sections", [])
-        ):
-            report.errors.append(
-                f"{label}: contribution {contribution['id']} references unknown section "
-                f"{section_id}"
-            )
+        if section_id:
+            if workspace_id and workspace_id in workspaces:
+                known_sections = {
+                    section["id"]
+                    for section in workspaces[workspace_id].get("sections", [])
+                }
+            else:
+                known_sections = {
+                    section["id"]
+                    for workspace in workspaces.values()
+                    for section in workspace.get("sections", [])
+                }
+            if section_id not in known_sections:
+                relationship = (
+                    f" in workspace {workspace_id}" if workspace_id else ""
+                )
+                report.errors.append(
+                    f"{label}: contribution {contribution['id']} references unknown "
+                    f"section {section_id}{relationship}"
+                )
         missing_actions = set(contribution.get("actionIds", [])) - known_module_actions
         if missing_actions:
             report.errors.append(
