@@ -72,7 +72,7 @@ def validate_pygame_runtime_archives(package: zipfile.ZipFile, files: set[str]) 
                 for member in members:
                     name = member.name
                     relative = PurePosixPath(name)
-                    if (not name or "\\\\" in name or relative.is_absolute()
+                    if (not name or "\\" in name or relative.is_absolute()
                             or ".." in relative.parts or not relative.parts):
                         raise ValueError("unsafe tar path: %r" % name)
                     if not (member.isfile() or member.isdir()):
