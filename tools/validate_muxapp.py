@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import io
 import stat
+import tarfile
 import sys
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -21,6 +23,10 @@ REQUIRED_FILES = (
     "Void-Desk/lib/libluajit-5.1.so.2",
     "Void-Desk/lib/glyph_install.sh",
     "Void-Desk/resources/voiddesk.png",
+    "Void-Desk/assets/runtime_archives/pygame.tar.gz",
+    "Void-Desk/assets/runtime_archives/pygame.libs.tar.gz",
+    "Void-Desk/assets/runtime_archives/pygame-2.6.1.data.tar.gz",
+    "Void-Desk/assets/runtime_archives/pygame-2.6.1.dist-info.tar.gz",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog",
@@ -36,6 +42,83 @@ EXECUTABLE_FILES = (
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog",
 )
+
+
+def validate_pygame_runtime_archives(package: zipfile.ZipFile, files: set[str]) -> list[str]:
+    """Inspect the offline Pygame tar payload without extracting it to disk."""
+    prefix = "Void-Desk/assets/runtime_archives/"
+    archive_names = {
+        "pygame.tar.gz": prefix + "pygame.tar.gz",
+        "pygame.libs.tar.gz": prefix + "pygame.libs.tar.gz",
+        "pygame-2.6.1.data.tar.gz": prefix + "pygame-2.6.1.data.tar.gz",
+        "pygame-2.6.1.dist-info.tar.gz": prefix + "pygame-2.6.1.dist-info.tar.gz",
+    }
+    errors: list[str] = []
+    extracted: dict[str, set[str]] = {}
+    wheel_text = ""
+
+    for label, member_path in archive_names.items():
+        if member_path not in files:
+            continue
+        try:
+            payload = package.read(member_path)
+            if not payload:
+                raise ValueError("archive is empty")
+            with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as archive:
+                members = archive.getmembers()
+                if not members:
+                    raise ValueError("tar archive is empty")
+                names: set[str] = set()
+                for member in members:
+                    name = member.name
+                    relative = PurePosixPath(name)
+                    if (not name or "\\\\" in name or relative.is_absolute()
+                            or ".." in relative.parts or not relative.parts):
+                        raise ValueError("unsafe tar path: %r" % name)
+                    if not (member.isfile() or member.isdir()):
+                        raise ValueError("unsupported tar member type: %r" % name)
+                    names.add(str(relative))
+                extracted[label] = names
+                if label == "pygame-2.6.1.dist-info.tar.gz":
+                    wheel_member = next(
+                        (m for m in members if m.name.endswith("/WHEEL") or m.name == "WHEEL"),
+                        None,
+                    )
+                    if wheel_member is None:
+                        raise ValueError("WHEEL metadata is missing")
+                    stream = archive.extractfile(wheel_member)
+                    if stream is None:
+                        raise ValueError("WHEEL metadata cannot be read")
+                    wheel_text = stream.read().decode("utf-8")
+        except (OSError, tarfile.TarError, UnicodeDecodeError, ValueError) as exc:
+            errors.append("invalid bundled Pygame archive %s: %s" % (label, exc))
+
+    pygame_names = extracted.get("pygame.tar.gz", set())
+    for required in (
+        "pygame/__init__.py",
+        "pygame/base.cpython-311-aarch64-linux-gnu.so",
+    ):
+        if required not in pygame_names:
+            errors.append("bundled Pygame source archive missing: %s" % required)
+
+    libs_names = extracted.get("pygame.libs.tar.gz", set())
+    if not any(
+        name.startswith("pygame.libs/libSDL2-") and name.endswith(".so.0")
+        for name in libs_names
+    ):
+        errors.append("bundled Pygame SDL2 ARM64 libraries missing")
+
+    data_names = extracted.get("pygame-2.6.1.data.tar.gz", set())
+    if not any(name.startswith("pygame-2.6.1.data/") for name in data_names):
+        errors.append("bundled Pygame data archive has an unexpected layout")
+
+    if wheel_text and not (
+        "Tag: cp311-cp311-manylinux_2_17_aarch64" in wheel_text
+        and "Tag: cp311-cp311-manylinux2014_aarch64" in wheel_text
+    ):
+        errors.append("bundled Pygame wheel metadata is not CPython 3.11/aarch64")
+
+    return errors
 
 
 def validate_archive(archive: str | Path) -> list[str]:
@@ -106,6 +189,8 @@ def validate_archive(archive: str | Path) -> list[str]:
             for required in REQUIRED_FILES:
                 if required not in files:
                     errors.append("required file missing: %s" % required)
+
+            errors.extend(validate_pygame_runtime_archives(package, files))
 
             config_name = "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf"
             if config_name in files:
