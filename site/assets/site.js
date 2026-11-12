@@ -49,4 +49,90 @@
     update();
   }
   document.querySelectorAll("[data-year]").forEach(node => { node.textContent = new Date().getFullYear(); });
+
+  // Interactive asset atlas: category filters, search, lightbox and source-path copy.
+  const atlasRoot = document.querySelector("[data-asset-atlas]");
+  if (atlasRoot) {
+    const cards = Array.from(atlasRoot.querySelectorAll("[data-asset-card]"));
+    const filters = Array.from(atlasRoot.querySelectorAll("[data-asset-filter]"));
+    const searchInput = document.getElementById("asset-search");
+    const counter = document.getElementById("asset-count");
+    const emptyState = document.getElementById("asset-no-results");
+    const feedback = atlasRoot.querySelector("[data-asset-feedback]");
+    let activeGroup = "all";
+    const refreshAtlas = () => {
+      const query = (searchInput?.value || "").trim().toLocaleLowerCase();
+      let visible = 0;
+      cards.forEach(card => {
+        const matchesGroup = activeGroup === "all" || card.dataset.group === activeGroup;
+        const haystack = (card.textContent + " " + (card.dataset.search || "")).toLocaleLowerCase();
+        const matchesQuery = !query || haystack.includes(query);
+        const show = matchesGroup && matchesQuery;
+        card.hidden = !show;
+        if (show) visible += 1;
+      });
+      if (counter) counter.textContent = String(visible).padStart(2, "0") + " / " + String(cards.length).padStart(2, "0") + " ASSETS";
+      if (emptyState) emptyState.hidden = visible !== 0;
+    };
+    filters.forEach(button => button.addEventListener("click", () => {
+      activeGroup = button.dataset.assetFilter || "all";
+      filters.forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      refreshAtlas();
+    }));
+    searchInput?.addEventListener("input", refreshAtlas);
+    document.addEventListener("keydown", event => {
+      if (event.key === "/" && searchInput && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+        event.preventDefault();
+        searchInput.focus();
+      }
+      if (event.key === "Escape" && document.activeElement === searchInput) {
+        searchInput.value = "";
+        refreshAtlas();
+        searchInput.blur();
+      }
+    });
+    refreshAtlas();
+
+    const dialog = document.getElementById("asset-dialog");
+    const dialogImage = document.getElementById("asset-dialog-image");
+    const dialogTitle = document.getElementById("asset-dialog-title");
+    document.querySelectorAll("[data-preview]").forEach(trigger => trigger.addEventListener("click", () => {
+      if (!dialog || !dialogImage || typeof dialog.showModal !== "function") return;
+      dialogImage.src = trigger.dataset.preview || "";
+      dialogImage.alt = trigger.querySelector("img")?.alt || trigger.dataset.title || "Asset preview";
+      if (dialogTitle) dialogTitle.textContent = trigger.dataset.title || "Asset preview";
+      dialog.showModal();
+    }));
+
+    const fallbackCopy = value => {
+      const helper = document.createElement("textarea");
+      helper.value = value;
+      helper.setAttribute("readonly", "");
+      helper.style.position = "fixed";
+      helper.style.opacity = "0";
+      document.body.appendChild(helper);
+      helper.select();
+      let copied = false;
+      try { copied = document.execCommand("copy"); } catch (_) { copied = false; }
+      helper.remove();
+      return copied;
+    };
+    document.querySelectorAll("[data-copy-asset]").forEach(button => button.addEventListener("click", async () => {
+      const value = button.dataset.copyAsset || "";
+      let copied = false;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(value);
+          copied = true;
+        } else {
+          copied = fallbackCopy(value);
+        }
+      } catch (_) {
+        copied = fallbackCopy(value);
+      }
+      if (feedback) feedback.textContent = copied ? "COPIED TO CLIPBOARD — " + value : "COPY UNAVAILABLE — " + value;
+      button.textContent = copied ? "Copied ✓" : "Select path";
+    }));
+  }
+
 })();
