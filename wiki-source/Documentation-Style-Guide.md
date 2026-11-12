@@ -6,6 +6,15 @@ The manual should feel like a guided field interface, not an unformatted dump of
 
 ## Page anatomy
 
+Use short, direct titles such as **Install**, **First launch**, **Controls**, **Network** and **Troubleshooting**. Avoid slogans and abstract headings. Every page covers one topic and starts with a short explanation.
+
+On handheld displays, body copy must be readable at normal viewing distance. Essential instructions must never be hidden in tiny metadata. Use short paragraphs, generous spacing and collapsible advanced details.
+
+## Button and key icons
+
+When a guide mentions a physical control, show its matching button glyph inline instead of repeating a text-only label. Use device-specific artwork where available. Never imply a universal mapping: the active screen footer and input profile remain authoritative. If an exact glyph is unavailable, use a semantic icon with accessible text rather than inventing a physical mapping.
+
+
 1. A clear title and one-line purpose.
 2. A visual overview when it improves understanding.
 3. A short “what is current” or “important” callout.
