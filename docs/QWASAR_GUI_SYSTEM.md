@@ -344,13 +344,13 @@ Studio's future Layout Designer consumes the same manifest and schemas. It edits
 - RT:TOOLBOX replaces separate Toolbox/Workshop NEXUS destinations without breaking legacy route/profile references.
 - The Resolver validates a sample custom profile and generates a deterministic composition without embedding code or changing permissions.
 - LÖVE applies top-level workspace order, visibility and enabled state through stable legacy node IDs.
-- Pygame can select a platform-compatible profile and persist the selection, but its NEXUS menu/RT:TOOLBOX migration still needs to consume the effective composition.
+- Pygame can select a platform-compatible profile, persist the selection and apply workspace order/visibility/enabled state to all 14 active NEXUS destinations; RT:TOOLBOX section migration still remains.
 - Shell/global-panel overrides and full section-level profile composition are not yet consumed by both renderers.
 - Schema, manifest, route/action tests and device interaction tests pass.
 
 ---
 
-This document defines the QWASAR GUI architecture and distinguishes the first working profile pipeline from the remaining renderer migration. The Resolver and generated composition snapshot are implemented; LÖVE consumes top-level NEXUS workspace states, while Pygame exposes profile selection but retains its legacy navigation. Dynamic component installation, signed community contributions, the global M media overlay migration and the consolidated RT:TOOLBOX navigation are not yet complete.
+This document defines the QWASAR GUI architecture and distinguishes the first working profile pipeline from the remaining renderer migration. The Resolver and generated composition snapshot are implemented; both LÖVE and Pygame consume top-level NEXUS workspace states through stable legacy node IDs. Dynamic component installation, signed community contributions, the global M media overlay migration and the consolidated RT:TOOLBOX navigation are not yet complete.
 
 
 ## 15. Boot, installation flavours and engine selection
