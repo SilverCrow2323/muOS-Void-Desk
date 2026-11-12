@@ -4,6 +4,7 @@ local theme     = require("theme.loader")
 local sm        = require("core.scene_manager")
 local nodes     = require("core.nodes")
 local widgets   = require("core.widgets")
+local qwasar_profile = require("core.qwasar_profile")
 
 local function get(k, d) return config.get(k, d) end
 local function set(k, v) config.set(k, v) end
@@ -11,7 +12,7 @@ local function set(k, v) config.set(k, v) end
 return dashboard.new({
     title = "SETTINGS",
     node_idx = 7,
-    widget_height = 140,
+    widget_height = 176,
     status = "Configuration",
 
     widgets_draw = function(scene, alpha)
@@ -22,6 +23,10 @@ return dashboard.new({
         local theme_n = get("theme", "cyberpunk")
         local lang = get("lang", "en")
         local show_ba = get("show_bootanim", true) and "ON" or "OFF"
+        local profile_status = qwasar_profile.status()
+        local profile_label = profile_status.loaded
+            and (profile_status.name or profile_status.id)
+            or "Built-in defaults"
 
         -- highlight engine in the box
         local ecol = (engine == "love") and {0.40, 0.85, 1.0} or {0.90, 0.70, 0.30}
@@ -35,6 +40,8 @@ return dashboard.new({
         widgets.info_row(20, 144, W - 40, "Boot animation", show_ba,
                          (get("show_bootanim", true) and {0.4, 0.9, 0.5} or {0.55, 0.58, 0.62}),
                          alpha)
+        widgets.info_row(20, 164, W - 40, "QWASAR profile",
+                         profile_label, nc, alpha)
     end,
 
     items = {

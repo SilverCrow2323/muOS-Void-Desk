@@ -13,6 +13,8 @@ local bodies, stars = {}, {}
 local orbit_offset = { [1]=0, [2]=0, [3]=0, [4]=0 }
 local time = 0
 local selected = 1
+local disabled_notice = nil
+local disabled_notice_until = 0
 
 -- Selection flight along the arc
 local sel = {
@@ -239,6 +241,8 @@ end
 function nexus.enter(args)
     time = 0
     selected = (args and args.selected) or 1
+    disabled_notice = nil
+    disabled_notice_until = 0
     math.randomseed(77)
     stars = {}
     for i = 1, 200 do
@@ -269,6 +273,12 @@ function nexus.enter(args)
         elseif action == "down" then change_ring(1)    -- toward outer
         elseif action == "a" then
             local b = bodies[selected]
+            if b.node.profile_enabled == false then
+                disabled_notice = (b.node.profile_label or b.node.name)
+                    .. " — disabled in active profile"
+                disabled_notice_until = time + 2.5
+                return
+            end
             warp.active = true; warp.t = 0
             warp.target_idx = b.node.idx
             local sc = b.node.scene
@@ -407,6 +417,10 @@ function nexus.draw()
         if vis_alpha <= 0.02 then goto continue end
 
         local c = b.color
+        if b.node.profile_enabled == false then
+            c = { 0.34, 0.36, 0.41 }
+            vis_alpha = math.min(vis_alpha, 0.62)
+        end
         local rr = b.r * scl
 
         -- Light direction: from sun (320,240) toward body
@@ -462,7 +476,10 @@ function nexus.draw()
         local selb = bodies[selected]
         local f_label = font.bold(14) or love.graphics.newFont(14)
         love.graphics.setFont(f_label)
-        local label = selb.node.name
+        local label = selb.node.profile_label or selb.node.name
+        if selb.node.profile_enabled == false then
+            label = label .. "  // DISABLED"
+        end
         local tw = f_label:getWidth(label)
         local lx = selb.x - tw / 2
         local ly = selb.y + selb.r + 32
@@ -470,6 +487,21 @@ function nexus.draw()
         love.graphics.print(label, lx + 1, ly + 1)
         love.graphics.setColor(selb.color[1], selb.color[2], selb.color[3], 1)
         love.graphics.print(label, lx, ly)
+    end
+
+    if disabled_notice and time < disabled_notice_until then
+        local f_notice = font.regular(10) or love.graphics.newFont(10)
+        local tw_notice = f_notice:getWidth(disabled_notice)
+        local box_w = math.min(W - 24, tw_notice + 24)
+        local box_x = (W - box_w) / 2
+        local box_y = H - 92
+        love.graphics.setColor(0.08, 0.09, 0.12, 0.94)
+        love.graphics.rectangle("fill", box_x, box_y, box_w, 24, 4)
+        love.graphics.setColor(0.55, 0.58, 0.64, 0.9)
+        love.graphics.rectangle("line", box_x, box_y, box_w, 24, 4)
+        love.graphics.setFont(f_notice)
+        love.graphics.printf(disabled_notice, box_x + 8, box_y + 6,
+                             box_w - 16, "center")
     end
 
     -- Chrome

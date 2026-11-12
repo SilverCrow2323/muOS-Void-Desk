@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "1.0",
+  "id": "qwasar.profile.voiddesk.desktop-default",
+  "name": "Void Desk // PC Default",
+  "description": "Desktop profile with the same portable QWASAR workspace model and a comfortable desktop shell.",
+  "author": "Void Desk Official",
+  "compatibility": {
+    "minimumUiApi": "1.0",
+    "platforms": [
+      "desktop"
+    ],
+    "models": []
+  },
+  "workspaceOrder": [
+    "start-session",
+    "the-forge",
+    "uplink",
+    "media-vault",
+    "rt-toolbox",
+    "settings",
+    "info-community",
+    "end-node"
+  ],
+  "shell": {
+    "header": {
+      "enabled": true,
+      "density": "compact",
+      "slotOrder": [
+        "leading",
+        "context",
+        "status",
+        "trailing"
+      ]
+    },
+    "footer": {
+      "enabled": true,
+      "density": "compact",
+      "slotOrder": [
+        "navigation",
+        "status"
+      ]
+    },
+    "homePanels": {
+      "left": {
+        "enabled": true,
+        "collapsedByDefault": false,
+        "placement": "left"
+      },
+      "right": {
+        "enabled": true,
+        "collapsedByDefault": true,
+        "placement": "right"
+      }
+    },
+    "globalPanels": {
+      "mediaPlayer": {
+        "enabled": true,
+        "placement": "bottom"
+      },
+      "jobCenter": {
+        "enabled": true,
+        "placement": "right"
+      }
+    }
+  },
+  "workspaceOverrides": [
+    {
+      "id": "rt-toolbox",
+      "enabled": true,
+      "visible": true,
+      "order": 4,
+      "sections": [
+        {
+          "id": "toolbox.everyday",
+          "enabled": true,
+          "visible": true,
+          "order": 0
+        },
+        {
+          "id": "toolbox.files-storage",
+          "enabled": true,
+          "visible": true,
+          "order": 1
+        },
+        {
+          "id": "toolbox.system-health",
+          "enabled": true,
+          "visible": true,
+          "order": 2
+        },
+        {
+          "id": "toolbox.developer-terminal",
+          "enabled": true,
+          "visible": true,
+          "order": 3
+        }
+      ]
+    }
+  ],
+  "moduleStates": [],
+  "contributionStates": [],
+  "bindings": [
+    {
+      "actionId": "panel.media.toggle",
+      "input": "keyboard",
+      "value": "m",
+      "enabled": true
+    }
+  ],
+  "theme": {
+    "visualStyle": "megastructure",
+    "palette": "cyberpunk",
+    "density": "comfortable",
+    "motion": "reduced"
+  }
+}

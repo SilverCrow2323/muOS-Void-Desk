@@ -72,3 +72,6 @@ fix_*.log
 # Local screenshots: review and explicitly export selected images before publishing.
 data/visual-captures/*
 !data/visual-captures/.gitkeep
+
+# Generated, engine-neutral QWASAR runtime composition
+data/qwasar_effective_profile.json

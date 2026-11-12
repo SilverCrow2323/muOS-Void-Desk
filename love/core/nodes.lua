@@ -66,9 +66,69 @@ nodes.LIST = {
 }
 
 function nodes.color_for(idx) return nodes.COLOR[idx] or {0.5,0.5,0.5} end
+
+for base_position, node in ipairs(nodes.LIST) do
+    node.base_order = base_position
+end
+
+-- Stable adapter from QWASAR workspace IDs to legacy NEXUS node identities.
+-- Node indices, routes and orbital rings remain unchanged; only profile
+-- visibility, enabled state, label and within-orbit navigation order change.
+local WORKSPACE_BY_NODE = {
+    [0] = "start-session",
+    [3] = "the-forge",
+    [5] = "uplink",
+    [2] = "media-vault",
+    [4] = "rt-toolbox",
+    [7] = "settings",
+    [8] = "info-community",
+    [9] = "end-node",
+}
+
+function nodes.apply_profile(composition)
+    if type(composition) ~= "table"
+        or type(composition.workspaces) ~= "table" then
+        return false, "invalid QWASAR workspace composition"
+    end
+
+    local by_id = {}
+    for _, workspace in ipairs(composition.workspaces) do
+        if type(workspace) == "table" and type(workspace.id) == "string" then
+            by_id[workspace.id] = workspace
+        end
+    end
+
+    for base_position, node in ipairs(nodes.LIST) do
+        node.profile_enabled = true
+        node.profile_visible = true
+        node.profile_label = nil
+        node.profile_order = 10000 + (node.base_order or base_position)
+
+        local workspace_id = WORKSPACE_BY_NODE[node.idx]
+        local workspace = workspace_id and by_id[workspace_id] or nil
+        if workspace then
+            node.profile_enabled = workspace.enabled ~= false
+            node.profile_visible = workspace.visible ~= false
+            node.profile_label = workspace.label
+            node.profile_order = tonumber(workspace.order) or base_position
+        end
+    end
+
+    nodes.profile_id = composition.profile and composition.profile.id or nil
+    nodes.profile_name = composition.profile and composition.profile.name or nil
+    table.sort(nodes.LIST, function(a, b)
+        return (a.profile_order or 0) < (b.profile_order or 0)
+    end)
+    return true
+end
+
 function nodes.visible()
     local out = {}
-    for _, n in ipairs(nodes.LIST) do if not n.hidden then table.insert(out, n) end end
+    for _, n in ipairs(nodes.LIST) do
+        if not n.hidden and n.profile_visible ~= false then
+            table.insert(out, n)
+        end
+    end
     return out
 end
 function nodes.get(idx)

@@ -173,6 +173,7 @@ import calendar as calmod
 import collections
 import datetime as dtmod
 import ftplib
+import json
 import random
 import re
 import subprocess
@@ -2188,6 +2189,9 @@ class App(object):
         if not fbdisplay.attach(self.surface):
             print("fbdisplay not available")
         self.cfg = load_cfg()
+        self.qwasar_profile_options = self._qwasar_profile_options()
+        self.qwasar_profile_pending = False
+        self._load_qwasar_profile_snapshot()
         self.lang = self.cfg.get("lang", "en")
         self.accent = ACCENTS.get(self.cfg.get("theme", "ambra"),
                                   ACCENTS["ambra"])
@@ -13271,6 +13275,68 @@ class App(object):
             self.log_lines = ["file not found:", path]
         self.scroll = max(0, len(self.log_lines) - 23)
 
+    def _qwasar_profile_options(self):
+        """Return only portable profile files compatible with this host."""
+        folder = os.path.join(APP_DIR, "data", "profiles")
+        platform_id = os.environ.get("VOIDDESK_PLATFORM")
+        preferred = (
+            "data/profiles/voiddesk-desktop-default.qprofile.json"
+            if platform_id == "desktop"
+            else "data/profiles/voiddesk-handheld-default.qprofile.json"
+        )
+        choices = []
+        try:
+            names = sorted(os.listdir(folder))
+        except OSError:
+            names = []
+        for name in names:
+            if not name.endswith(".qprofile.json"):
+                continue
+            relative = os.path.join("data", "profiles", name)
+            if platform_id:
+                try:
+                    with open(os.path.join(APP_DIR, relative), encoding="utf-8") as stream:
+                        profile = json.load(stream)
+                    platforms = profile.get("compatibility", {}).get("platforms", [])
+                    if platform_id not in platforms and "any" not in platforms:
+                        continue
+                except (OSError, ValueError, TypeError):
+                    continue
+            choices.append(relative)
+        if preferred in choices:
+            choices.remove(preferred)
+            choices.insert(0, preferred)
+        selected = self.cfg.get("qwasar_profile")
+        if isinstance(selected, str) and selected and selected not in choices:
+            choices.insert(0, selected)
+        return choices or [preferred]
+
+    def _load_qwasar_profile_snapshot(self):
+        """Load the generated engine-neutral snapshot; do not execute profile data."""
+        path = os.path.join(APP_DIR, "data", "qwasar_effective_profile.json")
+        self.qwasar_profile_composition = None
+        self.qwasar_profile_name = "Built-in defaults"
+        self.qwasar_profile_warnings = []
+        try:
+            with open(path, encoding="utf-8") as stream:
+                value = json.load(stream)
+            if (
+                not isinstance(value, dict)
+                or value.get("schemaVersion") != "1.0"
+                or not isinstance(value.get("workspaces"), list)
+                or not isinstance(value.get("profile"), dict)
+            ):
+                raise ValueError("unsupported effective profile format")
+            self.qwasar_profile_composition = value
+            self.qwasar_profile_name = str(
+                value["profile"].get("name") or value["profile"].get("id")
+                or "Unnamed profile"
+            )
+            self.qwasar_profile_warnings = list(value.get("warnings", []))
+        except (OSError, ValueError, TypeError):
+            # Legacy menu remains fully available when the snapshot is absent.
+            self.qwasar_profile_composition = None
+
     # ------------------------------------------------------------- opzioni
     def opt_defs(self):
         it = (self.lang == "it")
@@ -13281,6 +13347,8 @@ class App(object):
             ("opt_font_scale", "font_scale", CYCLES["fscale"][1]),
             ("opt_intro", "intro", [True, False]),
             ("opt_engine", "engine", ["py", "love"]),
+            ("hdr", "PROFILO QWASAR" if it else "QWASAR PROFILE", None),
+            ("QWASAR PROFILE", "qwasar_profile", self.qwasar_profile_options),
             ("opt_batt", "battery", [True, False]),
             ("hdr", "ANIMAZIONI & EFFETTI" if it else "ANIMATIONS & VFX",
              None),
@@ -14062,6 +14130,8 @@ class App(object):
                 nxt = vals[(vals.index(cur) + 1) % len(vals)
                            if cur in vals else 0]
                 self.cfg[ck] = nxt
+                if ck == "qwasar_profile":
+                    self.qwasar_profile_pending = True
                 if ck == "theme":
                     self.accent = ACCENTS[nxt]
                     self.accent2 = theme_secondary(self.accent)
@@ -14074,6 +14144,14 @@ class App(object):
                     self.logs = self.build_logs()
             elif btn == "B":
                 save_cfg(self.cfg)
+                if self.qwasar_profile_pending:
+                    try:
+                        self.notify(
+                            "QWASAR profile saved — restart Void Desk to apply"
+                        )
+                    except Exception:
+                        pass
+                    self.qwasar_profile_pending = False
                 self.pop_state()
         elif top == "map":
             rows = self.map_rows()
@@ -18638,6 +18716,12 @@ class App(object):
                 val = self.cfg.get(ck, vals[0] if vals else "")
                 vs = self.tx(VAL_EN, self.t("yes") if val is True else
                              self.t("no") if val is False else str(val))
+                if ck == "qwasar_profile":
+                    vs = os.path.basename(str(val))
+                    if vs.endswith(".qprofile.json"):
+                        vs = vs[:-len(".qprofile.json")]
+                    if self.qwasar_profile_pending:
+                        vs += " *"
                 vw = self.f_med.size(vs)[0]
                 st_icon_map = {"clock_badge": "clock", "st_bt": "bt",
                               "st_wifi": "wifi", "st_usb": "usb",

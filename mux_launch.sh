@@ -21,6 +21,8 @@ echo "$(date) === VOIDDESK launch (dir: $APP_DIR) ===" >>"$LOG"
 export LD_LIBRARY_PATH="$APP_DIR/lib:${LD_LIBRARY_PATH:-}"
 export VOIDDESK_APP_DIR="$APP_DIR"
 export VOIDDESK_FULLSCREEN=1
+export VOIDDESK_PLATFORM=muos
+export VOIDDESK_MODEL=H700
 
 # Helper: force engine back to LOVE in desk_config.json (self-heal on failure)
 revert_engine_to_love() {
@@ -50,6 +52,20 @@ except Exception:
 " 2>/dev/null)"
     [ -z "$ENGINE" ] && ENGINE="love"
     echo "$(date) engine: $ENGINE" >>"$LOG"
+
+    # Build one engine-neutral profile snapshot for both Pygame and LÖVE.
+    # The resolver is read-only with respect to the source manifest/profile.
+    if [ -f "$APP_DIR/tools/qwasar_profile_resolver.py" ]; then
+        python3 "$APP_DIR/tools/qwasar_profile_resolver.py" \
+            --root "$APP_DIR" \
+            --platform muos --model H700 \
+            --default-profile data/profiles/voiddesk-handheld-default.qprofile.json \
+            --output "$DATA/qwasar_effective_profile.json" >>"$LOG" 2>&1
+        PROFILE_RC=$?
+        if [ "$PROFILE_RC" -ne 0 ]; then
+            echo "$(date) QWASAR profile preflight failed (rc=$PROFILE_RC); continuing with legacy frontend defaults" >>"$LOG"
+        fi
+    fi
 
     # The py engine needs a bootstrapped pygame runtime (desk/../runtime).
     # If it was never built (or got wiped), build it now instead of
