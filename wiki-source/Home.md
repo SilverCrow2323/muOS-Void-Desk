@@ -53,15 +53,19 @@ The v12 proposal groups eight destinations by user intent. RT:WORKSHOP has two s
 
 See [official muOS releases](https://muos.dev/release) and [release progress](https://muos.dev/release/progress).
 
-<details>
-<summary>📷 Earlier interface screenshots (historical references)</summary>
+## 🧩 Navigation icon library
 
-These PNGs show earlier UI work. They do not demonstrate v12 completion or feature parity.
+The small PNGs below are **menu/hub icons from `resources/`**, not screenshots of application screens.
 
-<img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/nexus-menu.png" alt="Earlier NEXUS menu" width="48%" />
-<img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/uplink-hub.png" alt="Earlier Uplink screen" width="48%" />
+| WORKSHOP | SETTINGS | THE FORGE | START SESSION | RT:TOOLBOX |
+|---|---|---|---|---|
+| <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/workshop.png" width="72" alt="Workshop icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/settings.png" width="72" alt="Settings icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/the_forge.png" width="72" alt="The Forge icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/start.png" width="72" alt="Start Session icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/rt_toolbox.png" width="72" alt="RT Toolbox icon" /> |
 
-</details>
+| NETSPHERE / UPLINK | muOS APPS | MEDIA VAULT | INFO | END |
+|---|---|---|---|---|
+| <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/net_sphere.png" width="72" alt="Netsphere icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/muos.png" width="72" alt="muOS Apps icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/media_vault.png" width="72" alt="Media Vault icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/info.png" width="72" alt="Info icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/end.png" width="72" alt="End icon" /> |
+
+
 
 ## Project links
 
