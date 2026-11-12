@@ -145,7 +145,7 @@ class QwasarSwitchboard:
         root: Path,
         target_profile_path: str | Path,
         manifest_path: str = DEFAULT_MANIFEST,
-        default_profile_path: str = DEFAULT_PROFILE,
+        default_profile_path: str = DEFAULT_PROFILE_TEMPLATE,
     ) -> Path:
         """Restore from the trusted bundled default, even if the target is corrupt."""
         switchboard = cls(root, default_profile_path, manifest_path)
