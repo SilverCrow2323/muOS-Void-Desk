@@ -6431,22 +6431,22 @@ class App(object):
             return
         if btn == "X":
             self.radio_stop()
-            self.notify("Void Radio", "stream fermato", "system")
+            self.notify("Void Radio", "Stream stopped", "system")
             return
         if not self.radio_mpv or not self.radio_mpv.is_running():
-            self.notify("Controller media", "nessun flusso audio on",
+            self.notify("Media controls", "No active audio stream",
                         "standard")
             return
         if btn == "A":
             paused = self.radio_mpv.toggle_pause()
-            self.notify("Void Radio", "paused" if paused else "ripresa",
+            self.notify("Void Radio", "Paused" if paused else "Resumed",
                         "message")
         elif btn in ("LEFT", "RIGHT"):
             vol = self.radio_mpv.get_property("volume")
             vol = int(vol if isinstance(vol, (int, float)) else 100)
             vol = max(0, min(100, vol + (5 if btn == "RIGHT" else -5)))
             self.radio_mpv.set_volume(vol)
-            self.notify("Volume radio", "%d%%" % vol, "standard")
+            self.notify("Radio volume", "%d%%" % vol, "standard")
 
     def _media_panel_draw(self):
         phase = self.media_panel_phase
@@ -6467,18 +6467,18 @@ class App(object):
         pw, ph, px = W - 32, 164, 16
         col = (90, 200, 190)
         self.npanel(px, y, pw, ph, border=col, fill=(7, 18, 17), cut=14)
-        self.text("M // CONTROLLER MULTIMEDIALE", (px + 16, y + 13),
+        self.text("M // MEDIA CONTROLLER", (px + 16, y + 13),
                   self.f_tiny, col)
         active = self.radio_mpv is not None and self.radio_mpv.is_running()
         info = self.radio_mpv.status() if active else {}
         title = (info.get("icy_title") or
                  (self.radio_playing or {}).get("name") or
-                 "NESSUN FLUSSO ATTIVO")
+                 "NO ACTIVE STREAM")
         self.text(title[:48], (px + 16, y + 42), self.f_med_b,
                   FG if active else DIM, maxw=pw - 32)
-        state = "PAUSA" if info.get("pause") else "PLAYING"
+        state = "PAUSED" if info.get("pause") else "PLAYING"
         if not active:
-            state = "open Void Radio per iniziare"
+            state = "Open Void Radio to start"
         self.text(state, (px + 16, y + 72), self.f_tiny,
                   (230, 190, 60) if info.get("pause") else col)
         vol = info.get("volume", 0) if active else 0
@@ -6486,7 +6486,7 @@ class App(object):
         pygame.draw.rect(self.surface, col,
                          (px + 16, y + 98, int((pw - 32) * vol / 100), 6))
         self.text("%3d%%" % vol, (px + pw - 60, y + 110), self.f_tiny, FG)
-        self.text("A pausa/riprendi   SX/DX volume   X ferma   B close",
+        self.text("A pause/resume   LEFT/RIGHT volume   X stop   B close",
                   (px + 16, y + 132), self.f_tiny, FAINT, maxw=pw - 32)
 
     def _radio_health_update(self):
@@ -18959,7 +18959,8 @@ class App(object):
         elif top.startswith("hub:") and top[4:] == "mediahub":
             items = HUBS["mediahub"][2]
             media_cols = [(80, 220, 200), (218, 68, 96),
-                          (105, 155, 245), (245, 185, 64)]
+                          (105, 155, 245), (245, 185, 64),
+                          (190, 120, 255)]
             self.surface.fill((5, 10, 15))
             self.header("MEDIA VAULT", icon="speaker")
             # segnali verticali: ogni tool riceve la sua frequenza/tonalita'.
