@@ -63,7 +63,11 @@ nodes.LIST = {
       type="planet", size=15, surface="icy", rot_speed=0.6 },
     { idx=14, name="LEGACY", icon="legacy", ring=4, hidden=true,
       type="planet", size=10, surface="volcanic", rot_speed=0.5 },
-}
+} 
+
+for (base_position, node) in ipairs(nodes.LIST) do
+    node.base_order = base_position
+end
 
 function nodes.color_for(idx) return nodes.COLOR[idx] or {0.5,0.5,0.5} end
 
@@ -98,7 +102,7 @@ function nodes.apply_profile(composition)
         node.profile_enabled = true
         node.profile_visible = true
         node.profile_label = nil
-        node.profile_order = 10000 + base_position
+        node.profile_order = 10000 + (node.base_order or base_position)
 
         local workspace_id = WORKSPACE_BY_NODE[node.idx]
         local workspace = workspace_id and by_id[workspace_id] or nil
