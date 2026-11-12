@@ -28,6 +28,10 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path]:
     profile_path = tmp_path / DEFAULT_PROFILE
     profile_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / DEFAULT_PROFILE, profile_path)
+    shutil.copy2(
+        ROOT / "data/profiles/voiddesk-desktop-default.qprofile.json",
+        tmp_path / "data/profiles/voiddesk-desktop-default.qprofile.json",
+    )
     return tmp_path, profile_path
 
 
@@ -209,13 +213,43 @@ def test_missing_custom_profile_falls_back_but_default_corruption_is_fatal(tmp_p
         resolver.resolve()
 
 
-def test_profile_settings_are_not_copied_into_frontend_composition(tmp_path: Path):
+def test_portable_settings_are_preserved_and_sensitive_keys_are_rejected(tmp_path: Path):
     resolver, profile_path = _resolver(tmp_path)
     profile = _read(profile_path)
-    profile["settings"] = {"panel": {"density": "compact"}}
+    profile["settings"] = {"panel": {"density": "compact"}, "toolbox": {"columns": 2}}
     _write(profile_path, profile)
 
     composition = resolver.resolve()
+    assert composition["settings"] == profile["settings"]
 
-    assert "settings" not in composition
-    assert "apiToken" not in json.dumps(composition)
+    profile["settings"]["cloud"] = {"apiToken": "must-not-be-exported"}
+    _write(profile_path, profile)
+    with pytest.raises(ProfileResolutionError):
+        resolver.resolve(fallback_to_default=False)
+
+
+def test_platform_compatibility_selects_the_matching_safe_default(tmp_path: Path):
+    resolver, h700_profile = _resolver(tmp_path)
+    with pytest.raises(ProfileResolutionError, match="not compatible"):
+        resolver.resolve(
+            h700_profile,
+            fallback_to_default=False,
+            target_platform="desktop",
+        )
+
+    desktop_default = tmp_path / "data/profiles/voiddesk-desktop-default.qprofile.json"
+    composition = resolver.resolve(
+        h700_profile,
+        target_platform="desktop",
+    )
+    assert composition["profile"]["id"] == "qwasar.profile.voiddesk.desktop-default"
+    assert any("Selected profile was rejected" in warning for warning in composition["warnings"])
+
+
+def test_profile_minimum_ui_api_is_enforced(tmp_path: Path):
+    resolver, profile_path = _resolver(tmp_path)
+    profile = _read(profile_path)
+    profile["compatibility"]["minimumUiApi"] = "99.0"
+    _write(profile_path, profile)
+    with pytest.raises(ProfileResolutionError, match="requires UI API"):
+        resolver.resolve(fallback_to_default=False)
