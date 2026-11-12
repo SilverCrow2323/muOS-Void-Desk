@@ -75,12 +75,20 @@ jobs:
               assert "Void-Desk/desk/main.py" in names, "Pygame frontend missing"
               assert "Void-Desk/love/main.lua" in names, "LÖVE frontend missing"
               assert "Void-Desk/bin/bootstrap_lite.py" in names, "Pygame bootstrap missing"
+              assert "Void-Desk/service/voiddesk_service.py" in names, "Void Desk service missing"
+              assert "Void-Desk/lib/libluajit-5.1.so.2" in names, "LÖVE LuaJIT library missing"
+              assert "Void-Desk/resources/voiddesk.png" in names, "muOS app icon missing"
               service_root = "Void-Desk/external/rt-tailscale-m/app/RtTailscale/"
-              for entrypoint in ("rt", "ts", "watchdog"):
-                  name = service_root + entrypoint
-                  assert name in names, f"Rt:Tailscale-M entrypoint missing: {entrypoint}"
+              executable_paths = [
+                  "Void-Desk/mux_launch.sh",
+                  "Void-Desk/bin/xfce_launch.sh",
+                  "Void-Desk/lib/love",
+                  *(service_root + name for name in ("rt", "ts", "watchdog")),
+              ]
+              for name in executable_paths:
+                  assert name in names, f"runtime entrypoint missing: {name}"
                   entry_mode = (archive.getinfo(name).external_attr >> 16) & 0o777
-                  assert entry_mode & 0o111, f"Rt:Tailscale-M entrypoint not executable: {entrypoint}"
+                  assert entry_mode & 0o111, f"runtime entrypoint not executable: {name}"
               assert all(PurePosixPath(name).parts[0] == "Void-Desk" for name in names)
           print("muOS package smoke checks passed")
           PY
