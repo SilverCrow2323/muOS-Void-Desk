@@ -4028,10 +4028,42 @@ class App(object):
                              random.choice([1, 1, 2]))
         return tint
 
+    def draw_info_keycaps(self, label, x, y, height=18, color=None):
+        """Draw logical controller labels as visual keycaps in the controls guide.
+
+        Names are deliberately semantic (A/B/L1...), not illustrations of
+        physical positions. The active firmware/controller profile decides
+        where those logical inputs exist on a real device.
+        """
+        label = str(label or "").strip().upper()
+        if not label:
+            return False
+        aliases = {"SX": "LEFT", "DX": "RIGHT"}
+        labels = [part.strip() for part in
+                  label.replace("/", ",").replace("+", ",").split(",")
+                  if part.strip()]
+        allowed = {
+            "A", "B", "X", "Y", "L1", "R1", "L2", "R2", "L3", "R3",
+            "START", "SELECT", "MENU", "STICK",
+            "UP", "DOWN", "LEFT", "RIGHT",
+        }
+        labels = [aliases.get(part, part) for part in labels]
+        if not labels or any(part not in allowed for part in labels):
+            return False
+        cx = int(x)
+        tint = color or self.accent
+        for part in labels:
+            width = icons.draw_button(
+                self.surface, part, cx, int(y), height, tint)
+            cx += width + 4
+        return True
+
     def render_info_rows(self, accent, panel=True, txt_col=None,
                          severity_icons=False):
         """Render manual/info copy at a handheld-readable size."""
         rows = self.info_lines or []
+        control_guide = self.info_title in (
+            "GUIDA CONTROLLI", "CONTROLS GUIDE")
         first = max(0, min(self.scroll, max(0, len(rows) - 1)))
         y = 50
         bottom = H - 46
@@ -4076,8 +4108,11 @@ class App(object):
                                          (21, y + 2), (21, y + 7), 1)
                     kx = 34
                 if key_s:
-                    self.text(key_s, (kx, y + 1), self.f_small_b, FAINT,
-                              maxw=170)
+                    drawn = (control_guide and self.draw_info_keycaps(
+                        key_s, kx, y + 1, 18, accent))
+                    if not drawn:
+                        self.text(key_s, (kx, y + 1), self.f_small_b, FAINT,
+                                  maxw=170)
                 avail_w = (W - 220) if key_s else (W - 48 - (kx - 24))
                 x0 = 220 if key_s else kx
                 if self.f_med.size(val_s)[0] <= avail_w:
@@ -13231,25 +13266,43 @@ class App(object):
         def kv(k, v, c=FG):
             return ("kv", k, v, c)
 
+        def mapped(action):
+            # Show the live, saved QJoyPad binding for this desktop action.
+            # It is resolved from the device keys discovered by jsmap, not
+            # from a hard-coded physical-button assumption.
+            return self.btn_names(self.cur_map().get(action, []))
+
         L = [("sec", "gamepad", "NEL MENU" if it else "IN THE MENU")]
-        L.append(kv("A / B", "confirm / indietro" if it
+        L.append(kv("A / B", "conferma / indietro" if it
                     else "confirm / back"))
         L.append(kv("SX / DX", "salta di categoria (componenti)" if it
                     else "jump by category (components)"))
-        L.append(kv("X / Y", "select / tutti-nessuno" if it
+        L.append(kv("X / Y", "seleziona / tutti-nessuno" if it
                     else "mark / all-none"))
-        L.append(kv("R1", "update lo stato dei componenti" if it
+        L.append(kv("R1", "aggiorna lo stato dei componenti" if it
                     else "refresh component status"))
+        L.append(kv("", "A/B/X/Y sono nomi logici: la posizione fisica "
+                    "dipende da firmware e profilo attivo" if it else
+                    "A/B/X/Y are logical names; physical positions depend "
+                    "on the active firmware and controller profile", DIM))
         L.append(("sec", "desktop", "DENTRO XFCE" if it else "INSIDE XFCE"))
         L.append(kv("STICK", "muove il mouse" if it else "moves the mouse"))
-        L.append(kv("A / X", "click sinistro / destro" if it
-                    else "left / right click"))
-        L.append(kv("L1 / R1", "rotella giu' / su" if it
-                    else "wheel down / up"))
-        L.append(kv("MENU", "keyboard a screen" if it
+        L.append(kv(mapped("click_l"), "click sinistro" if it
+                    else "left click"))
+        L.append(kv(mapped("click_r"), "click destro" if it
+                    else "right click"))
+        L.append(kv(mapped("wheel_dn"), "rotella giu'" if it
+                    else "wheel down"))
+        L.append(kv(mapped("wheel_up"), "rotella su" if it
+                    else "wheel up"))
+        L.append(kv(mapped("kbd"), "keyboard a schermo" if it
                     else "on-screen keyboard"))
         L.append(kv("START+SELECT", "pannello LIVE (volume, esci...)" if it
                     else "LIVE panel (volume, quit...)", self.accent))
+        L.append(kv("", "i tasti desktop mostrano i binding correnti di "
+                    "OPZIONI > Mappatura" if it else
+                    "desktop keycaps show the current SETTINGS > Mapping "
+                    "bindings", DIM))
         L.append(kv("", "per uscire: Logout dal menu XFCE" if it
                     else "to quit: Logout from the XFCE menu", DIM))
         L.append(("sec", "gear", "SE QUALCOSA VA STORTO" if it
