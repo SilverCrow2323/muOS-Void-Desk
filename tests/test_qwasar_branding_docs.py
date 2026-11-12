@@ -151,6 +151,11 @@ def test_voiddesk_symbol_is_shared_by_site_and_pygame():
     assert "M263 352 V492" in source
     assert 'symbol = BRAND / "voiddesk_symbol.svg"' in builder
     assert 'key in ("voiddesk", "brand")' in icons
+    identity = (ROOT / "docs" / "VISUAL_IDENTITY.md").read_text(
+        encoding="utf-8"
+    )
+    assert "official Void Desk symbol" in identity
+    assert "silhouette, proportions and orientation are fixed" in identity
     assert 'icons.draw(surface, "voiddesk", 10, 8, 26, acc)' in header
     assert 'icons.draw(surface, "voiddesk", 12, 8, 26, acc)' in header
 
