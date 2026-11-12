@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#090d12">
+<meta name="description" content="QWASAR Studio concept workbench: layout composition, module manifests, release profiles and safe local export.">
+<title>QWASAR Studio / Field Portal</title>
+<link rel="icon" href="assets/voiddesk_symbol.png"><link rel="stylesheet" href="assets/site.css"><script src="assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a><div class="page-noise" aria-hidden="true"></div>
+<header class="topbar">
+<a class="brand" href="index.html" aria-label="QWASAR Void Desk home"><span class="brand-mark"><img src="assets/voiddesk_symbol.png" alt=""></span><span class="brand-copy"><strong>QWASAR</strong><small>VOID DESK / FIELD PORTAL</small></span></a>
+<button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-menu-toggle><span></span><span></span><span></span><b class="sr-only">Open navigation</b></button>
+<nav class="nav" id="primary-nav" aria-label="Main navigation"><a href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="field-manual.html">Field manual</a><a href="asset-atlas.html">Asset atlas</a><a class="active" href="studio.html">Studio</a><a href="blueprint.html">V12 blueprint</a><button class="command-open" type="button" data-command-open aria-haspopup="dialog" aria-keyshortcuts="Control+K"><span class="command-glyph" aria-hidden="true">⌕</span><span>Jump to</span><kbd>CTRL K</kbd></button><a class="nav-github" href="https://github.com/SilverCrow2323/Void-Desk-Project" target="_blank" rel="noreferrer">Source ↗</a></nav>
+</header>
+<main id="main">
+<section class="page-hero wrap studio-hero">
+<div class="eyebrow"><span class="pulse-dot"></span> QWASAR STUDIO / LABORATORY BUILD 001</div>
+<p class="page-kicker">ONE WORKBENCH · FOUR WORKFLOWS · DATA FIRST</p>
+<h1>Design the system.<br><em>Keep control.</em></h1>
+<p class="hero-lede">QWASAR Studio is the planned browser companion for QWASAR-Env. This interactive concept explores the four workbenches: composing layouts, inspecting module manifests, preparing release manifests and reviewing a catalogue — without pretending that cloud services or executable module publishing already exist.</p>
+<div class="page-stats"><span><b>04</b> WORKBENCHES</span><span><b>01</b> PORTABLE PROFILE</span><span><b>0</b> EXECUTABLES EXPORTED</span></div>
+<div class="studio-status"><span class="status-light"></span><strong>LOCAL CONCEPT / INTERACTIVE PROTOTYPE</strong><span>NO ACCOUNT · NO DEVICE PAIRING · NO CLOUD API</span></div>
+</section>
+
+<section class="section wrap" data-studio>
+<div class="section-heading"><div><div class="eyebrow">01 / WORKBENCH SELECTOR</div><h2>One Studio.<br><em>Four focused tools.</em></h2></div><p>Switch workbenches to explore the product direction. Controls in this page operate locally in your browser and export sample data only.</p></div>
+<div class="studio-shell">
+<div class="studio-bar"><div class="studio-bar-brand"><span class="studio-mini-mark">Q</span><span><b>QWASAR STUDIO</b><small>LOCAL WORKSPACE / UNSAVED DEMO</small></span></div><div class="studio-bar-right"><span class="studio-device"><i></i> NO DEVICE PAIRED</span><span class="studio-version">UI CONCEPT 0.1</span></div></div>
+<div class="studio-workbench-head">
+<div class="studio-tabs" role="tablist" aria-label="Studio workbenches">
+<button class="studio-tab is-active" type="button" role="tab" id="tab-layout" aria-controls="panel-layout" aria-selected="true" data-studio-tab="layout"><span>01</span> Layout Designer</button>
+<button class="studio-tab" type="button" role="tab" id="tab-modules" aria-controls="panel-modules" aria-selected="false" data-studio-tab="modules"><span>02</span> Module Forge</button>
+<button class="studio-tab" type="button" role="tab" id="tab-release" aria-controls="panel-release" aria-selected="false" data-studio-tab="release"><span>03</span> Release Composer</button>
+<button class="studio-tab" type="button" role="tab" id="tab-library" aria-controls="panel-library" aria-selected="false" data-studio-tab="library"><span>04</span> Community Library</button>
+</div>
+<div class="studio-context"><span class="context-dot"></span><span id="studio-context-label">LAYOUT / NEXUS HOME</span></div>
+</div>
+
+<section class="studio-panel is-active" id="panel-layout" role="tabpanel" aria-labelledby="tab-layout" data-studio-panel="layout">
+<div class="studio-panel-title"><div><span class="eyebrow">LAYOUT DESIGNER / CANVAS</span><h3>Compose a NEXUS home.</h3><p>Reorder registered destinations and export a declarative sample profile. The canvas does not install missing modules or create executable actions.</p></div><button class="studio-action studio-action-primary" type="button" data-export-profile>Export .qprofile <span>↓</span></button></div>
+<div class="layout-lab">
+<aside class="component-rail"><div class="rail-head">COMPONENT RAIL <span>04</span></div>
+<button class="component-add" type="button" data-add-layout="section"><b>▤</b><span><strong>Section</strong><small>Named layout group</small></span><i>+</i></button>
+<button class="component-add" type="button" data-add-layout="tile"><b>▦</b><span><strong>Menu tile</strong><small>Registered destination</small></span><i>+</i></button>
+<button class="component-add" type="button" data-add-layout="widget"><b>◫</b><span><strong>Status widget</strong><small>Read-only information</small></span><i>+</i></button>
+<button class="component-add" type="button" data-add-layout="region"><b>◇</b><span><strong>Region</strong><small>Placement slot</small></span><i>+</i></button>
+<div class="rail-note">STRUCTURE ONLY<br><span>NO RAW CODE / NO SHELL ACTIONS</span></div></aside>
+<div class="layout-canvas-wrap"><div class="canvas-toolbar"><span>CANVAS / NEXUS HOME</span><span><i></i> SAMPLE PROFILE</span></div>
+<div class="layout-canvas" id="layout-canvas" aria-label="Editable sample NEXUS layout">
+<div class="canvas-section-label"><span>MAIN DESTINATIONS</span><small>ORDERED / 03 ITEMS</small></div>
+<article class="layout-node is-selected" tabindex="0" data-layout-node data-node-id="start-session" data-node-label="Start Session" data-node-type="tile"><span class="node-grip">⠿</span><span class="node-symbol">▶</span><span class="node-copy"><b>START SESSION</b><small>session.launch / registered route</small></span><span class="node-tag">TILE</span><span class="node-controls"><button type="button" data-node-move="-1" aria-label="Move Start Session up">↑</button><button type="button" data-node-move="1" aria-label="Move Start Session down">↓</button></span></article>
+<article class="layout-node" tabindex="0" data-layout-node data-node-id="the-forge" data-node-label="THE FORGE" data-node-type="tile"><span class="node-grip">⠿</span><span class="node-symbol">⌘</span><span class="node-copy"><b>THE FORGE</b><small>forge.home / registered route</small></span><span class="node-tag">TILE</span><span class="node-controls"><button type="button" data-node-move="-1" aria-label="Move THE FORGE up">↑</button><button type="button" data-node-move="1" aria-label="Move THE FORGE down">↓</button></span></article>
+<article class="layout-node" tabindex="0" data-layout-node data-node-id="media-vault" data-node-label="MEDIA VAULT" data-node-type="tile"><span class="node-grip">⠿</span><span class="node-symbol">▣</span><span class="node-copy"><b>MEDIA VAULT</b><small>media.home / registered route</small></span><span class="node-tag">TILE</span><span class="node-controls"><button type="button" data-node-move="-1" aria-label="Move Media Vault up">↑</button><button type="button" data-node-move="1" aria-label="Move Media Vault down">↓</button></span></article>
+</div>
+<div class="canvas-footer"><span id="layout-count">03 NODES IN CANVAS</span><button type="button" data-reset-layout>Reset sample ↺</button></div></div>
+<aside class="inspector-rail"><div class="rail-head">INSPECTOR <span>PROPS</span></div><div class="inspector-card"><span class="inspector-label">SELECTED NODE</span><strong id="inspector-name">START SESSION</strong><code id="inspector-id">start-session</code><div class="inspector-divider"></div><span class="inspector-label">COMPONENT TYPE</span><b id="inspector-type">Menu tile</b><div class="inspector-divider"></div><span class="inspector-label">ACTION ROUTE</span><code id="inspector-route">session.launch</code><p>Routes are references to actions already registered by the installed runtime. A profile cannot define new executable actions.</p></div><div class="inspector-safe"><span>✓</span> Schema-first / data-only</div></aside>
+</div>
+<div class="studio-feedback" data-studio-feedback aria-live="polite">Select a node to inspect it. Use the arrows to reorder the canvas.</div>
+</section>
+
+<section class="studio-panel" id="panel-modules" role="tabpanel" aria-labelledby="tab-modules" data-studio-panel="modules" hidden>
+<div class="studio-panel-title"><div><span class="eyebrow">MODULE FORGE / MANIFEST INSPECTOR</span><h3>Define a contribution.</h3><p>Templates are examples of manifest metadata, not installable or executable modules. Choose one to inspect its declared surface.</p></div><span class="studio-state-chip">SCHEMA PREVIEW</span></div>
+<div class="module-lab">
+<div class="module-template-list">
+<button class="module-template is-selected" type="button" data-module-template="widget"><span class="module-template-icon">◫</span><span><b>Widget</b><small>Read-only status surface</small></span><em>01</em></button>
+<button class="module-template" type="button" data-module-template="menu"><span class="module-template-icon">▦</span><span><b>Menu tile</b><small>Registered navigation entry</small></span><em>02</em></button>
+<button class="module-template" type="button" data-module-template="panel"><span class="module-template-icon">▤</span><span><b>Hub panel</b><small>Workspace contribution</small></span><em>03</em></button>
+<button class="module-template" type="button" data-module-template="theme"><span class="module-template-icon">◈</span><span><b>Theme pack</b><small>Allowlisted visual tokens</small></span><em>04</em></button>
+</div>
+<div class="manifest-preview"><div class="manifest-head"><span>MANIFEST.JSON</span><span id="manifest-template-label">WIDGET TEMPLATE / DRAFT</span></div><pre><code id="manifest-code">{
+  "schema": "qwasar.module/v1",
+  "id": "sample.status-widget",
+  "kind": "widget",
+  "version": "0.1.0",
+  "entry": {
+    "slot": "home.right",
+    "component": "StatusCard"
+  },
+  "capabilities": [],
+  "permissions": [],
+  "trust": "local-draft"
+}</code></pre><div class="manifest-foot"><span>JSON / DECLARATIVE</span><button type="button" data-copy-manifest>Copy manifest</button></div></div>
+</div>
+<div class="trust-note"><b>TRUST BOUNDARY</b><p>Executable community modules remain disabled until source review, signing, capability enforcement, sandboxing, revocation and rollback exist. A manifest preview is not proof of runtime support.</p></div>
+</section>
+
+<section class="studio-panel" id="panel-release" role="tabpanel" aria-labelledby="tab-release" data-studio-panel="release" hidden>
+<div class="studio-panel-title"><div><span class="eyebrow">RELEASE COMPOSER / PACKAGE PLAN</span><h3>Choose a release flavour.</h3><p>Prepare a sample build manifest for review. This browser concept does not run a build, estimate a verified package size or issue release signatures.</p></div><span class="studio-state-chip">MANIFEST ONLY</span></div>
+<div class="release-lab">
+<div class="release-options">
+<label class="release-select-label" for="release-flavour">PACKAGE FLAVOUR</label>
+<select id="release-flavour"><option value="Full">Full — all permitted first-party modules</option><option value="Essential">Essential — core handheld experience</option><option value="Slim">Slim — minimal footprint</option><option value="Custom">Custom — explicit allowlist</option></select>
+<label class="release-select-label" for="release-engine">TARGET FRONTEND</label>
+<select id="release-engine"><option value="pygame">Pygame / reference frontend</option><option value="love">LÖVE / experimental frontend</option></select>
+<div class="release-checks"><span>MANIFEST CONTENTS</span><label><input type="checkbox" checked disabled> Core shell and navigation</label><label><input type="checkbox" checked disabled> Schema-validated settings</label><label><input type="checkbox" disabled> Community executable modules</label><small>Executable community modules are not eligible for this concept export.</small></div>
+<button class="studio-action studio-action-primary" type="button" data-export-release>Export build manifest <span>↓</span></button>
+</div>
+<div class="release-summary"><div class="summary-top"><span>BUILD PLAN / PREVIEW</span><span class="summary-mark">Q—RC</span></div><div class="summary-flavour" id="release-summary-flavour">FULL</div><h4 id="release-summary-engine">Pygame · reference frontend</h4><p id="release-summary-description">A complete first-party package plan, subject to the real build pipeline and module compatibility checks.</p><div class="summary-lines"><div><span>PROFILE FORMAT</span><b>JSON</b></div><div><span>SIGNATURE</span><b>NOT ISSUED</b></div><div><span>BUILD STATUS</span><b>NOT STARTED</b></div></div></div>
+</div>
+<div class="trust-note"><b>RELEASE INTEGRITY</b><p>Official signing remains maintainer-controlled. A personal custom package must be visibly labelled custom and cannot impersonate an official release.</p></div>
+</section>
+
+<section class="studio-panel" id="panel-library" role="tabpanel" aria-labelledby="tab-library" data-studio-panel="library" hidden>
+<div class="studio-panel-title"><div><span class="eyebrow">COMMUNITY LIBRARY / LOCAL SAMPLE</span><h3>Inspect before you trust.</h3><p>This is a sample catalogue to demonstrate the information hierarchy. It is not connected to a live service or community publishing API.</p></div><span class="studio-state-chip">OFFLINE SAMPLE</span></div>
+<div class="library-lab">
+<article class="library-module"><div class="catalog-art catalog-profile">Q<span>01</span></div><div class="catalog-copy"><div class="catalog-meta"><span>PROFILE / DATA ONLY</span><b class="catalog-trust">LOCAL SAMPLE</b></div><h4>Handheld Starter</h4><p>A simple NEXUS ordering and visibility profile for a small screen.</p><div class="catalog-tags"><i>PROFILE V1</i><i>NO EXECUTABLES</i></div></div></article>
+<article class="library-module"><div class="catalog-art catalog-theme">◈<span>02</span></div><div class="catalog-copy"><div class="catalog-meta"><span>THEME / DATA ONLY</span><b class="catalog-trust">LOCAL SAMPLE</b></div><h4>Polar Signal</h4><p>A restrained palette preset using supported visual tokens.</p><div class="catalog-tags"><i>THEME TOKENS</i><i>NO PERMISSIONS</i></div></div></article>
+<article class="library-module catalog-warning"><div class="catalog-art catalog-code">!</div><div class="catalog-copy"><div class="catalog-meta"><span>EXECUTABLE MODULE</span><b class="catalog-trust catalog-blocked">NOT ENABLED</b></div><h4>Community code package</h4><p>Executable community publishing remains unavailable until the security and review requirements are implemented.</p><div class="catalog-tags"><i>REVIEW REQUIRED</i><i>SANDBOX REQUIRED</i></div></div></article>
+</div>
+<div class="trust-note"><b>SHARING POLICY</b><p>Profile sharing is opt-in and data-only. Imports must be schema-validated, secrets and device identifiers must be stripped, and installing a module is always a separate explicit action.</p></div>
+</section>
+</div>
+</section>
+
+<section class="section section-dark"><div class="wrap">
+<div class="section-heading"><div><div class="eyebrow">02 / THEME LAB</div><h2>Change the mood.<br><em>Keep the tokens.</em></h2></div><p>Preview a few possible Studio palettes. These theme presets affect this page only; they are not applied to a connected handheld.</p></div>
+<div class="theme-lab" data-theme-lab>
+<div class="theme-presets" role="group" aria-label="Studio preview themes">
+<button type="button" class="theme-preset is-active" data-theme-preset="megastructure" aria-pressed="true"><i class="swatch swatch-mega"></i><span><b>Megastructure</b><small>Signal red · orbital cyan</small></span></button>
+<button type="button" class="theme-preset" data-theme-preset="polar" aria-pressed="false"><i class="swatch swatch-polar"></i><span><b>Polar Signal</b><small>Ice blue · soft graphite</small></span></button>
+<button type="button" class="theme-preset" data-theme-preset="ember" aria-pressed="false"><i class="swatch swatch-ember"></i><span><b>Ember Foundry</b><small>Copper · warm white</small></span></button>
+</div>
+<div class="theme-preview" id="theme-preview">
+<div class="theme-preview-top"><span>LIVE TOKEN PREVIEW</span><span>LOCAL ONLY / NO SAVE</span></div>
+<div class="theme-preview-main"><div class="theme-preview-orb">Q</div><div><span class="eyebrow">DESIGN SYSTEM / TOKENS</span><h3>One visual language.<br><em>Many surfaces.</em></h3><p>Consistent contrast, focus and meaning across the interface.</p><div class="theme-samples"><i></i><i></i><i></i><i></i></div></div></div>
+<div class="theme-preview-bottom"><span>--COLOR-ACCENT</span><b id="theme-accent-value">#F0525F</b><span>--COLOR-FOCUS</span><b id="theme-focus-value">#55D5DF</b></div>
+</div>
+</div>
+</div></section>
+<section class="section wrap"><div class="section-heading"><div><div class="eyebrow">03 / ARCHITECTURE & SAFETY</div><h2>Local first.<br><em>Remote by consent.</em></h2></div><p>Studio can work with portable files without account access. The handheld remains usable offline and retains authority over applying settings.</p></div>
+<div class="studio-principles">
+<article><span>01 / PORTABLE</span><h3>Profiles are data.</h3><p>Declarative JSON describes layouts, ordering, labels, supported settings and references to installed contributions.</p></article>
+<article><span>02 / VALIDATED</span><h3>Schema before apply.</h3><p>The local engine validates and migrates a profile, stages changes, backs up the active selection and retains rollback.</p></article>
+<article><span>03 / TRUSTED</span><h3>Code needs governance.</h3><p>Executable modules require signatures, review, capabilities, sandboxing, revocation and controlled activation.</p></article>
+<article><span>04 / OPTIONAL</span><h3>Cloud is additive.</h3><p>Pairing and sync are opt-in future services. No inbound device ports or exposed host-control endpoints are required.</p></article>
+</div>
+<div class="studio-source-links"><a href="https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/STUDIO_ARCHITECTURE.md">Read Studio technical architecture ↗</a><a href="https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/QWASAR_GUI_SYSTEM.md">Read UI composition contract ↗</a><a href="blueprint.html">Explore NEXUS v12 ↗</a></div>
+</section>
+<section class="closing-band"><div class="wrap closing-inner"><div><div class="eyebrow">THE WORKBENCH IS A STARTING POINT</div><h2>Compose with intent.<br><em>Ship with evidence.</em></h2></div><div class="closing-actions"><a class="button button-primary" href="architecture.html">Review system architecture ↗</a><a class="button button-quiet" href="https://github.com/SilverCrow2323/Void-Desk-Project/issues">Discuss the Studio roadmap</a></div></div></section>
+</main>
+<dialog class="command-dialog" id="command-dialog" aria-labelledby="command-title">
+<div class="command-shell"><div class="command-heading"><div><span class="eyebrow">QWASAR / QUICK NAVIGATION</span><h2 id="command-title">Where do you want to go?</h2></div><form method="dialog"><button type="submit" aria-label="Close command palette">ESC</button></form></div>
+<label class="command-search"><span aria-hidden="true">⌕</span><input id="command-search-input" type="search" placeholder="Search pages, guides and actions…" autocomplete="off"></label>
+<div class="command-results" id="command-results" role="list" aria-label="Navigation results"></div>
+<p class="command-help"><kbd>CTRL</kbd> + <kbd>K</kbd> OPEN <span>·</span> <kbd>↑</kbd> <kbd>↓</kbd> NAVIGATE <span>·</span> <kbd>ENTER</kbd> OPEN <span>·</span> <kbd>ESC</kbd> CLOSE</p></div>
+</dialog>
+<footer class="footer wrap"><a class="footer-brand" href="index.html">QWASAR <span>/</span> VOID DESK</a><p>STUDIO LAB / Interactive concept, not a deployed Studio service.</p><div><a href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="asset-atlas.html">Asset atlas</a><a href="blueprint.html">Blueprint</a><a href="https://github.com/SilverCrow2323/Void-Desk-Project">GitHub ↗</a></div><small>© <span data-year></span> QWASAR-Env / Void Desk</small></footer>
+</body></html>
