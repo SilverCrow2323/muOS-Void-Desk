@@ -97,9 +97,9 @@ jobs:
         run: |
           echo "## Void Desk for muOS — build complete" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Package:** `Void-Desk-${PACKAGE_VERSION}.muxapp`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Package:** Void-Desk-${PACKAGE_VERSION}.muxapp" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Target:** muOS / compatible H700 handhelds" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Validation:** archive layout, required launchers, executable bit and SHA-256" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Artifact:** download the package and checksum from this workflow run" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Copy the `.muxapp` to SD1/ARCHIVE/ and install it with muOS Archive Manager." >> "$GITHUB_STEP_SUMMARY"
+          echo "Copy the .muxapp package to SD1/ARCHIVE/ and install it with muOS Archive Manager." >> "$GITHUB_STEP_SUMMARY"
