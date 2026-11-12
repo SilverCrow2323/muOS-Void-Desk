@@ -56,7 +56,7 @@ BANNER = rf"""{Color.CYAN}{Color.BOLD}
  ╚══════════════════════════════════════════════════════════════════╝{Color.RESET}"""
 
 DEFAULT_CONFIG = {
-    "engine": "love",
+    "engine": "py",
     "pc_mode": "auto",
     "debug": False,
     "video_driver": "x11"
@@ -564,7 +564,7 @@ def cli(argv):
     if cmd == "--py":
         return action_launch("py")
     if cmd == "--engine":
-        eng = argv[1] if len(argv) > 1 else "love"
+        eng = argv[1] if len(argv) > 1 else "py"
         if eng not in ("py", "love"):
             print(f"  {Color.RED}[ERR] Unknown engine: {eng} (expected: py | love){Color.RESET}")
             return 2
