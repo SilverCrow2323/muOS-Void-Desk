@@ -65,6 +65,17 @@ The following PNG files in `resources/` are **menu and hub icons**, not screensh
 
 These are existing project assets. The NEXUS v12 diagram above is a **proposed navigation map**, not a screenshot.
 
+<details>
+<summary>🖥️ Actual screen reference — THE FORGE</summary>
+
+This is a screenshot of the **THE FORGE screen**, not an icon:
+
+<img src="resources/forge-menu.png" alt="THE FORGE application screen" width="720" />
+
+The separate `resources/the_forge.png` file shown in the navigation icon grid above is the **THE FORGE hub icon**.
+</details>
+
+
 
 ## 🧩 Runtime and frontends
 
