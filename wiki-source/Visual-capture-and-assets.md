@@ -1,56 +1,53 @@
-# QWASAR Desk — Visual capture and asset catalogue
+# 🎨 Visual capture and assets
 
-## Capture every LÖVE scene
+The visual language is **Megastructure**: industrial science fiction, monumental geometry, steel/graphite surfaces, technical labels and restrained signal colours. Documentation uses the same visual grammar, but it must remain easy to read on a phone or a narrow GitHub panel.
 
-On a Linux development PC with LÖVE 11.5 installed:
+## 📷 Existing interface PNGs
 
-~~~bash
-python3 tools/capture_love_screenshots.py
-~~~
+These repository PNGs are earlier interface references. They are not v12 mock-ups and do not certify that every linked action works.
 
-The script starts the Python companion service, runs the LÖVE frontend, switches through its scene catalogue and captures each rendered screen. When no display is available it uses Xvfb. The capture summary is saved as data/visual-captures/love-batch-manifest.json.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/nexus-menu.png" alt="Earlier NEXUS screen" width="48%" />
+  <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/uplink-hub.png" alt="Earlier Uplink screen" width="48%" />
+  <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/media_vault.png" alt="Earlier Media Vault screen" width="48%" />
+  <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/workshop.png" alt="Earlier Workshop screen" width="48%" />
+</p>
 
-This pass verifies that scenes can be opened and rendered in the desktop runtime. GitHub Actions uploads a `voiddesk-love-visual-captures` artifact from each run (screenshots, JSON sidecars, manifest and logs; 30-day retention). Open the workflow run and download it from **Artifacts**. Synthetic system/network status is used for this test, not live host data. It is not hardware validation for muOS or a claim that all LÖVE actions are complete.
+## Architecture and concept diagrams
 
-## Automated Pygame home-style smoke capture
+![QWASAR system map](assets/qwasar-system-map.svg)
 
-On Linux/CI, run:
+![NEXUS v12 proposal](assets/nexus-v12-navigation.svg)
 
-~~~bash
+![Firmware and input resolution](assets/muos-profile-resolution.svg)
+
+These SVG diagrams remain editable in `docs/assets/`. The same assets are copied into the GitHub Wiki by `tools/publish_wiki.sh`.
+
+## Capture UI screens
+
+Both frontends provide an F12 capture path when enabled. Captures and JSON metadata are written under `data/visual-captures/`.
+
+```bash
+# Pygame states and home styles
 python3 tools/capture_pygame_screenshots.py --all-states
-~~~
 
-The harness boots the real Pygame application with an isolated temporary config and SDL's dummy video/audio drivers, renders the five supported home styles (BLAME, HUD, Terminal, Orbit and NEXUS), then smoke-renders every state branch declared in `App.render_state()`. Each direct state render produces a PNG and JSON sidecar; the manifest is `data/visual-captures/pygame-home-manifest.json`.
+# LÖVE scene capture (requires LÖVE 11.5 on a Linux development PC)
+python3 tools/capture_love_screenshots.py
+```
 
-GitHub Actions uploads these files as `voiddesk-pygame-visual-captures` (30-day retention). A failed style makes the command fail and is recorded in the manifest. Direct state rendering does not prove that a screen is reachable through normal navigation, that its actions work, or that controller/hardware flows are valid. Treat this as broad renderer coverage, not end-to-end feature validation.
+A capture pass is renderer evidence, not proof of navigation, action behaviour or physical device support.
 
-## Capture one current screen
+## Build an asset catalogue
 
-Both frontends support F12. PNG screenshots and JSON metadata sidecars are saved under data/visual-captures/.
-
-## Generate the asset catalogue and galleries
-
-~~~bash
+```bash
 python3 tools/visual_capture.py
 python3 tools/visual_capture.py --check
-~~~
+```
 
-The standard-library script scans images and fonts in assets/, resources/, love/assets/ and glyph/. It records size, dimensions where available and SHA-256, verifies active LÖVE NEXUS node textures and indexes screenshots.
+The report indexes images and fonts, records dimensions and hashes, and checks active image references.
 
-Generated reports:
+## Publish approved screenshots
 
-- docs/visual/ASSET_CATALOG.md
-- docs/visual/SCREENSHOT_CHECKLIST.md
-- docs/visual/visual-inventory.json
-- docs/visual/ASSET_GALLERY.html
-- docs/visual/SCREENSHOT_GALLERY.html
+Captures are ignored by Git by default. Inspect each image for SSIDs, IP addresses, hostnames, usernames, personal filenames and private media before exporting or committing it. Never publish real tokens or credentials.
 
-## Publish selected images
-
-Captures are ignored by Git by default. They may reveal SSIDs, IP addresses, hostnames, personal media names or other private data. Inspect every screenshot before publishing.
-
-~~~bash
-python3 tools/visual_capture.py --export-public
-~~~
-
-This copies reviewed screenshots into docs/visual/captures/. Do not publish raw captures until they have been reviewed.
+See the repository [visual capture guide](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/visual/README.md) and [documentation style guide](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/DOCUMENTATION_STYLE_GUIDE.md).

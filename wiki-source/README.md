@@ -1,24 +1,27 @@
-# QWASAR Desk Wiki source pages
+# GitHub Wiki source and publishing
 
-These Markdown pages are the source-controlled documentation for the QWASAR Desk GitHub Wiki. They are reviewed alongside the application source so the product manual, architecture and package instructions stay versioned together.
+The source-controlled pages live in this directory. The repository is the canonical editing location; the GitHub Wiki is a published reading surface.
 
-## One-time bootstrap
+## First-time Wiki activation
 
-The repository Wiki must be initialized once in GitHub before its special `.wiki.git` repository exists.
+GitHub creates the special Wiki repository only after its first page has been saved.
 
-1. Open https://github.com/SilverCrow2323/Void-Desk-Project/wiki
-2. Select **Create the first page**.
-3. Use the title **Home** and paste the contents of `wiki-source/Home.md`.
-4. Save the page.
-
-## Publish or refresh the Wiki
-
-After the first Home page has been saved, clone the source repository on a PC and run:
+1. Open [Void Desk Wiki](https://github.com/SilverCrow2323/Void-Desk-Project/wiki).
+2. Create a page titled **Home**.
+3. Paste the content of [Home.md](Home.md) and save it.
+4. On a machine with Git credentials and this repository cloned, run:
 
 ~~~bash
 sh tools/publish_wiki.sh
 ~~~
 
-The publisher clones the special Wiki repository, copies the reviewed Markdown pages and sidebar, commits and pushes them using the Git credentials already configured on the PC. It does not modify the source repository.
+The publisher clones the Wiki repo, copies all reviewed Markdown pages and the four SVG diagrams to its local assets folder, commits and pushes. It does not rewrite the main repository.
 
-**Current limitation:** this branch updates the source-controlled Wiki pages. The live GitHub Wiki has not yet been initialized through its one-time Home-page UI action, so the publisher cannot sync it until that action is completed.
+## Editing rules
+
+- Edit files here, not only in the live Wiki.
+- Keep Wiki page links extension-free.
+- Keep diagrams under <code>docs/assets/</code>; the publisher copies them into Wiki <code>assets/</code>.
+- Use PNG for screenshots and logos; use editable SVG for diagrams.
+- Mark v12/preview content clearly as roadmap.
+- Redact network and device identifiers from captures.

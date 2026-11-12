@@ -1,4 +1,9 @@
-# Void Desk architecture
+# Void Desk — current runtime architecture
+
+![Void Desk field manual](assets/voiddesk-docs-banner.svg)
+
+> [!NOTE]
+> This page maps the **current source implementation**. It is not the v12 navigation specification. For the target structure and consolidation rules, read the [v12 blueprint](V12_BLUEPRINT.md) and the [tool catalog](TOOL_CATALOG.md).
 
 This note maps the Void Desk source tree and main runtime paths. It does not imply that every optional integration is available on every firmware.
 

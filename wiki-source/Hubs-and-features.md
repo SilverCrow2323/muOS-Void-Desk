@@ -1,23 +1,52 @@
-# QWASAR Desk — Hubs and features
+# 🧭 Hubs and features
 
-QWASAR Desk uses the NEXUS home interface to route into feature hubs. Feature availability depends on engine, firmware, installed programs, hardware and permissions.
+NEXUS is the main entry point to Void Desk. The current source tree contains several legacy hub names and routes; the v12 proposal reorganises those responsibilities without silently claiming that the new interface has shipped.
 
-| Hub | Purpose | Notes |
+> [!NOTE]
+> Tool availability depends on the frontend, firmware, installed dependencies, hardware and permissions. A visible menu item or a rendered screenshot is not proof that its action works.
+
+## Current source inventory
+
+| Existing area | Responsibilities found in the repository | Reality check |
 |---|---|---|
-| START SESSION | Start or install the optional desktop environment | XFCE is the documented baseline; setup is device- and storage-dependent |
-| THE FORGE | Desktop components and packages | LÖVE package actions use the background job queue with an explicit command allowlist; cache cleaning remains incomplete |
-| UPLINK | Wi-Fi, Bluetooth, hotspot and network integrations | Adapter and firmware support matter |
-| MEDIA VAULT | Radio, IPTV, local media and audio tools | VoidCast is a standalone optional app; external tools are discovered from the shared registry and only installed launchers are offered |
-| WORKSHOP | System status, storage and maintenance | Pygame is fuller; LÖVE diagnostics/monitor/log flows need work |
-| RT:TOOLBOX | Everyday utilities | Calendar reads the shared `data/calendar.json` event store; terminal, Calculator and Clock scenes are linked; Toolbox counts are backed by the service. Notes/RSS/Weather remain incomplete |
-| MUOS APPS | Discover and launch other muOS applications | Requires host application layout and permissions |
-| SETTINGS | Themes, language, UI and engine settings | LÖVE settings are a smaller experimental subset |
-| INFO & ABOUT | Project information and update details | Some actions display status text rather than a full manual |
-| END SESSION | Close, reboot or power off | Device power-off must be tested on hardware |
+| START SESSION | Optional desktop and terminal/session hand-off | Depends on device storage and available session images |
+| THE FORGE | Package and component maintenance | Operations must be capability-checked and reported accurately |
+| UPLINK | Wireless, network, remote access and sync entry points | Not every integration is enabled on every firmware |
+| MEDIA VAULT | Radio, IPTV and media-related tools | Individual media paths have separate implementation status |
+| WORKSHOP | Device checks, logs, storage and maintenance | Some engine actions remain incomplete |
+| RT:TOOLBOX | Everyday tools, shell and utilities | Tool coverage differs across frontends |
+| MUOS APPS | Discover and hand off to installed muOS apps | Requires valid app roots and launcher metadata |
+| SETTINGS | Appearance, controls and app configuration | Some advanced categories are part of the v12 plan |
+| INFO / ABOUT | Project and update information | Being folded into Settings / Documentation in the v12 proposal |
+| END SESSION | Exit, return and power actions | Device power behaviour requires physical tests |
 
-For troubleshooting, use the Troubleshooting page. For engine differences, see Frontends.
+## Proposed v12 workspaces
 
+![Proposed NEXUS structure](assets/nexus-v12-navigation.svg)
 
-## Tool taxonomy
+| Destination | Role |
+|---|---|
+| **START SESSION** | Desktop environments, terminal sessions and supported workspace hand-off |
+| **THE FORGE** | Packages, runtimes, updates and registered modules |
+| **UPLINK** | Network Probe, BaseStation, PC companion, Tailscale, Syncthing and FTP |
+| **MEDIA VAULT** | Playback, library, radio, IPTV and playlists |
+| **RT:WORKSHOP** | One maintenance/create area with SYSTEMS and TOOLS satellites |
+| **SETTINGS** | General, appearance, controls, connectivity, identity, device/OS, QWASAR and privacy |
+| **MUOS APPS** | Discover and launch native muOS applications |
+| **END NODE** | Close, return, restart, reboot and safe power-off flows |
 
-The proposed workspace/category model is documented in [Tool Catalog](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/TOOL_CATALOG.md). Tool availability is still capability- and firmware-dependent. The catalog is an inventory, not a claim that every item is enabled on every device.
+### RT:WORKSHOP satellites
+
+- **SYSTEMS:** device health, temperature, storage, logs, backups and diagnostics.
+- **TOOLS:** shell, Python executor, calculator, clock, calendar, notes and developer utilities.
+
+### UPLINK sub-screens
+
+- **BaseStation:** a unified panel with separate state for PC companion and local file-bridge services.
+- **Network Probe:** scrollable diagnostic report with interfaces, routes, DNS, performance, tailnet and service state.
+- **Syncthing:** dedicated themed device/folder screen using the existing host service rather than spawning a duplicate daemon.
+- **Tailscale:** dedicated service view with explicit login, peers and action status.
+
+## Source-grounded catalog
+
+The deeper tool inventory and module taxonomy live in [docs/TOOL_CATALOG.md](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/TOOL_CATALOG.md). The v12 target and release gates are in [docs/V12_BLUEPRINT.md](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/V12_BLUEPRINT.md).

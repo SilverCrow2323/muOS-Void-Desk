@@ -1,67 +1,59 @@
-# Symbiotic Layer — QWASAR Desk and muOS
+# 🧬 Symbiotic Layer — Void Desk and muOS
 
-## Vision
+## The idea
 
-QWASAR Desk (formerly Void Desk) aims to grow from a launched application into a deeply integrated handheld environment. "Symbiotic Layer" is the technical name for that direction: QWASAR should use and extend the host firmware through supported interfaces while leaving its native boot and recovery mechanisms intact.
+The **Symbiotic Layer** is the long-term integration model for Void Desk: richer system capabilities and a custom handheld experience built around the host firmware, without taking control away from the firmware itself.
 
-This is an architectural roadmap, not a claim that QWASAR currently replaces the muOS frontend or firmware.
+It is an architecture direction, not a claim that Void Desk currently replaces the muOS frontend or firmware.
 
-## Current host boundary
+![QWASAR-Env system boundaries](assets/qwasar-system-map.svg)
 
-The current target is MustardOS / muOS 2606.0 Andromeda on compatible H700 hardware. QWASAR is packaged and launched as a normal muOS application.
+## Host boundary
 
-MustardOS documents a standard Application Runner. It prepares the CPU governor, SDL environment, HOME directory, SD1/SD2-aware storage, foreground process tracking and cleanup. Its launcher metadata is parsed by the native frontend.
+The current target is MustardOS / muOS **2606.0 Andromeda** on compatible H700 devices. Void Desk is installed and launched as a normal muOS application through the supported application lifecycle.
 
-Developer references:
+The official developer references describe the application runner, launching and extension mechanisms:
+
 - [Application Runner](https://community.muos.dev/t/application-runner/1282)
 - [Extending MustardOS](https://muos.dev/docs/infrastructure/extending)
 - [Frontend and Launching](https://muos.dev/docs/infrastructure/launching)
-- [Boot and Services](https://muos.dev/docs/infrastructure/boot)
 
-## Integration rules
+## Integration principles
 
-1. Keep the official application runner as the entry and exit boundary.
-2. Use the documented shared helper functions and setup flow; do not remove the shared function library.
-3. Use the bind-mounted runtime application path where provided; do not hardcode SD1 or SD2 mount paths.
-4. Keep QWASAR state namespaced and separate from muOS-owned configuration.
-5. Use atomic writes, migrations and backups for persistent files.
-6. Own every service QWASAR starts and stop it cleanly on exit, power-off and failure.
-7. Prefer documented manifests, themes, launcher metadata, task scripts and Web Dashboard APIs over patching native binaries.
-8. Keep local service listeners loopback-only unless a separately reviewed, authenticated interface is deliberately enabled.
-9. Do not spawn a second instance of a host service that is already running.
-10. Every deeper integration needs an uninstall and recovery path.
+1. Preserve the official app runner and its startup/cleanup lifecycle.
+2. Use resolved runtime paths where the host provides them; avoid hard-coded SD mount assumptions.
+3. Keep QWASAR state namespaced and separate from firmware-owned configuration.
+4. Use atomic writes, migrations and backups for persistent state.
+5. Give every service one clear owner and stop it cleanly on exit/failure.
+6. Do not spawn a duplicate instance of a host service that is already active.
+7. Keep privileged listeners local by default; remote pairing requires a separate authenticated design.
+8. Require backup, rollback and uninstall paths for deeper integration.
 
 ## Integration levels
 
 | Level | Goal | Status |
 |---|---|---|
-| 0 — App | QWASAR runs as a normal muOS application | Current baseline |
-| 1 — Services | QWASAR-managed services have health checks and clean lifecycle | In progress |
-| 2 — Capabilities | One typed API for device, network, storage and media features | Planned |
-| 3 — Experience | Optional QWASAR navigation, profiles, themes and dashboards | Planned |
-| 4 — Ecosystem | KNULLI, ROCKNIX and custom platform adapters | Planned; no blanket support claim |
-| 5 — Deep integration | User-selected integration through documented reversible hooks | Research only |
+| 0 — Application | Launch as a normal muOS application | Current baseline |
+| 1 — Services | QWASAR-owned services with lifecycle and health checks | In progress |
+| 2 — Capabilities | Typed APIs for device, network, storage and media | Planned / partial |
+| 3 — Experience | NEXUS, profiles, themes and global panels | Partial / in progress |
+| 4 — Ecosystem | KNULLI, ROCKNIX and other adapters | Planned; no blanket support claim |
+| 5 — Deeper integration | Optional, reversible hooks | Research only |
 
-## What deeper integration does not mean
+## What it does not mean
 
 - No bootloader replacement.
 - No destructive init-script changes.
-- No patching protected muOS frontend binaries as a shortcut.
-- No disabling firmware recovery or safe-mode mechanisms.
-- No overwriting firmware-owned data without explicit user approval.
-- No hidden dependency that prevents muOS from launching when QWASAR fails.
+- No protected firmware binary patching as a shortcut.
+- No disabling native firmware recovery or safe mode.
+- No mandatory cloud dependency for normal handheld launch.
+- No host mutation without explicit user-facing status and rollback.
 
-The native muOS frontend must remain available. Users must be able to disable or uninstall QWASAR and return to a normal host experience.
+> [!CAUTION]
+> The device must remain bootable and recoverable when Void Desk is disabled, uninstalled or fails to start.
 
 ## Recovery contract
 
-Before a deeper integration is enabled, QWASAR must be able to back up the affected state, stage the change, health-check it, roll back a failed activation, and remove only QWASAR-owned files/services. Every supported device/firmware combination needs install, update, rollback and uninstall evidence.
+Before deeper integration is enabled, the system must back up affected state, stage the change, health-check it, roll back a failed activation and remove only QWASAR-owned files/services. Each claimed device/firmware combination needs install, update, rollback and uninstall evidence.
 
-## Roadmap
-
-- Stabilise the current Pygame application and service lifecycle.
-- Complete the capability inventory and service adapters.
-- Share tool and capability metadata across Pygame, LÖVE and Studio.
-- Add optional, profile-driven navigation and visual customisation.
-- Pair Studio securely with a device for opt-in profile sync.
-- Add platform adapters only after firmware-specific research and hardware testing.
+For the detailed v12 target, see [docs/V12_BLUEPRINT.md](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/V12_BLUEPRINT.md).

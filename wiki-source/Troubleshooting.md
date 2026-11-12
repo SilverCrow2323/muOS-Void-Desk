@@ -1,28 +1,60 @@
-# QWASAR Desk — Troubleshooting
+# 🧰 Troubleshooting
+
+Start with the exact symptom and preserve logs before repeating an operation. A generic error message is rarely enough to identify a root cause.
+
+> [!IMPORTANT]
+> Include the exact handheld model, full muOS build, Void Desk version/commit and selected frontend in every report. Redact SSIDs, passwords, API keys, pairing tokens, IP addresses, hostnames and personal filenames.
 
 ## Black screen or immediate exit
 
-1. Confirm the .muxapp was installed through Applications → Archive Manager from SD1 ARCHIVE/.
-2. Confirm the package contains one Void-Desk/ directory at its root.
-3. Check data/voiddesk.log.
-4. Try the recommended Pygame frontend and inspect bootstrap logs if runtime installation fails.
+1. Confirm the `.muxapp` was installed through **Applications → Archive Manager** from `SD1/ARCHIVE/`.
+2. Confirm that the archive has one top-level `Void-Desk/` directory.
+3. Start with the recommended Pygame frontend.
+4. Preserve `data/voiddesk.log` and bootstrap/runtime logs before retrying.
+5. Check free storage and permissions; do not repeatedly reinstall over an unknown partial state.
 
-## Bluetooth activity stutters the UI
+## Controller buttons behave differently
 
-The Pygame status bar reads a cached snapshot while a background poller checks Bluetooth and other host status. If the problem persists, record the device model, MustardOS build, selected engine and whether Bluetooth is enabled.
+- Record the exact firmware release and device model.
+- Capture SDL controller name and GUID.
+- Compare the selected input profile with the actual raw button events.
+- Test confirm/back/start, shoulders, triggers, stick clicks, volume and reconnect separately.
+- Use the on-screen footer and calibration tool rather than assuming the same physical key across firmware releases.
+
+See [Controls and navigation](Controls-and-navigation).
+
+## UPLINK reports a service offline
+
+Distinguish the local listener from the remote client and remote peer. A local file bridge being active does not prove that PC Uplink is connected. Preserve the service log and report the exact status label and timestamp.
+
+## Tailscale or Syncthing crashes / does not connect
+
+Record whether the daemon/service is already enabled by muOS, whether it is installed, the last status response and the relevant service logs. Avoid starting a second daemon as a workaround. Do not share API keys or authentication tokens in an issue.
+
+## RT:Shell exits or shows a font error
+
+A basic PTY shell does not require XFCE. Capture the complete traceback, selected shell path and font-loading error. A missing optional font should fall back to a bundled/system monospace font instead of terminating the whole panel.
 
 ## Device does not power off
 
-When launched by muOS, the Pygame frontend hands the shutdown request to mux_launch.sh. The launcher stops the companion service, synchronizes writes and tries forced power-off fallbacks. This path cannot be fully verified by CI.
+The shutdown hand-off and kernel power-off fallbacks require physical-device validation. Record the device model, firmware build, whether the display/LED changed, last lines of the launcher log and whether media/audio continued. Avoid repeated hard resets while storage writes may still be active.
 
-If the device remains on, record the model, exact firmware version, screen/LED state, last lines of data/voiddesk.log, and whether the device is warm or still playing audio. Do not repeatedly force-reset during filesystem writes.
+## Browser reports `Input/output error`
 
-## Browser reports Input/output error
+That message alone is not diagnostic. Include the exact browser, whether it was launched inside XFCE or from the muOS host, full error text and relevant session logs.
 
-This message alone is insufficient to diagnose the problem. Report the exact browser, whether it was launched from XFCE or the muOS host, and the full error text. Useful logs include data/xfce_session.log, data/session_xfce.log and data/voiddesk.log.
+<details>
+<summary>📄 Useful log and evidence checklist</summary>
 
-NetSurf, Falkon and Dillo are optional desktop-image browsers. qtWebBrowser is a separate third-party muOS application.
+- `data/voiddesk.log` — launcher and application lifecycle.
+- `data/logs/` — additional service/application logs when present.
+- `data/xfce_session.log` and `data/session_xfce.log` — optional desktop session.
+- `data/visual-captures/` — screenshots and metadata; inspect before sharing.
 
-## LÖVE screen has missing options
+Include only the relevant excerpt. Remove network identifiers, credentials, tokens, hostnames and personal paths.
 
-LÖVE is an experimental, incomplete prototype. If an action is labelled coming soon or does not do anything, report the scene name and selected item. Use Pygame for normal operation.
+</details>
+
+## Still stuck?
+
+Open a [GitHub issue](https://github.com/SilverCrow2323/Void-Desk-Project/issues) with reproduction steps, expected/actual result, firmware/device details and redacted logs.

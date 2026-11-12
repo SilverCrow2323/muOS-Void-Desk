@@ -1,71 +1,44 @@
-# Void Desk Frontends — Pygame and LÖVE
+# 🖥️ Frontends — Pygame and LÖVE
 
-The handheld application is **Void Desk**, part of the wider **QWASAR-Env** ecosystem. See [the product and device map](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/PRODUCT_ECOSYSTEM_MAP.md) for the cross-device architecture and LÖVE completion gates.
+Void Desk currently contains two frontend implementations. They do not yet provide feature parity.
 
-Void Desk is planned as a modular environment: profiles arrange registered contributions, modules provide tools/widgets/panels, and APT packages belong to the optional XFCE image. See [the module and package contract](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/MODULE_SYSTEM.md). QWASAR Studio will provide Module Forge, Layout Designer, Release Composer and Community Library in one web app.
+## Pygame — reference frontend
 
-## Pygame (recommended)
+Pygame is the primary handheld implementation and the recommended frontend for normal muOS use.
 
-Pygame is the main and more complete Void Desk frontend.
+- Entry point: `desk/main.py`
+- Hub screens: `desk/hubs/`
+- Shared constants and routing: `desk/`
+- Device launcher: `mux_launch.sh`
+- Runtime bootstrap: `bin/bootstrap_lite.py`
 
-- Entry point: desk/main.py
-- Shared constants and menu metadata: desk/const.py
-- Feature panels: desk/hubs/
-- Runtime bootstrap: bin/bootstrap_lite.py
-- Device launcher: mux_launch.sh
+The Pygame implementation is the reference for current user-visible behaviour. Individual actions still need feature-level tests and physical-device validation.
 
-The Pygame UI is the reference implementation for user-visible features and expected behaviour.
+## LÖVE — experimental frontend
 
-### Pygame visual verification
+The LÖVE frontend is an active development target, not a feature-equivalent production alternative.
 
-- F12 saves the current composed frame to `data/visual-captures/`.
-- `python3 tools/capture_pygame_screenshots.py --all-states` renders all five supported home styles (BLAME, HUD, Terminal, Orbit and NEXUS) and smoke-renders every branch declared in `App.render_state()`.
-- CI publishes the generated screenshots and manifest as the `voiddesk-pygame-visual-captures` artifact.
+- Entry point: `love/main.lua`
+- Scenes: `love/scenes/`
+- Shared renderer and widgets: `love/core/`
+- Themes: `love/theme/`
+- Local service bridge: `love/core/bridge.lua` and `service/voiddesk_service.py`
 
-The CI currently renders 103/103 screens (five home styles plus 98 non-home state branches). Direct state rendering does not prove navigation reachability, working actions, controller behaviour or handheld hardware certification.
+A scene rendering in CI does not prove that its routes, services, controller focus or actions work. Missing features must be presented as unavailable rather than simulated as success.
 
-## LÖVE (experimental)
+> [!WARNING]
+> Do not choose LÖVE as the default handheld frontend until the matching ARM64 runtime is packaged, the complete target scope is implemented, and the same user journeys have been tested on the actual H700 device.
 
-The LÖVE frontend under love/ is an incomplete prototype. It is included for active development and testing, not as a feature-equivalent production option.
+## Shared direction
 
-- Entry point: love/main.lua
-- Scenes: love/scenes/
-- Shared renderer/widgets: love/core/
-- Theme palettes: love/theme/
-- Python service bridge: love/core/bridge.lua and service/voiddesk_service.py
+The v12 architecture aims to share the UI composition contract, semantic actions, focus/navigation model, theme tokens and capability APIs. Each frontend remains a renderer/adapter; privileged host operations belong to the service layer.
 
-Some screens exist, but several actions are placeholders or do not yet have a working backend path. The toolbox, workshop, media and repair flows still have incomplete actions. The UI must report unavailable functionality honestly instead of pretending an operation succeeded.
+The long-term engine choice should be made after performance, accessibility and feature coverage have been measured. Avoid permanent divergence between two independent versions of the product.
 
-## Known current limitations
+## Visual verification
 
-### Remaining LÖVE service gaps
+- Pygame smoke captures: `python3 tools/capture_pygame_screenshots.py --all-states`
+- LÖVE scene captures: `python3 tools/capture_love_screenshots.py`
+- Asset and screenshot inventory: `python3 tools/visual_capture.py --check`
 
-These bridge endpoints are not implemented yet:
-
-- IPTV playlist and EPG loading: `iptv_load_playlist`, `iptv_load_epg`
-
-MUOS app discovery and launch now use the fixed SD1/SD2 application roots, a live selectable list, and the shared `.muos_app` hand-off marker. The shell launcher validates the selected app path again before executing its `mux_launch.sh` and relaunches Void Desk when the child application exits.
-
-The GitHub release lookup is served by `gh_fetch_releases` with a bounded request and an explicit empty-catalogue state. THE FORGE no longer calls the legacy `comp_install`, `comp_autostart`, or `clihub_list` commands: package work is routed through the native APT manager, the shell route opens the supported LÖVE PTY, and XFCE launch uses the muOS session hand-off.
-
-A screen can render in CI while its service action remains unavailable. Keep these gaps separate from visual test coverage and report them honestly in the UI.
-
-
-- LÖVE Toolbox links Calculator and Clock to existing scenes, reads Calendar events from the shared `data/calendar.json` store, and displays live note/text counts from the service. Notes, RSS and Weather remain incomplete.
-- THE FORGE uses a process-backed job queue for package installation; arbitrary shell commands are rejected by the service allowlist.
-- Shell uses a real nonblocking PTY through the local service (`shell_start`, `shell_poll`, `shell_send`, `shell_kill`).
-- External Tools reads the shared `external/tools.json` registry, reports whether each launcher is actually present, and starts only registered launchers. Missing optional submodules are shown as not installed rather than being treated as successful launches.
-- Pygame Syncthing discovery now checks the Andromeda storage configuration, defaults to the documented local API port 7070, and never spawns a second daemon on muOS. The service must be enabled in Configuration → Connectivity → Web Services → Syncthing. The panel still needs full device/folder management and hardware validation.
-- Rt:Tailscale-M is pinned as a source submodule and its upstream static/UI tests plus 21 QEMU service checks run in CI. Its service is not yet embedded as a native QWASAR Desk feature; the final .muxapp builder must vendor the pinned service files rather than rely on a gitlink.
-- Workshop diagnostics, live monitor, logs and cleanup are incomplete.
-- Media Library and Radio flows need parity work.
-- Desktop repair is a placeholder.
-- The legacy Pygame component installer/autostart pages do not yet have native LÖVE equivalents; they are not exposed as live LÖVE actions.
-- Tool-specific UI and confirmation/error states still need validation on handheld hardware.
-
-The Settings screen can change the configured engine. The choice is applied after restarting the application. Use Pygame for normal use; switch to LÖVE only when deliberately testing the prototype.
-
-
-## Visual styles and palettes
-
-QWASAR separates visual composition from colour palettes. The direction set includes Megastructure, Manga Ink, Industrial, Terminal, Neon Noir and Minimal. Pygame remains the reference UI; LÖVE palette work is in progress and does not yet imply full style or feature parity. Read [Visual Identity](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/VISUAL_IDENTITY.md).
+See [Visual capture and assets](Visual-capture-and-assets). Renderer coverage is not an end-to-end hardware test.

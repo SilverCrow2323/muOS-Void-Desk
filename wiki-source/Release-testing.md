@@ -1,30 +1,61 @@
-# QWASAR Desk — Release testing and bug reports
+# 🧪 Release testing and bug reports
 
-## Test the package
+A package is ready only when the published description matches the actual build and the claimed device/firmware combinations have been tested on hardware.
 
-The development line is v10.5.4-NEXUS. A release must not be described as stable solely because CI is green.
+> [!IMPORTANT]
+> CI, headless rendering, QEMU and a successful archive build are useful evidence, but none of them alone proves that controller, display, audio, storage, Wi-Fi or shutdown works on a physical handheld.
 
-Before publishing a test package:
-- build the .muxapp with only one top-level Void-Desk/ folder;
-- run `python3 tools/validate_muxapp.py path/to/VoidDesk.muxapp` and fix every reported error;
-- install it through Archive Manager on MustardOS 2606.0 Andromeda;
-- confirm startup, controller navigation and shutdown;
-- verify the Bluetooth panel and NEXUS animation together;
-- test optional XFCE hand-off only if there is enough storage and network;
-- test Pygame on target hardware; LÖVE remains experimental.
+## Release status snapshot
 
-## Bug report template
+| Item | Status on 12 November 2026 |
+|---|---|
+| Latest published handheld package | v10.2.0, published 11 August 2026 |
+| v10.5.4-NEXUS | Development / draft review; PR #66 is not merged |
+| v12 | Blueprint only; not an installable release |
+| Main packaging target | muOS 2606.0 Andromeda on compatible H700 hardware |
+| LÖVE | Experimental; no feature-parity claim |
 
-Include QWASAR Desk version or commit, exact device model, MustardOS/muOS build, frontend (py or love), screen and selected action, reproduction steps, expected and actual behaviour, and relevant log lines or screenshot. Redact credentials, Wi-Fi names, private IPs, hostnames, tokens and personal filenames.
+Always confirm the [current Releases page](https://github.com/SilverCrow2323/Void-Desk-Project/releases) before downloading a package.
 
-## Open issue examples
+## Package test checklist
 
-- [Browser launch error](https://github.com/SilverCrow2323/Void-Desk-Project/issues/1)
-- [Bluetooth stutters / power-off](https://github.com/SilverCrow2323/Void-Desk-Project/issues/2)
+- [ ] Build the `.muxapp` from the intended commit.
+- [ ] Confirm one `Void-Desk/` root and required runtime files.
+- [ ] Run the repository package validator.
+- [ ] Install through muOS Archive Manager on the target device.
+- [ ] Confirm startup, main navigation and controller mapping.
+- [ ] Test media/audio, storage access and networking where in scope.
+- [ ] Test service start/stop and safe error paths.
+- [ ] Test return to muOS, shutdown and restart flows.
+- [ ] Test update/rollback/uninstall for the release scope.
+- [ ] Verify the documentation and changelog match the shipped package.
 
-Do not close hardware issues until the reporter has verified the behaviour on the affected handheld.
+## Hardware test record
 
+Record the exact handheld model, board identity if known, full firmware release/build, frontend, controller GUID, package version/commit, test date, scenarios and result. A broad statement such as “H700 compatible” is not enough if only one H700 model has been tested.
 
-## Brand and package transition
+## Bug report contents
 
-The public product identity is QWASAR Desk. The current release and installable package still use the legacy Void Desk identifiers. Do not infer a new package/release name until the migration is published and tested.
+Include:
+
+- version or commit;
+- device and firmware;
+- frontend (`py` or `love`);
+- screen and selected action;
+- reproduction steps;
+- expected and actual behaviour;
+- relevant redacted log lines or screenshot.
+
+Open a [GitHub issue](https://github.com/SilverCrow2323/Void-Desk-Project/issues). Do not close hardware-specific issues until the affected device has been retested.
+
+<details>
+<summary>🔬 Visual test evidence — what it proves</summary>
+
+- A PNG proves that a renderer produced a frame at a given size.
+- A scene smoke test proves the scene loaded in the test environment.
+- A service unit test proves the tested code path under its simulated conditions.
+- A physical-device test provides evidence only for the named hardware, firmware, package and test cases.
+
+Do not combine these into a blanket compatibility claim.
+
+</details>
