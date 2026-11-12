@@ -2,17 +2,19 @@
 
 The visual language is **Megastructure**: industrial science fiction, monumental geometry, steel/graphite surfaces, technical labels and restrained signal colours. Documentation uses the same visual grammar, but it must remain easy to read on a phone or a narrow GitHub panel.
 
-## 📷 Existing interface PNGs
+## 🧩 Navigation icon library
 
-These repository PNGs are earlier interface references. They are not v12 mock-ups and do not certify that every linked action works.
+The following PNG files in `https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/` are **menu and hub icons**, not screenshots of application screens. They are the visual identity assets used to represent Void Desk destinations.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/nexus-menu.png" alt="Earlier NEXUS screen" width="48%" />
-  <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/uplink-hub.png" alt="Earlier Uplink screen" width="48%" />
-  <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/media_vault.png" alt="Earlier Media Vault screen" width="48%" />
-  <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/workshop.png" alt="Earlier Workshop screen" width="48%" />
-</p>
+| WORKSHOP | SETTINGS | THE FORGE | START SESSION | RT:TOOLBOX |
+|---|---|---|---|---|
+| <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/workshop.png" width="76" alt="Workshop icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/settings.png" width="76" alt="Settings icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/the_forge.png" width="76" alt="The Forge icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/start.png" width="76" alt="Start Session icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/rt_toolbox.png" width="76" alt="RT Toolbox icon" /> |
 
+| NETSPHERE / UPLINK | muOS APPS | MEDIA VAULT | INFO | END |
+|---|---|---|---|---|
+| <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/net_sphere.png" width="76" alt="Netsphere icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/muos.png" width="76" alt="muOS Apps icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/media_vault.png" width="76" alt="Media Vault icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/info.png" width="76" alt="Info icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/end.png" width="76" alt="End icon" /> |
+
+These are existing project assets. The NEXUS v12 diagram above is a **proposed navigation map**, not a screenshot.
 ## Architecture and concept diagrams
 
 ![QWASAR system map](assets/qwasar-system-map.svg)
