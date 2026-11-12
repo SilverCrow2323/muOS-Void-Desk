@@ -4030,6 +4030,7 @@ class App(object):
 
     def render_info_rows(self, accent, panel=True, txt_col=None,
                          severity_icons=False):
+        """Render manual/info copy at a handheld-readable size."""
         rows = self.info_lines or []
         first = max(0, min(self.scroll, max(0, len(rows) - 1)))
         y = 50
@@ -4038,63 +4039,64 @@ class App(object):
             self.content_panel(46, bottom + 4)
         vcol = txt_col or FG
         warn_y = (224, 176, 40)
-        row_margin = 20  # spazio minimo garantito prima di iniziare
-                         # una riga nuova, non solo dopo averla disegnata
+        row_margin = 24
         for r in rows[first:]:
             if y >= bottom - row_margin:
                 break
             if not isinstance(r, tuple):
-                self.text(str(r), (30, y), self.f_med, vcol, maxw=W - 60)
-                y += 24
+                self.text(str(r), (24, y), self.f_med, vcol, maxw=W - 48)
+                y += 28
                 continue
             if r[0] == "sec":
-                icons.draw(self.surface, r[1], 14, y + 1, 15, accent)
+                icons.draw(self.surface, r[1], 14, y + 2, 18, accent)
                 lab = self.tx(STAT_EN, r[2])
-                self.text(lab, (36, y), self.f_small, accent)
-                tw = self.f_small.size(lab)[0]
-                pygame.draw.line(self.surface, LINE, (44 + tw, y + 8),
-                                 (W - 14, y + 8), 1)
-                y += 22
+                self.text(lab, (40, y), self.f_med_b, accent)
+                tw = self.f_med_b.size(lab)[0]
+                pygame.draw.line(self.surface, LINE, (48 + tw, y + 10),
+                                 (W - 14, y + 10), 1)
+                y += 28
             else:
                 key_s = self.tx(STAT_EN, r[1])
                 val_s = self.tx(VAL_EN, r[2])
                 col = r[3]
-                kx = 30
+                kx = 24
                 if severity_icons:
                     if col in (OK_G, FG):
                         pygame.draw.lines(self.surface, OK_G, False,
-                            [(16, y + 6), (20, y + 11), (28, y + 1)], 2)
+                            [(14, y + 8), (19, y + 13), (29, y + 1)], 2)
                     elif col == NO_R:
                         pygame.draw.line(self.surface, NO_R,
-                                         (16, y - 1), (26, y + 9), 2)
+                                         (15, y), (27, y + 12), 2)
                         pygame.draw.line(self.surface, NO_R,
-                                         (26, y - 1), (16, y + 9), 2)
+                                         (27, y), (15, y + 12), 2)
                     elif col == warn_y:
                         pygame.draw.polygon(self.surface, warn_y,
-                            [(21, y - 2), (28, y + 9), (14, y + 9)], 1)
+                            [(21, y - 1), (29, y + 12), (13, y + 12)], 1)
                         pygame.draw.line(self.surface, warn_y,
-                                         (21, y + 1), (21, y + 5), 1)
+                                         (21, y + 2), (21, y + 7), 1)
                     kx = 34
                 if key_s:
-                    self.text(key_s, (kx, y), self.f_tiny, FAINT)
-                avail_w = (W - 240) if key_s else (W - 60 - (kx - 30))
+                    self.text(key_s, (kx, y + 1), self.f_small_b, FAINT,
+                              maxw=170)
+                avail_w = (W - 220) if key_s else (W - 48 - (kx - 24))
                 x0 = 220 if key_s else kx
-                if self.f_small.size(val_s)[0] <= avail_w:
-                    self.text(val_s, (x0, y - 2), self.f_small, col,
+                if self.f_med.size(val_s)[0] <= avail_w:
+                    self.text(val_s, (x0, y - 1), self.f_med, col,
                               maxw=avail_w)
-                    y += 20
+                    y += 26
                 else:
-                    wrapped = self.note_wrap(val_s, W - 60,
-                                             self.f_small, 6)
+                    wrapped = self.note_wrap(val_s, W - 48,
+                                             self.f_med, 5)
                     if key_s:
-                        y += 18
+                        y += 20
                     for wln in wrapped:
                         if y >= bottom:
                             break
-                        self.text(wln, (kx, y), self.f_small, col,
-                                  maxw=W - 60)
-                        y += 19
-                    y += 5
+                        self.text(wln, (kx, y), self.f_med, col,
+                                  maxw=W - 48)
+                        y += 24
+                    y += 6
+
 
     def play_python_intro(self):
         """Sagoma di serpente stilizzata originale che si arrotola --
