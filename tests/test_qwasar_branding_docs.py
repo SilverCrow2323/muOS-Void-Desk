@@ -164,3 +164,14 @@ def test_voiddesk_symbol_is_shared_by_site_and_pygame():
     ):
         html = (ROOT / "site" / page).read_text(encoding="utf-8")
         assert "voiddesk_symbol.svg" in html
+
+def test_wiki_page_template_enforces_one_topic_and_label_rules():
+    template = (ROOT / "docs" / "WIKI_PAGE_TEMPLATE.md").read_text(
+        encoding="utf-8"
+    )
+    assert "# [Short topic title]" in template
+    assert "one concept or fact per bullet" in template.lower()
+    assert "**MUST KNOW!!**" in template
+    assert "**Optional**" in template
+    assert "remove this block when it does not apply" in template
+    assert "One page covers one topic." in template
