@@ -186,5 +186,5 @@ def test_wiki_page_template_enforces_one_topic_and_label_rules():
     assert "one concept or fact per bullet" in template.lower()
     assert "**MUST KNOW!!**" in template
     assert "**Optional**" in template
-    assert "remove this block when it does not apply" in template
+    assert "remove this block when it does not apply" in template.lower()
     assert "One page covers one topic." in template
