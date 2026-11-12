@@ -105,6 +105,10 @@ def _copy_tailscale_service(repo_root: Path, package_root: Path):
     target.mkdir(parents=True, exist_ok=True)
     for name in ("rt", "ts", "watchdog", "VERSION"):
         shutil.copy2(source / name, target / name)
+    # Rt:Tailscale-M calls these shell entrypoints directly (including
+    # watchdog -> rt); the upstream gitlink currently stores them as 0644.
+    for name in ("rt", "ts", "watchdog"):
+        (target / name).chmod(0o755)
     _copy_tree(source / "panel", target / "panel")
     shutil.copy2(upstream / "LICENSE", target / "LICENSE")
     shutil.copy2(upstream / "THIRD-PARTY.md", target / "THIRD-PARTY.md")
