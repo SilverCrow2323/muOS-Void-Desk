@@ -1,5 +1,7 @@
 import importlib.util
+import io
 import stat
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -33,6 +35,40 @@ def make_archive(path: Path, members: dict[str, bytes]):
             archive.writestr(info, payload)
 
 
+def tar_gz_bytes(members: dict[str, bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        for name, payload in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(payload)
+            info.mode = 0o644
+            archive.addfile(info, io.BytesIO(payload))
+    return buffer.getvalue()
+
+
+def runtime_archives():
+    return {
+        "Void-Desk/assets/runtime_archives/pygame.tar.gz": tar_gz_bytes({
+            "pygame/__init__.py": b"from . import base\\n",
+            "pygame/base.cpython-311-aarch64-linux-gnu.so": b"ELF fixture",
+        }),
+        "Void-Desk/assets/runtime_archives/pygame.libs.tar.gz": tar_gz_bytes({
+            "pygame.libs/libSDL2-test.so.0": b"ELF SDL fixture",
+        }),
+        "Void-Desk/assets/runtime_archives/pygame-2.6.1.data.tar.gz": tar_gz_bytes({
+            "pygame-2.6.1.data/headers/include/pgcompat.h": b"/* fixture */\\n",
+        }),
+        "Void-Desk/assets/runtime_archives/pygame-2.6.1.dist-info.tar.gz": tar_gz_bytes({
+            "pygame-2.6.1.dist-info/WHEEL": (
+                b"Wheel-Version: 1.0\\nRoot-Is-Purelib: false\\n"
+                b"Tag: cp311-cp311-manylinux_2_17_aarch64\\n"
+                b"Tag: cp311-cp311-manylinux2014_aarch64\\n"
+            ),
+            "pygame-2.6.1.dist-info/METADATA": b"Name: pygame\\nVersion: 2.6.1\\n",
+        }),
+    }
+
+
 def valid_members():
     return {
         "Void-Desk/mux_launch.sh": b"#!/bin/sh\n",
@@ -46,6 +82,7 @@ def valid_members():
         "Void-Desk/lib/libluajit-5.1.so.2": b"fake-luajit-library",
         "Void-Desk/lib/glyph_install.sh": b"# glyph fixture\n",
         "Void-Desk/resources/voiddesk.png": b"png-fixture",
+        **runtime_archives(),
         "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt": b"#!/bin/sh\n",
         "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts": b"#!/bin/sh\n",
         "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog": b"#!/bin/sh\n",
@@ -80,6 +117,33 @@ def test_muxapp_rejects_non_executable_muos_launcher(tmp_path):
     assert any("bin/xfce_launch.sh" in error and "not executable" in error
                for error in errors)
     assert any("lib/love" in error and "not executable" in error
+               for error in errors)
+
+
+def test_muxapp_rejects_invalid_offline_pygame_wheel_tag(tmp_path):
+    archive = tmp_path / "wrong-abi.muxapp"
+    members = valid_members()
+    members["Void-Desk/assets/runtime_archives/pygame-2.6.1.dist-info.tar.gz"] = (
+        tar_gz_bytes({
+            "pygame-2.6.1.dist-info/WHEEL": (
+                b"Tag: cp310-cp310-manylinux2014_aarch64\\n"
+            )
+        })
+    )
+    make_archive(archive, members)
+    errors = load_validator().validate_archive(archive)
+    assert any("not CPython 3.11/aarch64" in error for error in errors)
+
+
+def test_muxapp_rejects_missing_offline_pygame_binary(tmp_path):
+    archive = tmp_path / "missing-pygame-base.muxapp"
+    members = valid_members()
+    members["Void-Desk/assets/runtime_archives/pygame.tar.gz"] = tar_gz_bytes({
+        "pygame/__init__.py": b"# incomplete wheel\\n",
+    })
+    make_archive(archive, members)
+    errors = load_validator().validate_archive(archive)
+    assert any("pygame/base.cpython-311-aarch64-linux-gnu.so" in error
                for error in errors)
 
 
