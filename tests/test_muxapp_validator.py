@@ -5,6 +5,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+EXECUTABLE_MEMBERS = {
+    "Void-Desk/mux_launch.sh",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog",
+}
 
 
 def load_validator():
@@ -20,7 +26,7 @@ def make_archive(path: Path, members: dict[str, bytes]):
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name, payload in members.items():
             info = zipfile.ZipInfo(name)
-            mode = 0o755 if name == "Void-Desk/mux_launch.sh" else 0o644
+            mode = 0o755 if name in EXECUTABLE_MEMBERS else 0o644
             info.external_attr = (stat.S_IFREG | mode) << 16
             archive.writestr(info, payload)
 
@@ -30,6 +36,9 @@ def valid_members():
         "Void-Desk/mux_launch.sh": b"#!/bin/sh\n",
         "Void-Desk/voiddesk.py": b"print('VoidDesk')\n",
         "Void-Desk/love/main.lua": b"function love.load() end\n",
+        "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt": b"#!/bin/sh\n",
+        "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts": b"#!/bin/sh\n",
+        "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog": b"#!/bin/sh\n",
         "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf": (
             b"PANEL=0\nPANEL_BIND=127.0.0.1\nWATCHDOG=1\n"
             b"TAILDROP=1\nTS_MODE=auto\nWIFI_WAIT=120\n"
@@ -56,6 +65,8 @@ def test_muxapp_rejects_non_executable_muos_launcher(tmp_path):
             package.writestr(info, payload)
     errors = load_validator().validate_archive(archive)
     assert any("muOS launcher is not executable" in error for error in errors)
+    assert sum("Rt:Tailscale-M entrypoint is not executable" in error
+               for error in errors) == 3
 
 
 def test_muxapp_rejects_extra_top_level_directory(tmp_path):
