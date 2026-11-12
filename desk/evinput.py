@@ -50,8 +50,18 @@ def resolve_profile(selection="auto"):
         return detect_muos_release()
     return "andromeda" if selection == "andromeda" else "not_andromeda"
 
-def set_profile(selection="auto"):
+def set_profile(selection=None):
     global KEYMAP
+    if selection is None:
+        selection = os.environ.get("VOID_MUOS_PROFILE")
+    if not selection:
+        try:
+            import json
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            with open(os.path.join(root, "data", "desk_config.json"), encoding="utf-8") as stream:
+                selection = json.load(stream).get("muos_profile", "auto")
+        except (OSError, ValueError, TypeError):
+            selection = "auto"
     KEYMAP = dict(KEYMAP_ANDROMEDA if resolve_profile(selection) == "andromeda"
                   else KEYMAP_NON_ANDROMEDA)
     return resolve_profile(selection)
@@ -59,7 +69,7 @@ def set_profile(selection="auto"):
 
 
 _state = {"fds": [], "hx": 0, "hy": 0, "active": False, "raw": []}
-set_profile(os.environ.get("VOID_MUOS_PROFILE", "auto"))
+set_profile()
 
 
 def start():
