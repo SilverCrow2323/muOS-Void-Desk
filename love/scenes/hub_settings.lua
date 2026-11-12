@@ -23,6 +23,8 @@ return dashboard.new({
         local theme_n = get("theme", "cyberpunk")
         local lang = get("lang", "en")
         local show_ba = get("show_bootanim", true) and "ON" or "OFF"
+        local muos_choice = get("muos_profile", "auto")
+        local muos_label = muos_choice == "auto" and "AUTO" or (muos_choice == "andromeda" and "ANDROMEDA (=)" or "NON-ANDROMEDA (!=)")
         local profile_status = qwasar_profile.status()
         local profile_label = profile_status.loaded
             and (profile_status.name or profile_status.id)
@@ -42,6 +44,8 @@ return dashboard.new({
                          alpha)
         widgets.info_row(20, 164, W - 40, "QWASAR profile",
                          profile_label, nc, alpha)
+        widgets.info_row(20, 184, W - 40, "muOS input profile",
+                         muos_label, nc, alpha)
     end,
 
     items = {
@@ -66,6 +70,19 @@ return dashboard.new({
               theme.apply(nxt)
               scene.set_status("Theme: " .. nxt)
               return "Theme: " .. nxt
+          end },
+        { badge = "M", label = "muOS input profile",
+          desc = "Auto detect, force Andromeda (=), or every other release (!=, including Jacaranda)",
+          action = function(scene)
+              local choices = {"auto", "andromeda", "not_andromeda"}
+              local cur = get("muos_profile", "auto")
+              local idx = 1
+              for i, value in ipairs(choices) do if value == cur then idx = i end end
+              local nxt = choices[idx % #choices + 1]
+              set("muos_profile", nxt)
+              local label = nxt == "auto" and "AUTO" or (nxt == "andromeda" and "ANDROMEDA (=)" or "NON-ANDROMEDA (!=)")
+              scene.set_status("muOS input profile: " .. label .. " — restart to apply")
+              return "muOS profile: " .. label
           end },
         { badge = "L", label = "Language",
           desc = "English / Italiano",
