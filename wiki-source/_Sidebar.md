@@ -21,5 +21,5 @@
 - [Development](Development)
 - [Documentation style guide](Documentation-Style-Guide)
 - [v10.5.4 development snapshot](Pre-release-10.5.4)
-- [Source repository](https://github.com/SilverCrow2323/Void-Desk-Project)
-- [Technical docs](https://github.com/SilverCrow2323/Void-Desk-Project/tree/main/docs)
+- <a href="https://github.com/SilverCrow2323/Void-Desk-Project">Source repository</a>
+- <a href="https://github.com/SilverCrow2323/Void-Desk-Project/tree/main/docs">Technical docs</a>
