@@ -47,6 +47,8 @@ jobs:
           python -m compileall -q \
             BUILDCHECK.py voiddesk.py bin desk service outdesk \
             voidcast_addons assets tools
+      - name: Build and validate QWASAR Field Portal
+        run: python tools/build_site.py --output "$RUNNER_TEMP/qwasar-site"
       - name: Run unit tests
         run: python -m pytest -q
       - name: Run repository integrity audit
