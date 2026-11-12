@@ -144,12 +144,14 @@ def test_voiddesk_symbol_is_shared_by_site_and_pygame():
     source = symbol.read_text(encoding="utf-8")
     builder = (ROOT / "tools" / "build_site.py").read_text(encoding="utf-8")
     icons = (ROOT / "desk" / "icons.py").read_text(encoding="utf-8")
+    header = (ROOT / "desk" / "header.py").read_text(encoding="utf-8")
 
     assert "<circle" in source
     assert "M263 78 L94 352 H429 Z" in source
     assert "M263 352 V492" in source
     assert 'symbol = BRAND / "voiddesk_symbol.svg"' in builder
     assert 'key in ("voiddesk", "brand")' in icons
+    assert 'icons.draw(surface, "voiddesk", 10, 8, 26, acc)' in header
 
     for page in (
         "index.html",
