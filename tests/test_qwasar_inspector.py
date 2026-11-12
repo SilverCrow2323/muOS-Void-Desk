@@ -195,3 +195,19 @@ def test_inspector_rejects_duplicate_module_contribution_ids(tmp_path: Path):
 
     assert not report.ok
     assert any("duplicate contribution ID wifi-overview.tile" in error for error in report.errors)
+
+def test_inspector_rejects_global_panel_with_unknown_trigger_action(tmp_path: Path):
+    root = _fixture(tmp_path)
+    path = root / "data/qwasar_ui_manifest.json"
+    manifest = _read(path)
+    panel_id = next(iter(manifest["shell"]["globalPanels"]))
+    manifest["shell"]["globalPanels"][panel_id]["triggerAction"] = "action.not-registered"
+    _write(path, manifest)
+
+    report = inspect_repository(root, profile_paths=[], module_paths=[])
+
+    assert not report.ok
+    assert any(
+        f"global panel {panel_id} references unknown action action.not-registered" in error
+        for error in report.errors
+    )
