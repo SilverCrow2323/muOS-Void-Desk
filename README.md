@@ -174,7 +174,9 @@ The installed root remains `Void-Desk/` during this branding transition.
 
 ## Build Void Desk packages
 
-The **Build Void Desk** GitHub Actions workflow is available from the Actions tab. The current builder produces the default package set; Full/Essential/Slim variants will be added after the module registry and lockfile are implemented. The target release model is three reproducible `.muxapp` flavours:
+The **Build Void Desk** GitHub Actions workflow is available from the Actions tab. The current builder produces the default package set; Full/Essential/Slim variants will be added after the module registry and lockfile are implemented.
+
+For a handheld-only build, use **Actions → Build muxapp for muOS → Run workflow**. Enter the package version (default `10.5.4`); the workflow builds and validates the `.muxapp`, checks the launcher executable bit and SHA-256, then publishes the package and checksum as a downloadable 30-day artifact. This dedicated workflow is manual and becomes available in Actions after its workflow file reaches the default branch. The target release model is three reproducible `.muxapp` flavours:
 
 - **Full** — all maintained and compatible first-party modules.
 - **Essential** — core daily-use hubs and tools.
