@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 531 533" role="img" aria-labelledby="title">
+  <title id="title">Void Desk symbol</title>
+  <defs>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#56e1df"/>
+      <stop offset="1" stop-color="#12aeb8"/>
+    </linearGradient>
+    <filter id="grain" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency=".72" numOctaves="2" seed="8" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.15" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g fill="none" stroke="url(#mark)" stroke-width="43" stroke-linecap="round" stroke-linejoin="round" filter="url(#grain)">
+    <circle cx="265.5" cy="265.5" r="241"/>
+    <path d="M263 78 L94 352 H429 Z"/>
+    <path d="M263 352 V492"/>
+  </g>
+</svg>
