@@ -90,7 +90,7 @@ def validate_archive(archive: str | Path) -> list[str]:
                     for setting in required_settings:
                         if setting not in config.splitlines():
                             errors.append("Rt:Tailscale-M config missing setting: %s" % setting)
-                    if "\\\\n" in config:
+                    if "\\n" in config:
                         errors.append("Rt:Tailscale-M config contains literal escaped newlines")
                 except (UnicodeDecodeError, KeyError) as exc:
                     errors.append("cannot read Rt:Tailscale-M config: %s" % exc)
