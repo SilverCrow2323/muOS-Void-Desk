@@ -165,6 +165,10 @@ def build_archive(repo_root: Path, output: Path):
         "lib/libluajit-5.1.so.2",
         "lib/glyph_install.sh",
         "resources/voiddesk.png",
+        "assets/runtime_archives/pygame.tar.gz",
+        "assets/runtime_archives/pygame.libs.tar.gz",
+        "assets/runtime_archives/pygame-2.6.1.data.tar.gz",
+        "assets/runtime_archives/pygame-2.6.1.dist-info.tar.gz",
     )
     missing = [name for name in required_main if not (repo_root / name).is_file()]
     if missing:
