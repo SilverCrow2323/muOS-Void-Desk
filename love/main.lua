@@ -7,12 +7,23 @@ local inputdbg   = require("core.input_debug")
 local notifications = require("core.notifications")
 local crt        = require("core.crt_shader")
 local visual_capture = require("core.visual_capture")
+local qwasar_profile = require("core.qwasar_profile")
+local qwasar_nodes = require("core.nodes")
 local crt_on     = true
 local axis_state = {} -- analog-stick edge tracking (per axis)
 
 function love.load()
     config.load()
     theme.apply(config.get("theme", "cyberpunk"))
+    local composition, profile_err = qwasar_profile.load()
+    if composition then
+        qwasar_nodes.apply_profile(composition)
+        print("[QWASAR] profile loaded: " ..
+            tostring((composition.profile or {}).name or "unnamed"))
+    else
+        print("[QWASAR] profile snapshot unavailable; using built-in NEXUS defaults: " ..
+            tostring(profile_err or "not generated"))
+    end
     bridge.init()
     crt.init()
 

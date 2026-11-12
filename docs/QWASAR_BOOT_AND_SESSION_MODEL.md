@@ -1,7 +1,7 @@
 # QWASAR Boot, Build and Session Model
 
 **Scope:** pre-frontend startup, multiple Void Desk installations, build flavours, rendering engines, standalone sessions, PC integration and optional virtualization.
-**Status:** architecture contract. The selector, multi-instance installer, GRUB adapter, QWASAR Link and VirtualBox provider are planned; do not imply they already run.
+**Status:** architecture contract. Platform-aware profile resolution and launcher preflight are implemented for muOS/H700 and Linux PC. The full instance/flavour/session selector, multi-instance installer, GRUB adapter, QWASAR Link and VirtualBox provider remain planned; do not imply they already run.
 
 ## 1. Two selectors, two different jobs
 
@@ -35,6 +35,12 @@ These are separate axes, not one combined build name:
 | Session target | Desktop / Terminal / PC workstation / VM | Which environment to enter after Void Desk is ready |
 
 The selector remembers the previous valid selection but displays only combinations supported by the installed instance, frontend adapter, platform adapter and device capabilities. If an engine is missing or fails health checks, it offers an explicit compatible fallback; it never reports a fallback as feature-equivalent without a parity declaration.
+
+### Profile selection currently implemented
+
+The launcher runs the shared QWASAR Profile Resolver before the frontend starts. It checks the target platform and optional device model, then writes `data/qwasar_effective_profile.json` atomically. muOS uses the H700 default profile; the PC launcher uses a separate desktop default profile. A user-selected relative profile path is stored as `qwasar_profile` in `data/desk_config.json`.
+
+A rejected/missing/incompatible selected profile falls back to the platform default. If the preflight itself cannot produce a valid snapshot, the launchers log the issue and preserve the frontends' built-in legacy defaults. The Pygame settings screen can select a profile and requires a restart to apply it; LÖVE currently applies top-level workspace order/visibility/enabled state to its NEXUS nodes. This is a first profile pipeline, not the complete launch selector described above. See [QWASAR Profile Resolver](QWASAR_PROFILE_RESOLVER.md).
 
 ## 3. Build flavours and side-by-side installation
 

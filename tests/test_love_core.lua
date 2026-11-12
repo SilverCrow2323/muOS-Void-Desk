@@ -30,6 +30,41 @@ for _, node in ipairs(visible_nodes) do
                .. tostring(texture))
 end
 
+-- The QWASAR adapter may reorder mapped workspaces, hide them or disable
+-- them, but it must preserve the legacy node identity and recovery entry.
+local qwasar_workspaces = {
+    { id = "start-session", order = 0, enabled = true, visible = true },
+    { id = "the-forge", order = 1, enabled = true, visible = true },
+    { id = "uplink", order = 2, enabled = false, visible = true },
+    { id = "media-vault", order = 3, enabled = true, visible = true },
+    { id = "rt-toolbox", order = 4, enabled = true, visible = false },
+    { id = "settings", order = 5, enabled = true, visible = true },
+    { id = "info-community", order = 6, enabled = true, visible = true },
+    { id = "end-node", order = 7, enabled = true, visible = true },
+}
+local applied, apply_err = nodes.apply_profile({
+    profile = { id = "test-profile", name = "Test profile" },
+    workspaces = qwasar_workspaces,
+})
+equal(applied, true, "QWASAR profile should configure NEXUS")
+local profiled_nodes = nodes.visible()
+local expected_ids = { 0, 3, 5, 2, 7, 8, 9, 6, 1 }
+equal(#profiled_nodes, #expected_ids, "hidden workspace should be omitted")
+for i, expected_idx in ipairs(expected_ids) do
+    equal(profiled_nodes[i].idx, expected_idx,
+          "profile workspace order must preserve stable NEXUS node IDs")
+end
+local disabled_uplink = nodes.get(5)
+equal(disabled_uplink.profile_enabled, false,
+      "disabled workspace remains represented as disabled")
+local hidden_toolbox = nodes.get(4)
+equal(hidden_toolbox.profile_visible, false,
+      "hidden workspace is removed from visible NEXUS nodes")
+local protected_end = nodes.get(9)
+equal(protected_end.profile_visible, true,
+      "END NODE remains visible when present in a valid profile")
+
+
 -- Every release-critical subscene must exist on disk.
 assert(file_exists("love/scenes/hub_apt.lua"),
        "missing native APT manager scene")

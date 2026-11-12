@@ -115,7 +115,50 @@ def which_love():
         print("     Please install PC version: sudo apt install love")
     return None
 
+def prepare_qwasar_profile():
+    """Generate the read-only shared composition snapshot before either engine starts."""
+    resolver = APP_DIR / "tools" / "qwasar_profile_resolver.py"
+    if not resolver.is_file():
+        return False
+    output = APP_DIR / "data" / "qwasar_effective_profile.json"
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(resolver),
+                "--root", str(APP_DIR),
+                "--platform", "desktop",
+                "--default-profile", "data/profiles/voiddesk-desktop-default.qprofile.json",
+                "--output", str(output),
+            ],
+            cwd=str(APP_DIR),
+            env=dict(
+                os.environ,
+                VOIDDESK_APP_DIR=str(APP_DIR),
+                VOIDDESK_PLATFORM="desktop",
+            ),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        if result.stdout:
+            print(result.stdout.rstrip())
+        if result.returncode != 0:
+            print(
+                f"{Color.YELLOW}[QWASAR] Profile preflight failed "
+                f"(rc={result.returncode}); the frontend will use its safe legacy defaults."
+                f"{Color.RESET}"
+            )
+            return False
+        return output.is_file()
+    except OSError as exc:
+        print(f"{Color.YELLOW}[QWASAR] Profile preflight unavailable: {exc}{Color.RESET}")
+        return False
+
+
 def launch_love():
+    prepare_qwasar_profile()
     love = which_love()
     if not love:
         print(f"  {Color.RED}❌ LÖVE binary not found!{Color.RESET}")
@@ -127,8 +170,9 @@ def launch_love():
     env = dict(os.environ)
     env["LD_LIBRARY_PATH"] = str(APP_DIR / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
     env["VOIDDESK_APP_DIR"] = str(APP_DIR)
+    env["VOIDDESK_PLATFORM"] = "desktop"
     env.setdefault("VOIDDESK_PC", "1")
-    
+
     love_dir = APP_DIR / "love"
     if not love_dir.is_dir():
         print(f"  {Color.YELLOW}⚠️  LÖVE source directory not found at: {love_dir}{Color.RESET}")
@@ -310,6 +354,7 @@ def run_pygame_runtime():
 # ================================================================ LAUNCHER ==
 def launch_py():
     """Ensure VENV and run pygame runtime inside it."""
+    prepare_qwasar_profile()
     if not VENV_PY.is_file():
         print(f"  {Color.YELLOW}⚙️ Setting up Python Virtual Environment (.venv_desktop)...{Color.RESET}")
         subprocess.run([sys.executable, "-m", "venv", str(APP_DIR / ".venv_desktop")])
@@ -320,6 +365,7 @@ def launch_py():
     print(f"  {Color.GREEN}🚀 Re-executing QWASAR Desk inside Pygame VENV...{Color.RESET}")
     env = dict(os.environ)
     env["VOIDDESK_APP_DIR"] = str(APP_DIR)
+    env["VOIDDESK_PLATFORM"] = "desktop"
     env.setdefault("VOIDDESK_PC", "1")
     subprocess.run([str(VENV_PY), str(SELF), "--_runtime"], env=env)
     return 0
