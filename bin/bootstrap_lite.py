@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Bootstrap the muOS Pygame runtime from bundled ARM64 archives or PyPI."""
+"""Prepara il runtime Pygame per muOS dagli archivi ARM64 inclusi o da PyPI."""
 
 import glob
 import json
@@ -98,7 +98,7 @@ def safe_extract_tar(archive_path, destination):
             relative = PurePosixPath(name)
             if (not name or "\\" in name or relative.is_absolute()
                     or ".." in relative.parts or not relative.parts):
-                raise ValueError("unsafe tar member: %r" % name)
+                raise ValueError("elemento non sicuro nell'archivio: %r" % name)
             target = (root / Path(*relative.parts)).resolve()
             if target != root and root not in target.parents:
                 raise ValueError("tar member escapes runtime: %r" % name)
@@ -106,11 +106,11 @@ def safe_extract_tar(archive_path, destination):
                 target.mkdir(parents=True, exist_ok=True)
                 continue
             if not member.isfile():
-                raise ValueError("unsupported tar member type: %r" % name)
+                raise ValueError("tipo di elemento non supportato nell'archivio: %r" % name)
             target.parent.mkdir(parents=True, exist_ok=True)
             source = archive.extractfile(member)
             if source is None:
-                raise ValueError("cannot read tar member: %r" % name)
+                raise ValueError("impossibile leggere l'elemento dell'archivio: %r" % name)
             with source, target.open("wb") as output:
                 shutil.copyfileobj(source, output)
             mode = 0o755 if member.mode & 0o111 else 0o644
@@ -125,12 +125,12 @@ def extract_bundled_runtime(archives_dir=None, destination=None,
     python_version = tuple(python_version or sys.version_info[:2])
     machine = (machine or platform.machine()).lower()
     if python_version[:2] != (3, 11) or machine not in ("aarch64", "arm64"):
-        return False, "bundled wheel is CPython 3.11/aarch64 only"
+        return False, "il pacchetto incluso richiede CPython 3.11 e architettura aarch64"
 
     paths = [archives_dir / name for name in BUNDLED_ARCHIVES]
     missing = [path.name for path in paths if not path.is_file() or path.stat().st_size == 0]
     if missing:
-        return False, "bundled runtime archives missing: " + ", ".join(missing)
+        return False, "archivi del runtime inclusi mancanti: " + ", ".join(missing)
 
     shutil.rmtree(destination, ignore_errors=True)
     destination.mkdir(parents=True, exist_ok=True)
@@ -145,17 +145,17 @@ def extract_bundled_runtime(archives_dir=None, destination=None,
         )
         for path in required:
             if not path.is_file():
-                raise ValueError("bundled runtime member missing: %s" % path.name)
+                raise ValueError("file del runtime incluso mancante: %s" % path.name)
 
         libs = destination / "pygame.libs"
         if not libs.is_dir() or not any(
                 item.name.startswith("libSDL2-") for item in libs.iterdir()):
-            raise ValueError("bundled SDL2 runtime libraries missing")
+            raise ValueError("librerie SDL2 del runtime incluso mancanti")
 
         wheel_metadata = required[2].read_text(encoding="utf-8")
         if ("cp311-cp311-manylinux2014_aarch64" not in wheel_metadata
                 and "cp311-cp311-manylinux_2_17_aarch64" not in wheel_metadata):
-            raise ValueError("bundled Pygame wheel ABI/platform tag mismatch")
+            raise ValueError("versione ABI/piattaforma del pacchetto Pygame incluso non compatibile")
         return True, ""
     except Exception as exc:
         shutil.rmtree(destination, ignore_errors=True)
@@ -177,7 +177,7 @@ def verify_runtime(runtime_path):
              "import pygame,sys;sys.stdout.write(pygame.version.ver)"],
             env=env, capture_output=True, text=True, timeout=60)
     except Exception as exc:
-        log("FATAL: verify non eseguibile: %s" % exc)
+        log("ERRORE: verifica non eseguibile: %s" % exc)
         return None
 
 
@@ -222,10 +222,10 @@ def finish_runtime(runtime_path, pygame_version, tag, machine):
 
     sdl = find_system_sdl()
     if sdl:
-        log("libSDL2 di sistema: %s" % sdl[0])
+        log("Libreria SDL2 di sistema: %s" % sdl[0])
         SDL_TXT.write_text(sdl[0] + "\n", encoding="utf-8")
     else:
-        log("libSDL2 di sistema: not found (si usa quella del wheel)")
+        log("Libreria SDL2 di sistema: not found (si usa quella del wheel)")
         try:
             SDL_TXT.unlink()
         except OSError:
@@ -240,58 +240,58 @@ def finish_runtime(runtime_path, pygame_version, tag, machine):
 
 
 def main():
-    log("==== VOIDDESK BOOTSTRAP-LITE v1.5 start ====")
+    log("==== AVVIO INSTALLAZIONE RUNTIME PYGAME v1.6 ====")
     tag = "cp%d%d" % sys.version_info[:2]
     machine = platform.machine()
-    log("python: %s (%s) - arch: %s" %
+    log("Python: %s (%s) - architettura: %s" %
         (platform.python_version(), tag, machine))
 
     for junk in (DATA / "rootfs", DATA / "rootfs.tar.gz"):
         if junk.is_dir():
-            log("pulizia residui chroot: %s" % junk)
+            log("rimozione residui chroot: %s" % junk)
             shutil.rmtree(junk, ignore_errors=True)
         elif junk.is_file():
             junk.unlink()
 
     candidate = Path(str(RUNTIME) + ".candidate")
-    log("1/4 controllo runtime Pygame incluso nel pacchetto...")
+    log("1/4 Verifica del runtime Pygame incluso...")
     bundled, reason = extract_bundled_runtime(
         ARCHIVE_DIR, candidate, sys.version_info[:2], machine
     )
     if bundled:
-        log("   runtime ARM64/CPython 3.11 presente: verifico import...")
+        log("   Runtime ARM64/CPython 3.11 trovato: verifico il caricamento...")
         verified = verify_runtime(candidate)
         if verified is not None and verified.returncode == 0:
-            log("   pygame %s OK (offline bundle)" % verified.stdout.strip())
+            log("   Pygame %s caricato correttamente (installazione offline)" % verified.stdout.strip())
             finish_runtime(candidate, verified.stdout.strip(), tag, machine)
-            log("==== VOIDDESK BOOTSTRAP-LITE completed (offline) ====")
+            log("==== INSTALLAZIONE RUNTIME COMPLETATA (OFFLINE) ====")
             return 0
         detail = verified.stderr.strip()[-800:] if verified is not None else "verify failed"
-        log("   bundle non caricabile su questo firmware: " + detail)
+        log("   Il pacchetto incluso non è caricabile su questo firmware: " + detail)
         shutil.rmtree(candidate, ignore_errors=True)
     else:
-        log("   bundle non applicabile: %s" % reason)
+        log("   Pacchetto incluso non compatibile: %s" % reason)
 
-    log("2/4 cerco un wheel Pygame compatibile su PyPI...")
+    log("2/4 Ricerca di un pacchetto Pygame compatibile su PyPI...")
     opener_instance = opener()
     url = filename = version = None
     for package in ("pygame", "pygame-ce"):
         url, filename, version = pick_wheel(opener_instance, package, tag, machine)
         if url:
-            log("   trovato: %s (v%s)" % (filename, version))
+            log("   Trovato: %s (versione %s)" % (filename, version))
             break
     if not url:
-        log("FATAL: nessun wheel pygame per %s/%s" % (tag, machine))
+        log("ERRORE: nessun pacchetto Pygame disponibile per %s/%s" % (tag, machine))
         return 1
 
-    log("3/4 scarico %s..." % filename)
+    log("3/4 Download di %s..." % filename)
     try:
         download(opener_instance, url, WHL)
     except Exception as exc:
-        log("FATAL: download failed: %s" % exc)
+        log("ERRORE: download non riuscito: %s" % exc)
         return 1
 
-    log("4/4 estraggo e verifico runtime in staging...")
+    log("4/4 Estrazione e verifica del runtime...")
     shutil.rmtree(candidate, ignore_errors=True)
     candidate.mkdir(parents=True, exist_ok=True)
     try:
@@ -304,19 +304,19 @@ def main():
             wheel.extractall(candidate)
     except Exception as exc:
         shutil.rmtree(candidate, ignore_errors=True)
-        log("FATAL: estrazione wheel failed: %s" % exc)
+        log("ERRORE: estrazione del pacchetto non riuscita: %s" % exc)
         return 1
 
     verified = verify_runtime(candidate)
     if verified is None or verified.returncode != 0:
         detail = verified.stderr.strip()[-800:] if verified is not None else "verify failed"
         shutil.rmtree(candidate, ignore_errors=True)
-        log("FATAL: import pygame failed: " + detail)
+        log("ERRORE: caricamento di Pygame non riuscito: " + detail)
         return 1
 
-    log("   pygame %s OK" % verified.stdout.strip())
+    log("   Pygame %s caricato correttamente" % verified.stdout.strip())
     finish_runtime(candidate, verified.stdout.strip(), tag, machine)
-    log("==== VOIDDESK BOOTSTRAP-LITE completed (online) ====")
+    log("==== INSTALLAZIONE RUNTIME COMPLETATA (ONLINE) ====")
     return 0
 
 
