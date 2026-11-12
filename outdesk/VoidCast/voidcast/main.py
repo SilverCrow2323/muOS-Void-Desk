@@ -1090,7 +1090,7 @@ class SettingsScreen(Screen):
 
 
 class RemapScreen(Screen):
-    ORDER = ["A", "B", "X", "Y", "L1", "R1", "SELECT", "START"]
+    ORDER = ["A", "B", "X", "Y", "L1", "R1", "L2", "R2", "SELECT", "START", "MENU", "L3", "R3"]
 
     def __init__(self, app):
         super().__init__(app)
