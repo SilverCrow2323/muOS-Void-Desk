@@ -70,13 +70,13 @@ def test_bootstrap_refuses_bundled_runtime_for_wrong_python_or_arch(tmp_path):
         archives, tmp_path / "wrong-python", (3, 10), "aarch64"
     )
     assert not ok
-    assert "CPython 3.11/aarch64 only" in error
+    assert "CPython 3.11 e architettura aarch64" in error
 
     ok, error = bootstrap.extract_bundled_runtime(
         archives, tmp_path / "wrong-arch", (3, 11), "armv7l"
     )
     assert not ok
-    assert "CPython 3.11/aarch64 only" in error
+    assert "CPython 3.11 e architettura aarch64" in error
 
 
 def test_bootstrap_rejects_tar_path_traversal(tmp_path):
@@ -93,7 +93,7 @@ def test_bootstrap_rejects_tar_path_traversal(tmp_path):
     )
 
     assert not ok
-    assert "unsafe tar member" in error
+    assert "elemento non sicuro nell'archivio" in error
     assert not (tmp_path / "outside.txt").exists()
 
 
@@ -109,4 +109,4 @@ def test_bootstrap_rejects_wrong_wheel_abi(tmp_path):
     )
 
     assert not ok
-    assert "ABI/platform tag mismatch" in error
+    assert "versione ABI/piattaforma" in error
