@@ -189,6 +189,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pygame
 from desk import love_bridge  # LÖVE bridge (Andromeda)          # noqa: E402
+from desk.qwasar.nexus_adapter import compose_nexus_profile  # noqa: E402
 import evinput         # noqa: E402
 import fbdisplay       # noqa: E402
 import icons           # noqa: E402
@@ -2192,6 +2193,10 @@ class App(object):
         self.qwasar_profile_options = self._qwasar_profile_options()
         self.qwasar_profile_pending = False
         self._load_qwasar_profile_snapshot()
+        (self.qwasar_nexus_rings,
+         self.qwasar_nexus_node_states) = compose_nexus_profile(
+            self.qwasar_profile_composition
+        )
         self.lang = self.cfg.get("lang", "en")
         self.accent = ACCENTS.get(self.cfg.get("theme", "ambra"),
                                   ACCENTS["ambra"])
@@ -11577,8 +11582,8 @@ class App(object):
             pygame.draw.line(self.surface, gcol, (0, gy2), (W, gy2), 1)
 
     def _nexus_ring_list(self, ring):
-        return (NEXUS_RING_INNER, NEXUS_RING_MID, NEXUS_RING_OUT,
-                NEXUS_RING_FAR)[ring]
+        """Return the effective profile-composed ring while retaining node IDs."""
+        return self.qwasar_nexus_rings[ring]
 
     def _nexus_ring_step(self, ring):
         """Gradi tra un nodo e il successivo su quell'anello -- NON
@@ -11727,8 +11732,10 @@ class App(object):
         self._nexus_dashed_ring(3, NEXUS_RING_RADIUS[3],
                                 self.nexus_ring == 3, sel_wx, sel_wy, zoom)
         positions = {}
-        for ring, ring_list in ((1, NEXUS_RING_MID), (2, NEXUS_RING_OUT),
-                                (3, NEXUS_RING_FAR)):
+        for ring, ring_list in (
+                (1, self._nexus_ring_list(1)),
+                (2, self._nexus_ring_list(2)),
+                (3, self._nexus_ring_list(3))):
             for i, idx in enumerate(ring_list):
                 r_node = NEXUS_RING_RADIUS[ring]
                 angle = self._nexus_world_angle(ring, i, t_now)
@@ -11746,6 +11753,9 @@ class App(object):
             r = max(4, int(base_r * zoom * (0.75 + 0.32 * depth) *
                           (1.12 if sel else 1.0)))
             raw_col = NEXUS_NODE_COLOR.get(idx, self.accent)
+            node_state = self.qwasar_nexus_node_states.get(idx, {})
+            if node_state.get("enabled") is False:
+                raw_col = (108, 114, 126)
             shade = 0.60 + 0.40 * depth
             col = tuple(min(255, int(c * shade)) for c in raw_col)
             if sel:
@@ -11825,7 +11835,13 @@ class App(object):
         di una riga sola troncata."""
         idx = self.sel
         label, sub = self.menu[idx]
-        col = NEXUS_NODE_COLOR.get(idx, self.accent)
+        node_state = self.qwasar_nexus_node_states.get(idx, {})
+        label = node_state.get("label") or label
+        disabled = node_state.get("enabled") is False
+        if disabled:
+            label = label + "  // DISABLED"
+        col = ((108, 114, 126) if disabled
+               else NEXUS_NODE_COLOR.get(idx, self.accent))
         icon_key = self.menu_icons[idx]
         bx = bx0
         bw = max(140, W - bx - 14)
@@ -17031,6 +17047,15 @@ class App(object):
             sys.exit(0)
 
     def activate(self, i):
+        node_state = getattr(self, "qwasar_nexus_node_states", {}).get(i, {})
+        if node_state.get("enabled") is False:
+            label = node_state.get("label") or self.menu[i][0]
+            self.notify(
+                label,
+                "This workspace is disabled in the active QWASAR profile.",
+                kind="warning",
+            )
+            return
         if i < 10:
             try:
                 self.play_menu_transition(i)
