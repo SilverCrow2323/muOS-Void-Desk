@@ -50,8 +50,8 @@ def log(msg):
 
 def opener():
     ctx = ssl.create_default_context()
-    # Keep normal TLS certificate and hostname verification for online fallback.
-    # The normal first-boot path uses the bundled offline runtime.
+    # Mantiene attiva la verifica TLS di certificato e nome host per il download alternativo.
+    # Al primo avvio viene normalmente usato il runtime offline incluso.
     op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx))
     op.addheaders = [("User-Agent", "VoidDesk/1.5")]
     return op
@@ -101,7 +101,7 @@ def safe_extract_tar(archive_path, destination):
                 raise ValueError("elemento non sicuro nell'archivio: %r" % name)
             target = (root / Path(*relative.parts)).resolve()
             if target != root and root not in target.parents:
-                raise ValueError("tar member escapes runtime: %r" % name)
+                raise ValueError("un elemento dell'archivio esce dalla cartella runtime: %r" % name)
             if member.isdir():
                 target.mkdir(parents=True, exist_ok=True)
                 continue
@@ -119,7 +119,7 @@ def safe_extract_tar(archive_path, destination):
 
 def extract_bundled_runtime(archives_dir=None, destination=None,
                             python_version=None, machine=None):
-    """Extract the pinned CPython 3.11/aarch64 Pygame runtime without Internet."""
+    """Estrae il runtime Pygame CPython 3.11/aarch64 incluso, senza connessione Internet."""
     archives_dir = Path(archives_dir or ARCHIVE_DIR)
     destination = Path(destination or (str(RUNTIME) + ".candidate"))
     python_version = tuple(python_version or sys.version_info[:2])
@@ -225,13 +225,13 @@ def finish_runtime(runtime_path, pygame_version, tag, machine):
         log("Libreria SDL2 di sistema: %s" % sdl[0])
         SDL_TXT.write_text(sdl[0] + "\n", encoding="utf-8")
     else:
-        log("Libreria SDL2 di sistema: not found (si usa quella del wheel)")
+        log("Libreria SDL2 di sistema non trovata (verrà usata quella inclusa nel pacchetto)")
         try:
             SDL_TXT.unlink()
         except OSError:
             pass
 
-    MARKER.write_text("pygame %s (%s %s)\n" %
+    MARKER.write_text("Pygame %s (%s %s)\n" %
                       (pygame_version, tag, machine), encoding="utf-8")
     try:
         WHL.unlink()
@@ -266,7 +266,7 @@ def main():
             finish_runtime(candidate, verified.stdout.strip(), tag, machine)
             log("==== INSTALLAZIONE RUNTIME COMPLETATA (OFFLINE) ====")
             return 0
-        detail = verified.stderr.strip()[-800:] if verified is not None else "verify failed"
+        detail = verified.stderr.strip()[-800:] if verified is not None else "verifica non riuscita"
         log("   Il pacchetto incluso non è caricabile su questo firmware: " + detail)
         shutil.rmtree(candidate, ignore_errors=True)
     else:
@@ -300,7 +300,7 @@ def main():
                 relative = PurePosixPath(info.filename)
                 if (relative.is_absolute() or ".." in relative.parts
                         or "\\" in info.filename):
-                    raise ValueError("unsafe wheel member: %s" % info.filename)
+                    raise ValueError("elemento non sicuro nel pacchetto: %s" % info.filename)
             wheel.extractall(candidate)
     except Exception as exc:
         shutil.rmtree(candidate, ignore_errors=True)
@@ -309,7 +309,7 @@ def main():
 
     verified = verify_runtime(candidate)
     if verified is None or verified.returncode != 0:
-        detail = verified.stderr.strip()[-800:] if verified is not None else "verify failed"
+        detail = verified.stderr.strip()[-800:] if verified is not None else "verifica non riuscita"
         shutil.rmtree(candidate, ignore_errors=True)
         log("ERRORE: caricamento di Pygame non riuscito: " + detail)
         return 1
