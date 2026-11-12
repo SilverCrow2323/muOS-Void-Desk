@@ -4,17 +4,25 @@ The visual language is **Megastructure**: industrial science fiction, monumental
 
 ## 🧩 Navigation icon library
 
-The following PNG files in `https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/` are **menu and hub icons**, not screenshots of application screens. They are the visual identity assets used to represent Void Desk destinations.
+The following PNG files copied to `assets/icons/` are **menu and hub icons**, not screenshots of application screens. They are the visual identity assets used to represent Void Desk destinations.
 
 | WORKSHOP | SETTINGS | THE FORGE | START SESSION | RT:TOOLBOX |
 |---|---|---|---|---|
-| <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/workshop.png" width="76" alt="Workshop icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/settings.png" width="76" alt="Settings icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/the_forge.png" width="76" alt="The Forge icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/start.png" width="76" alt="Start Session icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/rt_toolbox.png" width="76" alt="RT Toolbox icon" /> |
+| <img src="assets/icons/workshop.png" width="76" alt="Workshop icon" /> | <img src="assets/icons/settings.png" width="76" alt="Settings icon" /> | <img src="assets/icons/the_forge.png" width="76" alt="The Forge icon" /> | <img src="assets/icons/start.png" width="76" alt="Start Session icon" /> | <img src="assets/icons/rt_toolbox.png" width="76" alt="RT Toolbox icon" /> |
 
 | NETSPHERE / UPLINK | muOS APPS | MEDIA VAULT | INFO | END |
 |---|---|---|---|---|
-| <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/net_sphere.png" width="76" alt="Netsphere icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/muos.png" width="76" alt="muOS Apps icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/media_vault.png" width="76" alt="Media Vault icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/info.png" width="76" alt="Info icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/end.png" width="76" alt="End icon" /> |
+| <img src="assets/icons/net_sphere.png" width="76" alt="Netsphere icon" /> | <img src="assets/icons/muos.png" width="76" alt="muOS Apps icon" /> | <img src="assets/icons/media_vault.png" width="76" alt="Media Vault icon" /> | <img src="assets/icons/info.png" width="76" alt="Info icon" /> | <img src="assets/icons/end.png" width="76" alt="End icon" /> |
 
 These are existing project assets. The NEXUS v12 diagram above is a **proposed navigation map**, not a screenshot.
+## 🖥️ Actual application screen reference
+
+`forge-menu.png` is a real screenshot of the **THE FORGE screen**:
+
+<img src="assets/screens/forge-menu.png" alt="THE FORGE application screen" width="720" />
+
+By contrast, `the_forge.png` in the navigation icon library is only the hub icon.
+
 ## Architecture and concept diagrams
 
 ![QWASAR system map](assets/qwasar-system-map.svg)
