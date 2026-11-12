@@ -131,7 +131,7 @@ def build(output: Path) -> None:
         source = DIAGRAMS / name
         require_file(source)
         shutil.copy2(source, asset_root / name)
-    symbol = BRAND / "voiddesk_symbol.png"
+    symbol = BRAND / "voiddesk_symbol.svg"
     require_file(symbol)
     shutil.copy2(symbol, asset_root / symbol.name)
     for name in ICON_FILES:

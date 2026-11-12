@@ -15,6 +15,13 @@
 
 ## Choose your path
 
+| Need | Page |
+|---|---|
+| Quick answers | [FAQ](FAQ) |
+| Understand the project | [What is Void Desk?](What-is-Void-Desk) |
+| Start using it | [First steps](First-steps) |
+| Test on a Linux PC | [Desktop PC testing](Desktop-PC-testing) |
+
 | Goal | Page |
 |---|---|
 | Install Void Desk | [Installation — muOS Andromeda](Installation-muOS-Andromeda) |
@@ -69,7 +76,7 @@ The small PNGs below are **menu/hub icons from `resources/`**, not screenshots o
 
 
 
-<div align="center"><img src="assets/brand/voiddesk_symbol.png" width="84" alt="Void Desk logo" /></div>
+<div align="center"><img src="assets/brand/voiddesk_symbol.svg" width="84" alt="Void Desk logo" /></div>
 
 <details>
 <summary>🖥️ Actual screen reference — THE FORGE</summary>

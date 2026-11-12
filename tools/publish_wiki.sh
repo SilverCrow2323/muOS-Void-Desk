@@ -39,8 +39,10 @@ for asset in voiddesk-docs-banner.svg qwasar-system-map.svg nexus-v12-navigation
     cp "$ASSET_DIR/$asset" "$WIKI_DIR/assets/$asset"
 done
 
-[ -f "$BRAND_DIR/voiddesk_symbol.png" ] || { echo "Missing Void Desk symbol" >&2; exit 4; }
+[ -f "$BRAND_DIR/voiddesk_symbol.png" ] || { echo "Missing legacy Void Desk raster symbol" >&2; exit 4; }
 cp "$BRAND_DIR/voiddesk_symbol.png" "$WIKI_DIR/assets/brand/voiddesk_symbol.png"
+[ -f "$BRAND_DIR/voiddesk_symbol.svg" ] || { echo "Missing canonical Void Desk SVG symbol" >&2; exit 4; }
+cp "$BRAND_DIR/voiddesk_symbol.svg" "$WIKI_DIR/assets/brand/voiddesk_symbol.svg"
 
 for icon in workshop.png settings.png the_forge.png start.png rt_toolbox.png net_sphere.png muos.png media_vault.png info.png end.png; do
     [ -f "$RESOURCE_DIR/$icon" ] || { echo "Missing navigation icon: $icon" >&2; exit 5; }

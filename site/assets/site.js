@@ -447,4 +447,46 @@
     }));
   }
 
+
+  // Scroll progress and reveal-on-scroll. Reduced-motion users see all content immediately.
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const progress = document.createElement("div");
+  progress.className = "scroll-progress";
+  progress.setAttribute("aria-hidden","true");
+  progress.innerHTML = "<span></span>";
+  document.body.append(progress);
+  const progressBar = progress.firstElementChild;
+  let scrollTicking = false;
+  const updateProgress = () => {
+    const total = document.documentElement.scrollHeight - window.innerHeight;
+    const amount = total > 0 ? Math.min(1,Math.max(0,window.scrollY / total)) : 0;
+    if(progressBar)progressBar.style.transform = "scaleX("+amount+")";
+    scrollTicking = false;
+  };
+  window.addEventListener("scroll",() => {
+    if(!scrollTicking){scrollTicking=true;window.requestAnimationFrame(updateProgress);}
+  },{passive:true});
+  updateProgress();
+
+  if(!reducedMotion && "IntersectionObserver" in window){
+    const revealTargets = document.querySelectorAll(
+      "main > section:not(.studio-panel), .status-card, .portal-card, .layer-card, .engine-card, .destination-grid > article, .gate-list > div, .satellite-panels > article, .icon-library figure, [data-asset-card], .studio-principles > article"
+    );
+    const revealObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if(entry.isIntersecting){
+          entry.target.classList.add("is-visible");
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    },{threshold:0.12,rootMargin:"0px 0px -36px 0px"});
+    revealTargets.forEach((element,index) => {
+      if(element.closest("[hidden]"))return;
+      element.setAttribute("data-reveal","");
+      const delay=index%4;
+      if(delay)element.setAttribute("data-reveal-delay",String(delay));
+      revealObserver.observe(element);
+    });
+  }
+
 })();

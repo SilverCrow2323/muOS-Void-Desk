@@ -138,3 +138,53 @@ def test_ci_uses_one_bounded_apt_install_and_system_python_for_integration():
     assert "QWASAR_CI_APT_UPDATE_TIMEOUT:-120" in installer
     assert "QWASAR_CI_APT_INSTALL_TIMEOUT:-180" in installer
     assert "for attempt in 1 2; do" in installer
+
+def test_voiddesk_symbol_is_shared_by_site_and_pygame():
+    symbol = ROOT / "assets" / "brand" / "voiddesk_symbol.svg"
+    source = symbol.read_text(encoding="utf-8")
+    builder = (ROOT / "tools" / "build_site.py").read_text(encoding="utf-8")
+    icons = (ROOT / "desk" / "icons.py").read_text(encoding="utf-8")
+    header = (ROOT / "desk" / "header.py").read_text(encoding="utf-8")
+
+    assert "<circle" in source
+    assert "M263 78 L94 352 H429 Z" in source
+    assert "M263 352 V492" in source
+    assert 'symbol = BRAND / "voiddesk_symbol.svg"' in builder
+    publisher = (ROOT / "tools" / "publish_wiki.sh").read_text(
+        encoding="utf-8"
+    )
+    wiki_home = (ROOT / "wiki-source" / "Home.md").read_text(
+        encoding="utf-8"
+    )
+    assert 'cp "$BRAND_DIR/voiddesk_symbol.svg"' in publisher
+    assert 'src="assets/brand/voiddesk_symbol.svg"' in wiki_home
+    assert 'key in ("voiddesk", "brand")' in icons
+    identity = (ROOT / "docs" / "VISUAL_IDENTITY.md").read_text(
+        encoding="utf-8"
+    )
+    assert "official Void Desk symbol" in identity
+    assert "silhouette, proportions and orientation are fixed" in identity
+    assert 'icons.draw(surface, "voiddesk", 10, 8, 26, acc)' in header
+    assert 'icons.draw(surface, "voiddesk", 12, 8, 26, acc)' in header
+
+    for page in (
+        "index.html",
+        "architecture.html",
+        "field-manual.html",
+        "asset-atlas.html",
+        "studio.html",
+        "blueprint.html",
+    ):
+        html = (ROOT / "site" / page).read_text(encoding="utf-8")
+        assert "voiddesk_symbol.svg" in html
+
+def test_wiki_page_template_enforces_one_topic_and_label_rules():
+    template = (ROOT / "docs" / "WIKI_PAGE_TEMPLATE.md").read_text(
+        encoding="utf-8"
+    )
+    assert "# [Short topic title]" in template
+    assert "one concept or fact per bullet" in template.lower()
+    assert "**MUST KNOW!!**" in template
+    assert "**Optional**" in template
+    assert "remove this block when it does not apply" in template.lower()
+    assert "One page covers one topic." in template

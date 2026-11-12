@@ -4,28 +4,28 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#090d12">
 <meta name="description" content="QWASAR Studio concept workbench: layout composition, module manifests, release profiles and safe local export.">
-<title>QWASAR Studio / Field Portal</title>
-<link rel="icon" href="assets/voiddesk_symbol.png"><link rel="stylesheet" href="assets/site.css"><script src="assets/site.js" defer></script>
+<title>Studio — Void Desk</title>
+<link rel="icon" href="assets/voiddesk_symbol.svg"><link rel="stylesheet" href="assets/site.css"><script src="assets/site.js" defer></script>
 </head>
-<body>
+<body data-page="studio">
 <a class="skip-link" href="#main">Skip to content</a><div class="page-noise" aria-hidden="true"></div>
 <header class="topbar">
-<a class="brand" href="index.html" aria-label="QWASAR Void Desk home"><span class="brand-mark"><img src="assets/voiddesk_symbol.png" alt=""></span><span class="brand-copy"><strong>QWASAR</strong><small>VOID DESK / FIELD PORTAL</small></span></a>
+<a class="brand" href="index.html" aria-label="QWASAR Void Desk home"><span class="brand-mark"><img src="assets/voiddesk_symbol.svg" alt=""></span><span class="brand-copy"><strong>QWASAR</strong><small>VOID DESK / FIELD PORTAL</small></span></a>
 <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-menu-toggle><span></span><span></span><span></span><b class="sr-only">Open navigation</b></button>
-<nav class="nav" id="primary-nav" aria-label="Main navigation"><a href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="field-manual.html">Field manual</a><a href="asset-atlas.html">Asset atlas</a><a class="active" href="studio.html">Studio</a><a href="blueprint.html">V12 blueprint</a><button class="command-open" type="button" data-command-open aria-haspopup="dialog" aria-keyshortcuts="Control+K"><span class="command-glyph" aria-hidden="true">⌕</span><span>Jump to</span><kbd>CTRL K</kbd></button><a class="nav-github" href="https://github.com/SilverCrow2323/Void-Desk-Project" target="_blank" rel="noreferrer">Source ↗</a></nav>
+<nav class="nav" id="primary-nav" aria-label="Main navigation"><a href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="field-manual.html">Manual</a><a href="asset-atlas.html">Assets</a><a class="active" href="studio.html">Studio</a><a href="blueprint.html">v12 plan</a><button class="command-open" type="button" data-command-open aria-haspopup="dialog" aria-keyshortcuts="Control+K"><span class="command-glyph" aria-hidden="true">⌕</span><span>Jump to</span><kbd>CTRL K</kbd></button><a class="nav-github" href="https://github.com/SilverCrow2323/Void-Desk-Project" target="_blank" rel="noreferrer">Source ↗</a></nav>
 </header>
 <main id="main">
-<section class="page-hero wrap studio-hero">
-<div class="eyebrow"><span class="pulse-dot"></span> QWASAR STUDIO / LABORATORY BUILD 001</div>
+<section class="page-hero wrap studio-hero" data-zone="hero">
+<div class="eyebrow">STUDIO PREVIEW</div>
 <p class="page-kicker">ONE WORKBENCH · FOUR WORKFLOWS · DATA FIRST</p>
-<h1>Design the system.<br><em>Keep control.</em></h1>
-<p class="hero-lede">QWASAR Studio is the planned browser companion for QWASAR-Env. This interactive concept explores the four workbenches: composing layouts, inspecting module manifests, preparing release manifests and reviewing a catalogue — without pretending that cloud services or executable module publishing already exist.</p>
+<h1>Studio</h1>
+<p class="hero-lede">A local concept with four tools: Layout Designer, Module Forge, Release Composer and Community Library. Exports contain data only.</p>
 <div class="page-stats"><span><b>04</b> WORKBENCHES</span><span><b>01</b> PORTABLE PROFILE</span><span><b>0</b> EXECUTABLES EXPORTED</span></div>
 <div class="studio-status"><span class="status-light"></span><strong>LOCAL CONCEPT / INTERACTIVE PROTOTYPE</strong><span>NO ACCOUNT · NO DEVICE PAIRING · NO CLOUD API</span></div>
 </section>
 
-<section class="section wrap" data-studio>
-<div class="section-heading"><div><div class="eyebrow">01 / WORKBENCH SELECTOR</div><h2>One Studio.<br><em>Four focused tools.</em></h2></div><p>Switch workbenches to explore the product direction. Controls in this page operate locally in your browser and export sample data only.</p></div>
+<section class="section wrap" data-studio data-zone="workbench">
+<div class="section-heading"><div><div class="eyebrow">01 / WORKBENCH SELECTOR</div><h2>Tools</h2></div><p>Switch workbenches to explore the product direction. Controls in this page operate locally in your browser and export sample data only.</p></div>
 <div class="studio-shell">
 <div class="studio-bar"><div class="studio-bar-brand"><span class="studio-mini-mark">Q</span><span><b>QWASAR STUDIO</b><small>LOCAL WORKSPACE / UNSAVED DEMO</small></span></div><div class="studio-bar-right"><span class="studio-device"><i></i> NO DEVICE PAIRED</span><span class="studio-version">UI CONCEPT 0.1</span></div></div>
 <div class="studio-workbench-head">
@@ -38,7 +38,7 @@
 <div class="studio-context"><span class="context-dot"></span><span id="studio-context-label">LAYOUT / NEXUS HOME</span></div>
 </div>
 
-<section class="studio-panel is-active" id="panel-layout" role="tabpanel" aria-labelledby="tab-layout" data-studio-panel="layout">
+<section class="studio-panel is-active" id="panel-layout" role="tabpanel" aria-labelledby="tab-layout" data-studio-panel="layout" data-zone="layout">
 <div class="studio-panel-title"><div><span class="eyebrow">LAYOUT DESIGNER / CANVAS</span><h3>Compose a NEXUS home.</h3><p>Reorder registered destinations and export a declarative sample profile. The canvas does not install missing modules or create executable actions.</p></div><button class="studio-action studio-action-primary" type="button" data-export-profile>Export .qprofile <span>↓</span></button></div>
 <div class="layout-lab">
 <aside class="component-rail"><div class="rail-head">COMPONENT RAIL <span>04</span></div>
@@ -60,7 +60,7 @@
 <div class="studio-feedback" data-studio-feedback aria-live="polite">Select a node to inspect it. Use the arrows to reorder the canvas.</div>
 </section>
 
-<section class="studio-panel" id="panel-modules" role="tabpanel" aria-labelledby="tab-modules" data-studio-panel="modules" hidden>
+<section class="studio-panel" id="panel-modules" role="tabpanel" aria-labelledby="tab-modules" data-studio-panel="modules" hidden data-zone="modules">
 <div class="studio-panel-title"><div><span class="eyebrow">MODULE FORGE / MANIFEST INSPECTOR</span><h3>Define a contribution.</h3><p>Templates are examples of manifest metadata, not installable or executable modules. Choose one to inspect its declared surface.</p></div><span class="studio-state-chip">SCHEMA PREVIEW</span></div>
 <div class="module-lab">
 <div class="module-template-list">
@@ -86,7 +86,7 @@
 <div class="trust-note"><b>TRUST BOUNDARY</b><p>Executable community modules remain disabled until source review, signing, capability enforcement, sandboxing, revocation and rollback exist. A manifest preview is not proof of runtime support.</p></div>
 </section>
 
-<section class="studio-panel" id="panel-release" role="tabpanel" aria-labelledby="tab-release" data-studio-panel="release" hidden>
+<section class="studio-panel" id="panel-release" role="tabpanel" aria-labelledby="tab-release" data-studio-panel="release" hidden data-zone="release">
 <div class="studio-panel-title"><div><span class="eyebrow">RELEASE COMPOSER / PACKAGE PLAN</span><h3>Choose a release flavour.</h3><p>Prepare a sample build manifest for review. This browser concept does not run a build, estimate a verified package size or issue release signatures.</p></div><span class="studio-state-chip">MANIFEST ONLY</span></div>
 <div class="release-lab">
 <div class="release-options">
@@ -102,7 +102,7 @@
 <div class="trust-note"><b>RELEASE INTEGRITY</b><p>Official signing remains maintainer-controlled. A personal custom package must be visibly labelled custom and cannot impersonate an official release.</p></div>
 </section>
 
-<section class="studio-panel" id="panel-library" role="tabpanel" aria-labelledby="tab-library" data-studio-panel="library" hidden>
+<section class="studio-panel" id="panel-library" role="tabpanel" aria-labelledby="tab-library" data-studio-panel="library" hidden data-zone="library">
 <div class="studio-panel-title"><div><span class="eyebrow">COMMUNITY LIBRARY / LOCAL SAMPLE</span><h3>Inspect before you trust.</h3><p>This is a sample catalogue to demonstrate the information hierarchy. It is not connected to a live service or community publishing API.</p></div><span class="studio-state-chip">OFFLINE SAMPLE</span></div>
 <div class="library-lab">
 <article class="library-module"><div class="catalog-art catalog-profile">Q<span>01</span></div><div class="catalog-copy"><div class="catalog-meta"><span>PROFILE / DATA ONLY</span><b class="catalog-trust">LOCAL SAMPLE</b></div><h4>Handheld Starter</h4><p>A simple NEXUS ordering and visibility profile for a small screen.</p><div class="catalog-tags"><i>PROFILE V1</i><i>NO EXECUTABLES</i></div></div></article>
@@ -114,8 +114,8 @@
 </div>
 </section>
 
-<section class="section section-dark"><div class="wrap">
-<div class="section-heading"><div><div class="eyebrow">02 / THEME LAB</div><h2>Change the mood.<br><em>Keep the tokens.</em></h2></div><p>Preview a few possible Studio palettes. These theme presets affect this page only; they are not applied to a connected handheld.</p></div>
+<section class="section section-dark" data-zone="themes"><div class="wrap">
+<div class="section-heading"><div><div class="eyebrow">02 / THEME LAB</div><h2>Themes</h2></div><p>Preview a few possible Studio palettes. These theme presets affect this page only; they are not applied to a connected handheld.</p></div>
 <div class="theme-lab" data-theme-lab>
 <div class="theme-presets" role="group" aria-label="Studio preview themes">
 <button type="button" class="theme-preset is-active" data-theme-preset="megastructure" aria-pressed="true"><i class="swatch swatch-mega"></i><span><b>Megastructure</b><small>Signal red · orbital cyan</small></span></button>
@@ -129,7 +129,7 @@
 </div>
 </div>
 </div></section>
-<section class="section wrap"><div class="section-heading"><div><div class="eyebrow">03 / ARCHITECTURE & SAFETY</div><h2>Local first.<br><em>Remote by consent.</em></h2></div><p>Studio can work with portable files without account access. The handheld remains usable offline and retains authority over applying settings.</p></div>
+<section class="section wrap" data-zone="boundaries"><div class="section-heading"><div><div class="eyebrow">03 / ARCHITECTURE & SAFETY</div><h2>Privacy</h2></div><p>Studio can work with portable files without account access. The handheld remains usable offline and retains authority over applying settings.</p></div>
 <div class="studio-principles">
 <article><span>01 / PORTABLE</span><h3>Profiles are data.</h3><p>Declarative JSON describes layouts, ordering, labels, supported settings and references to installed contributions.</p></article>
 <article><span>02 / VALIDATED</span><h3>Schema before apply.</h3><p>The local engine validates and migrates a profile, stages changes, backs up the active selection and retains rollback.</p></article>
@@ -138,13 +138,13 @@
 </div>
 <div class="studio-source-links"><a href="https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/STUDIO_ARCHITECTURE.md">Read Studio technical architecture ↗</a><a href="https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/QWASAR_GUI_SYSTEM.md">Read UI composition contract ↗</a><a href="blueprint.html">Explore NEXUS v12 ↗</a></div>
 </section>
-<section class="closing-band"><div class="wrap closing-inner"><div><div class="eyebrow">THE WORKBENCH IS A STARTING POINT</div><h2>Compose with intent.<br><em>Ship with evidence.</em></h2></div><div class="closing-actions"><a class="button button-primary" href="architecture.html">Review system architecture ↗</a><a class="button button-quiet" href="https://github.com/SilverCrow2323/Void-Desk-Project/issues">Discuss the Studio roadmap</a></div></div></section>
+<section class="closing-band" data-zone="closing"><div class="wrap closing-inner"><div><div class="eyebrow">THE WORKBENCH IS A STARTING POINT</div><h2>Studio notes</h2></div><div class="closing-actions"><a class="button button-primary" href="architecture.html">Review system architecture ↗</a><a class="button button-quiet" href="https://github.com/SilverCrow2323/Void-Desk-Project/issues">Discuss the Studio roadmap</a></div></div></section>
 </main>
 <dialog class="command-dialog" id="command-dialog" aria-labelledby="command-title">
-<div class="command-shell"><div class="command-heading"><div><span class="eyebrow">QWASAR / QUICK NAVIGATION</span><h2 id="command-title">Where do you want to go?</h2></div><form method="dialog"><button type="submit" aria-label="Close command palette">ESC</button></form></div>
+<div class="command-shell"><div class="command-heading"><div><span class="eyebrow">QWASAR / QUICK NAVIGATION</span><h2 id="command-title">Quick navigation</h2></div><form method="dialog"><button type="submit" aria-label="Close command palette">ESC</button></form></div>
 <label class="command-search"><span aria-hidden="true">⌕</span><input id="command-search-input" type="search" placeholder="Search pages, guides and actions…" autocomplete="off"></label>
 <div class="command-results" id="command-results" role="list" aria-label="Navigation results"></div>
 <p class="command-help"><kbd>CTRL</kbd> + <kbd>K</kbd> OPEN <span>·</span> <kbd>↑</kbd> <kbd>↓</kbd> NAVIGATE <span>·</span> <kbd>ENTER</kbd> OPEN <span>·</span> <kbd>ESC</kbd> CLOSE</p></div>
 </dialog>
-<footer class="footer wrap"><a class="footer-brand" href="index.html">QWASAR <span>/</span> VOID DESK</a><p>STUDIO LAB / Interactive concept, not a deployed Studio service.</p><div><a href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="asset-atlas.html">Asset atlas</a><a href="blueprint.html">Blueprint</a><a href="https://github.com/SilverCrow2323/Void-Desk-Project">GitHub ↗</a></div><small>© <span data-year></span> QWASAR-Env / Void Desk</small></footer>
+<footer class="footer wrap"><a class="footer-brand" href="index.html">QWASAR <span>/</span> VOID DESK</a><p>STUDIO LAB / Interactive concept, not a deployed Studio service.</p><div><a href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="asset-atlas.html">Assets</a><a href="blueprint.html">Blueprint</a><a href="https://github.com/SilverCrow2323/Void-Desk-Project">GitHub ↗</a></div><small>© <span data-year></span> QWASAR-Env / Void Desk</small></footer>
 </body></html>

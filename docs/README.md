@@ -11,6 +11,13 @@ A field manual for the handheld product, its host integration, the QWASAR contra
 
 ## Choose your path
 
+| Quick help | Source |
+|---|---|
+| FAQ and practical Wiki guides | [Wiki home](../wiki-source/Home.md) · [FAQ](../wiki-source/FAQ.md) |
+| What is Void Desk? | [Overview](../wiki-source/What-is-Void-Desk.md) |
+| First launch | [First steps](../wiki-source/First-steps.md) |
+| Linux PC testing | [PC guide](../wiki-source/Desktop-PC-testing.md) |
+
 | Role / goal | Start here | Next |
 |---|---|---|
 | New user | [Install on muOS](../wiki-source/Installation-muOS-Andromeda.md) | [Controls](../wiki-source/Controls-and-navigation.md) |
@@ -53,6 +60,7 @@ A field manual for the handheld product, its host integration, the QWASAR contra
 ### Visual QA and collaboration
 - [Field Portal publishing and maintenance](FIELD_PORTAL_PUBLISHING.md)
 - [Documentation style guide](DOCUMENTATION_STYLE_GUIDE.md)
+- [Reusable Wiki page template](WIKI_PAGE_TEMPLATE.md)
 - [Visual capture and asset workflow](visual/README.md)
 - [Wiki source and publishing](../wiki-source/README.md)
 - [Contributing](../CONTRIBUTING.md)

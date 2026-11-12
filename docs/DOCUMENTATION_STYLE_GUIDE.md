@@ -6,6 +6,15 @@ The manual should feel like a guided field interface, not a grey dump of enginee
 
 ## Page anatomy
 
+Use short, direct titles. Prefer **Install**, **First launch**, **Controls**, **Network** and **Troubleshooting** over slogans or abstract names. Each page covers one topic and begins with a short plain-language explanation.
+
+The reading scale must work on a handheld display: body copy should remain comfortably readable at normal viewing distance, secondary metadata must not carry essential instructions, and tables must not force tiny text. Use short paragraphs, generous spacing and collapsible advanced details.
+
+## Controller and keyboard icons
+
+When referring to a physical control, show the matching button glyph inline instead of repeating a text-only label. Use the device-specific icon set where available. Never imply a universal physical mapping: label semantic actions separately and explain that the active footer/profile is authoritative. If an exact glyph is unavailable, use a clear semantic icon plus accessible text rather than inventing a device mapping.
+
+
 1. A clear title and one-line purpose.
 2. A visual overview when it improves understanding.
 3. A concise status or important callout.

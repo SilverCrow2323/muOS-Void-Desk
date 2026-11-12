@@ -59,6 +59,8 @@ def test_pc_bundle_excludes_device_state_and_secrets(tmp_path, monkeypatch):
         assert "VoidDesk-PC/voiddesk.py" in names
         assert "VoidDesk-PC/desk/main.py" in names
         assert "VoidDesk-PC/PC-README.txt" in names
+        pc_readme = archive.extractfile("VoidDesk-PC/PC-README.txt").read().decode("utf-8")
+        assert "$HOME/VoidDesk-PC/" in pc_readme
         assert "VoidDesk-PC/launch-pc.sh" in names
         assert "VoidDesk-PC/data" in names
         assert "VoidDesk-PC/data/desk_config.json" not in names

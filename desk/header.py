@@ -40,6 +40,11 @@ def _draw_brand(surface, app, acc):
     if sym is not None:
         surface.blit(sym, (10, 8))
         tx0 = 10 + sym.get_width() + 6
+    else:
+        # Keep the supplied Void Desk mark visible even when no raster badge
+        # loader is available (for example, minimal or recovery UI states).
+        icons.draw(surface, "voiddesk", 10, 8, 26, acc)
+        tx0 = 42
     surface.blit(app.f_big.render("Void-DESK", True, (150, 30, 30)), (tx0, 9))
     surface.blit(app.f_big.render("Void-DESK", True, (25, 90, 100)), (tx0 + 2, 7))
     surface.blit(app.f_big.render("Void-", True, FG), (tx0 + 1, 8))
@@ -61,9 +66,9 @@ def _draw_title(surface, app, title, icon, badge, acc):
         icons.draw(surface, icon, 12, 8, 28, acc)
         tx0 = 48
     else:
-        surface.blit(app.f_big.render("\u25a0 ", True, (140, 30, 30)), (13, 9))
-        surface.blit(app.f_big.render("\u25a0 ", True, acc), (14, 8))
-        tx0 = 14 + app.f_big.size("\u25a0 ")[0]
+        # The official Void Desk mark replaces the generic square fallback.
+        icons.draw(surface, "voiddesk", 12, 8, 26, acc)
+        tx0 = 46
     surface.blit(app.f_big.render(title, True, (140, 30, 30)), (tx0 - 1, 9))
     surface.blit(app.f_big.render(title, True, acc), (tx0, 8))
 

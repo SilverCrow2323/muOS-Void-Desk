@@ -9,6 +9,16 @@ QWASAR Desk has a recognizable industrial science-fiction identity: brutalist in
 
 The visual direction may be informed by dark cyberpunk manga and architectural science fiction (including the sense of scale and materiality associated with works such as *BLAME!*), but QWASAR Desk must use its own original compositions, symbols, layouts, illustrations and typography. Do not reproduce panels, characters, logos, page layouts or signature artwork from another work.
 
+## Void Desk mark
+
+The official Void Desk symbol is the supplied circular mark containing an upright triangular outline and a centered lower stem. Its silhouette, proportions and orientation are fixed brand geometry: recolour or adjust texture when needed, but do not redraw it as a different symbol.
+
+- Canonical scalable artwork: `assets/brand/voiddesk_symbol.svg`.
+- Site use: favicon, brand header and QWASAR core mark.
+- Pygame use: the `voiddesk` / `brand` glyph in `desk/icons.py`.
+- Keep the glyph legible at compact 24–28 px sizes; use a solid high-contrast accent.
+- Raster exports may be generated for launchers or stores, but the SVG remains the source of truth.
+
 ## Separate aesthetic from palette
 
 A **visual style** controls composition and rendering language: geometry, density, borders, texture, typography hierarchy, motion, illustration treatment and information layout.

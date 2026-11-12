@@ -7,6 +7,9 @@ Void Desk is designed for controller-first navigation. The exact physical button
 
 ## Semantic controls
 
+Use the matching button artwork in the active UI footer as the visual reference. The same semantic action can map to different physical controls on another device or firmware build.
+
+
 | Logical action | Purpose |
 |---|---|
 | `CONFIRM` | Activate the selected item |
@@ -58,3 +61,12 @@ See the [muOS compatibility design](https://github.com/SilverCrow2323/Void-Desk-
 ## Screenshot shortcut
 
 When supported, press **F12** while the frontend is visible. The capture and JSON sidecar are written under `data/visual-captures/`. Review images for private information before sharing them.
+
+## Button artwork
+
+- The in-app controls guide draws logical labels as button-shaped glyphs, including face buttons, shoulders, directions and system keys.
+- Inside XFCE, the guide reads the current saved `Settings → Mapping` assignments for mouse clicks, wheel and on-screen keyboard.
+- The glyph label is a logical input name, not a promise about which physical side of every handheld contains that button.
+
+> [!IMPORTANT]
+> **MUST KNOW!!** Physical placement and raw input numbering can change with firmware, board revision and controller. Use the active firmware/device profile and the live screen footer as the final reference.
