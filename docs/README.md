@@ -60,6 +60,7 @@ A field manual for the handheld product, its host integration, the QWASAR contra
 ### Visual QA and collaboration
 - [Field Portal publishing and maintenance](FIELD_PORTAL_PUBLISHING.md)
 - [Documentation style guide](DOCUMENTATION_STYLE_GUIDE.md)
+- [Reusable Wiki page template](WIKI_PAGE_TEMPLATE.md)
 - [Visual capture and asset workflow](visual/README.md)
 - [Wiki source and publishing](../wiki-source/README.md)
 - [Contributing](../CONTRIBUTING.md)
