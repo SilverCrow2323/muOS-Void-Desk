@@ -3,7 +3,9 @@
 from __future__ import annotations
 import argparse
 import shutil
+from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
@@ -16,6 +18,54 @@ ICON_FILES = ("workshop.png", "settings.png", "the_forge.png", "start.png", "rt_
 def require_file(path: Path) -> None:
     if not path.is_file():
         raise FileNotFoundError(f"Required site asset is missing: {path.relative_to(ROOT)}")
+
+class ReferenceCollector(HTMLParser):
+    """Collect local link and asset references from a generated HTML page."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.references: list[str] = []
+        self.ids: set[str] = set()
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if values.get("id"):
+            self.ids.add(str(values["id"]))
+        for key in ("href", "src"):
+            value = values.get(key)
+            if value:
+                self.references.append(value)
+
+
+def validate_site(output: Path) -> None:
+    pages = list(output.rglob("*.html"))
+    known_ids: dict[Path, set[str]] = {}
+    collected: dict[Path, list[str]] = {}
+    for page in pages:
+        parser = ReferenceCollector()
+        parser.feed(page.read_text(encoding="utf-8"))
+        known_ids[page.resolve()] = parser.ids
+        collected[page.resolve()] = parser.references
+
+    for page, references in collected.items():
+        for reference in references:
+            parsed = urlsplit(reference)
+            if parsed.scheme or parsed.netloc or parsed.path.startswith(("data:", "mailto:")):
+                continue
+            target = (page.parent / unquote(parsed.path)).resolve() if parsed.path else page
+            if target.is_dir():
+                target = target / "index.html"
+            if not target.is_file():
+                raise FileNotFoundError(
+                    f"Broken local reference in {page.relative_to(output.resolve())}: {reference}"
+                )
+            if parsed.fragment and target.suffix.lower() == ".html":
+                fragment_ids = known_ids.get(target.resolve(), set())
+                if parsed.fragment not in fragment_ids:
+                    raise ValueError(
+                        f"Broken fragment in {page.relative_to(output.resolve())}: {reference}"
+                    )
+
 
 def build(output: Path) -> None:
     if not (SITE / "index.html").is_file():
@@ -43,6 +93,7 @@ def build(output: Path) -> None:
     require_file(forge_screen)
     shutil.copy2(forge_screen, screen_root / forge_screen.name)
     (output / ".nojekyll").write_text("", encoding="utf-8")
+    validate_site(output.resolve())
     pages = sorted(path.name for path in output.glob("*.html"))
     print(f"Built {len(pages)} HTML pages into {output}")
     print(f"Copied {len(DIAGRAM_FILES)} diagrams, {len(ICON_FILES)} navigation icons,")
