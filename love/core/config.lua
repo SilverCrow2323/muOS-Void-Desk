@@ -23,6 +23,7 @@ function config.load()
     data = {
         lang = "en", theme = "cyberpunk", home_style = "nexus",
         engine = "love", bg_anim = true, sfx = true, music = true,
+        muos_profile = "auto",
         show_bootanim = true,
     }
 end

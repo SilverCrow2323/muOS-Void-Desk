@@ -23,6 +23,8 @@ export VOIDDESK_APP_DIR="$APP_DIR"
 export VOIDDESK_FULLSCREEN=1
 export VOIDDESK_PLATFORM=muos
 export VOIDDESK_MODEL=H700
+export MUOS_VERSION="$(GET_VAR system version 2>/dev/null || cat /opt/muos/config/system/version 2>/dev/null)"
+export VOID_MUOS_PROFILE="$(python3 -c "import json; print(json.load(open('$DATA/desk_config.json')).get('muos_profile','auto'))" 2>/dev/null || echo auto)"
 
 # Helper: force engine back to LOVE in desk_config.json (self-heal on failure)
 revert_engine_to_love() {
