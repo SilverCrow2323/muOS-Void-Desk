@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover - covered by CLI error path
 
 DEFAULT_MANIFEST = "data/qwasar_ui_manifest.json"
 DEFAULT_PROFILE = "data/profiles/voiddesk-handheld-default.qprofile.json"
+DEFAULT_PROFILE_TEMPLATE = "data/profiles/templates/voiddesk-handheld-default.qprofile.json"
 DEFAULT_PROFILE_SCHEMA = "schemas/qwasar-profile.schema.json"
 DEFAULT_UI_SCHEMA = "schemas/qwasar-ui.schema.json"
 PROFILE_STATES = {"enabled", "disabled", "hidden"}
@@ -602,7 +603,7 @@ class QwasarSwitchboard:
         current.extend(item for item in known if item not in current)
         return current
 
-    def reset_profile(self, default_profile_path: str | Path = DEFAULT_PROFILE) -> dict[str, Any]:
+    def reset_profile(self, default_profile_path: str | Path = DEFAULT_PROFILE_TEMPLATE) -> dict[str, Any]:
         defaults = _read_json(self._resolve(default_profile_path), "default QWASAR profile")
         return self._edit(lambda profile: (profile.clear(), profile.update(copy.deepcopy(defaults))))
 
