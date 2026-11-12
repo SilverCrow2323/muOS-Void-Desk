@@ -102,7 +102,7 @@ except Exception:
 
     if [ "$ENGINE" = "py" ]; then
         echo "$(date) launching Pygame frontend" >>"$LOG"
-        PYTHONPATH="$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" \
+        PYTHONPATH="$APP_DIR:$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}" \
             LD_LIBRARY_PATH="$APP_DIR/runtime/pygame.libs:$APP_DIR/lib:${LD_LIBRARY_PATH:-}" \
             PYGAME_HIDE_SUPPORT_PROMPT=1 \
             python3 "$APP_DIR/desk/main.py" >>"$LOG" 2>&1
