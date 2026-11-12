@@ -170,8 +170,9 @@ def launch_love():
     env = dict(os.environ)
     env["LD_LIBRARY_PATH"] = str(APP_DIR / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
     env["VOIDDESK_APP_DIR"] = str(APP_DIR)
+    env["VOIDDESK_PLATFORM"] = "desktop"
     env.setdefault("VOIDDESK_PC", "1")
-    
+
     love_dir = APP_DIR / "love"
     if not love_dir.is_dir():
         print(f"  {Color.YELLOW}⚠️  LÖVE source directory not found at: {love_dir}{Color.RESET}")
@@ -364,6 +365,7 @@ def launch_py():
     print(f"  {Color.GREEN}🚀 Re-executing QWASAR Desk inside Pygame VENV...{Color.RESET}")
     env = dict(os.environ)
     env["VOIDDESK_APP_DIR"] = str(APP_DIR)
+    env["VOIDDESK_PLATFORM"] = "desktop"
     env.setdefault("VOIDDESK_PC", "1")
     subprocess.run([str(VENV_PY), str(SELF), "--_runtime"], env=env)
     return 0
