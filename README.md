@@ -71,11 +71,14 @@ NEXUS is an animated, orbit-based hub selector designed for D-pad and controller
 | **MEDIA VAULT** | Media | Radio, IPTV, media library and audio tools |
 | **WORKSHOP** | Maintain | Device checks, diagnostics, storage, monitor, logs and maintenance |
 | **RT:TOOLBOX** | Create | Calculator, clock, calendar, notes, file manager, terminal and utilities |
-| **MUOS APPS / GAMES** | Play | Handheld app discovery, PortMaster hand-off and game tools |
+| **MUOS APPS** | Discover | Browse and launch applications provided by muOS |
+| **GAMES** | Play | Native games, PortMaster and game collections |
+| **DEVELOP** | Build | Terminal, editor, REPL and development utilities |
 | **SETTINGS** | Configure | Visuals, language, fonts, controller bindings and status indicators |
-| **INFO / COMMUNITY** | Discover | Manuals, project information and community links |
+| **INFO / COMMUNITY** | Discover | Manuals, project information and general community links |
+| **COMMUNITY** | Share | Community portal, wiki and sharing resources |
 | **OUTERDESK** | Extend | Standalone applications and optional integrations |
-| **END SESSION** | Configure | Exit, restart, reboot and power-off flows |
+| **END NODE** | Configure | Exit, restart, reboot and power-off flows |
 
 The source-grounded inventory and proposed categories are in [docs/TOOL_CATALOG.md](docs/TOOL_CATALOG.md) and `data/tool_catalog.json`. The future module manager will allow supported contributions to be rearranged and composed through QWASAR Studio; downloaded executable modules will require verification and explicit permissions. Availability depends on firmware, hardware, dependencies, permissions and frontend implementation; a menu entry alone is not proof that a tool is usable.
 
