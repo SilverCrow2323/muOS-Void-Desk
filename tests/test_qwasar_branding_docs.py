@@ -138,3 +138,26 @@ def test_ci_uses_one_bounded_apt_install_and_system_python_for_integration():
     assert "QWASAR_CI_APT_UPDATE_TIMEOUT:-120" in installer
     assert "QWASAR_CI_APT_INSTALL_TIMEOUT:-180" in installer
     assert "for attempt in 1 2; do" in installer
+
+def test_voiddesk_symbol_is_shared_by_site_and_pygame():
+    symbol = ROOT / "assets" / "brand" / "voiddesk_symbol.svg"
+    source = symbol.read_text(encoding="utf-8")
+    builder = (ROOT / "tools" / "build_site.py").read_text(encoding="utf-8")
+    icons = (ROOT / "desk" / "icons.py").read_text(encoding="utf-8")
+
+    assert "<circle" in source
+    assert "M263 78 L94 352 H429 Z" in source
+    assert "M263 352 V492" in source
+    assert 'symbol = BRAND / "voiddesk_symbol.svg"' in builder
+    assert 'key in ("voiddesk", "brand")' in icons
+
+    for page in (
+        "index.html",
+        "architecture.html",
+        "field-manual.html",
+        "asset-atlas.html",
+        "studio.html",
+        "blueprint.html",
+    ):
+        html = (ROOT / "site" / page).read_text(encoding="utf-8")
+        assert "voiddesk_symbol.svg" in html
