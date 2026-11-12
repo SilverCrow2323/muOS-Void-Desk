@@ -28,6 +28,8 @@ Void Desk is a controller-first handheld environment in the wider **QWASAR-Env**
 | Explore the visual documentation portal | [QWASAR Field Portal](site/index.html) · [Interactive Asset Atlas](site/asset-atlas.html) · [QWASAR Studio concept](site/studio.html) |
 | Publish or maintain the portal | [Field Portal publishing guide](docs/FIELD_PORTAL_PUBLISHING.md) |
 | Understand the project | [Documentation home](docs/README.md) |
+| Quick answers and first steps | [Wiki FAQ](wiki-source/FAQ.md) · [What is Void Desk?](wiki-source/What-is-Void-Desk.md) · [First steps](wiki-source/First-steps.md) |
+| Test the desktop version on Linux | [PC testing guide](wiki-source/Desktop-PC-testing.md) · [PC bundle notes](packaging/pc/README.md) |
 | Install the latest published package | [Installation guide](wiki-source/Installation-muOS-Andromeda.md) · [Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases) |
 | Explore the v12 direction | [v12 blueprint](docs/V12_BLUEPRINT.md) |
 | Check firmware and controller compatibility | [muOS compatibility matrix](docs/MUOS_FIRMWARE_COMPATIBILITY.md) |
