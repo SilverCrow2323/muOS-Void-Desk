@@ -92,3 +92,39 @@ def test_legacy_event_poll_returns_events_when_available():
     pygame = _FakePygame()
     assert poll_muos_events(pygame, direct_fb=False) == ("event",)
     assert pygame.event.called is True
+
+
+def test_direct_framebuffer_code_never_calls_nonexistent_event_init():
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "desk" / "main.py").read_text(
+        encoding="utf-8"
+    )
+    assert "pygame.event.init()" not in source
+    assert "poll_muos_events(" in source
+
+
+def test_real_pygame_can_render_software_surfaces_without_video_driver(monkeypatch):
+    import pygame
+
+    was_initialized = pygame.display.get_init()
+    if was_initialized:
+        pygame.display.quit()
+    calls = []
+    original_flip = pygame.display.flip
+    try:
+        surface = pygame.Surface((64, 48))
+        frame = pygame.Surface(
+            (64, 48), 0, 32,
+            (0x00FF0000, 0x0000FF00, 0x000000FF, 0)
+        )
+        frame.blit(surface, (0, 0))
+        monkeypatch.setattr(pygame.display, "flip", lambda: calls.append("fb"))
+        pygame.display.flip()
+        assert surface.get_size() == (64, 48)
+        assert frame.get_size() == (64, 48)
+        assert calls == ["fb"]
+    finally:
+        monkeypatch.setattr(pygame.display, "flip", original_flip)
+        if was_initialized:
+            pygame.display.init()
