@@ -158,7 +158,13 @@ class QwasarProfileResolver:
             for protected in self._protected
         )
 
-    def _validate_profile(self, profile: dict[str, Any], warnings: list[str]) -> None:
+    def _validate_profile(
+        self,
+        profile: dict[str, Any],
+        warnings: list[str],
+        target_platform: str | None = None,
+        target_model: str | None = None,
+    ) -> None:
         _validate_schema(
             profile,
             self._resolve(PROFILE_SCHEMA),
@@ -174,6 +180,30 @@ class QwasarProfileResolver:
             raise ProfileResolutionError(
                 "profile is missing required fields: " + ", ".join(sorted(missing))
             )
+
+        compatibility = profile.get("compatibility", {})
+        minimum_ui = compatibility.get("minimumUiApi", "1.0")
+        current_ui = self.manifest.get("apiVersion", "1.0")
+        try:
+            minimum_tuple = tuple(int(part) for part in minimum_ui.split("."))
+            current_tuple = tuple(int(part) for part in current_ui.split("."))
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise ProfileResolutionError("profile or manifest UI API version is invalid") from exc
+        if current_tuple < minimum_tuple:
+            raise ProfileResolutionError(
+                f"profile requires UI API {minimum_ui}, but this installation provides {current_ui}"
+            )
+        platforms = compatibility.get("platforms", [])
+        if target_platform and target_platform not in platforms and "any" not in platforms:
+            raise ProfileResolutionError(
+                f"profile is not compatible with platform {target_platform}"
+            )
+        models = compatibility.get("models", [])
+        if target_model and models and target_model not in models:
+            raise ProfileResolutionError(
+                f"profile is not compatible with device model {target_model}"
+            )
+        self._validate_safe_settings(profile.get("settings", {}))
 
         workspace_order = profile.get("workspaceOrder")
         if (
@@ -325,6 +355,28 @@ class QwasarProfileResolver:
                 )
 
     @staticmethod
+    def _validate_safe_settings(value: Any, path: str = "settings") -> None:
+        if isinstance(value, dict):
+            blocked = (
+                "password", "secret", "token", "credential", "privatekey",
+                "apikey", "installpath", "filesystempath",
+            )
+            for key, child in value.items():
+                normalized = "".join(ch for ch in str(key).lower() if ch.isalnum())
+                if any(term in normalized for term in blocked):
+                    raise ProfileResolutionError(
+                        f"profile setting key is not portable or safe: {path}.{key}"
+                    )
+                QwasarProfileResolver._validate_safe_settings(
+                    child, f"{path}.{key}"
+                )
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                QwasarProfileResolver._validate_safe_settings(
+                    child, f"{path}[{index}]"
+                )
+
+    @staticmethod
     def _menu_composition(
         entries: list[dict[str, Any]], override: dict[str, Any]
     ) -> list[dict[str, Any]]:
@@ -376,7 +428,12 @@ class QwasarProfileResolver:
                 match["enabled"] = binding.get("enabled", True)
         return result
 
-    def _compose(self, profile: dict[str, Any], source: Path, warnings: list[str]) -> dict[str, Any]:
+    def _compose(
+        self,
+        profile: dict[str, Any],
+        source: Path,
+        warnings: list[str],
+    ) -> dict[str, Any]:
         workspace_overrides = {
             item["id"]: item for item in profile.get("workspaceOverrides", [])
         }
@@ -423,16 +480,20 @@ class QwasarProfileResolver:
         panel_states = {}
         for panel_id, definition in self.manifest["shell"]["globalPanels"].items():
             profile_override = profile["shell"].get("globalPanels", {}).get(panel_id, {})
-            panel_states[panel_id] = {
-                "enabled": profile_override.get("enabled", definition["enabled"]),
-                "placement": profile_override.get("placement", definition["placement"]),
-            }
+            effective = copy.deepcopy(definition)
+            effective.update(profile_override)
+            panel_states[panel_id] = effective
 
-        shell_overrides = {
-            "header": copy.deepcopy(profile["shell"].get("header", {})),
-            "footer": copy.deepcopy(profile["shell"].get("footer", {})),
-            "homePanels": copy.deepcopy(profile["shell"].get("homePanels", {})),
-        }
+        shell_overrides = {}
+        for region in ("header", "footer"):
+            effective = copy.deepcopy(self.manifest["shell"][region])
+            effective.update(profile["shell"].get(region, {}))
+            shell_overrides[region] = effective
+        shell_overrides["homePanels"] = {}
+        for side, definition in self.manifest["shell"]["homePanels"].items():
+            effective = copy.deepcopy(definition)
+            effective.update(profile["shell"].get("homePanels", {}).get(side, {}))
+            shell_overrides["homePanels"][side] = effective
         return {
             "schemaVersion": "1.0",
             "manifestId": self.manifest["id"],
@@ -453,18 +514,44 @@ class QwasarProfileResolver:
                 item["moduleId"]: item["enabled"]
                 for item in profile.get("moduleStates", [])
             },
-            "contributions": {
-                item["contributionId"]: item["state"]
-                for item in profile.get("contributionStates", [])
-            },
+            "contributions": self._effective_contributions(profile),
+            "settings": copy.deepcopy(profile.get("settings", {})),
             "warnings": list(dict.fromkeys(warnings)),
         }
+
+    def _effective_contributions(self, profile: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        states: dict[str, dict[str, Any]] = {}
+        for item in profile.get("contributionStates", []):
+            states[item["contributionId"]] = {
+                key: copy.deepcopy(value)
+                for key, value in item.items()
+                if key != "contributionId"
+            }
+        for workspace in profile.get("workspaceOverrides", []):
+            for item in workspace.get("contributions", []):
+                current = states.setdefault(item["contributionId"], {})
+                current.update({
+                    key: copy.deepcopy(value)
+                    for key, value in item.items()
+                    if key != "contributionId"
+                })
+            for section in workspace.get("sections", []):
+                for item in section.get("contributions", []):
+                    current = states.setdefault(item["contributionId"], {})
+                    current.update({
+                        key: copy.deepcopy(value)
+                        for key, value in item.items()
+                        if key != "contributionId"
+                    })
+        return states
 
     def resolve(
         self,
         profile_path: str | Path | None = None,
         *,
         fallback_to_default: bool = True,
+        target_platform: str | None = None,
+        target_model: str | None = None,
     ) -> dict[str, Any]:
         requested = self._resolve(
             profile_path
@@ -475,7 +562,9 @@ class QwasarProfileResolver:
         try:
             profile = _read_object(requested, "QWASAR profile")
             local_warnings: list[str] = []
-            self._validate_profile(profile, local_warnings)
+            self._validate_profile(
+                profile, local_warnings, target_platform, target_model
+            )
             return self._compose(profile, requested, warnings + local_warnings)
         except (ProfileResolutionError, KeyError, TypeError, ValueError) as exc:
             if not fallback_to_default or requested == self.default_profile_path:
@@ -491,7 +580,9 @@ class QwasarProfileResolver:
         try:
             profile = _read_object(self.default_profile_path, "bundled default profile")
             local_warnings = []
-            self._validate_profile(profile, local_warnings)
+            self._validate_profile(
+                profile, local_warnings, target_platform, target_model
+            )
         except (ProfileResolutionError, KeyError, TypeError, ValueError) as exc:
             raise ProfileResolutionError(
                 f"selected and default profiles are invalid; safe startup is blocked: {exc}"
