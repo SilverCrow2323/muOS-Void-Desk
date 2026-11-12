@@ -51,18 +51,20 @@ The v12 blueprint proposes eight destinations grouped by user intent. **RT:WORKS
 
 ![Proposed NEXUS v12 information architecture](docs/assets/nexus-v12-navigation.svg)
 
-<details>
-<summary>📷 Existing interface references — historical, not v12 screenshots</summary>
+## 🧩 Navigation icon library
 
-These PNGs are already in the repository. They show earlier interface work, not proof that every proposed v12 screen or action exists today.
+The following PNG files in `resources/` are **menu and hub icons**, not screenshots of application screens. They are the visual identity assets used to represent Void Desk destinations.
 
-<p align="center">
-  <img src="resources/nexus-menu.png" alt="Earlier NEXUS menu" width="48%" />
-  <img src="resources/uplink-hub.png" alt="Earlier Uplink interface" width="48%" />
-  <img src="resources/media_vault.png" alt="Earlier Media Vault interface" width="48%" />
-  <img src="resources/workshop.png" alt="Earlier Workshop interface" width="48%" />
-</p>
-</details>
+| WORKSHOP | SETTINGS | THE FORGE | START SESSION | RT:TOOLBOX |
+|---|---|---|---|---|
+| <img src="resources/workshop.png" width="76" alt="Workshop icon" /> | <img src="resources/settings.png" width="76" alt="Settings icon" /> | <img src="resources/the_forge.png" width="76" alt="The Forge icon" /> | <img src="resources/start.png" width="76" alt="Start Session icon" /> | <img src="resources/rt_toolbox.png" width="76" alt="RT Toolbox icon" /> |
+
+| NETSPHERE / UPLINK | muOS APPS | MEDIA VAULT | INFO | END |
+|---|---|---|---|---|
+| <img src="resources/net_sphere.png" width="76" alt="Netsphere icon" /> | <img src="resources/muos.png" width="76" alt="muOS Apps icon" /> | <img src="resources/media_vault.png" width="76" alt="Media Vault icon" /> | <img src="resources/info.png" width="76" alt="Info icon" /> | <img src="resources/end.png" width="76" alt="End icon" /> |
+
+These are existing project assets. The NEXUS v12 diagram above is a **proposed navigation map**, not a screenshot.
+
 
 ## 🧩 Runtime and frontends
 
