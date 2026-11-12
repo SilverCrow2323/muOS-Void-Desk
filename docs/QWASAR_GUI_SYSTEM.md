@@ -3,7 +3,7 @@
 **Product family:** QWASAR-Env  
 **First host application:** Void Desk  
 **Contract:** QWASAR UI Composition API 1.0 (design baseline)  
-**Status:** architecture contract and reference manifest; runtime-generated layouts are not yet implemented.
+**Status:** architecture contract and reference manifest; the shared profile resolver and generated runtime snapshot are implemented, with partial frontend adoption.
 
 ## 1. Purpose
 
@@ -329,7 +329,7 @@ Studio's future Layout Designer consumes the same manifest and schemas. It edits
 2. **Component registry:** register existing LÖVE/Pygame components against stable IDs and add compatibility fallbacks.
 3. **Shell composition:** migrate header, footer, NEXUS side panels and media overlay to named slots.
 4. **Workspace templates:** migrate one workspace at a time, beginning with RT:TOOLBOX and THE FORGE after MEDIA VAULT is stable.
-5. **Profile resolver:** apply profile overrides transactionally and preserve v1 profile migration.
+5. **Profile resolver — first implementation landed:** the shared Python Resolver validates the manifest/profile, enforces platform compatibility and protected areas, and writes an atomic engine-neutral snapshot. LÖVE applies top-level NEXUS order/visibility/enabled state. Pygame exposes profile selection and reads the snapshot, but its legacy NEXUS menu is not yet profile-driven. See [QWASAR Profile Resolver](QWASAR_PROFILE_RESOLVER.md).
 6. **Module contributions:** allow signed/official modules to register declared slots; community executable modules remain disabled until signing/review/capability enforcement exist.
 7. **Studio editor:** use the same component registry and UI schema to build visual LEGO-style editing and preview.
 8. **Additional engines:** implement Qt 6, LVGL or Web adapters only after the adapter contract is exercised by both existing frontends.
@@ -342,12 +342,15 @@ Studio's future Layout Designer consumes the same manifest and schemas. It edits
 - Every visible menu entry resolves to a registered route/action and has honest state handling.
 - Workspace templates differ by declared content grammar, not duplicated ad-hoc code.
 - RT:TOOLBOX replaces separate Toolbox/Workshop NEXUS destinations without breaking legacy route/profile references.
-- A sample custom profile can reorder/hide components without embedding code or changing permissions.
+- The Resolver validates a sample custom profile and generates a deterministic composition without embedding code or changing permissions.
+- LÖVE applies top-level workspace order, visibility and enabled state through stable legacy node IDs.
+- Pygame can select a platform-compatible profile and persist the selection, but its NEXUS menu/RT:TOOLBOX migration still needs to consume the effective composition.
+- Shell/global-panel overrides and full section-level profile composition are not yet consumed by both renderers.
 - Schema, manifest, route/action tests and device interaction tests pass.
 
 ---
 
-This document defines the intended QWASAR GUI architecture. It does not claim that profile-driven runtime composition, dynamic component installation, the global M media overlay or the consolidated RT:TOOLBOX navigation is already implemented.
+This document defines the QWASAR GUI architecture and distinguishes the first working profile pipeline from the remaining renderer migration. The Resolver and generated composition snapshot are implemented; LÖVE consumes top-level NEXUS workspace states, while Pygame exposes profile selection but retains its legacy navigation. Dynamic component installation, signed community contributions, the global M media overlay migration and the consolidated RT:TOOLBOX navigation are not yet complete.
 
 
 ## 15. Boot, installation flavours and engine selection
