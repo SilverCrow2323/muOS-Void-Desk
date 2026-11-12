@@ -18,6 +18,7 @@
 - [Troubleshooting](Troubleshooting)
 - [Visual assets](Visual-capture-and-assets)
 - [v12 plan](Void-Desk-v12-Blueprint)
+- [Symbiotic Layer](Symbiotic-Layer)
 
 **DEVELOPMENT**
 - [Development](Development)
