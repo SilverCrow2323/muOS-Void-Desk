@@ -2615,6 +2615,7 @@ class App(object):
     def rebuild_menu(self):
         xfce_ok = os.path.exists(os.path.join(DATA, ".xfce_ready"))
         t = self.t
+        it = (self.lang == "it")
         self.menu = [
             (t("sess"), t("sess_s")),
             (t("mapps"), t("mapps_s")),
@@ -2626,10 +2627,24 @@ class App(object):
             (t("h_set"), t("h_set_s")),
             (t("h_info"), t("h_info_s")),
             (t("h_exit"), t("h_exit_s")),
+            ("GIOCHI" if it else "GAMES",
+             "Giochi nativi, PortMaster e raccolte" if it
+             else "Native games, PortMaster and collections"),
+            ("SVILUPPO" if it else "DEVELOP",
+             "Terminale, editor e strumenti di sviluppo" if it
+             else "Terminal, editor and development tools"),
+            ("COMMUNITY",
+             "Forum, wiki e condivisione" if it
+             else "Forums, wiki and sharing"),
+            ("OUTERDESK",
+             "Applicazioni e ambienti esterni" if it
+             else "External applications and environments"),
         ]
-        self.menu_icons = ["start", "window", "speaker", "forge",
-                           "toolbox", "uplink", "workshop", "gear",
-                           "book", "power"]
+        self.menu_icons = [
+            "start", "window", "speaker", "forge", "toolbox", "uplink",
+            "workshop", "gear", "book", "power", "games", "develop",
+            "community", "outerdesk",
+        ]
 
     # ---------------------------------------------------- stile SPDW/BLAME!
 
@@ -17092,6 +17107,15 @@ class App(object):
         elif i == 9:
             self.shutdown_sel = 0
             self.push("shutdownmenu", shape=shape)
+        elif i in (10, 11, 12, 13):
+            hub = {
+                10: "games",
+                11: "develop",
+                12: "community",
+                13: "outerdesk",
+            }[i]
+            self.hub_sel = 0
+            self.push("hub:" + hub, shape=shape)
 
     # -------------------------------------------------------------- render
     def render_home_hud(self):
