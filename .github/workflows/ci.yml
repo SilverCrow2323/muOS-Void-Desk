@@ -49,6 +49,8 @@ jobs:
             voidcast_addons assets tools
       - name: Build and validate QWASAR Field Portal
         run: python tools/build_site.py --output "$RUNNER_TEMP/qwasar-site"
+      - name: Check portal JavaScript syntax
+        run: node --check site/assets/site.js
       - name: Run unit tests
         run: python -m pytest -q
       - name: Run repository integrity audit
