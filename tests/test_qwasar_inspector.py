@@ -111,11 +111,12 @@ def test_inspector_rejects_unknown_profile_menu_and_global_panel_references(tmp_
     root = _fixture(tmp_path)
     path = root / "data/profiles/voiddesk-handheld-default.qprofile.json"
     profile = _read(path)
-    profile["workspaceOverrides"].append({
-        "id": "rt-toolbox",
-        "menuOrder": ["toolbox.not-registered"],
-        "hiddenMenuEntries": ["toolbox.missing-entry"],
-    })
+    toolbox_override = next(
+        item for item in profile["workspaceOverrides"]
+        if item["id"] == "rt-toolbox"
+    )
+    toolbox_override["menuOrder"] = ["toolbox.not-registered"]
+    toolbox_override["hiddenMenuEntries"] = ["toolbox.missing-entry"]
     profile["shell"].setdefault("globalPanels", {})["panel.not-registered"] = {
         "enabled": True,
     }
