@@ -52,7 +52,8 @@ PRESET_PLAYLISTS = [
 ]
 
 DEFAULTS = {
-    "language": "en",                # en | it
+    "language": "en",
+    "muos_profile": "auto",  # auto | andromeda | not_andromeda                # en | it
     "active_playlist": None,        # id playlist attiva
     "playlists": [],                # [{id, name, source(url|path), type:"url"/"file"}]
     "view_mode": "list",            # list | grid | guide
