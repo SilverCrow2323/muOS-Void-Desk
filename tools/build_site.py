@@ -87,9 +87,9 @@ def validate_site(output: Path) -> None:
     if studio.count("data-studio-tab=") != 4 or studio.count("data-studio-panel=") != 4:
         raise ValueError("QWASAR Studio must expose all four workbenches and panels")
     for required in (
-        'data-node-route="session.launch"',
-        'data-node-route="forge.home"',
-        'data-node-route="media.home"',
+        'data-node-route="session.launch.xfce"',
+        'data-node-route="route.forge.apt"',
+        'data-node-route="route.media.library"',
         "data-export-profile",
         "data-export-release",
     ):
