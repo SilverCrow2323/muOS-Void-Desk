@@ -13,8 +13,18 @@ REQUIRED_FILES = (
     "Void-Desk/mux_launch.sh",
     "Void-Desk/voiddesk.py",
     "Void-Desk/love/main.lua",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py",
+)
+
+EXECUTABLE_FILES = (
+    "Void-Desk/mux_launch.sh",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts",
+    "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog",
 )
 
 
@@ -67,8 +77,13 @@ def validate_archive(archive: str | Path) -> list[str]:
                     errors.append("symbolic links are not allowed: %s" % name)
                 if not info.is_dir():
                     files.add(normalized)
-                    if normalized == "Void-Desk/mux_launch.sh" and not (mode & 0o111):
-                        errors.append("muOS launcher is not executable: %s" % normalized)
+                    if normalized in EXECUTABLE_FILES and not (mode & 0o111):
+                        label = (
+                            "muOS launcher"
+                            if normalized == "Void-Desk/mux_launch.sh"
+                            else "Rt:Tailscale-M entrypoint"
+                        )
+                        errors.append("%s is not executable: %s" % (label, normalized))
 
             if top_levels != {"Void-Desk"}:
                 errors.append(
