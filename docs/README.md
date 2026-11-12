@@ -4,6 +4,8 @@
 
 A field manual for the handheld product, its host integration, the QWASAR contracts and the v12 direction.
 
+> **Visual documentation portal:** browse the [QWASAR Field Portal](../site/index.html) for the designed, responsive guide experience. The Markdown files here remain the technical source of truth.
+
 > [!IMPORTANT]
 > **Read implementation status honestly.** Pygame is the reference handheld frontend, LÖVE is experimental, and v12 is a blueprint—not a published package.
 

@@ -1,0 +1,43 @@
+name: Publish QWASAR Field Portal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "tools/build_site.py"
+      - "docs/assets/**"
+      - "assets/brand/**"
+      - "resources/*.png"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: qwasar-field-portal
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Assemble static site
+        run: python3 tools/build_site.py --output _site
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
