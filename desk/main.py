@@ -181,7 +181,10 @@ import sys
 import threading
 import time
 
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+# muOS uses a direct framebuffer surface; do not force SDL's unavailable dummy
+# video backend on that platform.
+if os.environ.get("VOIDDESK_DIRECT_FB") != "1":
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -189,6 +192,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pygame
 from desk import love_bridge  # LÖVE bridge (Andromeda)          # noqa: E402
+from desk.muos_video import init_muos_surface  # noqa: E402
 from desk.qwasar.nexus_adapter import compose_nexus_profile  # noqa: E402
 import evinput         # noqa: E402
 import fbdisplay       # noqa: E402
@@ -2176,19 +2180,32 @@ class App(object):
 
 # --- [E1] __init__ — Initialization, Config Loading, Boot Sequence ---
     def __init__(self):
-        # Guard: device has no X11/KMS, retry with dummy + fbdisplay
-        try:
-            pygame.display.init()
-        except pygame.error:
-            import os as _os_ffb
-            _os_ffb.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
-            _os_ffb.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
-            _os_ffb.environ.setdefault('VOIDCAST_FB', '1')
-            pygame.display.init()
-        pygame.font.init()
-        self.surface = pygame.display.set_mode((W, H))
-        if not fbdisplay.attach(self.surface):
-            print("fbdisplay not available")
+        # muOS H700 has no usable SDL video driver in this runtime. Create
+        # a regular software Surface and send frames straight to /dev/fb0.
+        # This deliberately avoids pygame.display.init()/set_mode() entirely.
+        if os.environ.get("VOIDDESK_DIRECT_FB") == "1":
+            pygame.font.init()
+            try:
+                pygame.event.init()
+            except pygame.error:
+                # Physical controls are read by evinput; window events are
+                # optional on a framebuffer-only device.
+                pass
+            self.surface = init_muos_surface(pygame, fbdisplay, (W, H))
+            print("[muOS] direct framebuffer active: %s" % fbdisplay.info())
+        else:
+            try:
+                pygame.display.init()
+            except pygame.error:
+                import os as _os_ffb
+                _os_ffb.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+                _os_ffb.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+                _os_ffb.environ.setdefault('VOIDCAST_FB', '1')
+                pygame.display.init()
+            pygame.font.init()
+            self.surface = pygame.display.set_mode((W, H))
+            if not fbdisplay.attach(self.surface):
+                print("fbdisplay not available")
         self.cfg = load_cfg()
         self.qwasar_profile_options = self._qwasar_profile_options()
         self.qwasar_profile_pending = False
@@ -23041,7 +23058,11 @@ class App(object):
                     self.on_button("LEFT")
                 elif hx > 0:
                     self.on_button("RIGHT")
-            for e in pygame.event.get():
+            try:
+                queued_events = pygame.event.get()
+            except pygame.error:
+                queued_events = ()
+            for e in queued_events:
                 if e.type == pygame.QUIT:
                     self.running = False
             self.render()
