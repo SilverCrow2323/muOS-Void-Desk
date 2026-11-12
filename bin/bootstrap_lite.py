@@ -50,10 +50,8 @@ def log(msg):
 
 def opener():
     ctx = ssl.create_default_context()
-    # Keep compatibility with older muOS CA stores; PyPI metadata and wheel
-    # selection are only the online fallback, never required on first boot.
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+    # Keep normal TLS certificate and hostname verification for online fallback.
+    # The normal first-boot path uses the bundled offline runtime.
     op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx))
     op.addheaders = [("User-Agent", "VoidDesk/1.5")]
     return op
@@ -202,8 +200,17 @@ def find_system_sdl():
 
 
 def finish_runtime(runtime_path, pygame_version, tag, machine):
-    shutil.rmtree(RUNTIME, ignore_errors=True)
-    os.replace(runtime_path, RUNTIME)
+    backup = APP / "runtime.previous"
+    shutil.rmtree(backup, ignore_errors=True)
+    if RUNTIME.exists():
+        os.replace(RUNTIME, backup)
+    try:
+        os.replace(runtime_path, RUNTIME)
+    except OSError:
+        if backup.exists() and not RUNTIME.exists():
+            os.replace(backup, RUNTIME)
+        raise
+    shutil.rmtree(backup, ignore_errors=True)
 
     for base, _dirs, files in os.walk(RUNTIME):
         for filename in files:
