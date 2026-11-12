@@ -7,7 +7,7 @@ from desk import icons
 
 def test_controller_keycaps_render_face_shoulder_direction_and_system_keys():
     pygame.font.init()
-    surface = pygame.Surface((260, 30), pygame.SRCALPHA)
+    surface = pygame.Surface((560, 30), pygame.SRCALPHA)
     x = 2
     for label in ("A", "B", "X", "Y", "L1", "R1", "START", "SELECT",
                   "MENU", "LEFT", "RIGHT", "STICK"):
