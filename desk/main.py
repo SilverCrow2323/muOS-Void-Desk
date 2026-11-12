@@ -192,7 +192,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pygame
 from desk import love_bridge  # LÖVE bridge (Andromeda)          # noqa: E402
-from desk.muos_video import init_muos_surface  # noqa: E402
+from desk.muos_video import init_muos_surface, poll_muos_events  # noqa: E402
 from desk.qwasar.nexus_adapter import compose_nexus_profile  # noqa: E402
 import evinput         # noqa: E402
 import fbdisplay       # noqa: E402
@@ -2185,12 +2185,6 @@ class App(object):
         # This deliberately avoids pygame.display.init()/set_mode() entirely.
         if os.environ.get("VOIDDESK_DIRECT_FB") == "1":
             pygame.font.init()
-            try:
-                pygame.event.init()
-            except pygame.error:
-                # Physical controls are read by evinput; window events are
-                # optional on a framebuffer-only device.
-                pass
             self.surface = init_muos_surface(pygame, fbdisplay, (W, H))
             print("[muOS] direct framebuffer active: %s" % fbdisplay.info())
         else:
@@ -23058,10 +23052,9 @@ class App(object):
                     self.on_button("LEFT")
                 elif hx > 0:
                     self.on_button("RIGHT")
-            try:
-                queued_events = pygame.event.get()
-            except pygame.error:
-                queued_events = ()
+            queued_events = poll_muos_events(
+                pygame, direct_fb=(os.environ.get("VOIDDESK_DIRECT_FB") == "1")
+            )
             for e in queued_events:
                 if e.type == pygame.QUIT:
                     self.running = False

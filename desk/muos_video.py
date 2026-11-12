@@ -1,4 +1,4 @@
-"""Direct software-surface output for muOS framebuffer-only devices."""
+"""Direct software-surface output and event policy for muOS framebuffer devices."""
 
 
 def init_muos_surface(pygame, fbdisplay, size):
@@ -17,3 +17,18 @@ def init_muos_surface(pygame, fbdisplay, size):
             "check /dev/fb0 access and framebuffer geometry" % detail
         )
     return surface
+
+
+def poll_muos_events(pygame, direct_fb=False):
+    """Poll SDL window events only when an SDL display exists.
+
+    In direct framebuffer mode, controls come from evinput/evdev and there is
+    no SDL video/event queue to pump. Some Pygame builds do not expose a usable
+    event subsystem without display initialization, so do not touch it there.
+    """
+    if direct_fb:
+        return ()
+    try:
+        return pygame.event.get()
+    except pygame.error:
+        return ()

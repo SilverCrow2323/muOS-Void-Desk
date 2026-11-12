@@ -56,7 +56,7 @@ def _probe(f):
         pass
     return None
 
-_state = {"fb": None}
+_state = {"fb": None, "error": None}
 
 
 class _FBOut(object):
@@ -65,6 +65,7 @@ class _FBOut(object):
         sysfs = sysfs or os.environ.get("VOIDCAST_FB_SYSFS",
                                         "/sys/class/graphics/fb0")
         self.ok = False
+        self.error = None
         try:
             self.f = open(dev, "r+b")
             _reset_pan(self.f)
@@ -91,7 +92,8 @@ class _FBOut(object):
             self.masks = masks
             self._fit = None
             self.ok = True
-        except Exception:
+        except Exception as exc:
+            self.error = "%s: %s" % (type(exc).__name__, exc)
             self.close()
 
     def close(self):
@@ -166,7 +168,8 @@ def grab(dev=None, sysfs=None):
 def info():
     fb = _state.get("fb")
     if fb is None or not fb.ok:
-        return "fb: non attivo"
+        detail = _state.get("error")
+        return "fb: non attivo" + (" (%s)" % detail if detail else "")
     return ("fb: %dx%d %dbpp stride=%d masks=%s"
             % (fb.w, fb.h, fb.bpp, fb.stride,
                ",".join(hex(m) for m in fb.masks)))
@@ -178,10 +181,13 @@ def attach(surface):
     old = _state.get("fb")
     if old is not None:
         old.close()
+    _state["error"] = None
     fb = _FBOut()
     if not fb.ok:
+        _state["error"] = fb.error or "framebuffer open/probe failed without detail"
         return False
     _state["fb"] = fb
+    _state["error"] = None
 
     def _flip():
         fb.present(surface)
