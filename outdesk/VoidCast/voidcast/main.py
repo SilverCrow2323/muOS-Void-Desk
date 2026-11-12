@@ -1010,7 +1010,7 @@ class SettingsScreen(Screen):
             ("ADDONS",         "%d active" % len(self.app.addons.addons), ""),
             ("LOG",            i18n.t("tools.log_sub"), ""),
             ("ABOUT",          "VOIDCAST %s" % C.APP_VERSION, "ℹ"),
-            ("MUOS INPUT",     "Auto / Andromeda (=) / Non-Andromeda (!=)", cfg.get("muos_profile", "auto").upper()),
+            ("MUOS INPUT",     "Auto / Andromeda (=) / Non-Andromeda (!=)", (cfg.get("muos_profile", "auto").upper() + " → " + evinput.resolve_profile(cfg.get("muos_profile", "auto")).upper())),
         ]
 
     def on_button(self, btn):
