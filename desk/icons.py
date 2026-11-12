@@ -480,6 +480,77 @@ def draw(surf, key, x, y, sz, col):
         rect(4, 4, 16, 16, 2, 2)
 
 
+_BUTTON_FONT_CACHE = {}
+
+
+def button_keycap_width(label, height=18):
+    """Width of a controller keycap at the requested pixel height."""
+    label = str(label).strip().upper()
+    if label in ("A", "B", "X", "Y", "UP", "DOWN", "LEFT", "RIGHT"):
+        return max(16, int(height))
+    if label in ("L1", "R1", "L2", "R2"):
+        return max(24, int(height * 1.55))
+    if label == "STICK":
+        return max(34, int(height * 2.05))
+    return max(27, int(height * 1.8), int(len(label) * height * 0.38 + 10))
+
+
+def draw_button(surface, label, x, y, height=18, color=(220, 230, 238),
+                background=(12, 20, 28)):
+    """Draw a labelled controller keycap without implying a physical layout.
+
+    Face buttons are circular, shoulder controls are horizontal capsules,
+    directional inputs use arrow glyphs, and system keys use labelled keys.
+    Returns the rendered width so several keycaps can be placed in a row.
+    """
+    label = str(label).strip().upper()
+    height = max(14, int(height))
+    width = button_keycap_width(label, height)
+    rect = pygame.Rect(int(x), int(y), width, height)
+    radius = max(3, height // 3)
+
+    if label in ("A", "B", "X", "Y"):
+        pygame.draw.circle(surface, background,
+                           (rect.centerx, rect.centery), height // 2)
+        pygame.draw.circle(surface, color,
+                           (rect.centerx, rect.centery),
+                           max(2, height // 2 - 1), 1)
+    else:
+        pygame.draw.rect(surface, background, rect, border_radius=radius)
+        pygame.draw.rect(surface, color, rect, 1, border_radius=radius)
+
+    if label in ("UP", "DOWN", "LEFT", "RIGHT"):
+        cx, cy = rect.center
+        span = max(3, height // 4)
+        if label == "UP":
+            pts = [(cx, cy - span), (cx - span, cy + span // 2),
+                   (cx + span, cy + span // 2)]
+        elif label == "DOWN":
+            pts = [(cx, cy + span), (cx - span, cy - span // 2),
+                   (cx + span, cy - span // 2)]
+        elif label == "LEFT":
+            pts = [(cx - span, cy), (cx + span // 2, cy - span),
+                   (cx + span // 2, cy + span)]
+        else:
+            pts = [(cx + span, cy), (cx - span // 2, cy - span),
+                   (cx - span // 2, cy + span)]
+        pygame.draw.polygon(surface, color, pts)
+        return width
+
+    font_size = max(9, int(height * (0.52 if len(label) > 3 else 0.66)))
+    font = _BUTTON_FONT_CACHE.get(font_size)
+    if font is None:
+        try:
+            font = pygame.font.Font(None, font_size)
+            _BUTTON_FONT_CACHE[font_size] = font
+        except pygame.error:
+            font = None
+    if font is not None:
+        glyph = font.render(label, True, color)
+        surface.blit(glyph, glyph.get_rect(center=rect.center))
+    return width
+
+
 # ---------------------------------------------------------------- indicatori
 def battery_icon(surf, x, y, sz, pct, charging, col_ok, col_low, col_bg):
     u = sz / 24.0
