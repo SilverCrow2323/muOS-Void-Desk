@@ -24,6 +24,10 @@ export VOIDDESK_APP_DIR="$APP_DIR"
 export VOIDDESK_FULLSCREEN=1
 export VOIDDESK_PLATFORM=muos
 export VOIDDESK_MODEL=H700
+# muOS H700 has a Linux framebuffer, not an X11 display. Prefer SDL fbcon;
+# desk/main.py otherwise defaults to the unavailable SDL dummy video driver.
+export SDL_VIDEODRIVER=fbcon
+export SDL_FBDEV=/dev/fb0
 
 # Pygame is the supported muOS frontend. LÖVE stays opt-in only when its
 # complete ARM64 runtime is present in a future package flavour.
