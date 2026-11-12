@@ -85,6 +85,6 @@ def test_legacy_nodes_keep_stable_identity_and_are_not_reinterpreted():
 
     rings, states = compose_nexus_profile(composition)
     assert rings[1][-1] == 6
-    assert rings[2][-1] == 1
+    assert rings[2] == (4, 1, 7, 8)
     assert states[6]["workspace_id"] is None
     assert states[1]["workspace_id"] is None
