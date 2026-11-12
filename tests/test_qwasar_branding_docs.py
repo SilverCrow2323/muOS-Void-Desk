@@ -150,6 +150,14 @@ def test_voiddesk_symbol_is_shared_by_site_and_pygame():
     assert "M263 78 L94 352 H429 Z" in source
     assert "M263 352 V492" in source
     assert 'symbol = BRAND / "voiddesk_symbol.svg"' in builder
+    publisher = (ROOT / "tools" / "publish_wiki.sh").read_text(
+        encoding="utf-8"
+    )
+    wiki_home = (ROOT / "wiki-source" / "Home.md").read_text(
+        encoding="utf-8"
+    )
+    assert 'cp "$BRAND_DIR/voiddesk_symbol.svg"' in publisher
+    assert 'src="assets/brand/voiddesk_symbol.svg"' in wiki_home
     assert 'key in ("voiddesk", "brand")' in icons
     identity = (ROOT / "docs" / "VISUAL_IDENTITY.md").read_text(
         encoding="utf-8"
