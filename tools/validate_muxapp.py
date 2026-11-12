@@ -103,7 +103,7 @@ def validate_pygame_runtime_archives(package: zipfile.ZipFile, files: set[str]) 
 
     libs_names = extracted.get("pygame.libs.tar.gz", set())
     if not any(
-        name.startswith("pygame.libs/libSDL2-") and name.endswith(".so.0")
+        name.startswith("pygame.libs/libSDL2-") and ".so.0" in name
         for name in libs_names
     ):
         errors.append("bundled Pygame SDL2 ARM64 libraries missing")
