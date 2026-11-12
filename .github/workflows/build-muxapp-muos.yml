@@ -75,6 +75,12 @@ jobs:
               assert "Void-Desk/desk/main.py" in names, "Pygame frontend missing"
               assert "Void-Desk/love/main.lua" in names, "LÖVE frontend missing"
               assert "Void-Desk/bin/bootstrap_lite.py" in names, "Pygame bootstrap missing"
+              service_root = "Void-Desk/external/rt-tailscale-m/app/RtTailscale/"
+              for entrypoint in ("rt", "ts", "watchdog"):
+                  name = service_root + entrypoint
+                  assert name in names, f"Rt:Tailscale-M entrypoint missing: {entrypoint}"
+                  entry_mode = (archive.getinfo(name).external_attr >> 16) & 0o777
+                  assert entry_mode & 0o111, f"Rt:Tailscale-M entrypoint not executable: {entrypoint}"
               assert all(PurePosixPath(name).parts[0] == "Void-Desk" for name in names)
           print("muOS package smoke checks passed")
           PY
