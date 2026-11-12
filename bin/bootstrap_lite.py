@@ -32,7 +32,7 @@ BUNDLED_ARCHIVES = (
 sys.path.insert(0, str(APP / "lib"))
 try:
     import fbtext
-    SCREEN = fbtext.Screen(title="VOIDDESK - installazione runtime pygame")
+    SCREEN = fbtext.Screen(title="VOIDDESK - Installazione runtime Pygame")
 except Exception:
     SCREEN = None
 
