@@ -37,7 +37,10 @@ jobs:
       - name: Verify build tools and source syntax
         run: |
           python -m py_compile tools/build_muxapp.py tools/validate_muxapp.py
-          sh -n mux_launch.sh
+          sh -n mux_launch.sh bin/xfce_launch.sh
+          sh -n external/rt-tailscale-m/app/RtTailscale/rt
+          sh -n external/rt-tailscale-m/app/RtTailscale/ts
+          sh -n external/rt-tailscale-m/app/RtTailscale/watchdog
           test -f external/rt-tailscale-m/app/RtTailscale/rt
           test -f external/rt-tailscale-m/app/RtTailscale/ts
           test -f external/rt-tailscale-m/app/RtTailscale/panel/server.py
