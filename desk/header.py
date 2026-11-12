@@ -40,6 +40,11 @@ def _draw_brand(surface, app, acc):
     if sym is not None:
         surface.blit(sym, (10, 8))
         tx0 = 10 + sym.get_width() + 6
+    else:
+        # Keep the supplied Void Desk mark visible even when no raster badge
+        # loader is available (for example, minimal or recovery UI states).
+        icons.draw(surface, "voiddesk", 10, 8, 26, acc)
+        tx0 = 42
     surface.blit(app.f_big.render("Void-DESK", True, (150, 30, 30)), (tx0, 9))
     surface.blit(app.f_big.render("Void-DESK", True, (25, 90, 100)), (tx0 + 2, 7))
     surface.blit(app.f_big.render("Void-", True, FG), (tx0 + 1, 8))
