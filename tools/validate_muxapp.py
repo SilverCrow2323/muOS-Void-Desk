@@ -55,7 +55,7 @@ def validate_pygame_runtime_archives(package: zipfile.ZipFile, files: set[str]) 
     }
     errors: list[str] = []
     extracted: dict[str, set[str]] = {}
-    wheel_text = ""
+    wheel_text: str | None = None
 
     for label, member_path in archive_names.items():
         if member_path not in files:
@@ -112,11 +112,11 @@ def validate_pygame_runtime_archives(package: zipfile.ZipFile, files: set[str]) 
     if not any(name.startswith("pygame-2.6.1.data/") for name in data_names):
         errors.append("bundled Pygame data archive has an unexpected layout")
 
-    if wheel_text and not (
+    if wheel_text is None or not (
         "Tag: cp311-cp311-manylinux_2_17_aarch64" in wheel_text
         and "Tag: cp311-cp311-manylinux2014_aarch64" in wheel_text
     ):
-        errors.append("bundled Pygame wheel metadata is not CPython 3.11/aarch64")
+        errors.append("bundled Pygame wheel metadata is missing or not CPython 3.11/aarch64")
 
     return errors
 
