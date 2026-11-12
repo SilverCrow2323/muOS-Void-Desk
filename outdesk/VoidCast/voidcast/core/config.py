@@ -66,10 +66,10 @@ DEFAULTS = {
     "favorites": [],                # lista di url canale
     "last_group": "*",
     "show_logos": True,             # scarica/mostra i loghi tvg-logo (cache su disco)
-    "button_map": {                 # raw joystick button -> logico (rimappabile)
+    "button_map": {                 # joydev js1 indices verified on RG35XX H
         "0": "A", "1": "B", "2": "X", "3": "Y",
-        "4": "L1", "5": "R1", "6": "SELECT", "7": "START",
-        "8": "L2", "9": "R2",
+        "4": "L1", "5": "R1", "6": "L2", "7": "R2",
+        "8": "SELECT", "9": "START", "10": "MENU", "11": "L3", "12": "R3",
     },
     "theme_accent": "crimson",
     "anim_intensity": 2,        # 0=off 1=subtle 2=normal 3=intense
