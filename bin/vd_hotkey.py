@@ -21,7 +21,7 @@ EVSZ = struct.calcsize("llHHi")
 HOLD_S = 0.6
 MNT = sys.argv[1] if len(sys.argv) > 1 else ""
 DATA = os.path.join(APP, "data")
-_hold = {310: False, 311: False}
+_hold = {314: False, 315: False}
 _taps = []          # tasti premuti (codici grezzi) da smaltire
 
 
@@ -31,10 +31,13 @@ def kbd_buttons():
         cfg = json.load(open(os.path.join(DATA, "desk_config.json")))
         evs = (cfg.get("map") or {}).get("kbd")
         if evs:
+            # Migrate the old built-in MENU code; preserve explicit custom maps.
+            if evs == [312]:
+                return [316]
             return list(evs)
     except Exception:
         pass
-    return [312]        # MENU
+    return [316]        # MENU
 
 
 def log(m):
@@ -59,7 +62,7 @@ def poll_hold():
                         _hold[c] = (v != 0)
                     if v == 1:
                         _taps.append(c)
-    return _hold[310] and _hold[311]
+    return _hold[314] and _hold[315]
 
 
 def kbd_pids():

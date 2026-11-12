@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# VOIDDESK bootstrap-lite v1.4
-# Niente chroot: scarica il wheel pygame precompilato adatto a questo
-# python/arch e lo scompatta in <app>/runtime. Funziona anche su exFAT.
+"""Prepara il runtime Pygame per muOS dagli archivi ARM64 inclusi o da PyPI."""
 
 import glob
 import json
@@ -12,25 +10,33 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tarfile
 import urllib.request
 import zipfile
+from pathlib import Path, PurePosixPath
 
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib"))
+APP = Path(__file__).resolve().parents[1]
+DATA = APP / "data"
+RUNTIME = APP / "runtime"
+WHL = DATA / "pygame.whl"
+MARKER = DATA / ".pygame_ready"
+SDL_TXT = DATA / "sdl_path.txt"
+ARCHIVE_DIR = APP / "assets" / "runtime_archives"
+BUNDLED_ARCHIVES = (
+    "pygame.tar.gz",
+    "pygame.libs.tar.gz",
+    "pygame-2.6.1.data.tar.gz",
+    "pygame-2.6.1.dist-info.tar.gz",
+)
+
+sys.path.insert(0, str(APP / "lib"))
 try:
     import fbtext
-    SCREEN = fbtext.Screen(title="VOIDDESK - installazione runtime pygame")
+    SCREEN = fbtext.Screen(title="VOIDDESK - Installazione runtime Pygame")
 except Exception:
     SCREEN = None
 
-APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(APP, "data")
-RUNTIME = os.path.join(APP, "runtime")
-WHL = os.path.join(DATA, "pygame.whl")
-MARKER = os.path.join(DATA, ".pygame_ready")
-SDL_TXT = os.path.join(DATA, "sdl_path.txt")
-
-os.makedirs(DATA, exist_ok=True)
+DATA.mkdir(parents=True, exist_ok=True)
 
 
 def log(msg):
@@ -44,152 +50,273 @@ def log(msg):
 
 def opener():
     ctx = ssl.create_default_context()
-    ctx.check_hostname = False          # CA bundle vecchi sui firmware
-    ctx.verify_mode = ssl.CERT_NONE
+    # Mantiene attiva la verifica TLS di certificato e nome host per il download alternativo.
+    # Al primo avvio viene normalmente usato il runtime offline incluso.
     op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx))
-    op.addheaders = [("User-Agent", "VoidDesk/1.4")]
+    op.addheaders = [("User-Agent", "VoidDesk/1.5")]
     return op
 
 
 def pick_wheel(op, pkg, tag, mach):
     url = "https://pypi.org/pypi/%s/json" % pkg
-    with op.open(url, timeout=30) as r:
-        d = json.load(r)
-    for f in d.get("urls", []):
-        n = f.get("filename", "")
-        if (n.endswith(".whl") and tag in n and mach in n
-                and "manylinux" in n):
-            return f["url"], n, d["info"]["version"]
+    with op.open(url, timeout=30) as response:
+        data = json.load(response)
+    for item in data.get("urls", []):
+        filename = item.get("filename", "")
+        if (filename.endswith(".whl") and tag in filename
+                and mach in filename and "manylinux" in filename):
+            return item["url"], filename, data["info"]["version"]
     return None, None, None
 
 
 def download(op, url, dest):
-    download.next_pct = 0
-    with op.open(url, timeout=60) as r, open(dest, "wb") as f:
-        total = int(r.headers.get("Content-Length") or 0)
+    with op.open(url, timeout=60) as response, open(dest, "wb") as stream:
+        total = int(response.headers.get("Content-Length") or 0)
         done = 0
+        next_pct = 0
         while True:
-            chunk = r.read(262144)
+            chunk = response.read(262144)
             if not chunk:
                 break
-            f.write(chunk)
+            stream.write(chunk)
             done += len(chunk)
             if total:
                 pct = done * 100 // total
-                if pct >= download.next_pct or done == total:
-                    download.next_pct = pct + 20
+                if pct >= next_pct or done == total:
+                    next_pct = pct + 20
                     log("   %d%% (%0.1f/%0.1fMB)" %
                         (pct, done / 1e6, total / 1e6))
 
 
+def safe_extract_tar(archive_path, destination):
+    """Extract regular files/directories only; reject traversal and links."""
+    root = Path(destination).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive_path, "r:gz") as archive:
+        for member in archive.getmembers():
+            name = member.name
+            relative = PurePosixPath(name)
+            if (not name or "\\" in name or relative.is_absolute()
+                    or ".." in relative.parts or not relative.parts):
+                raise ValueError("elemento non sicuro nell'archivio: %r" % name)
+            target = (root / Path(*relative.parts)).resolve()
+            if target != root and root not in target.parents:
+                raise ValueError("un elemento dell'archivio esce dalla cartella runtime: %r" % name)
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            if not member.isfile():
+                raise ValueError("tipo di elemento non supportato nell'archivio: %r" % name)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source = archive.extractfile(member)
+            if source is None:
+                raise ValueError("impossibile leggere l'elemento dell'archivio: %r" % name)
+            with source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+            mode = 0o755 if member.mode & 0o111 else 0o644
+            target.chmod(mode)
+
+
+def extract_bundled_runtime(archives_dir=None, destination=None,
+                            python_version=None, machine=None):
+    """Estrae il runtime Pygame CPython 3.11/aarch64 incluso, senza connessione Internet."""
+    archives_dir = Path(archives_dir or ARCHIVE_DIR)
+    destination = Path(destination or (str(RUNTIME) + ".candidate"))
+    python_version = tuple(python_version or sys.version_info[:2])
+    machine = (machine or platform.machine()).lower()
+    if python_version[:2] != (3, 11) or machine not in ("aarch64", "arm64"):
+        return False, "il pacchetto incluso richiede CPython 3.11 e architettura aarch64"
+
+    paths = [archives_dir / name for name in BUNDLED_ARCHIVES]
+    missing = [path.name for path in paths if not path.is_file() or path.stat().st_size == 0]
+    if missing:
+        return False, "archivi del runtime inclusi mancanti: " + ", ".join(missing)
+
+    shutil.rmtree(destination, ignore_errors=True)
+    destination.mkdir(parents=True, exist_ok=True)
+    try:
+        for path in paths:
+            safe_extract_tar(path, destination)
+
+        required = (
+            destination / "pygame" / "__init__.py",
+            destination / "pygame" / "base.cpython-311-aarch64-linux-gnu.so",
+            destination / "pygame-2.6.1.dist-info" / "WHEEL",
+        )
+        for path in required:
+            if not path.is_file():
+                raise ValueError("file del runtime incluso mancante: %s" % path.name)
+
+        libs = destination / "pygame.libs"
+        if not libs.is_dir() or not any(
+                item.name.startswith("libSDL2-") for item in libs.iterdir()):
+            raise ValueError("librerie SDL2 del runtime incluso mancanti")
+
+        wheel_metadata = required[2].read_text(encoding="utf-8")
+        if ("cp311-cp311-manylinux2014_aarch64" not in wheel_metadata
+                and "cp311-cp311-manylinux_2_17_aarch64" not in wheel_metadata):
+            raise ValueError("versione ABI/piattaforma del pacchetto Pygame incluso non compatibile")
+        return True, ""
+    except Exception as exc:
+        shutil.rmtree(destination, ignore_errors=True)
+        return False, str(exc)
+
+
+def verify_runtime(runtime_path):
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(runtime_path)
+    env["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+    env["LD_LIBRARY_PATH"] = (
+        str(Path(runtime_path) / "pygame.libs") + ":"
+        + env.get("LD_LIBRARY_PATH", "")
+    )
+    env.pop("SDL_VIDEODRIVER", None)
+    try:
+        return subprocess.run(
+            [sys.executable, "-c",
+             "import pygame,sys;sys.stdout.write(pygame.version.ver)"],
+            env=env, capture_output=True, text=True, timeout=60)
+    except Exception as exc:
+        log("ERRORE: verifica non eseguibile: %s" % exc)
+        return None
+
+
 def find_system_sdl():
-    pats = [
+    patterns = [
         "/usr/lib/libSDL2-2.0.so*", "/usr/lib/libSDL2*.so*",
         "/usr/lib64/libSDL2*.so*", "/lib/libSDL2*.so*",
         "/usr/lib/aarch64-linux-gnu/libSDL2*.so*",
     ]
     hits = []
-    for p in pats:
-        hits.extend(glob.glob(p))
-    for base, _dirs, files in os.walk("/opt/muos"):
-        for fn in files:
-            if fn.startswith("libSDL2-2.0.so"):
-                hits.append(os.path.join(base, fn))
-    # preferisce il .so.0 "vero"
-    hits.sort(key=lambda h: (0 if ".so.0" in h else 1, len(h)))
+    for pattern in patterns:
+        hits.extend(glob.glob(pattern))
+    if os.path.isdir("/opt/muos"):
+        for base, _dirs, files in os.walk("/opt/muos"):
+            for filename in files:
+                if filename.startswith("libSDL2-2.0.so"):
+                    hits.append(os.path.join(base, filename))
+    hits.sort(key=lambda path: (0 if ".so.0" in path else 1, len(path)))
     return hits
 
 
-def main():
-    log("==== VOIDDESK BOOTSTRAP-LITE start ====")
-    tag = "cp%d%d" % sys.version_info[:2]
-    mach = platform.machine()
-    log("python: %s (%s) - arch: %s" % (
-        platform.python_version(), tag, mach))
-
-    # pulizia dei resti del vecchio approccio chroot (inutilizzabile su exFAT)
-    for junk in (os.path.join(DATA, "rootfs"),
-                 os.path.join(DATA, "rootfs.tar.gz")):
-        if os.path.isdir(junk):
-            log("pulizia residui chroot: %s" % junk)
-            shutil.rmtree(junk, ignore_errors=True)
-        elif os.path.isfile(junk):
-            os.remove(junk)
-
-    op = opener()
-    log("1/4 cerco il wheel pygame per %s/%s su PyPI..." % (tag, mach))
-    url = name = ver = None
-    for pkg in ("pygame", "pygame-ce"):
-        url, name, ver = pick_wheel(op, pkg, tag, mach)
-        if url:
-            log("   found: %s (v%s)" % (name, ver))
-            break
-    if not url:
-        log("FATAL: nessun wheel pygame per %s/%s" % (tag, mach))
-        return 1
-
-    log("2/4 scarico %s ..." % name)
+def finish_runtime(runtime_path, pygame_version, tag, machine):
+    backup = APP / "runtime.previous"
+    shutil.rmtree(backup, ignore_errors=True)
+    if RUNTIME.exists():
+        os.replace(RUNTIME, backup)
     try:
-        download(op, url, WHL)
-    except Exception as e:
-        log("FATAL: download failed: %s" % e)
-        return 1
+        os.replace(runtime_path, RUNTIME)
+    except OSError:
+        if backup.exists() and not RUNTIME.exists():
+            os.replace(backup, RUNTIME)
+        raise
+    shutil.rmtree(backup, ignore_errors=True)
 
-    log("3/4 scompatto in %s ..." % RUNTIME)
-    shutil.rmtree(RUNTIME, ignore_errors=True)
-    os.makedirs(RUNTIME, exist_ok=True)
-    try:
-        with zipfile.ZipFile(WHL) as z:
-            z.extractall(RUNTIME)
-    except Exception as e:
-        log("FATAL: estrazione wheel failed: %s" % e)
-        return 1
-    for base, _d, files in os.walk(RUNTIME):
-        for fn in files:
-            if fn.endswith(".so") or ".so." in fn:
+    for base, _dirs, files in os.walk(RUNTIME):
+        for filename in files:
+            if filename.endswith(".so") or ".so." in filename:
                 try:
-                    os.chmod(os.path.join(base, fn), 0o755)
+                    os.chmod(os.path.join(base, filename), 0o755)
                 except OSError:
                     pass
 
-    log("4/4 verify import pygame...")
-    env = dict(os.environ)
-    env["PYTHONPATH"] = RUNTIME
-    env["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-    env.pop("SDL_VIDEODRIVER", None)
-    try:
-        out = subprocess.run(
-            [sys.executable, "-c",
-             "import pygame,sys;sys.stdout.write(pygame.version.ver)"],
-            env=env, capture_output=True, text=True, timeout=60)
-    except Exception as e:
-        log("FATAL: verify non eseguibile: %s" % e)
-        return 1
-    if out.returncode != 0:
-        log("FATAL: import pygame failed:")
-        log(out.stderr.strip()[-800:])
-        return 1
-    log("   pygame %s OK" % out.stdout.strip())
-
     sdl = find_system_sdl()
     if sdl:
-        log("libSDL2 di sistema: %s" % sdl[0])
-        with open(SDL_TXT, "w") as f:
-            f.write(sdl[0] + "\n")
+        log("Libreria SDL2 di sistema: %s" % sdl[0])
+        SDL_TXT.write_text(sdl[0] + "\n", encoding="utf-8")
     else:
-        log("libSDL2 di sistema: not found (si usera' quella del wheel)")
+        log("Libreria SDL2 di sistema non trovata (verrà usata quella inclusa nel pacchetto)")
         try:
-            os.remove(SDL_TXT)
+            SDL_TXT.unlink()
         except OSError:
             pass
 
-    with open(MARKER, "w") as f:
-        f.write("pygame %s (%s %s)\n" % (out.stdout.strip(), tag, mach))
+    MARKER.write_text("Pygame %s (%s %s)\n" %
+                      (pygame_version, tag, machine), encoding="utf-8")
     try:
-        os.remove(WHL)
+        WHL.unlink()
     except OSError:
         pass
-    log("==== VOIDDESK BOOTSTRAP-LITE completed ====")
+
+
+def main():
+    log("==== AVVIO INSTALLAZIONE RUNTIME PYGAME v1.6 ====")
+    tag = "cp%d%d" % sys.version_info[:2]
+    machine = platform.machine()
+    log("Python: %s (%s) - architettura: %s" %
+        (platform.python_version(), tag, machine))
+
+    for junk in (DATA / "rootfs", DATA / "rootfs.tar.gz"):
+        if junk.is_dir():
+            log("rimozione residui chroot: %s" % junk)
+            shutil.rmtree(junk, ignore_errors=True)
+        elif junk.is_file():
+            junk.unlink()
+
+    candidate = Path(str(RUNTIME) + ".candidate")
+    log("1/4 Verifica del runtime Pygame incluso...")
+    bundled, reason = extract_bundled_runtime(
+        ARCHIVE_DIR, candidate, sys.version_info[:2], machine
+    )
+    if bundled:
+        log("   Runtime ARM64/CPython 3.11 trovato: verifico il caricamento...")
+        verified = verify_runtime(candidate)
+        if verified is not None and verified.returncode == 0:
+            log("   Pygame %s caricato correttamente (installazione offline)" % verified.stdout.strip())
+            finish_runtime(candidate, verified.stdout.strip(), tag, machine)
+            log("==== INSTALLAZIONE RUNTIME COMPLETATA (OFFLINE) ====")
+            return 0
+        detail = verified.stderr.strip()[-800:] if verified is not None else "verifica non riuscita"
+        log("   Il pacchetto incluso non è caricabile su questo firmware: " + detail)
+        shutil.rmtree(candidate, ignore_errors=True)
+    else:
+        log("   Pacchetto incluso non compatibile: %s" % reason)
+
+    log("2/4 Ricerca di un pacchetto Pygame compatibile su PyPI...")
+    opener_instance = opener()
+    url = filename = version = None
+    for package in ("pygame", "pygame-ce"):
+        url, filename, version = pick_wheel(opener_instance, package, tag, machine)
+        if url:
+            log("   Trovato: %s (versione %s)" % (filename, version))
+            break
+    if not url:
+        log("ERRORE: nessun pacchetto Pygame disponibile per %s/%s" % (tag, machine))
+        return 1
+
+    log("3/4 Download di %s..." % filename)
+    try:
+        download(opener_instance, url, WHL)
+    except Exception as exc:
+        log("ERRORE: download non riuscito: %s" % exc)
+        return 1
+
+    log("4/4 Estrazione e verifica del runtime...")
+    shutil.rmtree(candidate, ignore_errors=True)
+    candidate.mkdir(parents=True, exist_ok=True)
+    try:
+        with zipfile.ZipFile(WHL) as wheel:
+            for info in wheel.infolist():
+                relative = PurePosixPath(info.filename)
+                if (relative.is_absolute() or ".." in relative.parts
+                        or "\\" in info.filename):
+                    raise ValueError("elemento non sicuro nel pacchetto: %s" % info.filename)
+            wheel.extractall(candidate)
+    except Exception as exc:
+        shutil.rmtree(candidate, ignore_errors=True)
+        log("ERRORE: estrazione del pacchetto non riuscita: %s" % exc)
+        return 1
+
+    verified = verify_runtime(candidate)
+    if verified is None or verified.returncode != 0:
+        detail = verified.stderr.strip()[-800:] if verified is not None else "verifica non riuscita"
+        shutil.rmtree(candidate, ignore_errors=True)
+        log("ERRORE: caricamento di Pygame non riuscito: " + detail)
+        return 1
+
+    log("   Pygame %s caricato correttamente" % verified.stdout.strip())
+    finish_runtime(candidate, verified.stdout.strip(), tag, machine)
+    log("==== INSTALLAZIONE RUNTIME COMPLETATA (ONLINE) ====")
     return 0
 
 

@@ -56,7 +56,7 @@ def _probe(f):
         pass
     return None
 
-_state = {"fb": None}
+_state = {"fb": None, "error": None}
 
 
 class _FBOut(object):
@@ -65,6 +65,7 @@ class _FBOut(object):
         sysfs = sysfs or os.environ.get("VOIDCAST_FB_SYSFS",
                                         "/sys/class/graphics/fb0")
         self.ok = False
+        self.error = None
         try:
             self.f = open(dev, "r+b")
             _reset_pan(self.f)
@@ -91,7 +92,8 @@ class _FBOut(object):
             self.masks = masks
             self._fit = None
             self.ok = True
-        except Exception:
+        except Exception as exc:
+            self.error = "%s: %s" % (type(exc).__name__, exc)
             self.close()
 
     def close(self):
@@ -106,7 +108,8 @@ class _FBOut(object):
 
     def present(self, src):
         if not self.ok:
-            return
+            self.error = "framebuffer output is closed"
+            return False
         try:
             sw, sh = src.get_size()
             if (sw, sh) != (self.w, self.h):
@@ -130,8 +133,11 @@ class _FBOut(object):
                     o = y * self.stride
                     p = y * self.pitch
                     self.mm[o: o + bpr] = buf[p: p + bpr]
-        except Exception:
-            pass
+            self.error = None
+            return True
+        except Exception as exc:
+            self.error = "%s: %s" % (type(exc).__name__, exc)
+            return False
 
 
 def grab(dev=None, sysfs=None):
@@ -166,10 +172,15 @@ def grab(dev=None, sysfs=None):
 def info():
     fb = _state.get("fb")
     if fb is None or not fb.ok:
-        return "fb: non attivo"
-    return ("fb: %dx%d %dbpp stride=%d masks=%s"
-            % (fb.w, fb.h, fb.bpp, fb.stride,
-               ",".join(hex(m) for m in fb.masks)))
+        detail = _state.get("error")
+        return "fb: non attivo" + (" (%s)" % detail if detail else "")
+    detail = "fb: %dx%d %dbpp stride=%d masks=%s" % (
+        fb.w, fb.h, fb.bpp, fb.stride,
+        ",".join(hex(m) for m in fb.masks)
+    )
+    if fb.error:
+        detail += " write-error=%s" % fb.error
+    return detail
 
 
 def attach(surface):
@@ -178,17 +189,29 @@ def attach(surface):
     old = _state.get("fb")
     if old is not None:
         old.close()
+    _state["error"] = None
     fb = _FBOut()
     if not fb.ok:
+        _state["error"] = fb.error or "framebuffer open/probe failed without detail"
         return False
+    # Verify a real framebuffer write before advertising the display as
+    # ready. Historically present() swallowed exceptions, yielding a false
+    # positive where the app rendered but nothing reached the panel.
+    if not fb.present(surface):
+        _state["error"] = fb.error or "initial framebuffer write failed"
+        fb.close()
+        return False
+
     _state["fb"] = fb
+    _state["error"] = None
 
     def _flip():
-        fb.present(surface)
+        if not fb.present(surface):
+            _state["error"] = fb.error or "framebuffer write failed"
+            raise RuntimeError("fbdisplay: " + _state["error"])
 
     pygame.display.flip = _flip
     pygame.display.update = lambda *a, **k: _flip()
-    _flip()
     return True
 
 

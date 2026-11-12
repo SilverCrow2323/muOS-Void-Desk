@@ -105,6 +105,10 @@ def _copy_tailscale_service(repo_root: Path, package_root: Path):
     target.mkdir(parents=True, exist_ok=True)
     for name in ("rt", "ts", "watchdog", "VERSION"):
         shutil.copy2(source / name, target / name)
+    # Rt:Tailscale-M calls these shell entrypoints directly (including
+    # watchdog -> rt); the upstream gitlink currently stores them as 0644.
+    for name in ("rt", "ts", "watchdog"):
+        (target / name).chmod(0o755)
     _copy_tree(source / "panel", target / "panel")
     shutil.copy2(upstream / "LICENSE", target / "LICENSE")
     shutil.copy2(upstream / "THIRD-PARTY.md", target / "THIRD-PARTY.md")
@@ -115,18 +119,18 @@ def _copy_tailscale_service(repo_root: Path, package_root: Path):
     # Keep it disabled by default and bind localhost if explicitly enabled.
     config = target / "config" / "rt.conf"
     config.write_text(
-        "PANEL=0\\n"
-        "PANEL_PORT=8077\\n"
-        "PANEL_BIND=127.0.0.1\\n"
-        "WATCHDOG=1\\n"
-        "TAILDROP=1\\n"
-        "TAILDROP_DIR=\\n"
-        "TS_MODE=auto\\n"
-        "LOGIN_SERVER=\\n"
-        "SOCKS5=\\n"
-        "HTTP_PROXY=\\n"
-        "TS_EXTRA=\\n"
-        "WIFI_WAIT=120\\n",
+        "PANEL=0\n"
+        "PANEL_PORT=8077\n"
+        "PANEL_BIND=127.0.0.1\n"
+        "WATCHDOG=1\n"
+        "TAILDROP=1\n"
+        "TAILDROP_DIR=\n"
+        "TS_MODE=auto\n"
+        "LOGIN_SERVER=\n"
+        "SOCKS5=\n"
+        "HTTP_PROXY=\n"
+        "TS_EXTRA=\n"
+        "WIFI_WAIT=120\n",
         encoding="utf-8",
     )
     config.chmod(0o600)
@@ -149,7 +153,23 @@ def sha256_file(path: Path):
 def build_archive(repo_root: Path, output: Path):
     repo_root = Path(repo_root).resolve()
     output = Path(output).resolve()
-    required_main = ("mux_launch.sh", "voiddesk.py", "love/main.lua")
+    required_main = (
+        "mux_launch.sh",
+        "voiddesk.py",
+        "desk/main.py",
+        "love/main.lua",
+        "bin/bootstrap_lite.py",
+        "bin/xfce_launch.sh",
+        "service/voiddesk_service.py",
+        "lib/love",
+        "lib/libluajit-5.1.so.2",
+        "lib/glyph_install.sh",
+        "resources/voiddesk.png",
+        "assets/runtime_archives/pygame.tar.gz",
+        "assets/runtime_archives/pygame.libs.tar.gz",
+        "assets/runtime_archives/pygame-2.6.1.data.tar.gz",
+        "assets/runtime_archives/pygame-2.6.1.dist-info.tar.gz",
+    )
     missing = [name for name in required_main if not (repo_root / name).is_file()]
     if missing:
         raise RuntimeError("project root is incomplete: " + ", ".join(missing))
@@ -176,6 +196,11 @@ def build_archive(repo_root: Path, output: Path):
                 shutil.copy2(source, target)
 
         _copy_tailscale_service(repo_root, package_root)
+
+        # muOS invokes mux_launch.sh as an application entry point. Git checkouts
+        # may store it without the executable bit; normalize it in the package.
+        for relative in ("mux_launch.sh", "bin/xfce_launch.sh", "lib/love"):
+            (package_root / relative).chmod(0o755)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         timestamp = _zip_datetime()

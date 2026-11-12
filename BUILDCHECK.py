@@ -140,7 +140,15 @@ for m in re.finditer(r'\$APP_DIR/([A-Za-z0-9_./-]+)', la):
     if rel and not os.path.exists(rel):
         missing.add(rel)
 for rel in sorted(missing):
-    soft = rel.startswith(("sgrub", "runtime", "assets/logos"))
+    optional_love_runtime = (
+        rel == "lib/liblove-11.5.so"
+        and '[ ! -f "$APP_DIR/lib/liblove-11.5.so" ]' in la
+        and "LÖVE runtime incomplete; using supported Pygame frontend" in la
+    )
+    soft = (
+        rel.startswith(("sgrub", "runtime", "assets/logos"))
+        or optional_love_runtime
+    )
     if soft:
         warn("called by the launcher but missing: %s (optional, the launcher has a guard)" % rel)
     else:

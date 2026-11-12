@@ -15,15 +15,16 @@ muOS Apps
 mux_launch.sh
    |-- local Python service (service/voiddesk_service.py)
    |
-   |-- engine = py   -> desk/main.py + runtime/ (Pygame wheel)
-   |
-   '-- engine = love -> lib/love love/
+   '-- engine = py   -> desk/main.py + runtime/ (bundled ARM64 Pygame)
+ 
+LÖVE is an experimental, opt-in frontend. The current muOS package does not
+include its complete ARM64 runtime, so the device launcher must not select it.
            |
            '-- session hand-off -> bin/xfce_launch.sh
                                   -> return to QWASAR Desk
 ~~~
 
-The launcher re-reads the configured engine before each run. If the Pygame runtime is not ready, it calls bin/bootstrap_lite.py. Pygame remains the reference frontend; LÖVE is the alternative frontend being completed. An emergency fallback is an explicit configured launch policy, not proof that the two engines are feature-equivalent.
+The launcher re-reads the configured engine before each run and defaults to Pygame on muOS. If the Pygame runtime is not ready, it extracts the bundled CPython 3.11/aarch64 archives from assets/runtime_archives into a staging directory, verifies imports and then activates runtime/. This first boot works without network access. A PyPI wheel is only a fallback if the bundled ABI cannot be used. Pygame is the reference handheld frontend; LÖVE is experimental and may only be selected when its complete matching ARM64 shared-library set is packaged.
 
 The PC launcher, voiddesk.py, is currently a development convenience. The target PC launcher will provide the same pre-frontend instance/engine selector and session catalogue. Optional GRUB2 integration is separate and only selects complete bootable OS installations; it never changes the renderer inside an already running OS.
 
@@ -65,7 +66,7 @@ The device bootstrap discovers a compatible manylinux wheel from PyPI. It verifi
 
 ### LÖVE (experimental)
 
-The handheld package includes lib/love and the project under love/. The PC launcher prefers a system love executable because the bundled binary is target-architecture-specific. LÖVE is incomplete and is not yet at Pygame feature parity. Some routes and actions are still placeholders; keep it opt-in for development and testing. CI validates Lua syntax with LuaJIT and selected core behaviour with focused tests.
+The source tree contains an experimental aarch64 LÖVE executable and Lua project, but the muOS package must not treat that binary alone as a usable runtime: it also needs the matching liblove-11.5.so and its dependent shared libraries. Until that full runtime is included and validated, the muOS launcher defaults to Pygame and refuses an incomplete LÖVE selection. Some LÖVE routes and actions are still placeholders; it is not at Pygame feature parity.
 
 ## LÖVE-to-Python service bridge
 

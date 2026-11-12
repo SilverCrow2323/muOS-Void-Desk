@@ -69,22 +69,38 @@ class SettingsHub(HubMixin):
             app.pop_state()
 
     def engine(self, key):
-        """Frontend engine toggle (py | love). Writes to desk_config.json."""
+        """Frontend engine selection; LÖVE remains opt-in when packaged."""
         app = self.app
         if key == "A":
-            cur = app.cfg.get("engine", "love")
-            nxt = "py" if cur == "love" else "love"
-            app.cfg["engine"] = nxt
+            import json
+            import os
+            from desk.const import DATA
+
+            current = app.cfg.get("engine", "py")
+            next_engine = "py" if current == "love" else "love"
+            if os.environ.get("VOIDDESK_PLATFORM") == "muos":
+                app_dir = os.environ.get("VOIDDESK_APP_DIR", "")
+                love_runtime = os.path.join(app_dir, "lib", "liblove-11.5.so")
+                if next_engine == "love" and not os.path.isfile(love_runtime):
+                    app.notify("LÖVE runtime is not included in this muOS build")
+                    return
+
+            app.cfg["engine"] = next_engine
             try:
-                import json, os
-                from desk.const import DATA
-                with open(os.path.join(DATA, "desk_config.json"), "w") as f:
-                    json.dump(app.cfg, f, indent=1)
-            except Exception:
-                pass
-            try:
-                app.notify("Engine: " + nxt.upper() + " (restart to apply)")
-            except Exception:
-                pass
+                config_path = os.path.join(str(DATA), "desk_config.json")
+                temporary = config_path + ".tmp"
+                with open(temporary, "w", encoding="utf-8") as stream:
+                    json.dump(app.cfg, stream, indent=1)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, config_path)
+            except OSError as exc:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
+                app.notify("Cannot save engine setting: " + str(exc))
+                return
+            app.notify("Engine: " + next_engine.upper() + " (restart to apply)")
         elif key == "B":
             app.pop_state()

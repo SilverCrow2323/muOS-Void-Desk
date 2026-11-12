@@ -71,11 +71,14 @@ NEXUS is an animated, orbit-based hub selector designed for D-pad and controller
 | **MEDIA VAULT** | Media | Radio, IPTV, media library and audio tools |
 | **WORKSHOP** | Maintain | Device checks, diagnostics, storage, monitor, logs and maintenance |
 | **RT:TOOLBOX** | Create | Calculator, clock, calendar, notes, file manager, terminal and utilities |
-| **MUOS APPS / GAMES** | Play | Handheld app discovery, PortMaster hand-off and game tools |
+| **MUOS APPS** | Discover | Browse and launch applications provided by muOS |
+| **GAMES** | Play | Native games, PortMaster and game collections |
+| **DEVELOP** | Build | Terminal, editor, REPL and development utilities |
 | **SETTINGS** | Configure | Visuals, language, fonts, controller bindings and status indicators |
-| **INFO / COMMUNITY** | Discover | Manuals, project information and community links |
+| **INFO / COMMUNITY** | Discover | Manuals, project information and general community links |
+| **COMMUNITY** | Share | Community portal, wiki and sharing resources |
 | **OUTERDESK** | Extend | Standalone applications and optional integrations |
-| **END SESSION** | Configure | Exit, restart, reboot and power-off flows |
+| **END NODE** | Configure | Exit, restart, reboot and power-off flows |
 
 The source-grounded inventory and proposed categories are in [docs/TOOL_CATALOG.md](docs/TOOL_CATALOG.md) and `data/tool_catalog.json`. The future module manager will allow supported contributions to be rearranged and composed through QWASAR Studio; downloaded executable modules will require verification and explicit permissions. Availability depends on firmware, hardware, dependencies, permissions and frontend implementation; a menu entry alone is not proof that a tool is usable.
 
@@ -105,8 +108,9 @@ Pygame contains the main industrial visual language and several home styles. LÖ
 - **LÖVE:** experimental frontend in `love/`; entry point `love/main.lua`.
 - **Local service:** `service/voiddesk_service.py` provides the bridge for host status, jobs and selected device actions.
 - **Device launcher:** `mux_launch.sh` uses the muOS application lifecycle, launches the local service and selects the frontend.
+- **muOS default:** Pygame is the reference handheld frontend. The first launch extracts the bundled CPython 3.11/aarch64 runtime from `assets/runtime_archives/` offline; LÖVE remains experimental and cannot be selected on muOS until its complete ARM64 shared-library runtime is bundled.
 - **PC launcher:** `voiddesk.py` provides development and desktop launch modes.
-- **QWASAR profile pipeline:** `tools/qwasar_profile_resolver.py` validates the selected portable profile and writes the generated engine-neutral composition before either frontend starts. LÖVE applies top-level NEXUS workspace state; Pygame exposes profile selection and reads the snapshot, while its legacy NEXUS menu migration remains in progress.
+- **QWASAR profile pipeline:** `tools/qwasar_profile_resolver.py` validates the selected portable profile and writes the generated engine-neutral composition before either frontend starts; Pygame and LÖVE apply workspace order, visibility and enabled state to NEXUS while preserving legacy routes. LÖVE applies top-level NEXUS workspace state; Pygame exposes profile selection and reads the snapshot, while its legacy NEXUS menu migration remains in progress.
 - **Standalone tools:** `outdesk/` and `external/tools.json` describe optional applications and integrations.
 
 The local service is a privileged boundary and must remain local by default. Future Studio sync must be device-initiated and authenticated; it must not expose the existing host-control service to the internet.
@@ -171,7 +175,9 @@ The installed root remains `Void-Desk/` during this branding transition.
 
 ## Build Void Desk packages
 
-The **Build Void Desk** GitHub Actions workflow is available from the Actions tab. The current builder produces the default package set; Full/Essential/Slim variants will be added after the module registry and lockfile are implemented. The target release model is three reproducible `.muxapp` flavours:
+The **Build Void Desk** GitHub Actions workflow is available from the Actions tab. The current builder produces the default package set; Full/Essential/Slim variants will be added after the module registry and lockfile are implemented.
+
+For a handheld-only build, use **Actions → Build muxapp for muOS → Run workflow**. Enter the package version (default `10.5.4`); the workflow builds and validates the `.muxapp`, checks the launcher executable bit and SHA-256, then publishes the package and checksum as a downloadable 30-day artifact. This dedicated workflow is manual and becomes available in Actions after its workflow file reaches the default branch. The target release model is three reproducible `.muxapp` flavours:
 
 - **Full** — all maintained and compatible first-party modules.
 - **Essential** — core daily-use hubs and tools.

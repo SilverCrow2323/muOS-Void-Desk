@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 # VOIDCAST // core.evinput — input diretto da /dev/input/event* (evdev).
 #
-# Su muOS/RG35XX-H i tasti arrivano da un device "muOS-Keys" che il SDL
-# del wheel pygame non vede come joystick: si legge l'evdev grezzo.
-# Codici (verificati su RG35XX-H, stessi usati da PyLauncher):
-#   EV_KEY: 304 A, 305 B, 306 Y, 307 X, 308 L1, 309 R1, 310 SELECT,
-#           311 START, 312 MENU, 314 L2, 315 R2
+# Su muOS Andromeda / RG35XX-H leggiamo direttamente i codici Linux EV_KEY:
+#   304 A, 305 B, 306 Y, 307 X, 310 L1, 311 R1, 312 L2, 313 R2,
+#   314 SELECT, 315 START, 316 MENU (BTN_MODE).
 #   EV_ABS: 16 = dpad X (-1/0/+1), 17 = dpad Y (-1/0/+1)
 
 import os
@@ -18,8 +16,8 @@ _EVSZ = struct.calcsize("llHHi")  # 24 byte su 64 bit
 
 KEYMAP = {
     304: "A", 305: "B", 306: "Y", 307: "X",
-    308: "L1", 309: "R1", 314: "L2", 315: "R2",
-    310: "SELECT", 311: "START", 312: "MENU",
+    310: "L1", 311: "R1", 312: "L2", 313: "R2",
+    314: "SELECT", 315: "START", 316: "MENU",
     114: "VOL-", 115: "VOL+",
 }
 

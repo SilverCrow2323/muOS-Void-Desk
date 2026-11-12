@@ -1,6 +1,6 @@
 # QWASAR Profile Resolver
 
-**Status:** implemented as a shared resolver and launcher preflight; frontend adoption is in progress. The LÖVE NEXUS adapter applies top-level workspace order, visibility and enabled state. Pygame exposes profile selection and loads the generated snapshot, but its legacy NEXUS arrangement and RT:TOOLBOX section migration are not yet profile-driven.
+**Status:** implemented as a shared resolver and launcher preflight. Both LÖVE and Pygame NEXUS adapters apply top-level workspace order, visibility and enabled state while retaining stable legacy node IDs. Pygame's NEXUS workspace composition is profile-driven; RT:TOOLBOX section migration and shared shell/global-panel overrides remain follow-up work.
 
 ## 1. Purpose and boundaries
 
@@ -117,27 +117,30 @@ Profiles and the generated snapshot are never executed as code. Signature verifi
 - A hidden workspace is removed from visible NEXUS nodes.
 - A disabled-but-visible workspace remains visible, is marked disabled and cannot be opened.
 - END NODE remains protected by Resolver validation.
-- Legacy MUOS APPS and WORKSHOP nodes remain as compatibility extras; they are not silently reinterpreted as QWASAR workspaces.
+- Legacy MUOS APPS, WORKSHOP, GAMES, DEVELOP, COMMUNITY and OUTERDESK nodes remain as compatibility extras; they are not silently reinterpreted as QWASAR workspaces.
 - LÖVE Settings shows the active profile name.
 
 ### Pygame
 
 - The Pygame Settings screen lists compatible `.qprofile.json` files.
 - Saving a selection stores `qwasar_profile` in `data/desk_config.json`; a restart is required for the launcher to regenerate the snapshot.
-- Pygame reads and caches the generated profile summary at startup.
-- Pygame's legacy NEXUS node arrangement and the migration of its separate TOOLBOX/WORKSHOP menus into the four QWASAR RT:TOOLBOX sections are not yet driven by the composition. Stable legacy indices are deliberately preserved until that adapter migration is implemented and tested.
+- Pygame reads and caches the generated composition at startup.
+- The NEXUS adapter maps QWASAR workspace IDs to stable legacy node IDs and applies per-orbit order, visibility and enabled state.
+- Hidden workspaces are removed; disabled workspaces remain visible but muted and cannot be activated. START SESSION and END NODE remain protected recovery anchors.
+- All six non-QWASAR legacy destinations remain in their original orbits and retain their own routes: MUOS APPS, WORKSHOP, GAMES, DEVELOP, COMMUNITY and OUTERDESK.
+- The 14 active NEXUS destinations are represented by the Pygame menu and activation dispatcher. Non-NEXUS home styles, header/footer and side/global panel overrides, and migration of legacy TOOLBOX/WORKSHOP destinations into the four QWASAR RT:TOOLBOX sections remain follow-up work.
 
 ### Shared pending work
 
 - Consume shell region, home-panel and global-panel overrides in both frontends.
 - Apply profile-driven RT:TOOLBOX section/menu order and contributions.
-- Map every old Pygame destination and action to stable manifest IDs, including explicit aliases and unsupported-route states.
+- Map the remaining non-NEXUS Pygame destinations and actions to stable manifest IDs, including explicit aliases and unsupported-route states.
 - Add profile import/export UX and profile migration from the previous configuration format.
 - Verify the full flow on a physical H700 device and a Linux PC.
 
 ## 6. Tests and release checks
 
-The Python tests cover default H700 resolution, desktop compatibility, workspace/section/menu ordering, visibility versus enabled state, safe settings, module/contribution state data, registered action references, protected END NODE/shell behaviour, invalid-profile fallback, atomic output and output-path containment.
+The Python tests cover default H700 resolution, desktop compatibility, workspace/section/menu ordering, visibility versus enabled state, safe settings, module/contribution state data, registered action references, protected END NODE/shell behaviour, invalid-profile fallback, atomic output and output-path containment. Pygame adapter tests cover all pre-existing NEXUS node IDs, within-orbit ordering, hidden and disabled workspaces, protected START SESSION/END NODE and retention of every non-QWASAR legacy node.
 
 The LÖVE core tests cover stable node IDs, profile order, hidden workspaces and disabled workspaces. These tests are part of CI; a green workflow is still required before merging the feature branch.
 
@@ -149,4 +152,3 @@ Before a device release:
 4. test fallback with a malformed/incompatible selected profile;
 5. confirm END NODE, return-to-firmware and recovery remain reachable;
 6. confirm that uninstalling Void Desk leaves the normal muOS startup path intact.
-
