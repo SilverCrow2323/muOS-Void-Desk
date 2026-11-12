@@ -34,7 +34,7 @@ The long-term direction is a **Symbiotic Layer**. Void Desk uses the host firmwa
 
 ## At a glance
 
-The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md). The engine-neutral component, menu, widget, shell and workspace contract is in [QWASAR GUI System](docs/QWASAR_GUI_SYSTEM.md); boot/instance/session selection is in [QWASAR Boot and Session Model](docs/QWASAR_BOOT_AND_SESSION_MODEL.md). The module format, permissions, LEGO-style composition and release flavours are specified in [Void Desk Modules](docs/MODULE_SYSTEM.md).
+The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](docs/PRODUCT_ECOSYSTEM_MAP.md). The engine-neutral component, menu, widget, shell and workspace contract is in [QWASAR GUI System](docs/QWASAR_GUI_SYSTEM.md); the shared profile pipeline is documented in [QWASAR Profile Resolver](docs/QWASAR_PROFILE_RESOLVER.md); boot/instance/session selection is in [QWASAR Boot and Session Model](docs/QWASAR_BOOT_AND_SESSION_MODEL.md). The module format, permissions, LEGO-style composition and release flavours are specified in [Void Desk Modules](docs/MODULE_SYSTEM.md).
 
 | | |
 |---|---|
@@ -48,6 +48,8 @@ The product/device boundaries are defined in [QWASAR-Env Product Ecosystem Map](
 | PC entry point | `voiddesk.py` |
 | Handheld entry point | `mux_launch.sh` |
 | User configuration | `data/desk_config.json` |
+| Portable UI profiles | `data/profiles/*.qprofile.json` |
+| Generated effective UI composition | `data/qwasar_effective_profile.json` (ignored; regenerated at launch) |
 | Optional desktop | XFCE in a separate Ubuntu image |
 | License | No root-level LICENSE file is currently declared |
 
@@ -104,11 +106,24 @@ Pygame contains the main industrial visual language and several home styles. LÖ
 - **Local service:** `service/voiddesk_service.py` provides the bridge for host status, jobs and selected device actions.
 - **Device launcher:** `mux_launch.sh` uses the muOS application lifecycle, launches the local service and selects the frontend.
 - **PC launcher:** `voiddesk.py` provides development and desktop launch modes.
+- **QWASAR profile pipeline:** `tools/qwasar_profile_resolver.py` validates the selected portable profile and writes the generated engine-neutral composition before either frontend starts. LÖVE applies top-level NEXUS workspace state; Pygame exposes profile selection and reads the snapshot, while its legacy NEXUS menu migration remains in progress.
 - **Standalone tools:** `outdesk/` and `external/tools.json` describe optional applications and integrations.
 
 The local service is a privileged boundary and must remain local by default. Future Studio sync must be device-initiated and authenticated; it must not expose the existing host-control service to the internet.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for execution flow.
+
+### QWASAR profile quick start
+
+The launchers select the H700/muOS or PC default profile automatically. To select a custom profile, add a relative path to `data/desk_config.json`:
+
+~~~json
+{
+  "qwasar_profile": "data/profiles/my-custom-profile.qprofile.json"
+}
+~~~
+
+The Pygame Settings screen can cycle compatible profiles and save the choice; restart Void Desk to apply it. The LÖVE frontend reads the effective snapshot on startup and applies top-level workspace order, visibility and enabled state to NEXUS. Shell/global-panel and full RT:TOOLBOX section migration remain in progress. The resolver falls back to the platform default if the selected profile is invalid or incompatible. Read [the resolver guide](docs/QWASAR_PROFILE_RESOLVER.md) before authoring or sharing profile files.
 
 ## The Symbiotic Layer roadmap
 
