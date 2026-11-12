@@ -275,7 +275,7 @@ LÖVE is the next engineering focus. Pygame remains the behavioural reference, b
 
 ### Verified gaps and boundaries
 
-- MEDIA VAULT still contains two non-functional rows: Void Radio and Media Library. Their current callbacks only publish a temporary status string; neither starts playback nor opens a library. These are the first LÖVE feature gaps to implement.
+- MEDIA VAULT now has dedicated `void_radio` and `media_library` LÖVE scenes, already referenced by `hub_media.lua`. Void Radio calls the registered `radio_search`, `radio_favorites`, `radio_favorite_toggle`, `radio_play`, `radio_action` and `radio_status` handlers; Media Library calls `media_list`, `media_play` and `media_stop`. Mainline service tests cover bounded station data, catalogue IDs, player arguments, fixed media roots, supported extensions, symlink rejection and path traversal. CI scene/bridge checks do not yet certify controller interaction, radio network access or actual `mpv` audio/video playback on muOS/H700; those remain device acceptance gates.
 - MUOS APPS now has service handlers for discovery and launch. Static tests verify that the scene calls both handlers and that the shell launcher validates the hand-off path. Real RG35XX-H testing is still required.
 - INFO and FORGE use the registered `gh_fetch_releases` handler. The handler performs a bounded public release lookup and returns explicit errors; network/offline behaviour still needs device testing.
 - IPTV has service handlers for playlist, EPG, play, stop and status. The LÖVE scene implements channel selection, group filtering and favourites. Playback still depends on the media player being installed and available on the target device.
@@ -419,7 +419,7 @@ The first implementation work after this map should stay inside `Void-Desk-Proje
 1. Add LÖVE Diagnostics and Monitor to the automated scene capture set; deliberately exclude the generic stub from normal user-facing capture.
 2. Expand the action/route audit from Session, Forge, Workshop and Toolbox to every visible NEXUS node.
 3. Verify the live service handler table against every `bridge.call` made by LÖVE scenes.
-4. Replace or hide the two MEDIA VAULT placeholder actions.
+4. Complete LÖVE Media Vault end-to-end and physical acceptance: route/action flow, radio online/offline, player availability, media start/stop and controller navigation; do not call it hardware-validated until tested on H700.
 5. Complete the highest-priority UPLINK and Forge user journeys, testing each backend operation as it is connected.
 6. Start the physical H700 acceptance checklist before declaring LÖVE complete.
 
