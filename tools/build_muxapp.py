@@ -153,7 +153,19 @@ def sha256_file(path: Path):
 def build_archive(repo_root: Path, output: Path):
     repo_root = Path(repo_root).resolve()
     output = Path(output).resolve()
-    required_main = ("mux_launch.sh", "voiddesk.py", "love/main.lua")
+    required_main = (
+        "mux_launch.sh",
+        "voiddesk.py",
+        "desk/main.py",
+        "love/main.lua",
+        "bin/bootstrap_lite.py",
+        "bin/xfce_launch.sh",
+        "service/voiddesk_service.py",
+        "lib/love",
+        "lib/libluajit-5.1.so.2",
+        "lib/glyph_install.sh",
+        "resources/voiddesk.png",
+    )
     missing = [name for name in required_main if not (repo_root / name).is_file()]
     if missing:
         raise RuntimeError("project root is incomplete: " + ", ".join(missing))
@@ -183,8 +195,8 @@ def build_archive(repo_root: Path, output: Path):
 
         # muOS invokes mux_launch.sh as an application entry point. Git checkouts
         # may store it without the executable bit; normalize it in the package.
-        launcher = package_root / "mux_launch.sh"
-        launcher.chmod(0o755)
+        for relative in ("mux_launch.sh", "bin/xfce_launch.sh", "lib/love"):
+            (package_root / relative).chmod(0o755)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         timestamp = _zip_datetime()
