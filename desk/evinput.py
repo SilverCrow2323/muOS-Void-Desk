@@ -13,15 +13,53 @@ _EV_KEY = 1
 _EV_ABS = 3
 _EVSZ = struct.calcsize("llHHi")
 
-KEYMAP = {
+KEYMAP_ANDROMEDA = {
     304: "A", 305: "B", 306: "Y", 307: "X",
-    308: "L1", 309: "R1", 314: "L2", 315: "R2",
-    310: "SELECT", 311: "START", 312: "MENU",
+    310: "L1", 311: "R1", 312: "L2", 313: "R2",
+    314: "SELECT", 315: "START", 316: "MENU",
     114: "VOL-", 115: "VOL+",
-    88: "SCREENSHOT",  # Linux input KEY_F12
+}
+KEYMAP_NON_ANDROMEDA = {
+    304: "A", 305: "B", 307: "X", 308: "Y",
+    310: "L1", 311: "R1", 312: "SELECT", 313: "L3",
+    314: "R3", 315: "MENU", 316: "START",
+    317: "L2", 318: "R2", 114: "VOL-", 115: "VOL+",
 }
 
+def detect_muos_release():
+    value = os.environ.get("MUOS_VERSION", "")
+    if not value:
+        try:
+            import subprocess
+            value = subprocess.run(
+                ["sh", "-c", '. /opt/muos/script/var/func.sh 2>/dev/null; GET_VAR system version 2>/dev/null'],
+                capture_output=True, text=True, timeout=2).stdout.strip()
+        except Exception:
+            value = ""
+    if not value:
+        try:
+            with open("/opt/muos/config/system/version") as stream:
+                value = stream.readline().strip()
+        except OSError:
+            value = ""
+    return "andromeda" if "andromeda" in value.lower() else "not_andromeda"
+
+def resolve_profile(selection="auto"):
+    selection = str(selection or "auto").lower()
+    if selection == "auto":
+        return detect_muos_release()
+    return "andromeda" if selection == "andromeda" else "not_andromeda"
+
+def set_profile(selection="auto"):
+    global KEYMAP
+    KEYMAP = dict(KEYMAP_ANDROMEDA if resolve_profile(selection) == "andromeda"
+                  else KEYMAP_NON_ANDROMEDA)
+    return resolve_profile(selection)
+
+
+
 _state = {"fds": [], "hx": 0, "hy": 0, "active": False, "raw": []}
+set_profile(os.environ.get("VOID_MUOS_PROFILE", "auto"))
 
 
 def start():
