@@ -1,6 +1,6 @@
 #!/bin/sh
-# VOIDDESK v10.5.4 — muOS device launcher
-# HELP: VoidDesk - Void suite (LÖVE or Pygame frontend, switchable in Settings)
+# VOIDDESK v10.5.4 — muOS device launcher (Pygame reference frontend)
+# HELP: VoidDesk - controller-friendly Pygame desktop and utilities
 # ICON: voiddesk
 # GRID: voiddesk
 
@@ -24,8 +24,9 @@ export VOIDDESK_FULLSCREEN=1
 export VOIDDESK_PLATFORM=muos
 export VOIDDESK_MODEL=H700
 
-# Helper: force engine back to LOVE in desk_config.json (self-heal on failure)
-revert_engine_to_love() {
+# Pygame is the supported muOS frontend. LÖVE stays opt-in only when its
+# complete ARM64 runtime is present in a future package flavour.
+revert_engine_to_py() {
     python3 -c "
 import json
 p = '$DATA/desk_config.json'
@@ -33,7 +34,7 @@ try:
     d = json.load(open(p))
 except Exception:
     d = {}
-d['engine'] = 'love'
+d['engine'] = 'py'
 json.dump(d, open(p, 'w'), indent=1)
 " >>"$LOG" 2>&1
 }
@@ -46,11 +47,21 @@ run_engine() {
     ENGINE="$(python3 -c "
 import json
 try:
-    print(json.load(open('$DATA/desk_config.json')).get('engine','love'))
+    print(json.load(open('$DATA/desk_config.json')).get('engine','py'))
 except Exception:
-    print('love')
+    print('py')
 " 2>/dev/null)"
-    [ -z "$ENGINE" ] && ENGINE="love"
+    [ -z "$ENGINE" ] && ENGINE="py"
+    # Never select the experimental LÖVE binary unless its shared runtime
+    # is bundled too. Older packages shipped lib/love without liblove-11.5.so,
+    # which exits immediately at the dynamic loader.
+    if [ "$ENGINE" = "love" ] && {
+        [ ! -x "$APP_DIR/lib/love" ] || [ ! -f "$APP_DIR/lib/liblove-11.5.so" ];
+    }; then
+        echo "$(date) LÖVE runtime incomplete; using supported Pygame frontend" >>"$LOG"
+        ENGINE="py"
+        revert_engine_to_py
+    fi
     echo "$(date) engine: $ENGINE" >>"$LOG"
 
     # Build one engine-neutral profile snapshot for both Pygame and LÖVE.
@@ -67,10 +78,8 @@ except Exception:
         fi
     fi
 
-    # The py engine needs a bootstrapped pygame runtime (desk/../runtime).
-    # If it was never built (or got wiped), build it now instead of
-    # crashing; if that's not possible (offline, download failure, etc.)
-    # fall back to LOVE so the device never gets stuck on a broken choice.
+    # Pygame's CPython 3.11/aarch64 runtime is bundled under
+    # assets/runtime_archives and bootstraps locally without Internet.
     if [ "$ENGINE" = "py" ]; then
         MARKER="$DATA/.pygame_ready"
         if [ ! -f "$MARKER" ] || [ ! -d "$APP_DIR/runtime" ]; then
@@ -78,9 +87,9 @@ except Exception:
             python3 "$APP_DIR/bin/bootstrap_lite.py" >>"$LOG" 2>&1
             BOOT_RC=$?
             if [ $BOOT_RC -ne 0 ] || [ ! -f "$MARKER" ]; then
-                echo "$(date) bootstrap FAILED (rc=$BOOT_RC) - falling back to LOVE engine" >>"$LOG"
-                ENGINE="love"
-                revert_engine_to_love
+                echo "$(date) bootstrap FAILED (rc=$BOOT_RC); refusing to launch an incomplete engine" >>"$LOG"
+                RC=1
+                return
             fi
         fi
     fi
@@ -96,16 +105,13 @@ except Exception:
             return
         fi
         if [ $RC -ne 0 ]; then
-            echo "$(date) Pygame frontend crashed (rc=$RC) - reverting engine to LOVE for next boot" >>"$LOG"
-            revert_engine_to_love
-            echo "$(date) launching LÖVE frontend as fallback" >>"$LOG"
-            "$APP_DIR/lib/love" "$APP_DIR/love" >>"$LOG" 2>&1
-            RC=$?
+            echo "$(date) Pygame frontend failed (rc=$RC); keeping Pygame selected for diagnostics and next boot" >>"$LOG"
+            revert_engine_to_py
+            return
         fi
     else
-        echo "$(date) launching LÖVE frontend" >>"$LOG"
-        "$APP_DIR/lib/love" "$APP_DIR/love" >>"$LOG" 2>&1
-        RC=$?
+        echo "$(date) ERROR: unsupported engine '$ENGINE' on this muOS build" >>"$LOG"
+        RC=1
     fi
 }
 
