@@ -1,6 +1,6 @@
 # Void Desk Tool Catalog and Module Information Architecture
 
-This is an inventory of tool families and entry points found in the current source tree. It is a source-grounded map, not a promise that every item is enabled on every firmware or PC. Availability depends on host packages, device capabilities, permissions, optional downloads and frontend coverage. The future module system will turn these into declared contributions that users can compose into Void Desk workspaces. See [Void Desk Modules](MODULE_SYSTEM.md) for the module manifest, contribution slots, trust and package-flavour contract.
+This is an inventory of tool families and entry points found in the current source tree, paired with the proposed v12 workspace model below. It is a source-grounded map, not a promise that every item is enabled on every firmware or PC. Availability depends on host packages, device capabilities, permissions, optional downloads and frontend coverage. The future module system will turn these into declared contributions that users can compose into Void Desk workspaces. See [Void Desk Modules](MODULE_SYSTEM.md) for the module manifest, contribution slots, trust and package-flavour contract.
 
 ## Navigation model
 
@@ -12,30 +12,33 @@ Use three levels:
 
 Keep the existing NEXUS hubs as the visual top-level navigation for compatibility. The catalog can reorganize tools without renaming their internal routes. User-created profiles may reorder, relabel, hide, group and enable/disable registered contributions, but cannot create arbitrary executable routes or install code. Modules declare which contribution slots they fill.
 
-## Current workspace/category proposal
+## v12 target workspace/category model
 
-| Workspace | Category | Primary owner | Representative tools |
+> [!IMPORTANT]
+> This table defines the **proposed v12 information architecture**, not a claim that every destination or workflow is already implemented. The current source still contains legacy routes such as WORKSHOP and RT:TOOLBOX. Keep those routes compatible during migration; do not rename code paths just to match a label.
+
+![Proposed NEXUS v12 navigation](assets/nexus-v12-navigation.svg)
+
+| Destination | Section / satellite | Responsibility | Representative tools |
 |---|---|---|---|
-| START SESSION | Desktop Environments | START SESSION | XFCE, IceWM, LXDE, desktop session hand-off |
-| START SESSION | Terminal Sessions | START SESSION | standalone PTY shell, Python console, TUI sessions |
-| START SESSION | PC / Virtual Machines | START SESSION | QWASAR Link workstation, registered VirtualBox VMs on supported PC hosts |
-| THE FORGE | APT & System Packages | THE FORGE | APT in authorized desktop image or PC host adapter, package details, updates, cleanup |
-| THE FORGE | Void Desk Builds | THE FORGE | Full, Essential, Slim, Custom instances; side-by-side install/update |
-| THE FORGE | Modules & Runtimes | THE FORGE | QMOD modules, external tools, Pygame/LÖVE runtimes, future engine adapters |
-| UPLINK | Network & Wireless | UPLINK | Wi-Fi, hotspot, Bluetooth, network diagnostics |
-| UPLINK | Remote Access & Sync | UPLINK | Tailscale, Syncthing, pairing, device-to-PC connections |
-| UPLINK | PC Input Bridge | UPLINK | Input Leap compatibility backend, QWASAR Link remote input |
-| UPLINK | Online Services | UPLINK | Release feeds, online store, community catalogue, cloud profile sync |
-| MEDIA VAULT | Playback & Library | MEDIA VAULT | Audio/video players, Internet radio, IPTV, streaming, playlists, local media |
-| RT:TOOLBOX | Everyday Tools | RT:TOOLBOX / Everyday Tools | Calculator, clock, calendar, notes, editor, quick utilities |
-| RT:TOOLBOX | Files & Storage | RT:TOOLBOX / Files & Storage | File-GD X, file manager, archives, checksums, backup/restore |
-| RT:TOOLBOX | System & Diagnostics | RT:TOOLBOX / System & Diagnostics | Void Diag, Void Monitor, logs, health, safe cleanup/repair |
-| RT:TOOLBOX | Developer & Terminal | RT:TOOLBOX / Developer & Terminal | bounded shell, Python, builders, QWASAR Inspector, QWASAR Switchboard |
-| SETTINGS | Appearance & Controls | SETTINGS | Theme, palette, font scale, language, controller bindings, status bar, VFX, boot animation, shell layout |
-| INFO / COMMUNITY | Documentation & Community | INFO / COMMUNITY | Manual, release notes, credits, community and help |
-| END NODE | Exit / Recovery | END NODE | Return to firmware, quit, safe reboot and power-off |
+| START SESSION | Environments | Start, repair and return from standalone sessions | XFCE, IceWM, LXDE, terminal sessions |
+| THE FORGE | Build & Packages | Install/update/remove approved applications and build packages | APT in optional desktop image, Void Desk builds, runtimes |
+| THE FORGE | Modules & Profiles | Inspect compatible contributions and compose approved profiles | Module registry, profile validation, package flavours |
+| UPLINK | Network Intelligence | Diagnose interfaces, routes, DNS, throughput and connectivity | Network Probe, Wi-Fi, hotspot, Bluetooth |
+| UPLINK | Remote & Sync | Manage remote access, synchronisation and device pairing | Tailscale, Syncthing, PC companion, BaseStation, FTP |
+| MEDIA VAULT | Playback & Library | Browse and play local/online media | Audio/video, radio, IPTV, playlists, recordings |
+| RT:WORKSHOP | SYSTEMS | Device health and maintenance | Device diagnostics, monitor, storage, logs, backups, safe cleanup |
+| RT:WORKSHOP | TOOLS | Everyday and technical utilities | PTY shell, isolated Python runner, calculator, clock, calendar, file tools |
+| SETTINGS | General & Appearance | Personalise the interface | Language, themes, palette, typography, motion and display |
+| SETTINGS | Controls & Device | Configure hardware-aware behaviour | Controller profiles, calibration, detected device and firmware |
+| SETTINGS | Connectivity & Identity | Manage identity and trusted connections | BaseStation pairing, local Device ID, user profile |
+| SETTINGS | QWASAR & Documentation | Inspect ecosystem settings and read the manual | QWASAR status, docs, credits and About |
+| MUOS APPS | Application catalogue | Discover and hand off to installed native muOS apps | App discovery and validated launch hand-off |
+| END NODE | Exit & Recovery | Leave the app safely and return control to firmware | Close, restart, reboot and power-off flows |
 
-RT:TOOLBOX exposes installed tools and their runtime state. THE FORGE remains the sole owner of install/update/uninstall operations. “Disabled” means a contribution is not active in the profile; it does not mean its files are removed.
+The two RT:WORKSHOP satellites are deliberately distinct: **SYSTEMS** owns the health of the device; **TOOLS** owns utilities used by the user. UPLINK owns network diagnostics and network-facing services. SETTINGS owns configuration and documentation, so INFO/ABOUT does not need to remain a separate primary NEXUS destination.
+
+The v12 proposal does not change install ownership: **THE FORGE remains the only owner of install/update/uninstall operations**. A profile can hide or disable a contribution, but it does not delete its files or grant permissions. Current Pygame/LÖVE routes may continue to expose parts of the legacy IA until migration is complete.
 
 ## QWASAR management tools
 

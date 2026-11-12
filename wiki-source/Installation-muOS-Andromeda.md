@@ -1,33 +1,47 @@
-# Installation — MustardOS / muOS 2606.0 Andromeda
+# 📦 Installation — muOS 2606.0 Andromeda
 
-## Compatibility
+## Compatibility snapshot
 
-The current packaging target is MustardOS (muOS) **2606.0 Andromeda** on compatible H700 handhelds. Hardware-specific behaviour still needs testing on each model. Do not assume older muOS releases or other distributions are compatible.
+The current packaging target is **muOS 2606.0 Andromeda** on compatible Allwinner H700 handhelds. A successful package build is not proof that every H700 model has identical input, display, audio or power behaviour.
 
-## Install a .muxapp
+The official muOS site lists Jacaranda as an archived release and 2612 Supernova as in progress as of 12 November 2026. Void Desk must not label those releases certified without their own profile and hardware checks.
 
-1. Download the .muxapp asset from the relevant GitHub Release. Do not install the source-code ZIP.
-2. Copy the .muxapp file to the **ARCHIVE/** folder on SD1.
-3. On the handheld, open **Applications → Archive Manager**.
-4. Select the QWASAR Desk package and install it.
-5. Launch QWASAR Desk from the Applications menu.
+## Install the published package
 
-The .muxapp archive has one top-level application directory: **Void-Desk/**. It contains the launcher and app files. There must not be an extra application/ directory nested inside the package.
+1. Open [GitHub Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases).
+2. Download the latest published `.muxapp` asset. Do **not** install the source-code ZIP.
+3. Copy the package into `SD1/ARCHIVE/`.
+4. On the handheld, open **Applications → Archive Manager**.
+5. Select the Void Desk package and install it.
+6. Launch Void Desk from the Applications menu.
 
-## First launch
+The installed application directory is still named `Void-Desk/`. Do not rename or move it manually; package migration must be handled by a versioned installer.
 
-- Keep the device connected to reliable Wi-Fi during optional desktop-image setup.
-- Back up important saves and configuration before installing test builds or changing firmware.
-- Keep the device powered while the desktop image or packages are being installed.
-- Check that sufficient free storage is available before starting optional XFCE setup.
+> [!IMPORTANT]
+> The latest published handheld release currently listed by GitHub is **v10.2.0**, published on 11 August 2026. v10.5.4-NEXUS is a development line, not a published stable package. See [Releases](https://github.com/SilverCrow2323/Void-Desk-Project/releases).
 
-## Recommended engine
+## First launch checklist
 
-Use the **Pygame** frontend. The LÖVE frontend is an experimental prototype and is not yet a complete alternative.
+- Back up saves and personal configuration before testing development builds.
+- Keep the device powered during package or optional desktop-image installation.
+- Check free storage before installing the optional desktop environment.
+- Preserve launcher and bootstrap logs if startup fails.
+- Keep the native muOS frontend and recovery path available.
 
+## Recommended frontend
 
-## QWASAR name transition
+Use **Pygame** for normal operation. LÖVE remains experimental and is not yet a complete feature-equivalent alternative.
 
-The product identity is now QWASAR Desk, formerly Void Desk. The current installable package still uses the legacy `Void-Desk/` root and existing launcher/configuration paths. Do not rename or move these paths manually; a future migration will be handled by a versioned installer.
+<details>
+<summary>🔧 Package structure notes</summary>
 
-QWASAR continues to launch through the official muOS application runner. Keep the native muOS frontend and recovery path available.
+The `.muxapp` archive must contain one top-level `Void-Desk/` application directory. Avoid an extra nested directory or manual path renaming. For build/validation details, see [Development](Development) and the repository's [packaging documentation](https://github.com/SilverCrow2323/Void-Desk-Project/tree/main/packaging).
+
+</details>
+
+## Official references
+
+- [muOS releases](https://muos.dev/release)
+- [muOS release progress](https://muos.dev/release/progress)
+- [Application extending guide](https://muos.dev/docs/infrastructure/extending)
+- [Application launching guide](https://muos.dev/docs/infrastructure/launching)

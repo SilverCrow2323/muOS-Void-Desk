@@ -5,6 +5,12 @@
 **Scope:** unified web workbench for module authoring, LEGO-style layout composition, release building, community library, portable profiles, and device sync  
 **Initial runtime targets:** Pygame (py) and LÖVE (love). Qt 6 and LVGL are future adapters, not currently supported runtimes.
 
+## Interactive browser concept
+
+The [QWASAR Studio workbench prototype](../site/studio.html) is a static, locally interactive walkthrough of the four workbenches described below. It demonstrates layout reordering, data-only profile export, manifest inspection, release-plan export and local theme-token previews.
+
+The prototype does **not** connect to a hosted Studio API, pair with a handheld, install modules, run a package build, publish community content or issue signatures. The exported `.qprofile` and release-plan JSON files are examples for inspection; they are not signed releases or proof of runtime compatibility. Keep this distinction visible anywhere the prototype is presented.
+
 ## Product decisions
 
 - Studio is a responsive web app/PWA companion. The handheld remains usable without Studio or internet access.

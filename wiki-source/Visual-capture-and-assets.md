@@ -1,56 +1,63 @@
-# QWASAR Desk — Visual capture and asset catalogue
+# 🎨 Visual capture and assets
 
-## Capture every LÖVE scene
+The visual language is **Megastructure**: industrial science fiction, monumental geometry, steel/graphite surfaces, technical labels and restrained signal colours. Documentation uses the same visual grammar, but it must remain easy to read on a phone or a narrow GitHub panel.
 
-On a Linux development PC with LÖVE 11.5 installed:
+## 🧩 Navigation icon library
 
-~~~bash
-python3 tools/capture_love_screenshots.py
-~~~
+The following PNG files copied to `assets/icons/` are **menu and hub icons**, not screenshots of application screens. They are the visual identity assets used to represent Void Desk destinations.
 
-The script starts the Python companion service, runs the LÖVE frontend, switches through its scene catalogue and captures each rendered screen. When no display is available it uses Xvfb. The capture summary is saved as data/visual-captures/love-batch-manifest.json.
+| WORKSHOP | SETTINGS | THE FORGE | START SESSION | RT:TOOLBOX |
+|---|---|---|---|---|
+| <img src="assets/icons/workshop.png" width="76" alt="Workshop icon" /> | <img src="assets/icons/settings.png" width="76" alt="Settings icon" /> | <img src="assets/icons/the_forge.png" width="76" alt="The Forge icon" /> | <img src="assets/icons/start.png" width="76" alt="Start Session icon" /> | <img src="assets/icons/rt_toolbox.png" width="76" alt="RT Toolbox icon" /> |
 
-This pass verifies that scenes can be opened and rendered in the desktop runtime. GitHub Actions uploads a `voiddesk-love-visual-captures` artifact from each run (screenshots, JSON sidecars, manifest and logs; 30-day retention). Open the workflow run and download it from **Artifacts**. Synthetic system/network status is used for this test, not live host data. It is not hardware validation for muOS or a claim that all LÖVE actions are complete.
+| NETSPHERE / UPLINK | muOS APPS | MEDIA VAULT | INFO | END |
+|---|---|---|---|---|
+| <img src="assets/icons/net_sphere.png" width="76" alt="Netsphere icon" /> | <img src="assets/icons/muos.png" width="76" alt="muOS Apps icon" /> | <img src="assets/icons/media_vault.png" width="76" alt="Media Vault icon" /> | <img src="assets/icons/info.png" width="76" alt="Info icon" /> | <img src="assets/icons/end.png" width="76" alt="End icon" /> |
 
-## Automated Pygame home-style smoke capture
+These are existing project assets. The NEXUS v12 diagram above is a **proposed navigation map**, not a screenshot.
+## 🖥️ Actual application screen reference
 
-On Linux/CI, run:
+`forge-menu.png` is a real screenshot of the **THE FORGE screen**:
 
-~~~bash
+<img src="assets/screens/forge-menu.png" alt="THE FORGE application screen" width="720" />
+
+By contrast, `the_forge.png` in the navigation icon library is only the hub icon.
+
+## Architecture and concept diagrams
+
+![QWASAR system map](assets/qwasar-system-map.svg)
+
+![NEXUS v12 proposal](assets/nexus-v12-navigation.svg)
+
+![Firmware and input resolution](assets/muos-profile-resolution.svg)
+
+These SVG diagrams remain editable in `docs/assets/`. The same assets are copied into the GitHub Wiki by `tools/publish_wiki.sh`.
+
+## Capture UI screens
+
+Both frontends provide an F12 capture path when enabled. Captures and JSON metadata are written under `data/visual-captures/`.
+
+```bash
+# Pygame states and home styles
 python3 tools/capture_pygame_screenshots.py --all-states
-~~~
 
-The harness boots the real Pygame application with an isolated temporary config and SDL's dummy video/audio drivers, renders the five supported home styles (BLAME, HUD, Terminal, Orbit and NEXUS), then smoke-renders every state branch declared in `App.render_state()`. Each direct state render produces a PNG and JSON sidecar; the manifest is `data/visual-captures/pygame-home-manifest.json`.
+# LÖVE scene capture (requires LÖVE 11.5 on a Linux development PC)
+python3 tools/capture_love_screenshots.py
+```
 
-GitHub Actions uploads these files as `voiddesk-pygame-visual-captures` (30-day retention). A failed style makes the command fail and is recorded in the manifest. Direct state rendering does not prove that a screen is reachable through normal navigation, that its actions work, or that controller/hardware flows are valid. Treat this as broad renderer coverage, not end-to-end feature validation.
+A capture pass is renderer evidence, not proof of navigation, action behaviour or physical device support.
 
-## Capture one current screen
+## Build an asset catalogue
 
-Both frontends support F12. PNG screenshots and JSON metadata sidecars are saved under data/visual-captures/.
-
-## Generate the asset catalogue and galleries
-
-~~~bash
+```bash
 python3 tools/visual_capture.py
 python3 tools/visual_capture.py --check
-~~~
+```
 
-The standard-library script scans images and fonts in assets/, resources/, love/assets/ and glyph/. It records size, dimensions where available and SHA-256, verifies active LÖVE NEXUS node textures and indexes screenshots.
+The report indexes images and fonts, records dimensions and hashes, and checks active image references.
 
-Generated reports:
+## Publish approved screenshots
 
-- docs/visual/ASSET_CATALOG.md
-- docs/visual/SCREENSHOT_CHECKLIST.md
-- docs/visual/visual-inventory.json
-- docs/visual/ASSET_GALLERY.html
-- docs/visual/SCREENSHOT_GALLERY.html
+Captures are ignored by Git by default. Inspect each image for SSIDs, IP addresses, hostnames, usernames, personal filenames and private media before exporting or committing it. Never publish real tokens or credentials.
 
-## Publish selected images
-
-Captures are ignored by Git by default. They may reveal SSIDs, IP addresses, hostnames, personal media names or other private data. Inspect every screenshot before publishing.
-
-~~~bash
-python3 tools/visual_capture.py --export-public
-~~~
-
-This copies reviewed screenshots into docs/visual/captures/. Do not publish raw captures until they have been reviewed.
+See the repository [visual capture guide](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/visual/README.md) and [documentation style guide](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/DOCUMENTATION_STYLE_GUIDE.md).

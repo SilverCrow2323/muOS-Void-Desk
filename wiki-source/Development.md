@@ -1,53 +1,62 @@
-# QWASAR Desk — Development and architecture
+# 🛠️ Development and architecture
 
 ## Runtime path
 
-On the handheld, mux_launch.sh starts service/voiddesk_service.py and then the configured frontend:
+On the handheld, `mux_launch.sh` enters through the muOS application lifecycle, starts the local service and launches the configured frontend.
 
-- py: desk/main.py with the bootstrapped Pygame runtime (recommended).
-- love: lib/love love/ (experimental prototype).
+- `py` → `desk/main.py` using the bootstrapped Pygame runtime (reference frontend).
+- `love` → `love/main.lua` using the LÖVE runtime (experimental frontend).
 
-The local service is started by the shell launcher. LÖVE communicates with it through JSON request/response files under data/.
+The service boundary is responsible for selected host capabilities and long-running jobs. Frontends should not independently spawn duplicate daemons or block their render/input loops on slow commands.
+
+![QWASAR system overview](assets/qwasar-system-map.svg)
 
 ## Repository map
 
 | Path | Responsibility |
 |---|---|
-| desk/ | Pygame frontend |
-| desk/hubs/ | Pygame feature panels |
-| love/ | Experimental LÖVE frontend |
-| love/scenes/ | LÖVE scene modules |
-| love/core/ | Scene stack, input, render, bridge, widgets and effects |
-| service/ | Background service and IPTV service module |
-| bin/ | Runtime bootstrap, desktop image and device scripts |
-| assets/, resources/ | Artwork, fonts, sounds, images |
-| tests/ | Focused regression tests |
+| `desk/` | Python/Pygame frontend and hubs |
+| `love/` | LÖVE frontend, scenes, widgets and theme adapters |
+| `service/` | Local capability bridge and background service modules |
+| `bin/` | Bootstrap, desktop hand-off and device scripts |
+| `data/` | Configuration and generated runtime state |
+| `schemas/` | JSON contracts and validation schemas |
+| `assets/`, `resources/` | Fonts, artwork, sounds, glyphs and PNG screenshots |
+| `docs/` | Architecture, product and technical documentation |
+| `wiki-source/` | Source-controlled GitHub Wiki pages |
+| `tests/` | Focused regression and contract tests |
+| `tools/` | Build, validation and visual-capture tooling |
 
 ## Local checks
 
-~~~bash
+```bash
 python3 -m pip install pytest ruff
 python -m compileall -q BUILDCHECK.py voiddesk.py bin desk service outdesk voidcast_addons assets
 python -m pytest -q
 python BUILDCHECK.py
 find love -type f -name '*.lua' -print0 | xargs -0 -r -n 1 sh -c 'luajit -b "$1" /dev/null' _
-~~~
+```
 
-CI also runs focused LÖVE core tests for lazy scene loading, scene navigation and bridge request serialization.
+Run the checks relevant to the files you changed. A green CI job is not a physical-device certification.
 
-## Contributing
+## Contribution rules
 
-- Keep pull requests focused.
-- Add regression tests when practical.
-- Never hide failing checks with || true.
+- Keep pull requests focused and scoped.
+- Add regression tests for behaviour changes.
+- Do not hide failures with `|| true`.
 - Keep optional dependencies optional.
-- Avoid blocking commands in render/update loops.
-- Record hardware and firmware used for manual tests.
-- Do not claim LÖVE parity with Pygame until verified feature by feature.
+- Avoid blocking operations in render/update/input loops.
+- Give every capability one canonical service owner.
+- Record exact hardware, firmware and test conditions for device claims.
+- Do not claim LÖVE parity with Pygame until it is verified feature by feature.
+- Mark proposals and incomplete work clearly in documentation.
 
+## muOS host integration
 
-## Symbiotic Layer work
+Use the official application runner and documented extension points. Avoid guessed SD1/SD2 paths where a resolved path is available. Deeper integration must be namespaced, reversible and covered by backup/rollback/uninstall tests.
 
-See [Symbiotic Layer](Symbiotic-Layer) for the integration contract and milestones. The current target is a normal muOS application; deeper integration must use documented extension points, stable identifiers, atomic persistence and reversible changes.
+Official references: [Application Runner](https://community.muos.dev/t/application-runner/1282) · [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) · [Frontend and Launching](https://muos.dev/docs/infrastructure/launching).
 
-The official muOS developer references are [Application Runner](https://community.muos.dev/t/application-runner/1282), [Extending MustardOS](https://muos.dev/docs/infrastructure/extending) and [Frontend and Launching](https://muos.dev/docs/infrastructure/launching). Do not hardcode SD1/SD2 mount paths where the runner provides a resolved path, and do not bypass its setup/cleanup lifecycle.
+## Documentation workflow
+
+Update the README, matching technical page and Wiki source page together when a user-facing workflow changes. Use the reusable patterns in [Documentation style guide](https://github.com/SilverCrow2323/Void-Desk-Project/blob/main/docs/DOCUMENTATION_STYLE_GUIDE.md). The diagrams in `docs/assets/` are copied into the Wiki by `tools/publish_wiki.sh`.

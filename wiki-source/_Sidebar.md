@@ -1,12 +1,25 @@
-### QWASAR Desk Wiki
+### 🪐 VOID DESK / FIELD MANUAL
 
+**START HERE**
 - [Home](Home)
-- [Installation — Andromeda](Installation-muOS-Andromeda)
-- [Controls and navigation](Controls-and-navigation)
-- [Hubs and features](Hubs-and-features)
+- [Installation](Installation-muOS-Andromeda)
+- [Controls & navigation](Controls-and-navigation)
+
+**THE ENVIRONMENT**
+- [Hubs & features](Hubs-and-features)
 - [Frontends](Frontends)
+- [Void Desk v12 blueprint](Void-Desk-v12-Blueprint)
+- [muOS & input compatibility](muOS-Firmware-Compatibility)
 - [Symbiotic Layer](Symbiotic-Layer)
+
+**OPERATIONS**
 - [Troubleshooting](Troubleshooting)
-- [Development](Development)
-- [Visual capture and assets](Visual-capture-and-assets)
+- [Visual assets](Visual-capture-and-assets)
 - [Release testing](Release-testing)
+
+**BUILD / CONTRIBUTE**
+- [Development](Development)
+- [Documentation style guide](Documentation-Style-Guide)
+- [v10.5.4 development snapshot](Pre-release-10.5.4)
+- <a href="https://github.com/SilverCrow2323/Void-Desk-Project">Source repository</a>
+- <a href="https://github.com/SilverCrow2323/Void-Desk-Project/tree/main/docs">Technical docs</a>

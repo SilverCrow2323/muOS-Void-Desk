@@ -1,5 +1,8 @@
 # QWASAR Desk Visual Identity System
 
+![Void Desk documentation banner](assets/voiddesk-docs-banner.svg)
+
+For the same hierarchy in technical manuals and the GitHub Wiki, see the [Documentation Style Guide](DOCUMENTATION_STYLE_GUIDE.md). Product UI styling and documentation styling are related but distinct: the manual prioritises reading flow, while the application interface prioritises controller navigation.
 ## Direction
 
 QWASAR Desk has a recognizable industrial science-fiction identity: brutalist interfaces, immense architectural scale, dense technical typography, hard silhouettes, manga-like ink contrast, restrained grain, warning markings and vivid signal colours. The intended mood is raw, mysterious and tactile rather than glossy neon-by-default.
