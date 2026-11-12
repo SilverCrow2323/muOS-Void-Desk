@@ -152,6 +152,7 @@ def test_voiddesk_symbol_is_shared_by_site_and_pygame():
     assert 'symbol = BRAND / "voiddesk_symbol.svg"' in builder
     assert 'key in ("voiddesk", "brand")' in icons
     assert 'icons.draw(surface, "voiddesk", 10, 8, 26, acc)' in header
+    assert 'icons.draw(surface, "voiddesk", 12, 8, 26, acc)' in header
 
     for page in (
         "index.html",
