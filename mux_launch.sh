@@ -5,6 +5,7 @@
 # GRID: voiddesk
 
 . /opt/muos/script/var/func.sh
+command -v SETUP_STAGE_OVERLAY >/dev/null 2>&1 && SETUP_STAGE_OVERLAY
 APP_BIN="python3"
 SETUP_APP "$APP_BIN" ""
 
