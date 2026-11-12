@@ -2,6 +2,9 @@
 
 ## Compatibility snapshot
 
+> **MUST KNOW!!** Download the published `.muxapp` release asset. The source ZIP is not an installer.
+
+
 The current packaging target is **muOS 2606.0 Andromeda** on compatible Allwinner H700 handhelds. A successful package build is not proof that every H700 model has identical input, display, audio or power behaviour.
 
 The official muOS site lists Jacaranda as an archived release and 2612 Supernova as in progress as of 12 November 2026. Void Desk must not label those releases certified without their own profile and hardware checks.
