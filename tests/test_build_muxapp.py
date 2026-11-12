@@ -18,10 +18,12 @@ def load_builder():
 
 
 def make_project(root: Path):
-    for path in ("mux_launch.sh", "voiddesk.py", "love/main.lua",
-                 "bin/launcher.sh", "service/voiddesk_service.py",
-                 "external/tools.json", "LICENSE", "README.md",
-                 "THIRD-PARTY.md"):
+    for path in ("mux_launch.sh", "voiddesk.py", "desk/main.py", "love/main.lua",
+                 "bin/launcher.sh", "bin/bootstrap_lite.py", "bin/xfce_launch.sh",
+                 "service/voiddesk_service.py", "lib/love",
+                 "lib/libluajit-5.1.so.2", "lib/glyph_install.sh",
+                 "resources/voiddesk.png", "external/tools.json", "LICENSE",
+                 "README.md", "THIRD-PARTY.md"):
         target = root / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("test fixture\n")
@@ -69,12 +71,21 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
             ).external_attr >> 16) & 0o777
             for name in ("rt", "ts", "watchdog")
         }
+        love_mode = (archive.getinfo("Void-Desk/lib/love").external_attr >> 16) & 0o777
+        xfce_mode = (archive.getinfo(
+            "Void-Desk/bin/xfce_launch.sh"
+        ).external_attr >> 16) & 0o777
         tailscale_config = archive.read(
             "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf"
         ).decode("utf-8")
     assert names
     assert all(name.startswith("Void-Desk/") for name in names)
     assert "Void-Desk/mux_launch.sh" in names
+    assert "Void-Desk/desk/main.py" in names
+    assert "Void-Desk/bin/bootstrap_lite.py" in names
+    assert "Void-Desk/service/voiddesk_service.py" in names
+    assert "Void-Desk/lib/libluajit-5.1.so.2" in names
+    assert "Void-Desk/resources/voiddesk.png" in names
     assert "Void-Desk/love/main.lua" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py" in names
@@ -84,6 +95,8 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
     assert tailscale_config.splitlines()[0] == "PANEL=0"
     assert r"\n" not in tailscale_config
     assert launcher_mode & 0o111 == 0o111
+    assert love_mode & 0o111 == 0o111
+    assert xfce_mode & 0o111 == 0o111
     assert all(mode & 0o111 == 0o111 for mode in service_modes.values())
     assert not any(name.startswith("Void-Desk/tests/") for name in names)
     assert "Void-Desk/.env" not in names
