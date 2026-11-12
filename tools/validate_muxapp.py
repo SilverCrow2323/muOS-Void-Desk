@@ -88,11 +88,14 @@ def validate_archive(archive: str | Path) -> list[str]:
                 if not info.is_dir():
                     files.add(normalized)
                     if normalized in EXECUTABLE_FILES and not (mode & 0o111):
-                        label = (
-                            "muOS launcher"
-                            if normalized == "Void-Desk/mux_launch.sh"
-                            else "Rt:Tailscale-M entrypoint"
-                        )
+                        if normalized == "Void-Desk/mux_launch.sh":
+                            label = "muOS launcher"
+                        elif normalized.startswith(
+                            "Void-Desk/external/rt-tailscale-m/"
+                        ):
+                            label = "Rt:Tailscale-M entrypoint"
+                        else:
+                            label = "runtime entrypoint"
                         errors.append("%s is not executable: %s" % (label, normalized))
 
             if top_levels != {"Void-Desk"}:
