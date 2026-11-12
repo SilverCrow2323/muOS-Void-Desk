@@ -9,10 +9,12 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 
+# Keep these lists in lockstep with desk.const.NEXUS_RING_*.
+# Nodes 10-13 are established legacy destinations, not disposable placeholders.
 BASE_RINGS: tuple[tuple[int, ...], ...] = (
     (0,),
-    (3, 5, 2, 6),
-    (4, 1, 7, 8),
+    (3, 5, 2, 6, 10, 11),
+    (4, 1, 7, 8, 12, 13),
     (9,),
 )
 
@@ -29,11 +31,16 @@ WORKSPACE_BY_NODE: dict[int, str] = {
 
 PROTECTED_WORKSPACES = frozenset({"start-session", "end-node"})
 
-# The legacy-only nodes have stable slots between current QWASAR workspaces.
-# They remain in their original rings and do not get silently renamed.
+# Legacy-only nodes keep their relative slots when QWASAR workspaces move.
+# Ring 1: WORKSHOP, GAMES, DEVELOP.
+# Ring 2: MUOS APPS, COMMUNITY, OUTERDESK.
 LEGACY_SORT_ORDER: dict[int, float] = {
-    6: 3.5,  # WORKSHOP, between MEDIA VAULT and RT:TOOLBOX
-    1: 4.5,  # MUOS APPS, between RT:TOOLBOX and SETTINGS
+    6: 3.5,
+    10: 4.5,
+    11: 5.5,
+    1: 4.5,
+    12: 5.5,
+    13: 6.5,
 }
 
 
@@ -43,9 +50,9 @@ def compose_nexus_profile(
     """Return effective ring IDs and per-node display/activation state.
 
     Invalid/missing snapshots fall back to the exact legacy ring arrangement.
-    Only mapped QWASAR workspaces are reordered/hidden. Legacy-only nodes 1 and
-    6 are preserved. START SESSION and END NODE are forced visible/enabled as
-    a second recovery guard even if a malformed snapshot reaches this adapter.
+    Only mapped QWASAR workspaces are reordered/hidden. All non-QWASAR nodes
+    remain in their original orbit. START SESSION and END NODE are forced
+    visible/enabled as recovery anchors even if a malformed snapshot arrives.
     """
     states: dict[int, dict[str, Any]] = {}
     base_positions = {
@@ -84,19 +91,24 @@ def compose_nexus_profile(
             continue
         state = states[node_id]
         is_protected = workspace_id in PROTECTED_WORKSPACES
-        state["enabled"] = True if is_protected else workspace.get("enabled") is not False
-        state["visible"] = True if is_protected else workspace.get("visible") is not False
+        state["enabled"] = (
+            True if is_protected else workspace.get("enabled") is not False
+        )
+        state["visible"] = (
+            True if is_protected else workspace.get("visible") is not False
+        )
         label = workspace.get("label")
-        state["label"] = label if isinstance(label, str) and label.strip() else None
+        state["label"] = (
+            label if isinstance(label, str) and label.strip() else None
+        )
         order = workspace.get("order")
         if isinstance(order, (int, float)) and not isinstance(order, bool):
             state["order"] = float(order)
 
     rings: list[tuple[int, ...]] = []
-    for ring_index, base_ring in enumerate(BASE_RINGS):
+    for base_ring in BASE_RINGS:
         visible_ids = [
-            node_id for node_id in base_ring
-            if states[node_id]["visible"]
+            node_id for node_id in base_ring if states[node_id]["visible"]
         ]
         visible_ids.sort(
             key=lambda node_id: (
