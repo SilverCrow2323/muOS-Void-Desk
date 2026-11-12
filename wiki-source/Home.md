@@ -59,13 +59,25 @@ The small PNGs below are **menu/hub icons from `resources/`**, not screenshots o
 
 | WORKSHOP | SETTINGS | THE FORGE | START SESSION | RT:TOOLBOX |
 |---|---|---|---|---|
-| <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/workshop.png" width="72" alt="Workshop icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/settings.png" width="72" alt="Settings icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/the_forge.png" width="72" alt="The Forge icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/start.png" width="72" alt="Start Session icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/rt_toolbox.png" width="72" alt="RT Toolbox icon" /> |
+| <img src="assets/icons/workshop.png" width="72" alt="Workshop icon" /> | <img src="assets/icons/settings.png" width="72" alt="Settings icon" /> | <img src="assets/icons/the_forge.png" width="72" alt="The Forge icon" /> | <img src="assets/icons/start.png" width="72" alt="Start Session icon" /> | <img src="assets/icons/rt_toolbox.png" width="72" alt="RT Toolbox icon" /> |
 
 | NETSPHERE / UPLINK | muOS APPS | MEDIA VAULT | INFO | END |
 |---|---|---|---|---|
-| <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/net_sphere.png" width="72" alt="Netsphere icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/muos.png" width="72" alt="muOS Apps icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/media_vault.png" width="72" alt="Media Vault icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/info.png" width="72" alt="Info icon" /> | <img src="https://raw.githubusercontent.com/SilverCrow2323/Void-Desk-Project/main/resources/end.png" width="72" alt="End icon" /> |
+| <img src="assets/icons/net_sphere.png" width="72" alt="Netsphere icon" /> | <img src="assets/icons/muos.png" width="72" alt="muOS Apps icon" /> | <img src="assets/icons/media_vault.png" width="72" alt="Media Vault icon" /> | <img src="assets/icons/info.png" width="72" alt="Info icon" /> | <img src="assets/icons/end.png" width="72" alt="End icon" /> |
 
 
+
+<div align="center"><img src="assets/brand/voiddesk_symbol.png" width="84" alt="Void Desk logo" /></div>
+
+<details>
+<summary>🖥️ Actual screen reference — THE FORGE</summary>
+
+This is the **THE FORGE application screen**, not the hub icon:
+
+<img src="assets/screens/forge-menu.png" alt="THE FORGE application screen" width="720" />
+
+The separate `the_forge.png` in the navigation grid above is the **THE FORGE hub icon**.
+</details>
 
 ## Project links
 
