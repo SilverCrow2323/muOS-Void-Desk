@@ -122,6 +122,12 @@ def hat():
 def poll():
     """Legge gli eventi: ritorna i tasti logici premuti e aggiorna lo
     stato del dpad e la lista dei codici grezzi."""
+    try:
+        current_mtime = os.stat(CONFIG_PATH).st_mtime_ns
+        if _PROFILE_MTIME is not None and current_mtime != _PROFILE_MTIME:
+            set_profile()
+    except OSError:
+        pass
     out = []
     raw = []
     for fd in _state["fds"]:
