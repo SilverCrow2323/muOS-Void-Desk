@@ -108,7 +108,8 @@ class _FBOut(object):
 
     def present(self, src):
         if not self.ok:
-            return
+            self.error = "framebuffer output is closed"
+            return False
         try:
             sw, sh = src.get_size()
             if (sw, sh) != (self.w, self.h):
@@ -132,8 +133,11 @@ class _FBOut(object):
                     o = y * self.stride
                     p = y * self.pitch
                     self.mm[o: o + bpr] = buf[p: p + bpr]
-        except Exception:
-            pass
+            self.error = None
+            return True
+        except Exception as exc:
+            self.error = "%s: %s" % (type(exc).__name__, exc)
+            return False
 
 
 def grab(dev=None, sysfs=None):
@@ -170,9 +174,13 @@ def info():
     if fb is None or not fb.ok:
         detail = _state.get("error")
         return "fb: non attivo" + (" (%s)" % detail if detail else "")
-    return ("fb: %dx%d %dbpp stride=%d masks=%s"
-            % (fb.w, fb.h, fb.bpp, fb.stride,
-               ",".join(hex(m) for m in fb.masks)))
+    detail = "fb: %dx%d %dbpp stride=%d masks=%s" % (
+        fb.w, fb.h, fb.bpp, fb.stride,
+        ",".join(hex(m) for m in fb.masks)
+    )
+    if fb.error:
+        detail += " write-error=%s" % fb.error
+    return detail
 
 
 def attach(surface):
@@ -186,15 +194,24 @@ def attach(surface):
     if not fb.ok:
         _state["error"] = fb.error or "framebuffer open/probe failed without detail"
         return False
+    # Verify a real framebuffer write before advertising the display as
+    # ready. Historically present() swallowed exceptions, yielding a false
+    # positive where the app rendered but nothing reached the panel.
+    if not fb.present(surface):
+        _state["error"] = fb.error or "initial framebuffer write failed"
+        fb.close()
+        return False
+
     _state["fb"] = fb
     _state["error"] = None
 
     def _flip():
-        fb.present(surface)
+        if not fb.present(surface):
+            _state["error"] = fb.error or "framebuffer write failed"
+            raise RuntimeError("fbdisplay: " + _state["error"])
 
     pygame.display.flip = _flip
     pygame.display.update = lambda *a, **k: _flip()
-    _flip()
     return True
 
 
