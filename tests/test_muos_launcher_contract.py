@@ -13,6 +13,7 @@ def test_muos_launcher_defaults_to_pygame_and_recovers_to_pygame():
     assert "revert_engine_to_love" not in launcher
     assert "falling back to LOVE engine" not in launcher
     assert "Pygame frontend failed" in launcher
+    assert 'PYTHONPATH="$APP_DIR:$APP_DIR/runtime${PYTHONPATH:+:$PYTHONPATH}"' in launcher
 
 
 def test_muos_launcher_refuses_incomplete_love_runtime():
