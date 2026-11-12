@@ -35,4 +35,5 @@ def test_controls_guide_uses_keycaps_and_current_desktop_bindings():
     assert 'control_guide = self.info_title in (' in source
     assert 'self.draw_info_keycaps(' in source
     assert 'self.btn_names(self.cur_map().get(action, []))' in source
-    assert "physical positions depend on the active firmware" in source
+    assert "physical positions depend" in source
+    assert "on the active firmware and controller profile" in source
