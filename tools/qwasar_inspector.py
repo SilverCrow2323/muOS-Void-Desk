@@ -199,6 +199,12 @@ def _check_manifest(manifest: dict[str, Any], report: InspectionReport) -> None:
                 f"manifest: invalid props on {node['id']} ({node['type']}): {exc.message}"
             )
 
+    for panel_id, panel in manifest["shell"]["globalPanels"].items():
+        action_id = panel["triggerAction"]
+        if action_id not in action_ids:
+            report.errors.append(
+                f"manifest: global panel {panel_id} references unknown action {action_id}"
+            )
     for entry in _menu_entries(manifest):
         action_id = entry.get("actionId")
         if action_id and action_id not in action_ids:
