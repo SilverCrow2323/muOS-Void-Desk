@@ -14,6 +14,7 @@ BRAND = ROOT / "assets" / "brand"
 RESOURCES = ROOT / "resources"
 DIAGRAM_FILES = ("voiddesk-docs-banner.svg", "qwasar-system-map.svg", "nexus-v12-navigation.svg", "muos-profile-resolution.svg")
 ICON_FILES = ("workshop.png", "settings.png", "the_forge.png", "start.png", "rt_toolbox.png", "net_sphere.png", "muos.png", "media_vault.png", "info.png", "end.png")
+REQUIRED_SITE_PAGES = ("index.html", "architecture.html", "field-manual.html", "asset-atlas.html", "studio.html", "blueprint.html", "404.html")
 
 def require_file(path: Path) -> None:
     if not path.is_file():
@@ -66,10 +67,58 @@ def validate_site(output: Path) -> None:
                         f"Broken fragment in {page.relative_to(output.resolve())}: {reference}"
                     )
 
+    # Guard the portal's core product surfaces against accidental omission.
+    page_names = {page.name for page in pages}
+    missing_pages = sorted(set(REQUIRED_SITE_PAGES) - page_names)
+    if missing_pages:
+        raise FileNotFoundError(f"Required portal pages are missing: {', '.join(missing_pages)}")
+
+    page_text = {page.name: page.read_text(encoding="utf-8") for page in pages}
+    atlas = page_text["asset-atlas.html"]
+    if atlas.count("data-asset-card") != len(ICON_FILES):
+        raise ValueError(
+            f"Asset Atlas must expose {len(ICON_FILES)} navigation icons; "
+            f"found {atlas.count('data-asset-card')}"
+        )
+    if "assets/screens/forge-menu.png" not in atlas or "assets/icons/the_forge.png" not in atlas:
+        raise ValueError("Asset Atlas must keep the THE FORGE screen and hub icon distinct")
+
+    studio = page_text["studio.html"]
+    if studio.count("data-studio-tab=") != 4 or studio.count("data-studio-panel=") != 4:
+        raise ValueError("QWASAR Studio must expose all four workbenches and panels")
+    for required in (
+        'data-node-route="session.launch"',
+        'data-node-route="forge.home"',
+        'data-node-route="media.home"',
+        "data-export-profile",
+        "data-export-release",
+    ):
+        if required not in studio:
+            raise ValueError(f"QWASAR Studio is missing a required prototype contract: {required}")
+
+    script = output / "assets" / "site.js"
+    if not script.is_file():
+        raise FileNotFoundError("Shared portal JavaScript is missing")
+    script_text = script.read_text(encoding="utf-8")
+    for required in (
+        "data-studio-tab",
+        "voiddesk-studio-sample.qprofile",
+        "qwasar.release-manifest/v1",
+        'title:"QWASAR Studio"',
+    ):
+        if required not in script_text:
+            raise ValueError(f"Shared portal interactions are missing: {required}")
+
+    for page_name in REQUIRED_SITE_PAGES:
+        if page_name == "404.html":
+            continue
+        if 'id="command-dialog"' not in page_text[page_name]:
+            raise ValueError(f"{page_name} is missing the global command palette")
+
 
 def build(output: Path) -> None:
-    if not (SITE / "index.html").is_file():
-        raise FileNotFoundError("site/index.html is missing")
+    for page_name in REQUIRED_SITE_PAGES:
+        require_file(SITE / page_name)
     if output.exists():
         shutil.rmtree(output)
     shutil.copytree(SITE, output)
