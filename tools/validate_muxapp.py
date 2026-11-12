@@ -12,7 +12,15 @@ from pathlib import Path, PurePosixPath
 REQUIRED_FILES = (
     "Void-Desk/mux_launch.sh",
     "Void-Desk/voiddesk.py",
+    "Void-Desk/desk/main.py",
     "Void-Desk/love/main.lua",
+    "Void-Desk/bin/bootstrap_lite.py",
+    "Void-Desk/bin/xfce_launch.sh",
+    "Void-Desk/service/voiddesk_service.py",
+    "Void-Desk/lib/love",
+    "Void-Desk/lib/libluajit-5.1.so.2",
+    "Void-Desk/lib/glyph_install.sh",
+    "Void-Desk/resources/voiddesk.png",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog",
@@ -22,6 +30,8 @@ REQUIRED_FILES = (
 
 EXECUTABLE_FILES = (
     "Void-Desk/mux_launch.sh",
+    "Void-Desk/bin/xfce_launch.sh",
+    "Void-Desk/lib/love",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/ts",
     "Void-Desk/external/rt-tailscale-m/app/RtTailscale/watchdog",
