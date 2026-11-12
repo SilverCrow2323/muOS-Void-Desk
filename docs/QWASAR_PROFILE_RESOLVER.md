@@ -117,7 +117,7 @@ Profiles and the generated snapshot are never executed as code. Signature verifi
 - A hidden workspace is removed from visible NEXUS nodes.
 - A disabled-but-visible workspace remains visible, is marked disabled and cannot be opened.
 - END NODE remains protected by Resolver validation.
-- Legacy MUOS APPS and WORKSHOP nodes remain as compatibility extras; they are not silently reinterpreted as QWASAR workspaces.
+- Legacy MUOS APPS, WORKSHOP, GAMES, DEVELOP, COMMUNITY and OUTERDESK nodes remain as compatibility extras; they are not silently reinterpreted as QWASAR workspaces.
 - LÖVE Settings shows the active profile name.
 
 ### Pygame
@@ -125,8 +125,8 @@ Profiles and the generated snapshot are never executed as code. Signature verifi
 - The Pygame Settings screen lists compatible `.qprofile.json` files.
 - Saving a selection stores `qwasar_profile` in `data/desk_config.json`; a restart is required for the launcher to regenerate the snapshot.
 - Pygame reads and caches the generated composition at startup.
-- The NEXUS adapter maps the QWASAR workspace IDs to stable legacy node IDs. It applies per-orbit workspace order, removes hidden workspaces, keeps disabled workspaces visible but muted and blocks their activation.
-- Legacy MUOS APPS and WORKSHOP nodes remain in their existing rings as compatibility extras. They are deliberately not aliased to unrelated QWASAR workspace IDs.
+- The NEXUS adapter maps QWASAR workspace IDs to stable legacy node IDs. It applies per-orbit workspace order, removes hidden workspaces, keeps disabled workspaces visible but muted and blocks their activation.
+- All non-QWASAR legacy NEXUS nodes remain in their original rings: MUOS APPS, WORKSHOP, GAMES, DEVELOP, COMMUNITY and OUTERDESK. They are not aliased to unrelated QWASAR workspace IDs.
 - This phase applies workspace-level NEXUS state only. Header/footer and side/global panels, non-NEXUS home styles, and migration of the legacy TOOLBOX/WORKSHOP destinations into the four QWASAR RT:TOOLBOX sections remain follow-up work.
 
 ### Shared pending work
@@ -139,7 +139,7 @@ Profiles and the generated snapshot are never executed as code. Signature verifi
 
 ## 6. Tests and release checks
 
-The Python tests cover default H700 resolution, desktop compatibility, workspace/section/menu ordering, visibility versus enabled state, safe settings, module/contribution state data, registered action references, protected END NODE/shell behaviour, invalid-profile fallback, atomic output and output-path containment. Pygame adapter tests cover stable node IDs, within-orbit ordering, hidden and disabled workspaces, protected START SESSION/END NODE and retention of MUOS APPS/WORKSHOP legacy nodes.
+The Python tests cover default H700 resolution, desktop compatibility, workspace/section/menu ordering, visibility versus enabled state, safe settings, module/contribution state data, registered action references, protected END NODE/shell behaviour, invalid-profile fallback, atomic output and output-path containment. Pygame adapter tests cover all pre-existing NEXUS node IDs, within-orbit ordering, hidden and disabled workspaces, protected START SESSION/END NODE and retention of every non-QWASAR legacy node.
 
 The LÖVE core tests cover stable node IDs, profile order, hidden workspaces and disabled workspaces. These tests are part of CI; a green workflow is still required before merging the feature branch.
 
@@ -151,4 +151,3 @@ Before a device release:
 4. test fallback with a malformed/incompatible selected profile;
 5. confirm END NODE, return-to-firmware and recovery remain reachable;
 6. confirm that uninstalling Void Desk leaves the normal muOS startup path intact.
-
