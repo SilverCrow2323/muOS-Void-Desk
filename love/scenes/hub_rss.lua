@@ -13,6 +13,7 @@ local state = {
     category = 1, language = "all", items = {}, errors = {},
     selected = 1, first = 1, status = "Loading saved headlines...",
     loading = false, job_id = nil, cache_time = "",
+    cached_category = nil, cached_language = nil,
 }
 local ROW_H = 42
 
@@ -26,6 +27,8 @@ local function refresh_cache()
             state.errors = resp.errors or {}
             state.selected = math.max(1, math.min(state.selected, math.max(1,#state.items)))
             state.cache_time = tostring(resp.updated or "")
+            state.cached_category = resp.category or "all"
+            state.cached_language = resp.language or "all"
             if resp.cached then
                 state.status = string.format("%d headlines · %s", #state.items, tostring(resp.category or "all"))
             elseif #state.items == 0 then
@@ -35,6 +38,11 @@ local function refresh_cache()
             state.status = "RSS cache: " .. tostring(resp.error or "unavailable")
         end
     end)
+end
+
+local function cache_matches_filter()
+    return state.cached_category == categories[state.category]
+        and state.cached_language == state.language
 end
 
 local function request_refresh()
@@ -96,7 +104,7 @@ function scene.enter()
         if action == "up" then
             state.selected = math.max(1, state.selected - 1)
         elseif action == "down" then
-            state.selected = math.min(#state.items, state.selected + 1)
+            state.selected = math.min(cache_matches_filter() and #state.items or 0, state.selected + 1)
         elseif action == "left" or action == "l1" then
             change_category(-1)
         elseif action == "right" or action == "r1" then
@@ -108,7 +116,7 @@ function scene.enter()
         elseif action == "y" or action == "start" then
             request_refresh()
         elseif action == "a" then
-            open_selected()
+            if cache_matches_filter() then open_selected() else state.status = "Press Y to fetch this filter." end
         elseif action == "select" then
             refresh_cache()
         elseif action == "b" or action == "menu" then
@@ -152,10 +160,12 @@ function scene.draw()
     love.graphics.print("LANGUAGE "..state.language:upper().."  ·  "..#state.items.." HEADLINES",24,99)
 
     local top,bottom = 132,H-84
+    local matches_filter = cache_matches_filter()
+    local visible_items = matches_filter and state.items or {}
     local visible = math.max(1,math.floor((bottom-top)/ROW_H))
-    state.first = math.max(1,math.min(state.selected-visible+1,math.max(1,#state.items-visible+1)))
-    for i=state.first,math.min(#state.items,state.first+visible-1) do
-        local item = state.items[i]
+    state.first = math.max(1,math.min(state.selected-visible+1,math.max(1,#visible_items-visible+1)))
+    for i=state.first,math.min(#visible_items,state.first+visible-1) do
+        local item = visible_items[i]
         local y = top+(i-state.first)*ROW_H
         local selected = i==state.selected
         love.graphics.setColor(selected and 0.11 or 0.055,selected and 0.15 or 0.075,selected and 0.20 or 0.105,0.98)
@@ -169,12 +179,12 @@ function scene.draw()
         love.graphics.setColor(0.55,0.68,0.79,1)
         love.graphics.printf(tostring(item.source or "").."  ·  "..tostring(item.published or ""),26,y+23,W-52,"left")
     end
-    if #state.items==0 then
+    if #visible_items==0 then
         love.graphics.setFont(font.bold(13) or love.graphics.newFont(13))
         love.graphics.setColor(0.68,0.77,0.86,1)
-        love.graphics.printf("NO HEADLINES CACHED",24,210,W-48,"center")
+        love.graphics.printf(matches_filter and "NO HEADLINES CACHED" or "FILTER NOT CACHED",24,210,W-48,"center")
         love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
-        love.graphics.printf("Choose a category and press Y to fetch trusted feeds.",24,236,W-48,"center")
+        love.graphics.printf(matches_filter and "Choose a category and press Y to fetch trusted feeds." or "Press Y to refresh this category and language.",24,236,W-48,"center")
     end
     love.graphics.setFont(font.regular(9) or love.graphics.newFont(9))
     love.graphics.setColor(0.56,0.66,0.76,1)
