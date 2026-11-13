@@ -269,6 +269,10 @@ def main():
     finally:
         if not umount_all():
             fail("XFCE cleanup is incomplete; one or more mounts or loop devices remain active.", 97, "CLEANUP")
+            try:
+                os.remove(MARKER)
+            except OSError:
+                pass
             result = 1
 
     if result == 0:
