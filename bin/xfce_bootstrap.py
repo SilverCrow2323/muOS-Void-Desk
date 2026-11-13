@@ -182,6 +182,7 @@ def main():
         return fail("Could not mount the desktop image: %s" % (err or "unknown error"), 22, "MOUNT")
     log("   montata: %.1fGB liberi dentro l'immagine" % free_gb(MNT))
 
+    result = 1
     try:
         # ---- 2. ubuntu-base ---------------------------------------------
         if os.path.exists(MNT + "/etc/os-release"):
@@ -264,12 +265,18 @@ def main():
             f.write("xfce ok\n")
         log("==== XFCE DESKTOP INSTALLED ====")
         log("Launch it from Void Desk / Start Session.")
-        report(100, "COMPLETED", "XFCE is installed and ready", "The desktop image passed its post-install checks.", status="done", animation="verify", severity="success")
-        return 0
+        result = 0
     finally:
         if not umount_all():
             fail("XFCE cleanup is incomplete; one or more mounts or loop devices remain active.", 97, "CLEANUP")
-            return 1
+            result = 1
+
+    if result == 0:
+        report(100, "COMPLETED", "XFCE is installed and ready",
+               "The desktop image passed its post-install checks.",
+               status="done", animation="verify", severity="success")
+        log("==== XFCE BOOTSTRAP COMPLETED ====")
+    return result
 
 
 if __name__ == "__main__":
