@@ -2073,9 +2073,12 @@ def h_xfce_install(args):
     if IS_DEVICE:
         ready_marker = DATA / ".xfce_ready"
         desktop_image = DATA / "xfce.img"
-        if ready_marker.exists() and desktop_image.is_file() and desktop_image.stat().st_size > 3_000_000_000:
-            return {"ok": True, "already": True, "note": "XFCE is already installed"}
-        if ready_marker.exists() and not desktop_image.exists():
+        if ready_marker.exists():
+            try:
+                if desktop_image.is_file() and desktop_image.stat().st_size > 3_000_000_000:
+                    return {"ok": True, "already": True, "note": "XFCE is already installed"}
+            except OSError:
+                pass
             try:
                 ready_marker.unlink()
             except OSError:
