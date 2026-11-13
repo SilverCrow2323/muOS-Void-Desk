@@ -573,7 +573,7 @@ def action(action_name: str, value: int | None = None) -> dict:
                         if action_name == "toggle_pause":
                             client.sendall((json.dumps({
                                 "command": ["get_property", "pause"], "request_id": 2,
-                            }) + "\\n").encode("utf-8"))
+                            }) + "\n").encode("utf-8"))
                             followup = client.recv(2048).decode("utf-8", "replace")
                             for follow_line in followup.splitlines():
                                 try:
