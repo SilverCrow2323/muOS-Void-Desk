@@ -36,10 +36,11 @@ end
 
 -- Persist to a sibling temporary file and atomically rename it over the
 -- active config. A failed write leaves the last good file and memory intact.
-function config.set(k, v)
+function config.set_many(updates)
+    if type(updates) ~= "table" then return false end
     local candidate = {}
     for key, value in pairs(data) do candidate[key] = value end
-    candidate[k] = v
+    for key, value in pairs(updates) do candidate[key] = value end
 
     local ok, encoded = pcall(json.encode, candidate)
     if not ok or type(encoded) ~= "string" then return false end
@@ -66,6 +67,10 @@ function config.set(k, v)
 
     data = candidate
     return true
+end
+
+function config.set(k, v)
+    return config.set_many({ [k] = v })
 end
 
 function config.data() return data end
