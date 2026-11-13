@@ -83,7 +83,7 @@ local function current_media_label()
     if tablet.media.now_playing then return tostring(tablet.media.now_playing) end
     local radio = tablet.radio or {}
     if radio_playing() then
-        return tostring(radio.name or radio.station or radio.title or radio.now_playing or "Void Radio")
+        return tostring(radio.icy_name or radio.icy_title or radio.name or radio.station or radio.title or radio.now_playing or "Void Radio")
     end
     local iptv = tablet.iptv or {}
     if iptv_playing() then
