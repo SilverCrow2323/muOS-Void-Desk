@@ -59,7 +59,7 @@ local function request_refresh()
         service_task = "rss_refresh",
         category = category,
         language = state.language,
-        name = "Refresh RSS",
+        name = "Refresh RSS · " .. category .. " · " .. state.language,
         hub = "toolbox",
         description = "Fetch a small selection of trusted RSS/Atom sources and cache recent headlines.",
         reason = "The selected public feeds need to be refreshed before their articles can be browsed offline.",
