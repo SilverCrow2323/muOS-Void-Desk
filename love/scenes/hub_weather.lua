@@ -296,7 +296,7 @@ function scene.draw()
         {icon="btn_a",label="Refresh"},
         {icon="r1",label="On-screen keys"},
         {icon="btn_b",label="Back"},
-    },right_text="OPEN-METEO"})
+    }})
 end
 
 return scene
