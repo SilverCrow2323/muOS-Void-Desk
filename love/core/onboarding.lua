@@ -24,12 +24,27 @@ local function clean(value)
 end
 
 function onboarding.init(config)
-    onboarding.name = clean(config.get("profile_name", "")
-        or config.get("termid_name", ""))
-    if onboarding.name == "" then
-        onboarding.name = clean(config.get("termid_name", ""))
+    local stored = clean(config.get("profile_name", ""))
+    local legacy = clean(config.get("termid_name", ""))
+    local placeholders = {
+        qq = true, user = true, guest = true, unknown = true,
+        username = true, voiddesk = true, [""] = true,
+    }
+    local complete = config.get("profile_name_setup_complete", false) == true
+    if stored == "" and legacy ~= "" and not placeholders[legacy:lower()] then
+        -- Preserve a real identity created by the Pygame frontend and migrate
+        -- it atomically instead of asking existing users twice.
+        if config.set_many({
+            profile_name = legacy,
+            profile_name_setup_complete = true,
+            termid_name = legacy,
+        }) then
+            stored = legacy
+            complete = true
+        end
     end
-    onboarding.active = config.get("profile_name_setup_complete", false) ~= true
+    onboarding.name = stored
+    onboarding.active = not complete
     onboarding.cursor = 1
     onboarding.error = ""
     onboarding.pulse = 0
