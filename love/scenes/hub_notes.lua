@@ -297,9 +297,9 @@ function scene.draw()
         end
         love.graphics.setScissor()
         if state.osk then
-            local kb_y=H-178
+            local kb_y=H-190
             love.graphics.setColor(0.035,0.047,0.065,0.98)
-            love.graphics.rectangle("fill",12,kb_y,W-24,102,7)
+            love.graphics.rectangle("fill",12,kb_y,W-24,132,7)
             local cell_w=(W-52)/COLS
             for i,key in ipairs(KEYS) do
                 local row=math.floor((i-1)/COLS)
@@ -318,9 +318,11 @@ function scene.draw()
         end
     end
 
-    love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
-    love.graphics.setColor(0.54,0.65,0.75,1)
-    love.graphics.printf(state.status,x+14,H-103,w-28,"left")
+    if not state.osk then
+        love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
+        love.graphics.setColor(0.54,0.65,0.75,1)
+        love.graphics.printf(state.status,x+14,H-103,w-28,"left")
+    end
     chrome.draw_footer({
         theme=th,
         hints=state.mode=="list" and {
