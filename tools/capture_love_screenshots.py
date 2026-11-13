@@ -13,15 +13,15 @@ by Git until they have been reviewed for private information.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import shutil
 import subprocess
-import sys
 import struct
-import zlib
+import subprocess
+import sys
 import time
+import zlib
 from pathlib import Path
 
 
