@@ -6,7 +6,7 @@ It checks:
 
 - the default UI manifest against `schemas/qwasar-ui.schema.json`;
 - component type registration, strict component property schemas, named slots and unique component-node IDs;
-- menu, component and key-binding references to registered actions;
+- menu, component, global-panel trigger and key-binding references to registered actions;
 - portable profiles against `schemas/qwasar-profile.schema.json`, including workspace, section and action references;
 - module manifests against `schemas/qwasar-module.schema.json`, including contribution component types, props, workspace/section references and module-local action references.
 
