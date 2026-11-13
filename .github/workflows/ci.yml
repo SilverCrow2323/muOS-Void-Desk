@@ -36,8 +36,8 @@ jobs:
       PYGAME_HIDE_SUPPORT_PROMPT: "1"
       VOIDDESK_NOINTRO: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install Python test and visual tools
@@ -80,7 +80,7 @@ jobs:
         run: python tools/capture_pygame_screenshots.py --all-states
       - name: Upload Pygame visual captures
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voiddesk-pygame-visual-captures
           path: |
@@ -95,10 +95,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Build both installable packages
@@ -108,7 +108,7 @@ jobs:
           dpkg-deb --info dist/voiddesk_*_all.deb
           test "$(dpkg-deb --field dist/voiddesk_*_all.deb Architecture)" = "all"
       - name: Upload handheld and PC packages with checksums
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voiddesk-installers
           path: |
@@ -124,7 +124,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # One runner, one apt update, one dependency install. Previously Lua,
       # LÖVE and Tailscale each created a separate runner and repeated APT work.
       - name: Install native integration dependencies once
@@ -175,7 +175,7 @@ jobs:
             bash tests/run_integration.sh
       - name: Upload LÖVE visual captures and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voiddesk-love-visual-captures
           path: |
