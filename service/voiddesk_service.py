@@ -1510,7 +1510,9 @@ def h_media_action(args):
         response = _media_ipc(["cycle", "pause"])
         if not response or response.get("error") != "success":
             return {"ok": False, "error": "MPV pause control is unavailable"}
-        return {"ok": True, "action": action, "data": response.get("data")}
+        status = _media_ipc(["get_property", "pause"])
+        paused = status.get("data") if status and status.get("error") == "success" else None
+        return {"ok": True, "action": action, "data": paused}
     if action == "volume":
         try:
             value = max(0, min(100, int(args.get("value"))))
