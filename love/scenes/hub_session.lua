@@ -333,7 +333,7 @@ local function draw_details(th,W,H,t)
         love.graphics.setColor(1,0.83,0.82,1)
         love.graphics.printf("REMOVE "..env.name.."?",x+30,y+257,pw-60,"center")
         love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
-        love.graphics.printf("This changes the installed desktop image. Confirm only if you no longer need this environment.",x+30,y+278,pw-60,"center")
+        love.graphics.printf("XFCE removal also removes IceWM and LXDE from the shared image. Confirm only if you no longer need any of them.",x+30,y+278,pw-60,"center")
         local yes = state.detail_action == 1
         love.graphics.setColor(yes and 1 or 0.55,yes and 0.32 or 0.60,yes and 0.30 or 0.68,1)
         love.graphics.printf(yes and "[ YES, UNINSTALL ]" or "YES, UNINSTALL",x+28,y+325,pw/2-40,"center")
@@ -435,7 +435,6 @@ function scene.draw()
     if th.bg_anim then
         pcall(effects.scanlines,W,H,0.025)
     end
-    local user=config and nil
     local profile_name=""
     local cfg=require("core.config")
     profile_name=tostring(cfg.get("profile_name","") or "")
@@ -473,7 +472,7 @@ function scene.draw()
             {icon="dpad",label="Select environment"},
             {icon="btn_a",label="Details"},
             {icon="btn_b",label="Back"},
-            {icon="btn_m",label="System tablet"},
+            {icon="monitor",label="Tablet (M)"},
         },
         right_text=string.format("FREE %.1f GB",state.disk_free_gb or 0),
     })
