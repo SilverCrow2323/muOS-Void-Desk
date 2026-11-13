@@ -49,15 +49,15 @@ PY_HOT = (139, 248, 255)
 PY_MID = (18, 112, 137)
 PY_DIM = (9, 49, 65)
 
-FPS_DT = 0.075
-FRAMES = 36
+FPS_DT = 0.09
+FRAMES = 24
 HOLD = 0.40
 
 
 def segment(pt, x0, y0, x1, y1, col, width=2):
     """Linea DDA economica, con campioni ravvicinati e clipping del Painter."""
     dx, dy = x1 - x0, y1 - y0
-    steps = max(1, int(max(abs(dx), abs(dy)) / 3.5))
+    steps = max(1, int(max(abs(dx), abs(dy)) / 10.0))
     for i in range(steps + 1):
         q = i / float(steps)
         pt.fill(int(x0 + dx * q), int(y0 + dy * q), width, width, col)
@@ -66,8 +66,8 @@ def segment(pt, x0, y0, x1, y1, col, width=2):
 def ring(pt, cx, cy, radius, col, width=2, squash=1.0):
     """Anello ellittico a segmenti: evita dipendenze grafiche esterne."""
     prev = None
-    for i in range(97):
-        a = (i / 96.0) * math.pi * 2.0
+    for i in range(73):
+        a = (i / 72.0) * math.pi * 2.0
         p = (cx + math.cos(a) * radius,
              cy + math.sin(a) * radius * squash)
         if prev is not None:
@@ -111,8 +111,8 @@ def draw_spiral(pt, fb, now, extent):
                (-0.15, PY_HOT, 1))
     for phase, col, width in strands:
         prev = None
-        for i in range(181):
-            u = (i / 180.0) * extent
+        for i in range(97):
+            u = (i / 96.0) * extent
             radius = 9.0 + max_r * u
             angle = turns * u + phase + math.sin(u * 17.0 + now * 2.0) * 0.13
             warp = math.sin(angle * 1.9 - now * 3.2 + phase) * (3.0 + 19.0 * u)
@@ -149,8 +149,8 @@ def draw_logo(pt, fb, env, now):
     brand_y = (panel_y + 17) // fbtext.CH
     fb.text((panel_x + 31) // fbtext.CW, brand_y,
             "SPDW FACTORY", (115, 185, 197))
-    fb.text((panel_x + 180) // fbtext.CW, brand_y,
-            "// QWASAR ENVIRONMENT", PY_ACCENT)
+    fb.text((panel_x + 31) // fbtext.CW, brand_y + 1,
+            "QWASAR ENVIRONMENT", PY_ACCENT)
 
     title_y = panel_y + 53
     pt.big_text(panel_x + 29, title_y + 2, "VOID DESK", (5, 20, 28), 3)
@@ -161,7 +161,7 @@ def draw_logo(pt, fb, env, now):
     pt.frame(tag_x, tag_y, 116, 23, PY_ACCENT, 1)
     fb.text((tag_x + 10) // fbtext.CW, (tag_y + 2) // fbtext.CH,
             "PY-ENGINE", PY_HOT)
-    target = ("TARGET // " + (env or "DESKTOP").upper())[:18]
+    target = "ENV // " + (env or "DESKTOP").upper()
     target_x = panel_x + panel_w - 13 - len(target) * fbtext.CW
     fb.text(target_x // fbtext.CW, (tag_y + 2) // fbtext.CH,
             target, (106, 151, 162))
