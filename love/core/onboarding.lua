@@ -59,6 +59,13 @@ function onboarding.init(config)
     end
 end
 
+function onboarding.disable_for_visual_capture()
+    if os.getenv("VOIDDESK_CAPTURE_ALL") ~= "1" then return false end
+    onboarding.active = false
+    if love and love.keyboard then love.keyboard.setTextInput(false) end
+    return true
+end
+
 function onboarding.finish(config)
     local value = clean(onboarding.name):gsub("^%s+", ""):gsub("%s+$", "")
     if #value < 2 then
