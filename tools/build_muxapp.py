@@ -151,7 +151,7 @@ def sha256_file(path: Path):
 
 def git_blob_sha(data: bytes) -> str:
     """Return the Git object SHA-1 for a blob without writing it to the worktree."""
-    header = f"blob {len(data)}\\0".encode("ascii")
+    header = f"blob {len(data)}\0".encode("ascii")
     return hashlib.sha1(header + data).hexdigest()
 
 
