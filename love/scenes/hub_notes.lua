@@ -77,7 +77,7 @@ end
 
 local function new_note()
     local stamp = os.date("%Y%m%d-%H%M%S")
-    state.name = "Note-" .. stamp .. ".txt"
+    state.name = string.format("Note-%s-%03d.txt", stamp, math.floor((os.clock()*1000)%1000))
     state.content = ""
     state.mode = "edit"
     state.osk = false
@@ -129,7 +129,12 @@ local function add_key(key)
     elseif key == "NEWLINE" then
         state.content = state.content .. "\n"
     elseif key == "BACK" then
-        state.content = state.content:sub(1,-2)
+        if utf8 and utf8.offset then
+            local position = utf8.offset(state.content, -1)
+            if position then state.content = state.content:sub(1, position-1) end
+        else
+            state.content = state.content:sub(1,-2)
+        end
     elseif key == "DONE" then
         state.osk = false
         return
