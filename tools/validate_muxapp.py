@@ -13,7 +13,28 @@ REQUIRED_FILES = (
     "Void-Desk/mux_launch.sh",
     "Void-Desk/voiddesk.py",
     "Void-Desk/love/main.lua",
+    "Void-Desk/lib/love",
+    "Void-Desk/lib/liblove-11.5.so",
+    "Void-Desk/lib/libluajit-5.1.so.2",
 )
+
+AARCH64_MACHINE = 183
+MIN_LOVE_RUNTIME_BYTES = 1024 * 1024
+
+
+def _validate_aarch64_elf(data: bytes, label: str, errors: list[str]):
+    if len(data) < 64 or data[:4] != b"\x7fELF":
+        errors.append("%s is not a valid ELF executable/library" % label)
+        return False
+    if data[4] != 2 or data[5] != 1:
+        errors.append("%s must be a 64-bit little-endian ELF" % label)
+        return False
+    machine = int.from_bytes(data[18:20], "little")
+    if machine != AARCH64_MACHINE:
+        errors.append("%s targets ELF machine %d, not AArch64" % (label, machine))
+        return False
+    return True
+
 
 
 def validate_archive(archive: str | Path) -> list[str]:
@@ -63,6 +84,8 @@ def validate_archive(archive: str | Path) -> list[str]:
                 mode = (info.external_attr >> 16) & 0xFFFF
                 if stat.S_ISLNK(mode):
                     errors.append("symbolic links are not allowed: %s" % name)
+                if normalized == "Void-Desk/lib/love" and not (mode & 0o111):
+                    errors.append("LÖVE launcher is not executable: %s" % normalized)
                 if not info.is_dir():
                     files.add(normalized)
 
@@ -74,6 +97,38 @@ def validate_archive(archive: str | Path) -> list[str]:
             for required in REQUIRED_FILES:
                 if required not in files:
                     errors.append("required file missing: %s" % required)
+
+            runtime_paths = (
+                "Void-Desk/lib/love",
+                "Void-Desk/lib/liblove-11.5.so",
+                "Void-Desk/lib/libluajit-5.1.so.2",
+            )
+            runtime_data = {}
+            for runtime_path in runtime_paths:
+                if runtime_path in files:
+                    runtime_data[runtime_path] = package.read(runtime_path)
+
+            loader_path = "Void-Desk/lib/love"
+            love_path = "Void-Desk/lib/liblove-11.5.so"
+            luajit_path = "Void-Desk/lib/libluajit-5.1.so.2"
+            loader = runtime_data.get(loader_path)
+            love_lib = runtime_data.get(love_path)
+            luajit_lib = runtime_data.get(luajit_path)
+
+            if loader is not None:
+                if _validate_aarch64_elf(loader, "lib/love", errors):
+                    for dependency in (b"liblove-11.5.so", b"libluajit-5.1.so.2"):
+                        if dependency not in loader:
+                            errors.append(
+                                "lib/love does not declare expected runtime dependency: "
+                                + dependency.decode("ascii")
+                            )
+            if love_lib is not None:
+                _validate_aarch64_elf(love_lib, "lib/liblove-11.5.so", errors)
+                if len(love_lib) < MIN_LOVE_RUNTIME_BYTES:
+                    errors.append("lib/liblove-11.5.so is too small to be the LÖVE 11.5 runtime")
+            if luajit_lib is not None:
+                _validate_aarch64_elf(luajit_lib, "lib/libluajit-5.1.so.2", errors)
     except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
         errors.append("cannot read archive: %s" % exc)
 

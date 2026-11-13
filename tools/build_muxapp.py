@@ -10,6 +10,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import urllib.request
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TAILSCALE_COMMIT = "d6aa05363cd5d56b07e63e2261c960a26d73cd9c"
+LOVE_RUNTIME_BLOB_SHA = "f28fbe1f41b32708a4d80ed58a92f12cdfd8f0da"
+LOVE_RUNTIME_SOURCE_URL = "https://raw.githubusercontent.com/SilverCrow2323/dolphin-rt-core/79bdfc7707fd0785828e7e7a3f1146e775a6f312/Core_History/Dolphin%20RtCore%20for%20MuOS%20v11.5.00%20Triptych/Flavour%20III%20%7C%20'Frontendone'%20%5B%20Full%20L%C3%96VE%20Frontend%20GUI%20%5D/DolphinUI/lib/liblove-11.5.so"
 SKIP_ROOT_FILES = {
     ".gitignore", ".gitattributes", ".gitmodules", ".editorconfig",
     ".DS_Store", "Thumbs.db", "build-packages.sh",
@@ -146,6 +149,54 @@ def sha256_file(path: Path):
     return digest.hexdigest()
 
 
+def git_blob_sha(data: bytes) -> str:
+    """Return the Git object SHA-1 for a blob without writing it to the worktree."""
+    header = f"blob {len(data)}\0".encode("ascii")
+    return hashlib.sha1(header + data).hexdigest()
+
+
+def _ensure_love_runtime(package_root: Path):
+    """Bundle the exact AArch64 LÖVE 11.5 shared library expected by lib/love."""
+    lib_dir = package_root / "lib"
+    loader = lib_dir / "love"
+    luajit = lib_dir / "libluajit-5.1.so.2"
+    runtime = lib_dir / "liblove-11.5.so"
+    missing = [p.relative_to(package_root).as_posix()
+               for p in (loader, luajit) if not p.is_file()]
+    if missing:
+        raise RuntimeError("LÖVE runtime is incomplete; missing " + ", ".join(missing))
+
+    if runtime.is_symlink():
+        raise RuntimeError("LÖVE shared library must not be a symbolic link")
+    if not runtime.is_file():
+        try:
+            with urllib.request.urlopen(LOVE_RUNTIME_SOURCE_URL, timeout=60) as response:
+                payload = response.read(8 * 1024 * 1024)
+        except Exception as exc:
+            raise RuntimeError("could not fetch the pinned LÖVE 11.5 runtime: " + str(exc)) from exc
+        if len(payload) < 1024 * 1024:
+            raise RuntimeError("downloaded LÖVE 11.5 runtime is unexpectedly small")
+        if git_blob_sha(payload) != LOVE_RUNTIME_BLOB_SHA:
+            raise RuntimeError("downloaded LÖVE 11.5 runtime failed its pinned Git blob checksum")
+        lib_dir.mkdir(parents=True, exist_ok=True)
+        temporary = runtime.with_name(runtime.name + ".download")
+        try:
+            temporary.write_bytes(payload)
+            temporary.chmod(0o755)
+            os.replace(temporary, runtime)
+        finally:
+            temporary.unlink(missing_ok=True)
+    else:
+        payload = runtime.read_bytes()
+        if git_blob_sha(payload) != LOVE_RUNTIME_BLOB_SHA:
+            raise RuntimeError("lib/liblove-11.5.so is not the pinned H700 LÖVE 11.5 build")
+
+    if not runtime.is_file() or runtime.stat().st_size < 1024 * 1024:
+        raise RuntimeError("LÖVE 11.5 shared library is missing or truncated")
+    if not os.access(runtime, os.R_OK):
+        raise RuntimeError("LÖVE 11.5 shared library is not readable")
+
+
 def build_archive(repo_root: Path, output: Path):
     repo_root = Path(repo_root).resolve()
     output = Path(output).resolve()
@@ -176,6 +227,7 @@ def build_archive(repo_root: Path, output: Path):
                 shutil.copy2(source, target)
 
         _copy_tailscale_service(repo_root, package_root)
+        _ensure_love_runtime(package_root)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         timestamp = _zip_datetime()
