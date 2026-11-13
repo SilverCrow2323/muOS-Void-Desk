@@ -50,8 +50,15 @@ end
 function overlay.handle_action(action)
     if not jobs.overlay_open then return false end
     if action=="b" or action=="menu" or action=="select" then
-        -- Backgrounding only dismisses the modal; the supervised job continues.
-        jobs.hide_overlay()
+        local job = jobs.focused()
+        if job and job.can_background == false then
+            jobs.cancel(job.id, function(resp)
+                if resp and resp.ok then job.message = "Cancellation requested." end
+            end)
+        else
+            -- The supervised process continues; only the foreground details close.
+            jobs.hide_overlay()
+        end
         return true
     elseif action=="up" or action=="down" then
         return true
@@ -88,13 +95,14 @@ function overlay.draw()
     love.graphics.rectangle("fill",px+2,py+2,pw-4,58,8,8)
 
     local f_title=font.bold(19) or love.graphics.newFont(18)
+    pcall(icon.draw, tostring(job.icon or "tool"), px+20, py+14, 34, color, {alpha=1})
     love.graphics.setFont(f_title)
     love.graphics.setColor(0.93,0.96,1,1)
-    love.graphics.print(title,px+22,py+15)
+    love.graphics.print(title,px+66,py+15)
     local f_meta=font.regular(10) or love.graphics.newFont(10)
     love.graphics.setFont(f_meta)
     love.graphics.setColor(color[1],color[2],color[3],1)
-    love.graphics.print(string.upper(tostring(job.hub or "SYSTEM")).."  /  OPERATION #"..tostring(job.id),px+23,py+40)
+    love.graphics.print(string.upper(tostring(job.hub or "SYSTEM")).."  /  OPERATION #"..tostring(job.id),px+67,py+40)
 
     local spinner_x=px+pw-62
     draw_spinner(spinner_x,py+34,18,error_state and {1,0.32,0.30} or color,t,mode)
@@ -163,7 +171,7 @@ function overlay.draw()
             px+30,log_y+10)
     end
 
-    local footer=job.can_background==false and "B  CLOSE DETAILS" or "B  CONTINUE IN BACKGROUND"
+    local footer=job.can_background==false and "B  REQUEST CANCELLATION" or "B  CONTINUE IN BACKGROUND"
     love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
     love.graphics.setColor(0.63,0.72,0.81,1)
     love.graphics.print(footer,px+22,py+ph-27)
