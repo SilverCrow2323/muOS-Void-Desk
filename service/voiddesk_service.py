@@ -1170,6 +1170,12 @@ def h_job_start(args):
     else:
         return {"ok": False, "error": "job requires cmd or tool_id"}
 
+    if progress_file is not None:
+        try:
+            progress_file.unlink(missing_ok=True)
+        except OSError:
+            pass
+
     _JOB_SEQ += 1
     job_id = str(_JOB_SEQ)
     name = str(args.get("name") or tool_id or "Background job")[:80]
