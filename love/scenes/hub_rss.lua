@@ -102,7 +102,28 @@ function scene.enter()
     state.job_id = nil
     state.job_key = nil
     state.status = "Loading saved headlines..."
-    refresh_cache()
+    if os.getenv("VOIDDESK_CAPTURE_ALL") == "1" then
+        state.items = {
+            {title="muOS Andromeda: release notes and compatibility updates",
+             source="muOS Project",published="DEMO · Today",
+             url="https://example.invalid/demo/muos-release"},
+            {title="Linux handheld graphics: Vulkan and GLES explained",
+             source="Linux Gaming",published="DEMO · 2h ago",
+             url="https://example.invalid/demo/linux-graphics"},
+            {title="Retro systems: new community preservation archive",
+             source="Retro Computing",published="DEMO · Yesterday",
+             url="https://example.invalid/demo/retro-archive"},
+            {title="Indie showcase: five small games worth following",
+             source="Handheld News",published="DEMO · 3h ago",
+             url="https://example.invalid/demo/indie-showcase"},
+        }
+        state.cached_category = "all"
+        state.cached_language = "all"
+        state.cache_time = "visual fixture"
+        state.status = "DEMO HEADLINES · VISUAL FIXTURE · NOT LIVE"
+    else
+        refresh_cache()
+    end
     input.on("press", function(action)
         if action == "up" then
             state.selected = math.max(1, state.selected - 1)
