@@ -229,7 +229,7 @@ function onboarding.draw(theme)
             selected and accent[2] or 0.30, selected and accent[3] or 0.38, 1)
         love.graphics.setLineWidth(selected and 2 or 1)
         love.graphics.rectangle("line", x+2, y, cell_w-5, cell_h, 5)
-        local f = love.graphics.newFont(12)
+        local f = get_font(12)
         love.graphics.setFont(f)
         local tw = f:getWidth(label)
         love.graphics.setColor(text[1], text[2], text[3], 1)
@@ -237,7 +237,7 @@ function onboarding.draw(theme)
     end
 
     local footer_y = py+panel_h-48
-    love.graphics.setFont(love.graphics.newFont(11))
+    love.graphics.setFont(get_font(11))
     love.graphics.setColor(dim[1], dim[2], dim[3], 1)
     love.graphics.print("D-PAD / L-STICK  SELECT  ·  A ADD  ·  B DELETE  ·  START CONFIRM",
                         px+24, footer_y)
