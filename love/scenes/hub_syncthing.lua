@@ -176,7 +176,7 @@ end
 local config = {
     title = "SYNCTHING",
     node_idx = 5,
-    widget_height = 132,
+    widget_height = 110,
     row_height = 46,
     status = "Native muOS Web Service manager",
     on_enter = function(scene) refresh(scene, false) end,
