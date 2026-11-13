@@ -554,7 +554,7 @@ def action(action_name: str, value: int | None = None) -> dict:
             client.connect(_mpv_sock)
             client.sendall((json.dumps({
                 "command": command, "request_id": 1,
-            }) + "\\n").encode("utf-8"))
+            }) + "\n").encode("utf-8"))
             buffer = b""
             deadline = time.monotonic() + 0.8
             while time.monotonic() < deadline and len(buffer) < 4096:
