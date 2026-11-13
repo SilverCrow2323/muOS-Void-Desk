@@ -23,53 +23,60 @@ local function cel_tones(base, lit_dir_x, lit_dir_y)
     return shadow, mid, light, lit_dir_x, lit_dir_y
 end
 
--- Draw sphere with 8x8 hard-tone cells (cel shading)
+-- Three-tone cel-shaded sphere with a hard, directional terminator.
+-- Flat polygonal lighting replaces the coarse pixel-cell raster used before.
 local function draw_cel_sphere(x, y, r, base, lit_dx, lit_dy)
     local SHADOW, MID, LIGHT = cel_tones(base, lit_dx, lit_dy)
     local llen = math.sqrt(lit_dx*lit_dx + lit_dy*lit_dy)
-    if llen < 0.001 then lit_dx, lit_dy = -0.7, -0.7
-    else lit_dx, lit_dy = lit_dx/llen, lit_dy/llen end
-
-    local N = 8
-    local cell = (r * 2) / N
-
-    love.graphics.setColor(SHADOW[1], SHADOW[2], SHADOW[3], 1)
-    love.graphics.circle("fill", x, y, r)
-
-    -- batch by tone for fewer color changes
-    for tone_idx = 1, 3 do
-        local tone
-        if tone_idx == 1 then tone = SHADOW
-        elseif tone_idx == 2 then tone = MID
-        else tone = LIGHT end
-        love.graphics.setColor(tone[1], tone[2], tone[3], 1)
-
-        for i = 0, N-1 do
-            for j = 0, N-1 do
-                local cx = x - r + cell * (i + 0.5)
-                local cy = y - r + cell * (j + 0.5)
-                local dx, dy = cx - x, cy - y
-                local dist = math.sqrt(dx*dx + dy*dy)
-                if dist <= r - 0.5 then
-                    local d = (dx * lit_dx + dy * lit_dy) / r
-                    local matches
-                    if tone_idx == 1 then matches = (d <= -0.15)
-                    elseif tone_idx == 2 then matches = (d > -0.15 and d <= 0.4)
-                    else matches = (d > 0.4) end
-                    if matches then
-                        love.graphics.rectangle("fill",
-                            cx - cell/2 - 0.5, cy - cell/2 - 0.5,
-                            cell + 1, cell + 1)
-                    end
-                end
-            end
-        end
+    if llen < 0.001 then
+        lit_dx, lit_dy = -0.7, -0.7
+    else
+        lit_dx, lit_dy = lit_dx/llen, lit_dy/llen
     end
 
-    -- Bold BLAME outline
-    love.graphics.setColor(0.08, 0.08, 0.10, 0.95)
-    love.graphics.setLineWidth(2)
-    love.graphics.circle("line", x, y, r)
+    local angle
+    if math.atan2 then angle = math.atan2(lit_dy, lit_dx)
+    else angle = math.atan(lit_dy, lit_dx) end
+
+    -- Deep shadow base and a crisp lit hemisphere.
+    love.graphics.setColor(SHADOW[1], SHADOW[2], SHADOW[3], 1)
+    love.graphics.circle("fill", x, y, r, 48)
+    love.graphics.setColor(MID[1], MID[2], MID[3], 1)
+    love.graphics.arc("fill", "pie", x, y, r, angle-math.pi/2,
+                      angle+math.pi/2, 40)
+
+    -- Bright inner light mass; its edge is deliberately hard, like animation cel paint.
+    local hx = x + lit_dx*r*0.08
+    local hy = y + lit_dy*r*0.08
+    love.graphics.setColor(LIGHT[1], LIGHT[2], LIGHT[3], 1)
+    love.graphics.arc("fill", "pie", hx, hy, r*0.84,
+                      angle-0.72, angle+0.72, 32)
+
+    -- A restrained specular plate gives the body depth without a soft gradient.
+    love.graphics.setColor(
+        math.min(1, LIGHT[1]*1.10+0.05),
+        math.min(1, LIGHT[2]*1.10+0.05),
+        math.min(1, LIGHT[3]*1.10+0.05), 0.92)
+    love.graphics.ellipse("fill",
+        x + lit_dx*r*0.34 - lit_dy*r*0.03,
+        y + lit_dy*r*0.34 + lit_dx*r*0.03,
+        math.max(1.2,r*0.18), math.max(0.8,r*0.085), 24)
+
+    -- One angular facet and a dark terminator accent make the silhouette read as 2.5D.
+    love.graphics.setColor(MID[1]*0.72, MID[2]*0.72, MID[3]*0.72, 0.62)
+    local tx = x - lit_dx*r*0.12
+    local ty = y - lit_dy*r*0.12
+    love.graphics.arc("line", "open", tx, ty, r*0.94,
+                      angle+math.pi*0.50, angle+math.pi*0.86, 18)
+
+    -- Ink outline and a thin light-catching rim.
+    love.graphics.setColor(0.045, 0.055, 0.075, 0.98)
+    love.graphics.setLineWidth(math.max(1.25,r*0.075))
+    love.graphics.circle("line", x, y, r, 48)
+    love.graphics.setColor(LIGHT[1], LIGHT[2], LIGHT[3], 0.72)
+    love.graphics.setLineWidth(math.max(0.8,r*0.025))
+    love.graphics.arc("line", "open", x, y, r*0.97,
+                      angle-0.52, angle+0.52, 24)
 end
 
 -- Surface feature projection
