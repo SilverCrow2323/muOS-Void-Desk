@@ -109,3 +109,15 @@ def test_poll_raw_returns_stable_button_identities_and_drains_once():
 
     assert bridge.poll_raw() == [304, 310, 315]
     assert bridge.poll() == []
+
+def test_desktop_runtime_uses_the_shared_bridge_and_never_returns_none_from_poll():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    launcher = (root / "voiddesk.py").read_text(encoding="utf-8")
+    assert "from desk.desktop_input import DesktopInputBridge" in launcher
+    assert "input_bridge.handle_events(evs)" in launcher
+    assert "evinput.poll = input_bridge.poll" in launcher
+    assert "evinput.poll_raw = input_bridge.poll_raw" in launcher
+    assert "evinput.hat = input_bridge.hat" in launcher
+    assert "lambda: _q.copy() and _q.clear()" not in launcher
