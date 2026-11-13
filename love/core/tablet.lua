@@ -87,7 +87,9 @@ local function current_media_label()
     end
     local iptv = tablet.iptv or {}
     if iptv_playing() then
-        return tostring(iptv.channel or iptv.name or iptv.now_playing or "IPTV")
+        local channel = iptv.channel
+        if type(channel) == "table" then channel = channel.name end
+        return tostring(channel or iptv.name or iptv.now_playing or "IPTV")
     end
     return "Nothing is playing"
 end
