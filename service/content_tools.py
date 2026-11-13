@@ -112,8 +112,16 @@ def parse_rss(xml_bytes: bytes, source: str, limit: int = RSS_MAX_ITEMS):
         if local not in ("item", "entry"):
             continue
         title_node = _tag(element, "title")
-        summary_node = _tag(element, "description") or _tag(element, "summary") or _tag(element, "content")
-        date_node = _tag(element, "pubdate") or _tag(element, "published") or _tag(element, "updated")
+        summary_node = _tag(element, "description")
+        if summary_node is None:
+            summary_node = _tag(element, "summary")
+        if summary_node is None:
+            summary_node = _tag(element, "content")
+        date_node = _tag(element, "pubdate")
+        if date_node is None:
+            date_node = _tag(element, "published")
+        if date_node is None:
+            date_node = _tag(element, "updated")
         title = _plain_text(title_node.text if title_node is not None else "", 220)
         link = _entry_link(element)
         if not title or not link:
