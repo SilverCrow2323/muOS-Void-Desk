@@ -156,6 +156,45 @@ for _, id in ipairs(theme_ids) do
            "incomplete theme palette: " .. id)
 end
 
+-- First-run identity is mandatory for placeholder profiles, but a real
+-- name created by the Pygame frontend is migrated without asking twice.
+local onboarding = require("core.onboarding")
+local identity = {
+    data = { termid_name = "qq", profile_name_setup_complete = false },
+}
+function identity.get(key, default)
+    local value = identity.data[key]
+    if value == nil then return default end
+    return value
+end
+function identity.set_many(values)
+    for key, value in pairs(values) do identity.data[key] = value end
+    return true
+end
+onboarding.init(identity)
+equal(onboarding.active, true, "placeholder identity must open first-run setup")
+onboarding.name = "Void Pilot"
+equal(onboarding.finish(identity), true, "first-run identity should persist")
+equal(identity.data.profile_name, "Void Pilot", "profile name should be saved")
+equal(identity.data.termid_name, "Void Pilot", "legacy Pygame identity should stay in sync")
+equal(identity.data.profile_name_setup_complete, true, "first-run setup completion should persist")
+
+local legacy_identity = {
+    data = { termid_name = "ExistingPygameUser", profile_name_setup_complete = false },
+}
+function legacy_identity.get(key, default)
+    local value = legacy_identity.data[key]
+    if value == nil then return default end
+    return value
+end
+function legacy_identity.set_many(values)
+    for key, value in pairs(values) do legacy_identity.data[key] = value end
+    return true
+end
+onboarding.init(legacy_identity)
+equal(onboarding.active, false, "existing Pygame identity should migrate without a second prompt")
+equal(legacy_identity.data.profile_name, "ExistingPygameUser", "legacy name should migrate")
+
 local data_dir = root .. "/data"
 local held_dir = data_dir .. ".held"
 assert(os.rename(data_dir, held_dir), "test must be able to hold the data directory")
