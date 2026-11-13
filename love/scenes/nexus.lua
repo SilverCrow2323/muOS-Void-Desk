@@ -27,8 +27,8 @@ local sel = {
 local warp = { active=false, t=0, target_idx=nil,
                target_scene=nil, use_stub=false, quit=false }
 
-local RING_RADII = { [1]=0, [2]=175, [3]=235, [4]=290 }
-local SQUASH = 0.42
+local RING_RADII = { [1]=0, [2]=170, [3]=255, [4]=320 }
+local SQUASH = 0.48
 
 local function lerp(a, b, t) return a + (b - a) * t end
 
@@ -395,6 +395,9 @@ function nexus.draw()
         love.graphics.setColor(th.orbit_color[1], th.orbit_color[2],
                                th.orbit_color[3], 0.35 * warp_dim)
         love.graphics.ellipse("line", 320, 240, rr, rr * SQUASH)
+        love.graphics.setColor(th.orbit_color[1], th.orbit_color[2], th.orbit_color[3], 0.10 * warp_dim)
+        love.graphics.setLineWidth(1)
+        love.graphics.ellipse("line", 320, 240, rr - 4, (rr - 4) * SQUASH)
     end
 
     -- Sort for depth
