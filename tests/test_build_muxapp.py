@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+import io
 from pathlib import Path
 import zipfile
 from types import SimpleNamespace
@@ -68,6 +69,8 @@ def test_builder_emits_only_void_desk_root_and_bundles_rt_service(tmp_path, monk
     assert all(name.startswith("Void-Desk/") for name in names)
     assert "Void-Desk/mux_launch.sh" in names
     assert "Void-Desk/love/main.lua" in names
+    assert "Void-Desk/lib/liblove-11.5.so" in names
+    assert "Void-Desk/lib/libluajit-5.1.so.2" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/rt" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/panel/server.py" in names
     assert "Void-Desk/external/rt-tailscale-m/app/RtTailscale/config/rt.conf" in names
@@ -91,3 +94,28 @@ def test_builder_fails_if_pinned_submodule_is_not_initialized(tmp_path):
         assert "git submodule update --init --recursive" in str(exc)
     else:
         raise AssertionError("builder must refuse a package without Rt:Tailscale-M")
+
+
+
+def test_builder_fetches_pinned_runtime_when_missing(tmp_path, monkeypatch):
+    builder = load_builder()
+    package_root = tmp_path / "package" / "Void-Desk"
+    lib = package_root / "lib"
+    lib.mkdir(parents=True)
+    loader = lib / "love"
+    loader.write_bytes(elf64_aarch64(b"liblove-11.5.so\\0libluajit-5.1.so.2\\0"))
+    loader.chmod(0o755)
+    (lib / "libluajit-5.1.so.2").write_bytes(elf64_aarch64())
+
+    payload = elf64_aarch64(b"\\0" * (1024 * 1024))
+    monkeypatch.setattr(builder, "LOVE_RUNTIME_BLOB_SHA", builder.git_blob_sha(payload))
+    monkeypatch.setattr(builder, "LOVE_RUNTIME_SOURCE_URL", "https://example.invalid/liblove-11.5.so")
+    monkeypatch.setattr(
+        builder.urllib.request, "urlopen",
+        lambda *args, **kwargs: io.BytesIO(payload),
+    )
+
+    builder._ensure_love_runtime(package_root)
+    downloaded = lib / "liblove-11.5.so"
+    assert downloaded.read_bytes() == payload
+    assert downloaded.stat().st_mode & 0o111
