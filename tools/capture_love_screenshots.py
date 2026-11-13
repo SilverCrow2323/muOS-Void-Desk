@@ -13,6 +13,7 @@ by Git until they have been reviewed for private information.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -168,6 +169,46 @@ def main() -> int:
         requested = int(manifest.get("requested", 0))
         print("Captured %d/%d LÖVE screens; %d failed." %
               (len(captured), requested, len(failed)))
+
+        # A modal such as first-run onboarding can cover every scene while the
+        # screenshot manager still reports success. Verify the actual PNGs,
+        # their scene labels, and their content hashes before accepting a pass.
+        screens = [str(entry.get("screen", "")) for entry in captured
+                   if isinstance(entry, dict)]
+        if len(screens) != len(captured) or len(set(screens)) != len(captured):
+            print("ERROR: capture manifest contains missing or duplicate scene labels.",
+                  file=sys.stderr)
+            return 1
+        hashes = set()
+        png_signature = b"\\x89PNG\\r\\n\\x1a\\n"
+        for entry in captured:
+            relative = str(entry.get("path", ""))
+            image_path = (ROOT / relative).resolve()
+            try:
+                image_path.relative_to(CAPTURE_DIR.resolve())
+            except ValueError:
+                print("ERROR: capture path escapes the visual-capture directory.",
+                      file=sys.stderr)
+                return 1
+            try:
+                image_bytes = image_path.read_bytes()
+            except OSError as exc:
+                print("ERROR: missing capture for %s: %s" %
+                      (entry.get("screen", "?"), exc), file=sys.stderr)
+                return 1
+            if not image_bytes.startswith(png_signature):
+                print("ERROR: invalid PNG for %s." % entry.get("screen", "?"),
+                      file=sys.stderr)
+                return 1
+            hashes.add(hashlib.sha256(image_bytes).digest())
+        minimum_unique = max(1, (len(captured) * 3 + 3) // 4)
+        if len(hashes) < minimum_unique:
+            print("ERROR: only %d/%d captures contain distinct images; "
+                  "a global overlay may be covering the scenes." %
+                  (len(hashes), len(captured)), file=sys.stderr)
+            return 1
+        print("Verified %d distinct PNGs across %d scene labels." %
+              (len(hashes), len(screens)))
         for entry in failed:
             print("  FAILED %-20s %s" %
                   (entry.get("screen", "?"), entry.get("error", "")))
