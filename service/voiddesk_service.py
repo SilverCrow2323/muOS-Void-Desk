@@ -1654,6 +1654,18 @@ def h_iptv_play(args):
             "channel": channel.get("name", "Live stream")}
 
 
+def h_iptv_action(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "playback controls are disabled during visual capture"}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+    action = str(args.get("action") or "")
+    try:
+        return iptv_module.action(action, args.get("value"))
+    except Exception as exc:
+        return {"ok": False, "error": "IPTV control failed: " + str(exc)[:120]}
+
+
 def h_iptv_stop(args):
     if IS_VISUAL_CAPTURE:
         return {"ok": True, "state": "idle"}
@@ -2368,6 +2380,7 @@ HANDLERS = {
     "iptv_load_epg": h_iptv_load_epg,
     "iptv_epg_for": h_iptv_epg_for,
     "iptv_play": h_iptv_play,
+    "iptv_action": h_iptv_action,
     "iptv_stop": h_iptv_stop,
     "iptv_status": h_iptv_status,
     "list_external": h_list_external,
