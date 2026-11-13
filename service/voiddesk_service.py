@@ -1330,6 +1330,13 @@ def h_job_start(args):
     else:
         return {"ok": False, "error": "job requires cmd or tool_id"}
 
+    if service_task in ("rss_refresh", "weather_refresh"):
+        requested_name = name
+        for existing in _JOBS.values():
+            _job_refresh(existing)
+            if existing.get("name") == requested_name and existing.get("status") in ("running", "starting"):
+                return {"ok": True, "job": _job_public(existing), "already": True}
+
     if progress_file is not None:
         try:
             progress_file.unlink(missing_ok=True)
