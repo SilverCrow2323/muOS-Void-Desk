@@ -104,6 +104,7 @@ function love.keypressed(key, sc, isrepeat)
         return
     end
     if key == "m" then
+        if jobs.overlay_open then jobs.hide_overlay() end
         tablet.toggle()
         return
     end
