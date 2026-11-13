@@ -64,6 +64,7 @@ class DesktopInputBridge:
         self._queue = []
         self._held = set()
         self._joy_hats = {}
+        self._controller_dpad = {}
         self._trigger_states = {}
         self._joysticks = {}
         self._init_joysticks()
@@ -132,6 +133,7 @@ class DesktopInputBridge:
                 self._joy_hats[event.instance_id] = tuple(event.value)
             elif event.type == getattr(self.pygame, "JOYDEVICEREMOVED", None):
                 self._joy_hats.pop(event.instance_id, None)
+                self._controller_dpad.pop(event.instance_id, None)
                 joystick = self._joysticks.pop(event.instance_id, None)
                 if joystick is not None:
                     try:
@@ -144,11 +146,22 @@ class DesktopInputBridge:
                 self._queue_trigger(event.instance_id, event.axis, event.value)
             elif event.type == getattr(self.pygame, "CONTROLLERBUTTONDOWN", None):
                 action = self.CONTROLLER_BUTTON_ACTIONS.get(event.button)
-                if action is not None:
-                    if action in ("UP", "DOWN", "LEFT", "RIGHT"):
-                        self._queue.append(action)
-                    else:
-                        self._queue.append(action)
+                if action in ("UP", "DOWN", "LEFT", "RIGHT"):
+                    self._controller_dpad.setdefault(event.instance_id, set()).add(action)
+                elif action is not None:
+                    self._queue.append(action)
+            elif event.type == getattr(self.pygame, "CONTROLLERBUTTONUP", None):
+                action = self.CONTROLLER_BUTTON_ACTIONS.get(event.button)
+                if action in ("UP", "DOWN", "LEFT", "RIGHT"):
+                    held = self._controller_dpad.get(event.instance_id)
+                    if held is not None:
+                        held.discard(action)
+                        if not held:
+                            self._controller_dpad.pop(event.instance_id, None)
+            elif event.type == getattr(self.pygame, "CONTROLLERDEVICEREMOVED", None):
+                self._controller_dpad.pop(event.instance_id, None)
+                for key in [k for k in self._trigger_states if k[0] == event.instance_id]:
+                    self._trigger_states.pop(key, None)
             elif event.type == getattr(self.pygame, "CONTROLLERAXISMOTION", None):
                 self._queue_trigger(event.instance_id, event.axis, event.value)
 
@@ -177,4 +190,9 @@ class DesktopInputBridge:
             left = left or x < 0
             up = up or y > 0
             down = down or y < 0
+        for held in self._controller_dpad.values():
+            right = right or "RIGHT" in held
+            left = left or "LEFT" in held
+            up = up or "UP" in held
+            down = down or "DOWN" in held
         return (int(right) - int(left), int(up) - int(down))
