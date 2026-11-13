@@ -6,6 +6,7 @@ local chrome = require("core.chrome")
 local font = require("core.font")
 local nodes = require("core.nodes")
 local jobs = require("core.jobs")
+local config = require("core.config")
 
 local scene = {}
 local state = {
@@ -68,6 +69,7 @@ local function request_forecast()
         end
     end
     state.status = "Preparing forecast for " .. city .. "..."
+    config.set("weather_city", city)
     state.city_mode = false
     state.osk = false
     love.keyboard.setTextInput(false)
@@ -141,6 +143,7 @@ end
 
 function scene.enter()
     input.clear()
+    state.city = tostring(config.get("weather_city", state.city) or state.city)
     state.city_mode=false
     state.osk=false
     state.job_id=nil
