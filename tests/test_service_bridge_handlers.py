@@ -607,3 +607,15 @@ def test_text_editor_service_enforces_size_limit_and_ignores_temp_files(
     (directory / "readme.md").write_text("ok", encoding="utf-8")
     files = service.h_text_list({})["files"]
     assert [item["name"] for item in files] == ["readme.md"]
+
+
+
+def test_text_editor_service_handler_map_and_workspace_confinement(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    assert service.HANDLERS["text_list"] is service.h_text_list
+    assert service.HANDLERS["text_read"] is service.h_text_read
+    assert service.HANDLERS["text_save"] is service.h_text_save
+    assert service.HANDLERS["text_delete"] is service.h_text_delete
+    (tmp_path / "Texts").symlink_to(tmp_path / "outside", target_is_directory=True)
+    assert service.h_text_list({})["ok"] is False
