@@ -230,7 +230,7 @@ local function seed_global_overlay(target)
         }
         jobs.active[visual_job.id] = visual_job
         tablet.system = {
-            model = "RG35XX H",
+            model = "VISUAL FIXTURE · muOS H700 (SIMULATED)",
             kernel = "6.1.73-muos",
             uptime = "4h 12m",
             ram = {pct = 42, used_mb = 860, total_mb = 2048},
@@ -243,7 +243,7 @@ local function seed_global_overlay(target)
             info = {gateway = "192.168.1.1"},
         }
         tablet.media = {
-            now_playing = "Void Radio · Night Drive",
+            now_playing = "DEMO AUDIO · Night Drive",
             volume = 42,
             paused = false,
             library_count = 128,
