@@ -67,7 +67,7 @@ end
 return dashboard.new({
     title = "VOID DIAGNOSTICS",
     node_idx = 6,
-    widget_height = 142,
+    widget_height = 108,
     row_height = 46,
     status = "Read-only system and service checks",
 
