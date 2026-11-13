@@ -29,6 +29,10 @@ class FakePygame:
     K_LEFT = 27
     K_RIGHT = 28
 
+    JOYBUTTONDOWN = 31
+    JOYHATMOTION = 32
+    JOYAXISMOTION = 33
+
 
 def key_event(kind, key):
     return SimpleNamespace(type=kind, key=key)
@@ -121,3 +125,45 @@ def test_desktop_runtime_uses_the_shared_bridge_and_never_returns_none_from_poll
     assert "evinput.poll_raw = input_bridge.poll_raw" in launcher
     assert "evinput.hat = input_bridge.hat" in launcher
     assert "lambda: _q.copy() and _q.clear()" not in launcher
+
+def test_desktop_joystick_buttons_match_the_standard_gamepad_layout():
+    pygame = FakePygame()
+    bridge = DesktopInputBridge(pygame)
+    events = [
+        SimpleNamespace(type=pygame.JOYBUTTONDOWN, button=0),
+        SimpleNamespace(type=pygame.JOYBUTTONDOWN, button=1),
+        SimpleNamespace(type=pygame.JOYBUTTONDOWN, button=4),
+        SimpleNamespace(type=pygame.JOYBUTTONDOWN, button=5),
+        SimpleNamespace(type=pygame.JOYBUTTONDOWN, button=8),
+        SimpleNamespace(type=pygame.JOYBUTTONDOWN, button=9),
+        SimpleNamespace(type=pygame.JOYBUTTONDOWN, button=10),
+    ]
+    bridge.handle_events(events)
+    assert bridge.poll() == ["A", "B", "L1", "R1", "L3", "R3", "MENU"]
+
+
+def test_desktop_gamepad_hat_and_trigger_axes_are_supported():
+    pygame = FakePygame()
+    bridge = DesktopInputBridge(pygame)
+    bridge.handle_events([
+        SimpleNamespace(type=pygame.JOYHATMOTION, instance_id=7, value=(-1, 1)),
+        SimpleNamespace(type=pygame.JOYAXISMOTION, instance_id=7, axis=4, value=0.9),
+        SimpleNamespace(type=pygame.JOYAXISMOTION, instance_id=7, axis=5, value=0.8),
+    ])
+    assert bridge.hat() == (-1, 1)
+    assert bridge.poll() == ["L2", "R2"]
+
+
+def test_gamepad_trigger_axis_queues_only_once_until_released():
+    pygame = FakePygame()
+    bridge = DesktopInputBridge(pygame)
+    for value in (0.7, 0.8, 0.9):
+        bridge.handle_events([
+            SimpleNamespace(type=pygame.JOYAXISMOTION, instance_id=2, axis=4, value=value)
+        ])
+    assert bridge.poll() == ["L2"]
+    bridge.handle_events([
+        SimpleNamespace(type=pygame.JOYAXISMOTION, instance_id=2, axis=4, value=0.0),
+        SimpleNamespace(type=pygame.JOYAXISMOTION, instance_id=2, axis=4, value=0.9),
+    ])
+    assert bridge.poll() == ["L2"]
