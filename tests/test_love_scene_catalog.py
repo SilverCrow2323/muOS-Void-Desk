@@ -233,3 +233,17 @@ def test_first_run_onboarding_consumes_controller_input_before_scene_routes():
     assert "dispatch_control(logical" in raw
     assert 'dispatch_control("up"' in hat
     assert "dispatch_control(" in axis
+
+
+
+def test_visual_capture_includes_all_system_tablet_pages_and_operation_overlay():
+    capture = (LOVE / "core" / "visual_capture.lua").read_text(encoding="utf-8")
+    for name in (
+        "tablet_overview", "tablet_processes", "tablet_system",
+        "tablet_network", "tablet_media", "tablet_activity",
+        "operation_overlay",
+    ):
+        assert f'name = "{name}"' in capture
+    assert 'target.overlay == "tablet"' in capture
+    assert 'target.overlay == "operation"' in capture
+    assert "jobs.POLL_INTERVAL = 10" in capture
