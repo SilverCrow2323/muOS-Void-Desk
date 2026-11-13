@@ -170,6 +170,10 @@ def test_notes_has_a_real_toolbox_route_and_visual_capture():
     service = (ROOT / "service" / "voiddesk_service.py").read_text(encoding="utf-8")
     assert 'sm.push("hub_notes", {})' in toolbox
     assert (LOVE / "scenes" / "hub_notes.lua").is_file()
+    assert 'name = "void_radio"' in capture
+    assert 'name = "media_library"' in capture
+    assert (LOVE / "scenes" / "void_radio.lua").is_file()
+    assert (LOVE / "scenes" / "media_library.lua").is_file()
     assert 'name = "hub_notes"' in capture
     for command in ("notes_list", "notes_read", "notes_save", "notes_delete"):
         assert f'"{command}": h_' in service
