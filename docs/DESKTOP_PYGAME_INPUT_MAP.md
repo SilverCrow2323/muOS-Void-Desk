@@ -26,6 +26,6 @@ to M, so pressing Escape while selecting an item cannot accidentally invoke a
 system/menu action. End Session remains available through the explicit NEXUS
 flow.
 
-The desktop event bridge drains its action queue and always returns a list,
-including when the queue contains input. The handheld evdev reader and its
+The desktop event bridge accepts common XInput-style JOY events and SDL GameController events, drains its action queue and always returns a list,
+including when the queue contains input. Desktop L2/R2 are SDL trigger axes; the handheld evdev reader and its
 muOS-specific physical button layouts are unchanged.
