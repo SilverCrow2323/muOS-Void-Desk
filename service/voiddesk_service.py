@@ -17,6 +17,7 @@ import shlex
 import struct
 import signal
 import shutil
+import socket
 import subprocess
 import sys
 import termios
@@ -1277,6 +1278,7 @@ MEDIA_AUDIO_EXTS = {".mp3", ".ogg", ".oga", ".opus", ".flac", ".wav", ".m4a", ".
 MEDIA_VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v"}
 _MEDIA_PLAYER_PROC = None
 _MEDIA_NOW_PLAYING = ""
+_MEDIA_PLAYER_SOCKET = DATA / ".love_media.sock"
 
 
 def _media_resolve(candidate):
@@ -1343,6 +1345,29 @@ def h_media_list(args):
     return {"ok": True, "path": str(directory), "items": items[:200], "root": False}
 
 
+def _media_ipc(command):
+    """Send one bounded command to the local MPV Unix socket."""
+    if not _MEDIA_PLAYER_SOCKET.exists() or _MEDIA_PLAYER_SOCKET.is_symlink():
+        return None
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(0.6)
+            client.connect(str(_MEDIA_PLAYER_SOCKET))
+            payload = json.dumps({"command": command, "request_id": 1}) + "\\n"
+            client.sendall(payload.encode("utf-8"))
+            response = client.recv(4096).decode("utf-8", "replace").splitlines()
+        for line in response:
+            try:
+                parsed = json.loads(line)
+                if parsed.get("request_id") == 1:
+                    return parsed
+            except (ValueError, TypeError):
+                continue
+    except (OSError, ValueError):
+        return None
+    return None
+
+
 def h_media_play(args):
     global _MEDIA_PLAYER_PROC, _MEDIA_NOW_PLAYING
     target = _media_resolve(args.get("path"))
@@ -1355,8 +1380,12 @@ def h_media_play(args):
         return {"ok": False, "error": "mpv is not installed"}
     h_media_stop({})
     try:
+        if _MEDIA_PLAYER_SOCKET.is_symlink():
+            return {"ok": False, "error": "refusing a linked MPV control socket"}
+        _MEDIA_PLAYER_SOCKET.unlink(missing_ok=True)
         video = target.suffix.lower() in MEDIA_VIDEO_EXTS
-        player_args = [player, "--no-terminal"]
+        player_args = [player, "--no-terminal",
+                       "--input-ipc-server=" + str(_MEDIA_PLAYER_SOCKET)]
         player_args.append("--force-window=yes" if video else "--no-video")
         player_args.append(str(target))
         _MEDIA_PLAYER_PROC = subprocess.Popen(
@@ -1373,20 +1402,52 @@ def h_media_play(args):
         return {"ok": False, "error": "cannot start mpv: " + str(exc)[:120]}
 
 
+def h_media_action(args):
+    action = str(args.get("action") or "")
+    if action == "stop":
+        return h_media_stop({})
+    if _MEDIA_PLAYER_PROC is None or _MEDIA_PLAYER_PROC.poll() is not None:
+        return {"ok": False, "error": "no local media is playing"}
+    if action == "toggle_pause":
+        response = _media_ipc(["cycle", "pause"])
+        if not response or response.get("error") != "success":
+            return {"ok": False, "error": "MPV pause control is unavailable"}
+        return {"ok": True, "action": action, "data": response.get("data")}
+    if action == "volume":
+        try:
+            value = max(0, min(100, int(args.get("value"))))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "volume must be between 0 and 100"}
+        response = _media_ipc(["set_property", "volume", value])
+        if not response or response.get("error") != "success":
+            return {"ok": False, "error": "MPV volume control is unavailable"}
+        return {"ok": True, "volume": value}
+    return {"ok": False, "error": "unsupported media action"}
+
+
 def h_media_stop(args):
     global _MEDIA_PLAYER_PROC, _MEDIA_NOW_PLAYING
     process = _MEDIA_PLAYER_PROC
     if process is not None and process.poll() is None:
+        # Ask MPV to exit cleanly first; terminate is the bounded fallback.
+        _media_ipc(["quit"])
         try:
-            process.terminate()
             process.wait(timeout=2)
         except Exception:
             try:
-                process.kill()
-            except OSError:
-                pass
+                process.terminate()
+                process.wait(timeout=2)
+            except Exception:
+                try:
+                    process.kill()
+                except OSError:
+                    pass
     _MEDIA_PLAYER_PROC = None
     _MEDIA_NOW_PLAYING = ""
+    try:
+        _MEDIA_PLAYER_SOCKET.unlink(missing_ok=True)
+    except OSError:
+        pass
     return {"ok": True}
 
 
@@ -1394,18 +1455,30 @@ def h_media_status(args):
     try:
         if IS_VISUAL_CAPTURE:
             return {"ok": True, "media": {
-                "volume": 40,
-                "now_playing": None,
-                "library_count": 0,
-                "recordings": 0,
+                "volume": 40, "now_playing": None, "paused": False,
+                "library_count": 0, "recordings": 0,
             }}
-        vol = deskinfo.volume() if deskinfo is not None else None
         playing = None
+        paused = False
+        player_volume = None
         if _MEDIA_PLAYER_PROC is not None and _MEDIA_PLAYER_PROC.poll() is None:
             playing = _MEDIA_NOW_PLAYING or "Media"
+            pause_response = _media_ipc(["get_property", "pause"])
+            volume_response = _media_ipc(["get_property", "volume"])
+            if pause_response and pause_response.get("error") == "success":
+                paused = bool(pause_response.get("data"))
+            if volume_response and volume_response.get("error") == "success":
+                try:
+                    player_volume = int(volume_response.get("data"))
+                except (TypeError, ValueError):
+                    player_volume = None
+        vol = player_volume
+        if vol is None:
+            vol = deskinfo.volume() if deskinfo is not None else None
         return {"ok": True, "media": {
             "volume": vol if vol is not None else 0,
             "now_playing": playing,
+            "paused": paused,
             "library_count": 0,
             "recordings": 0,
         }}
@@ -2283,6 +2356,7 @@ HANDLERS = {
     "media_list": h_media_list,
     "media_play": h_media_play,
     "media_stop": h_media_stop,
+    "media_action": h_media_action,
     "radio_search": h_radio_search,
     "radio_favorites": h_radio_favorites,
     "radio_favorite_toggle": h_radio_favorite_toggle,
