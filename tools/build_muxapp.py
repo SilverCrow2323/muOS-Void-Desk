@@ -226,8 +226,8 @@ def build_archive(repo_root: Path, output: Path):
             elif source.is_file() and not name.endswith((".pyc", ".pyo")):
                 shutil.copy2(source, target)
 
-        _ensure_love_runtime(package_root)
         _copy_tailscale_service(repo_root, package_root)
+        _ensure_love_runtime(package_root)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         timestamp = _zip_datetime()
