@@ -424,7 +424,7 @@ end
 function scene.draw()
     local W, H = love.graphics.getDimensions()
     local th = theme.get()
-    local accent = nodes.color_for(4)
+    local accent = {0.31,0.79,0.98}
     love.graphics.clear(th.bg[1], th.bg[2], th.bg[3], 1)
     chrome.draw_header({theme=th,title="Void-DESK",subtitle="VOID EDIT",status_icons={"file-text","battery"}})
 
@@ -437,45 +437,107 @@ function scene.draw()
     if state.mode == "list" then
         love.graphics.setFont(cached_font(15))
         love.graphics.setColor(0.92,0.96,1,1)
-        love.graphics.print("TEXT WORKSPACE",x+16,y+12)
+        love.graphics.print("VOID EDIT / FILE DECK",x+16,y+12)
         love.graphics.setFont(cached_font(9))
-        love.graphics.setColor(0.53,0.66,0.78,1)
-        love.graphics.print("PRIVATE FILES  /  data/Texts  /  ALLOWLISTED TEXT TYPES",x+17,y+36)
-        local top, row_h = y+58, ROW_H
-        local visible = math.max(1,math.floor((h-90)/row_h))
-        state.first = math.max(1,math.min(state.selected-visible+1,
+        love.graphics.setColor(0.48,0.74,0.90,1)
+        love.graphics.print("CODE WORKSPACE  /  PRIVATE TEXT ROOT  /  UTF-8",x+17,y+36)
+
+        local left_x = x+12
+        local panel_y = y+58
+        local left_w = math.floor((w-40)*0.58)
+        local right_x = left_x+left_w+12
+        local right_w = x+w-12-right_x
+        local panel_h = h-70
+
+        -- File deck: compact rows with a dedicated selection rail.
+        love.graphics.setColor(0.024,0.042,0.062,0.98)
+        love.graphics.rectangle("fill",left_x,panel_y,left_w,panel_h,6)
+        love.graphics.setColor(accent[1],accent[2],accent[3],0.55)
+        love.graphics.rectangle("line",left_x,panel_y,left_w,panel_h,6)
+        love.graphics.setFont(cached_font(9))
+        love.graphics.setColor(0.55,0.72,0.84,1)
+        love.graphics.print(string.format("DOCUMENTS  /  %02d",#state.files),left_x+10,panel_y+9)
+        local row_y,row_h=panel_y+30,36
+        local visible=math.max(1,math.floor((panel_h-40)/row_h))
+        state.first=math.max(1,math.min(state.selected-visible+1,
             math.max(1,#state.files-visible+1)))
         for i=state.first,math.min(#state.files,state.first+visible-1) do
-            local item = state.files[i]
-            local ry = top+(i-state.first)*row_h
-            local selected = i == state.selected
-            love.graphics.setColor(selected and 0.12 or 0.065,
-                selected and 0.16 or 0.085,selected and 0.21 or 0.12,1)
-            love.graphics.rectangle("fill",x+12,ry,w-24,row_h-4,5)
-            love.graphics.setColor(selected and accent[1] or 0.25,
-                selected and accent[2] or 0.36,selected and accent[3] or 0.47,
-                selected and 0.95 or 0.52)
-            love.graphics.rectangle("line",x+12,ry,w-24,row_h-4,5)
-            love.graphics.setFont(cached_font(11))
-            love.graphics.setColor(0.91,0.95,1,1)
-            love.graphics.print(tostring(item.name),x+22,ry+6)
+            local item=state.files[i]
+            local ry=row_y+(i-state.first)*row_h
+            local selected=i==state.selected
+            love.graphics.setColor(selected and 0.10 or 0.045,
+                selected and 0.15 or 0.070,selected and 0.20 or 0.105,1)
+            love.graphics.rectangle("fill",left_x+7,ry,left_w-14,row_h-3,4)
+            if selected then
+                love.graphics.setColor(accent[1],accent[2],accent[3],0.98)
+                love.graphics.rectangle("fill",left_x+7,ry,3,row_h-3,2)
+            end
+            love.graphics.setFont(cached_font(9))
+            love.graphics.setColor(selected and 0.94 or 0.72,
+                selected and 0.97 or 0.82,selected and 1 or 0.90,1)
+            love.graphics.printf(tostring(item.name),left_x+16,ry+5,left_w-32,"left")
+            love.graphics.setFont(cached_font(7))
+            love.graphics.setColor(0.48,0.63,0.75,1)
+            love.graphics.print(string.format("%d B",tonumber(item.size) or 0),left_x+16,ry+21)
+        end
+        if #state.files==0 then
+            love.graphics.setFont(cached_font(10))
+            love.graphics.setColor(0.68,0.82,0.92,1)
+            love.graphics.printf("NO DOCUMENTS\n\nPress Y to create a new file.",left_x+12,panel_y+103,left_w-24,"center")
+        end
+
+        -- Distinct inspector panel: storage, format and selected-file metadata.
+        love.graphics.setColor(0.022,0.036,0.060,0.99)
+        love.graphics.rectangle("fill",right_x,panel_y,right_w,panel_h,6)
+        love.graphics.setColor(0.27,0.60,0.78,0.62)
+        love.graphics.rectangle("line",right_x,panel_y,right_w,panel_h,6)
+        love.graphics.setFont(cached_font(25))
+        love.graphics.setColor(accent[1],accent[2],accent[3],0.95)
+        love.graphics.printf("{ }",right_x+8,panel_y+12,right_w-16,"center")
+        love.graphics.setFont(cached_font(9))
+        love.graphics.setColor(0.88,0.94,0.99,1)
+        love.graphics.printf("CODE INSPECTOR",right_x+8,panel_y+49,right_w-16,"center")
+        love.graphics.setFont(cached_font(7))
+        love.graphics.setColor(0.48,0.66,0.80,1)
+        love.graphics.printf("DATA/TEXTS  ·  LOCAL ONLY",right_x+8,panel_y+64,right_w-16,"center")
+        love.graphics.setColor(0.21,0.38,0.50,0.55)
+        love.graphics.line(right_x+12,panel_y+82,right_x+right_w-12,panel_y+82)
+
+        local item=state.files[state.selected]
+        if item then
             love.graphics.setFont(cached_font(8))
-            love.graphics.setColor(0.56,0.68,0.79,1)
-            love.graphics.print(string.format("%d bytes",tonumber(item.size) or 0),x+22,ry+24)
+            love.graphics.setColor(0.50,0.72,0.85,1)
+            love.graphics.print("SELECTED FILE",right_x+12,panel_y+94)
+            love.graphics.setFont(cached_font(10))
+            love.graphics.setColor(0.94,0.97,1,1)
+            love.graphics.printf(tostring(item.name),right_x+12,panel_y+110,right_w-24,"left")
+            love.graphics.setFont(cached_font(8))
+            love.graphics.setColor(0.66,0.77,0.86,1)
+            love.graphics.print(string.format("SIZE  %d bytes",tonumber(item.size) or 0),right_x+12,panel_y+139)
+            love.graphics.print("TYPE  "..(tostring(item.name):match("%.[^.]+$") or "text"),right_x+12,panel_y+155)
+            love.graphics.print("EDIT  Press A to open",right_x+12,panel_y+181)
+        else
+            love.graphics.setFont(cached_font(9))
+            love.graphics.setColor(0.80,0.88,0.94,1)
+            love.graphics.printf("READY FOR A NEW FILE",right_x+12,panel_y+103,right_w-24,"center")
+            love.graphics.setFont(cached_font(8))
+            love.graphics.setColor(0.58,0.72,0.83,1)
+            love.graphics.printf("Choose a document or create one with Y.",right_x+16,panel_y+130,right_w-32,"center")
         end
-        if #state.files == 0 then
-            love.graphics.setFont(cached_font(12))
-            love.graphics.setColor(0.62,0.72,0.82,1)
-            love.graphics.printf("No text files yet.\nPress Y to create your first document.",x+24,y+145,w-48,"center")
-        end
+        love.graphics.setColor(0.25,0.45,0.58,0.65)
+        love.graphics.line(right_x+12,panel_y+206,right_x+right_w-12,panel_y+206)
+        love.graphics.setFont(cached_font(7))
+        love.graphics.setColor(0.47,0.67,0.79,1)
+        love.graphics.printf("ATOMIC SAVE\nSYMLINK GUARD\n128 KB LIMIT",right_x+12,panel_y+216,right_w-24,"left")
+
         if state.confirm_delete then
             love.graphics.setColor(0.22,0.045,0.06,0.98)
-            love.graphics.rectangle("fill",x+24,H-119,w-48,36,6)
+            love.graphics.rectangle("fill",x+20,H-119,w-40,36,6)
             love.graphics.setColor(1,0.4,0.38,1)
-            love.graphics.rectangle("line",x+24,H-119,w-48,36,6)
+            love.graphics.rectangle("line",x+20,H-119,w-40,36,6)
             love.graphics.setFont(cached_font(10))
             love.graphics.setColor(1,0.86,0.85,1)
-            love.graphics.printf("DELETE "..tostring(selected_file() or "FILE").."?  A CONFIRM  /  B CANCEL",x+32,H-107,w-64,"center")
+            love.graphics.printf("DELETE "..tostring(selected_file() or "FILE").."?  A CONFIRM  /  B CANCEL",x+28,H-107,w-56,"center")
         end
     else
         love.graphics.setFont(cached_font(13))
