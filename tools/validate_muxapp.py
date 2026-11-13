@@ -23,7 +23,7 @@ MIN_LOVE_RUNTIME_BYTES = 1024 * 1024
 
 
 def _validate_aarch64_elf(data: bytes, label: str, errors: list[str]):
-    if len(data) < 64 or data[:4] != b"\\x7fELF":
+    if len(data) < 64 or data[:4] != b"\x7fELF":
         errors.append("%s is not a valid ELF executable/library" % label)
         return False
     if data[4] != 2 or data[5] != 1:
