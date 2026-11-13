@@ -35,6 +35,8 @@ class FakePygame:
     JOYDEVICEADDED = 34
     JOYDEVICEREMOVED = 35
     CONTROLLERBUTTONDOWN = 36
+    CONTROLLERBUTTONUP = 38
+    CONTROLLERDEVICEREMOVED = 39
     CONTROLLERAXISMOTION = 37
 
 
@@ -216,6 +218,28 @@ def test_desktop_gamecontroller_events_use_standardized_button_order():
         SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, button=11),
     ])
     assert bridge.poll() == ["L1", "R1", "UP"]
+
+
+def test_gamecontroller_dpad_buttons_drive_hat_until_released():
+    pygame = FakePygame()
+    bridge = DesktopInputBridge(pygame)
+
+    bridge.handle_events([
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, instance_id=12, button=11),
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, instance_id=12, button=14),
+    ])
+    assert bridge.hat() == (1, 1)
+    assert bridge.poll() == []
+
+    bridge.handle_events([
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONUP, instance_id=12, button=14),
+    ])
+    assert bridge.hat() == (0, 1)
+
+    bridge.handle_events([
+        SimpleNamespace(type=pygame.CONTROLLERDEVICEREMOVED, instance_id=12),
+    ])
+    assert bridge.hat() == (0, 0)
 
 
 def test_desktop_joystick_initialization_and_hotplug_lifecycle():
