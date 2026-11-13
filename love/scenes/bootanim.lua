@@ -37,12 +37,12 @@ local function draw_background(W, H, now)
     love.graphics.clear(BG[1], BG[2], BG[3], 1)
     love.graphics.setLineWidth(1)
     set_rgb({ 0.035, 0.045, 0.058 }, 0.75)
-    for x = 20, W * 0.75, 42 do
+    for x = W * 0.25 + 20, W - 12, 42 do
         local dx = math.sin(x * 0.025 + now) * 4
         love.graphics.line(x + dx, 0, x + dx, H)
     end
     for y = 34, H, 48 do
-        love.graphics.line(0, y, W * 0.75, y)
+        love.graphics.line(W * 0.25, y, W, y)
     end
 end
 
@@ -145,7 +145,8 @@ local function draw_logo(W, H, progress, target)
     love.graphics.rectangle("fill", px + pw - 22, py + 15, 1, ph - 30)
 
     local small = font.regular(12)
-    font.print_shadow("SPDW FACTORY  //  QWASAR ENV", px + 24, py + 18,
+    local brand = "SPDW FACTORY  //  QWASAR ENV"
+    font.print_shadow(brand, px + pw - 24 - small:getWidth(brand), py + 18,
                       small, HOT, { 0, 0, 0, 0.7 })
 
     local title_font = font.bold(46)
@@ -170,7 +171,9 @@ local function draw_logo(W, H, progress, target)
     local target_font = font.mono(10)
     love.graphics.setFont(target_font)
     set_rgb(mix({ 0.18, 0.13, 0.11 }, HOT, 0.45), 0.9)
-    love.graphics.print(target_text, px + 25, tag_y + 6)
+    love.graphics.print(target_text,
+                        px + pw - 25 - target_font:getWidth(target_text),
+                        tag_y + 6)
 
     love.graphics.setColor(0.18, 0.055, 0.032, 1)
     love.graphics.rectangle("fill", px + 25, py + ph - 8, pw - 50, 2)
