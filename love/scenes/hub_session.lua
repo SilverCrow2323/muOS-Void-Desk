@@ -303,9 +303,12 @@ local function draw_card(env, x, y, w, h, selected, large, t)
         love.graphics.setColor(accent[1],accent[2],accent[3],0.95)
         love.graphics.print(ready and "A  OPEN ENVIRONMENT DETAILS" or "A  INSTALLATION DETAILS",x+22,y+h-38)
     else
-        love.graphics.printf(env.description,x+14,y+99,w-28, "left")
+        local short_description = env.id == "icewm"
+            and "Fast, minimal and low-memory."
+            or "Traditional lightweight desktop."
+        love.graphics.printf(short_description,x+14,y+93,w-28, "left")
         love.graphics.setColor(accent[1],accent[2],accent[3],0.95)
-        love.graphics.print("A  VIEW DETAILS",x+14,y+h-25)
+        love.graphics.print("A  VIEW DETAILS",x+14,y+h-20)
     end
     if selected then
         love.graphics.setColor(accent[1],accent[2],accent[3],0.85)
