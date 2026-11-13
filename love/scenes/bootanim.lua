@@ -144,12 +144,13 @@ local function draw_logo(W, H, progress, target)
     love.graphics.setColor(0.30, 0.085, 0.045, 0.9)
     love.graphics.rectangle("fill", px + pw - 22, py + 15, 1, ph - 30)
 
-    local small = font.regular(12)
+    local compact = W < 420
+    local small = font.regular(compact and 9 or (W < 560 and 10 or 12))
     local brand = "SPDW FACTORY  //  QWASAR ENVIRONMENT"
     font.print_shadow(brand, px + pw - 24 - small:getWidth(brand), py + 18,
                       small, HOT, { 0, 0, 0, 0.7 })
 
-    local title_font = font.bold(46)
+    local title_font = font.bold(W < 360 and 22 or (W < 480 and 28 or (W < 560 and 36 or 46)))
     love.graphics.setFont(title_font)
     local title = "VOID DESK"
     local tw = title_font:getWidth(title)
@@ -157,7 +158,7 @@ local function draw_logo(W, H, progress, target)
                       WHITE, { 0, 0, 0, 0.9 })
 
     local tag = "LOVE / LUA ENGINE"
-    local tag_font = font.mono(11)
+    local tag_font = font.mono(W < 480 and 8 or 11)
     local tag_w = tag_font:getWidth(tag) + 20
     local tag_x, tag_y = px + pw - 25 - tag_w, py + 119
     love.graphics.setColor(0.17, 0.045, 0.022, 1)
@@ -167,8 +168,8 @@ local function draw_logo(W, H, progress, target)
     love.graphics.setFont(tag_font)
     love.graphics.print(tag, tag_x + 10, tag_y + 5)
 
-    local target_text = "TARGET // " .. tostring(target or "DESKTOP"):upper()
-    local target_font = font.mono(10)
+    local target_text = "ENV // " .. tostring(target or "DESKTOP"):upper()
+    local target_font = font.mono(W < 480 and 8 or 10)
     love.graphics.setFont(target_font)
     set_rgb(mix({ 0.18, 0.13, 0.11 }, HOT, 0.45), 0.9)
     love.graphics.print(target_text,
