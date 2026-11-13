@@ -177,3 +177,18 @@ def test_notes_has_a_real_toolbox_route_and_visual_capture():
     assert 'name = "hub_notes"' in capture
     for command in ("notes_list", "notes_read", "notes_save", "notes_delete"):
         assert f'"{command}": h_' in service
+
+
+
+def test_visual_capture_bypasses_onboarding_and_rejects_duplicate_scene_images():
+    onboarding = (LOVE / "core" / "onboarding.lua").read_text(encoding="utf-8")
+    main = (LOVE / "main.lua").read_text(encoding="utf-8")
+    capture_script = (ROOT / "tools" / "capture_love_screenshots.py").read_text(
+        encoding="utf-8"
+    )
+    assert "function onboarding.disable_for_visual_capture()" in onboarding
+    assert "onboarding.disable_for_visual_capture()" in main
+    assert 'os.getenv("VOIDDESK_CAPTURE_ALL") ~= "1"' in onboarding
+    assert "hashlib.sha256(image_bytes).digest()" in capture_script
+    assert "global overlay may be covering the scenes" in capture_script
+    assert "png_signature" in capture_script
