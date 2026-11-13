@@ -150,7 +150,7 @@ def draw_logo(pt, fb, env, now):
     fb.text((panel_x + 31) // fbtext.CW, brand_y,
             "SPDW FACTORY", (115, 185, 197))
     fb.text((panel_x + 180) // fbtext.CW, brand_y,
-            "// QWASAR ENV", PY_ACCENT)
+            "// QWASAR ENVIRONMENT", PY_ACCENT)
 
     title_y = panel_y + 53
     pt.big_text(panel_x + 29, title_y + 2, "VOID DESK", (5, 20, 28), 3)
