@@ -734,6 +734,104 @@ def h_launch_external(args):
     })
 
 
+def _notes_name(candidate):
+    if not isinstance(candidate, str):
+        return None
+    value = candidate.strip()
+    if not value or len(value) > 64 or "/" in value or "\\" in value or "\x00" in value:
+        return None
+    if not value.lower().endswith(".txt"):
+        value += ".txt"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _.-]{0,47}\.txt", value):
+        return None
+    return value
+
+
+def h_notes_list(args):
+    notes_dir = DATA / "notes"
+    try:
+        notes_dir.mkdir(parents=True, exist_ok=True)
+        items = []
+        for path in notes_dir.iterdir():
+            if path.is_symlink() or not path.is_file() or path.suffix.lower() != ".txt":
+                continue
+            try:
+                stat = path.stat()
+                preview = path.read_text(encoding="utf-8", errors="replace")[:120]
+                items.append({
+                    "name": path.name,
+                    "size": stat.st_size,
+                    "modified": int(stat.st_mtime),
+                    "preview": preview.replace("\n", " ").strip(),
+                })
+            except OSError:
+                continue
+        items.sort(key=lambda item: item["modified"], reverse=True)
+        return {"ok": True, "notes": items[:100], "count": min(len(items), 100)}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot list notes: " + str(exc)[:120]}
+
+
+def h_notes_read(args):
+    name = _notes_name(args.get("name"))
+    if not name:
+        return {"ok": False, "error": "invalid note name"}
+    target = DATA / "notes" / name
+    if target.is_symlink() or not target.is_file():
+        return {"ok": False, "error": "note does not exist"}
+    try:
+        if target.stat().st_size > 32768:
+            return {"ok": False, "error": "note is larger than the 32 KB editor limit"}
+        return {"ok": True, "name": name,
+                "content": target.read_text(encoding="utf-8", errors="replace")}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot read note: " + str(exc)[:120]}
+
+
+def h_notes_save(args):
+    name = _notes_name(args.get("name"))
+    content = args.get("content")
+    if not name:
+        return {"ok": False, "error": "invalid note name"}
+    if not isinstance(content, str):
+        return {"ok": False, "error": "note content must be text"}
+    if len(content.encode("utf-8")) > 32768:
+        return {"ok": False, "error": "note exceeds the 32 KB limit"}
+    notes_dir = DATA / "notes"
+    target = notes_dir / name
+    temporary = notes_dir / ("." + name + ".tmp")
+    try:
+        notes_dir.mkdir(parents=True, exist_ok=True)
+        if target.is_symlink() or temporary.is_symlink():
+            return {"ok": False, "error": "linked note files are not allowed"}
+        with temporary.open("w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+        return {"ok": True, "name": name, "size": target.stat().st_size}
+    except OSError as exc:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {"ok": False, "error": "cannot save note: " + str(exc)[:120]}
+
+
+def h_notes_delete(args):
+    name = _notes_name(args.get("name"))
+    if not name:
+        return {"ok": False, "error": "invalid note name"}
+    target = DATA / "notes" / name
+    if target.is_symlink() or not target.is_file():
+        return {"ok": False, "error": "note does not exist"}
+    try:
+        target.unlink()
+        return {"ok": True, "name": name}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot delete note: " + str(exc)[:120]}
+
+
 def h_toolbox_stats(args):
     """Read-only counts for the LÖVE Toolbox dashboard."""
     notes_dir = DATA / "notes"
@@ -2390,6 +2488,10 @@ HANDLERS = {
     "list_external": h_list_external,
     "launch_external": h_launch_external,
     "toolbox_stats": h_toolbox_stats,
+    "notes_list": h_notes_list,
+    "notes_read": h_notes_read,
+    "notes_save": h_notes_save,
+    "notes_delete": h_notes_delete,
     "calendar_events": h_calendar_events,
     "hotspot_toggle": h_hotspot_toggle,
     "tailscale_status": h_tailscale_status,
