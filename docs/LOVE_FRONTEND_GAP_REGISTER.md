@@ -1,14 +1,14 @@
 # Void Desk LÖVE Frontend — Gap Register
 
 **Scope:** current LÖVE frontend in `love/`, local service in `service/voiddesk_service.py`, and muOS launcher hand-off.
-**Baseline:** `fix/love-experience-overhaul` (draft PR work, November 13, 2026). CI #774 passed on `cb7d9c64`; this follow-up hardens screenshot validation and must pass its own run.
+**Baseline:** `fix/love-experience-overhaul` (draft PR work, November 13, 2026). CI #774 passed on `cb7d9c64` for compile, tests, packaging and 28 scene captures; manual review invalidated the visual-capture evidence. The new pixel-level capture guard is pending CI.
 **Evidence rule:** source checks and automated screenshots are not hardware certification. Status below distinguishes implemented code from device validation.
 
 ## Current shape
 
 - 10 visible NEXUS destinations: START SESSION, THE FORGE, UPLINK, MEDIA VAULT, WORKSHOP, TOOLBOX, MUOS APPS, SETTINGS, INFO and END NODE.
 - 5 additional NEXUS entries are currently hidden: GAMES, DEVELOP, COMMUNITY, OUTERDESK and LEGACY.
-- The automated LÖVE capture batch enumerates 28 scenes, including Notes, Void Radio and Media Library. The capture runner disables only the onboarding modal in its isolated visual-test mode and verifies PNG signatures, unique screen labels and at least 75% distinct frame hashes. This prevents a full-screen modal from producing a false 28/28 success. Captures prove scene entry/rendering, not full interaction.
+- The automated LÖVE capture batch enumerates 28 scenes, including Notes, Void Radio and Media Library. Manual review of the CI #774 artifact found a capture false positive: onboarding remained above the scene manager, so all 28 screenshots showed the identity screen. The 28/28 count is therefore not accepted as visual proof. A follow-up now disables onboarding only in isolated capture mode and compares decoded 32×24 pixel samples to detect near-identical frames; the new CI run must validate this guard before the visual gate is reopened. Scene captures still prove rendering only, not full interaction.
 - Global tests check scene-route resolution, visible NEXUS destination resolution and registration of bridge commands used by LÖVE.
 - Row-level action tests currently concentrate on Session, Forge, Workshop, Toolbox and MUOS APPS.
 
