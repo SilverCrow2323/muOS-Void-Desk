@@ -154,6 +154,7 @@ rm -rf -- \
 rm -f -- \
     "$APP_DEST/lib/love" \
     "$APP_DEST/lib/libluajit-5.1.so.2" \
+    "$APP_DEST/lib/liblove-11.5.so" \
     "$APP_DEST/assets/xfce.img.gz" \
     "$APP_DEST/launch-pc.sh" \
     "$APP_DEST/build-packages.sh"
