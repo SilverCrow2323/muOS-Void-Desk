@@ -22,6 +22,7 @@ import subprocess
 import sys
 import termios
 import time
+import tempfile
 import traceback
 import urllib.error
 import urllib.parse
