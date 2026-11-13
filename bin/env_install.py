@@ -55,7 +55,7 @@ def report(data_dir, progress, phase, message, detail="", status="running",
            animation="install", severity="info"):
     global STATUS_FILE
     if STATUS_FILE is None:
-        STATUS_FILE = os.path.join(data_dir, ".env_install_state.json")
+        STATUS_FILE = os.path.join(data_dir, ".%s_install_state.json" % env_id)
     state = {
         "progress": max(0, min(100, int(progress))),
         "phase": str(phase)[:48],
