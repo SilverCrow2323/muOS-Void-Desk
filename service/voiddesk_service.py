@@ -858,6 +858,135 @@ def h_weather_cache(args):
     return _read_content_cache("weather_cache.json")
 
 
+_TEXT_EXTS = {
+    ".txt", ".md", ".log", ".cfg", ".ini", ".json", ".csv",
+    ".yml", ".yaml", ".sh", ".conf", ".xml",
+}
+_TEXT_MAX_BYTES = 128 * 1024
+
+
+def _text_filename(candidate):
+    if not isinstance(candidate, str):
+        return None
+    value = candidate.strip()
+    if (not value or len(value) > 112 or "\x00" in value or
+            "/" in value or "\\" in value or value in (".", "..") or
+            value.startswith(".")):
+        return None
+    suffix = Path(value).suffix.lower()
+    if suffix not in _TEXT_EXTS:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _().-]{0,79}\.[A-Za-z0-9]{1,8}", value):
+        return None
+    return value
+
+
+def _text_directory():
+    directory = DATA / "Texts"
+    directory.mkdir(parents=True, exist_ok=True)
+    if directory.is_symlink() or not directory.is_dir():
+        raise OSError("Texts directory must be a real directory")
+    return directory
+
+
+def h_text_list(args):
+    try:
+        directory = _text_directory()
+        files = []
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if entry.is_symlink() or not entry.is_file(follow_symlinks=False):
+                    continue
+                name = entry.name
+                if not _text_filename(name):
+                    continue
+                try:
+                    stat = entry.stat(follow_symlinks=False)
+                    files.append({
+                        "name": name,
+                        "size": stat.st_size,
+                        "modified": int(stat.st_mtime),
+                    })
+                except OSError:
+                    continue
+        files.sort(key=lambda item: item["name"].casefold())
+        return {"ok": True, "files": files[:200], "count": min(len(files), 200)}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot list text files: " + str(exc)[:120]}
+
+
+def h_text_read(args):
+    name = _text_filename(args.get("name"))
+    if not name:
+        return {"ok": False, "error": "invalid text filename or extension"}
+    try:
+        directory = _text_directory()
+        target = directory / name
+        if target.is_symlink() or not target.is_file():
+            return {"ok": False, "error": "text file does not exist"}
+        if target.stat().st_size > _TEXT_MAX_BYTES:
+            return {"ok": False, "error": "text file exceeds the 128 KB editor limit"}
+        content = target.read_text(encoding="utf-8", errors="replace")
+        if len(content.encode("utf-8")) > _TEXT_MAX_BYTES:
+            return {"ok": False, "error": "decoded text file exceeds the editor limit"}
+        return {"ok": True, "name": name, "content": content}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot read text file: " + str(exc)[:120]}
+
+
+def h_text_save(args):
+    name = _text_filename(args.get("name"))
+    content = args.get("content")
+    if not name:
+        return {"ok": False, "error": "invalid text filename or extension"}
+    if not isinstance(content, str):
+        return {"ok": False, "error": "text content must be a string"}
+    try:
+        encoded = content.encode("utf-8")
+    except UnicodeEncodeError:
+        return {"ok": False, "error": "text content is not valid UTF-8"}
+    if len(encoded) > _TEXT_MAX_BYTES:
+        return {"ok": False, "error": "text file exceeds the 128 KB editor limit"}
+    temporary = None
+    try:
+        directory = _text_directory()
+        target = directory / name
+        if target.is_symlink():
+            return {"ok": False, "error": "linked text files are not allowed"}
+        fd, temporary = tempfile.mkstemp(prefix=".void-edit-", suffix=".tmp",
+                                         dir=str(directory))
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+        temporary = None
+        return {"ok": True, "name": name, "size": len(encoded)}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot save text file: " + str(exc)[:120]}
+    finally:
+        if temporary:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
+
+
+def h_text_delete(args):
+    name = _text_filename(args.get("name"))
+    if not name:
+        return {"ok": False, "error": "invalid text filename or extension"}
+    try:
+        directory = _text_directory()
+        target = directory / name
+        if target.is_symlink() or not target.is_file():
+            return {"ok": False, "error": "text file does not exist"}
+        target.unlink()
+        return {"ok": True, "name": name}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot delete text file: " + str(exc)[:120]}
+
+
 def h_toolbox_stats(args):
     """Read-only counts for the LÖVE Toolbox dashboard."""
     notes_dir = DATA / "notes"
@@ -2563,6 +2692,10 @@ HANDLERS = {
     "notes_read": h_notes_read,
     "notes_save": h_notes_save,
     "notes_delete": h_notes_delete,
+    "text_list": h_text_list,
+    "text_read": h_text_read,
+    "text_save": h_text_save,
+    "text_delete": h_text_delete,
     "calendar_events": h_calendar_events,
     "hotspot_toggle": h_hotspot_toggle,
     "tailscale_status": h_tailscale_status,
