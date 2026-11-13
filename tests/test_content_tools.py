@@ -136,6 +136,41 @@ def test_weather_rejects_empty_city_and_out_of_range_geocoding(monkeypatch):
         tools.refresh_weather("Invalid")
 
 
+
+
+def test_rss_job_is_supervised_and_duplicate_requests_reuse_running_job(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    monkeypatch.setattr(service, "APP_DIR", ROOT)
+    service._JOBS.clear()
+    spawned = []
+
+    class FakeProcess:
+        pid = 98765
+        def poll(self):
+            return None
+
+    def fake_popen(args, **kwargs):
+        spawned.append((args, kwargs))
+        return FakeProcess()
+
+    monkeypatch.setattr(service.subprocess, "Popen", fake_popen)
+    args = {
+        "service_task": "rss_refresh", "category": "tech",
+        "language": "en", "name": "Refresh RSS",
+    }
+    first = service.h_job_start(args)
+    second = service.h_job_start(args)
+    assert first["ok"] is True
+    assert second["ok"] is True
+    assert second["already"] is True
+    assert first["job"]["id"] == second["job"]["id"]
+    assert len(spawned) == 1
+    assert spawned[0][0][-3:] == ["rss", "tech", "en"]
+    assert first["job"]["progress"] == 0
+    service._JOBS.clear()
+
+
 def test_service_content_cache_and_job_allowlists(tmp_path, monkeypatch):
     service = load_service()
     monkeypatch.setattr(service, "DATA", tmp_path)
