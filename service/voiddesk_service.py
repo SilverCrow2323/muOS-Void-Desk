@@ -996,13 +996,35 @@ def h_apt_catalog(args):
 
 
 def _job_refresh(job):
+    state_path = job.get("progress_file")
+    if state_path:
+        try:
+            state = json.loads(Path(state_path).read_text(encoding="utf-8"))
+            if isinstance(state, dict):
+                for field in ("progress", "phase", "message", "detail",
+                              "animation", "severity", "indeterminate"):
+                    if field in state:
+                        job[field] = state[field]
+                if state.get("status") == "failed":
+                    job["severity"] = "error"
+        except (OSError, ValueError, TypeError):
+            pass
+
     process = job.get("process")
     if job["status"] == "running" and process is not None:
         code = process.poll()
         if code is not None:
+            state_status = job.get("status_file_status")
             job["status"] = "done" if code == 0 else "error"
-            job["progress"] = 100 if code == 0 else 0
+            job["progress"] = 100 if code == 0 else job.get("progress", 0)
+            job["severity"] = "success" if code == 0 else "error"
             job["exit_code"] = code
+            lock_path = job.get("lock_path")
+            if lock_path:
+                try:
+                    Path(lock_path).unlink(missing_ok=True)
+                except OSError:
+                    pass
     return job
 
 
@@ -1014,8 +1036,18 @@ def _job_public(job):
         "hub": job["hub"],
         "status": job["status"],
         "started": job["started"],
-        "progress": job["progress"],
-        "color": [0.45, 0.72, 0.95],
+        "progress": job.get("progress", 0),
+        "phase": job.get("phase", ""),
+        "message": job.get("message", ""),
+        "detail": job.get("detail", ""),
+        "description": job.get("description", "Void Desk is performing this operation."),
+        "reason": job.get("reason", "This step is required to complete the selected action."),
+        "icon": job.get("icon", "tool"),
+        "animation": job.get("animation", "loading"),
+        "severity": job.get("severity", "info"),
+        "indeterminate": job.get("indeterminate", False),
+        "can_background": job.get("can_background", True),
+        "color": job.get("color", [0.45, 0.72, 0.95]),
     }
 
 
@@ -1024,8 +1056,10 @@ def h_job_start(args):
     global _JOB_SEQ
     command = None
     cwd = APP_DIR
+    progress_file = None
     cmd_text = args.get("cmd")
     tool_id = args.get("tool_id")
+    service_task = args.get("service_task")
 
     apt_action = args.get("apt_action")
     if apt_action is not None:
@@ -1055,11 +1089,28 @@ def h_job_start(args):
         if not script.is_file():
             return {"ok": False, "error": "package installer is missing"}
         command = ["sh", str(script), tokens[2]]
-    elif args.get("service_task") == "tailscale_start":
+    elif service_task == "tailscale_start":
         script = APP_DIR / "service" / "tailscale_job.py"
         if not script.is_file():
             return {"ok": False, "error": "Tailscale service job is missing"}
         command = [sys.executable, str(script)]
+    elif service_task == "xfce_bootstrap":
+        if not IS_DEVICE:
+            return {"ok": False, "error": "XFCE handheld bootstrap is available only on muOS devices"}
+        script = APP_DIR / "bin" / "xfce_bootstrap.py"
+        if not script.is_file():
+            return {"ok": False, "error": "XFCE bootstrap script is missing"}
+        progress_file = DATA / ".xfce_bootstrap_state.json"
+        command = [sys.executable, str(script)]
+    elif service_task == "env_install":
+        env_id = str(args.get("id") or "")
+        if env_id not in ("icewm", "lxde"):
+            return {"ok": False, "error": "unsupported desktop environment"}
+        script = APP_DIR / "bin" / "env_install.py"
+        if not script.is_file():
+            return {"ok": False, "error": "environment installer is missing"}
+        progress_file = DATA / (".%s_install_state.json" % env_id)
+        command = [sys.executable, str(script), env_id]
     elif tool_id:
         try:
             registry = json.loads(
@@ -1143,8 +1194,20 @@ def h_job_start(args):
         "status": "running",
         "started": time.time(),
         "progress": 0,
+        "phase": "Preparing",
+        "message": "Starting operation...",
+        "detail": "",
+        "description": str(args.get("description") or "Void Desk is performing this operation.")[:240],
+        "reason": str(args.get("reason") or "This step is required to complete the selected action.")[:240],
+        "icon": str(args.get("icon") or "tool")[:32],
+        "animation": str(args.get("animation") or "loading")[:24],
+        "severity": "info",
+        "indeterminate": progress_file is not None,
+        "can_background": args.get("can_background", True) is not False,
         "process": process,
         "log_path": log_path,
+        "progress_file": progress_file,
+        "color": args.get("color") or [0.45, 0.72, 0.95],
     }
     _JOBS[job_id] = job
     return {"ok": True, "job": _job_public(job)}
