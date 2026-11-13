@@ -1,5 +1,6 @@
 local jobs = require("core.jobs")
 local font = require("core.font")
+local icon = require("core.icon")
 local overlay = { log_cache = {}, log_time = {} }
 
 local function log_for(job)
