@@ -26,6 +26,12 @@ to M, so pressing Escape while selecting an item cannot accidentally invoke a
 system/menu action. End Session remains available through the explicit NEXUS
 flow.
 
-The desktop event bridge accepts common XInput-style JOY events and SDL GameController events, drains its action queue and always returns a list,
-including when the queue contains input. Desktop L2/R2 are SDL trigger axes; the handheld evdev reader and its
+The desktop bridge opens connected SDL joysticks at startup and handles device hot-plug.
+For common XInput-style JOY events, button indices map as follows: 0/1/2/3 =
+A/B/X/Y, 4/5 = L1/R1, 6/7 = Select/Start, 8/9 = L3/R3 and 10 = Menu.
+SDL GameController events use their standardized button order. Hat events drive
+the D-pad; trigger axes 4/5 drive L2/R2 with edge detection.
+
+The desktop event bridge drains its action queue and always returns a list,
+including when the queue contains input. The handheld evdev reader and its
 muOS-specific physical button layouts are unchanged.
