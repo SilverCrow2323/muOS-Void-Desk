@@ -30,6 +30,11 @@ local KEYS = {
     "SPACE","NEWLINE","BACK","DONE",
 }
 local COLS = 8
+local font_cache = {}
+local function cached_font(size)
+    if not font_cache[size] then font_cache[size] = love.graphics.newFont(size) end
+    return font_cache[size]
+end
 
 local function current_name()
     local item = state.notes[state.selected]
@@ -233,10 +238,10 @@ function scene.draw()
     love.graphics.rectangle("line",x,y,w,h,8)
 
     if state.mode=="list" then
-        love.graphics.setFont(font.bold(17) or love.graphics.newFont(17))
+        love.graphics.setFont(font.bold(17) or cached_font(17))
         love.graphics.setColor(0.92,0.96,1,1)
         love.graphics.print("LOCAL NOTEBOOK",x+16,y+12)
-        love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
+        love.graphics.setFont(font.regular(10) or cached_font(10))
         love.graphics.setColor(0.51,0.64,0.76,1)
         love.graphics.print("PRIVATE BY DEFAULT  /  STORED IN data/notes",x+17,y+37)
 
@@ -252,15 +257,15 @@ function scene.draw()
             love.graphics.rectangle("fill",x+12,yy,w-24,row_h-4,5)
             love.graphics.setColor(selected and accent[1] or 0.25,selected and accent[2] or 0.36,selected and accent[3] or 0.46,selected and 0.95 or 0.55)
             love.graphics.rectangle("line",x+12,yy,w-24,row_h-4,5)
-            love.graphics.setFont(font.bold(12) or love.graphics.newFont(12))
+            love.graphics.setFont(font.bold(12) or cached_font(12))
             love.graphics.setColor(0.91,0.95,1,1)
             love.graphics.print(tostring(row.name or "Untitled"),x+22,yy+6)
-            love.graphics.setFont(font.regular(9) or love.graphics.newFont(9))
+            love.graphics.setFont(font.regular(9) or cached_font(9))
             love.graphics.setColor(0.57,0.67,0.77,1)
             love.graphics.print(tostring(row.preview or ""):sub(1,80),x+22,yy+26)
         end
         if #state.notes==0 then
-            love.graphics.setFont(font.regular(13) or love.graphics.newFont(13))
+            love.graphics.setFont(font.regular(13) or cached_font(13))
             love.graphics.setColor(0.59,0.69,0.79,1)
             love.graphics.printf("Your notebook is empty.\nCreate a note with Y.",x+24,y+150,w-48,"center")
         end
@@ -269,15 +274,15 @@ function scene.draw()
             love.graphics.rectangle("fill",x+36,H-120,w-72,42,6)
             love.graphics.setColor(1,0.4,0.38,1)
             love.graphics.rectangle("line",x+36,H-120,w-72,42,6)
-            love.graphics.setFont(font.bold(11) or love.graphics.newFont(11))
+            love.graphics.setFont(font.bold(11) or cached_font(11))
             love.graphics.setColor(1,0.85,0.84,1)
             love.graphics.printf("DELETE "..tostring(current_name() or "NOTE").."?  A CONFIRM  /  B CANCEL",x+44,H-107,w-88,"center")
         end
     else
-        love.graphics.setFont(font.bold(15) or love.graphics.newFont(15))
+        love.graphics.setFont(font.bold(15) or cached_font(15))
         love.graphics.setColor(0.92,0.96,1,1)
         love.graphics.print(state.name,x+16,y+10)
-        love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
+        love.graphics.setFont(font.regular(10) or cached_font(10))
         love.graphics.setColor(0.54,0.66,0.77,1)
         love.graphics.print(string.format("%d / 32768 BYTES",#state.content),x+17,y+34)
 
@@ -286,7 +291,7 @@ function scene.draw()
         love.graphics.setColor(0.018,0.028,0.043,1)
         love.graphics.rectangle("fill",x+12,editor_y,w-24,editor_h,4)
         love.graphics.setScissor(x+18,editor_y+8,w-36,editor_h-16)
-        love.graphics.setFont(font.mono(11) or love.graphics.newFont(11))
+        love.graphics.setFont(font.mono(11) or cached_font(11))
         love.graphics.setColor(0.85,0.91,0.97,1)
         local max_lines=math.max(1,math.floor((editor_h-20)/15))
         local lines={}
@@ -311,7 +316,7 @@ function scene.draw()
                 love.graphics.rectangle("fill",bx,by,cell_w-3,18,3)
                 love.graphics.setColor(selected and accent[1] or 0.29,selected and accent[2] or 0.39,selected and accent[3] or 0.50,1)
                 love.graphics.rectangle("line",bx,by,cell_w-3,18,3)
-                love.graphics.setFont(font.bold(8) or love.graphics.newFont(8))
+                love.graphics.setFont(font.bold(8) or cached_font(8))
                 love.graphics.setColor(0.91,0.95,1,1)
                 love.graphics.printf(key,bx+1,by+5,cell_w-5,"center")
             end
@@ -319,7 +324,7 @@ function scene.draw()
     end
 
     if not state.osk then
-        love.graphics.setFont(font.regular(10) or love.graphics.newFont(10))
+        love.graphics.setFont(font.regular(10) or cached_font(10))
         love.graphics.setColor(0.54,0.65,0.75,1)
         love.graphics.printf(state.status,x+14,H-103,w-28,"left")
     end
