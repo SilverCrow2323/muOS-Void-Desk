@@ -208,3 +208,28 @@ def test_visual_capture_bypasses_onboarding_and_rejects_duplicate_scene_images()
     assert "def perceptual_distance(" in capture_script
     assert "global overlay may be covering the scenes" in capture_script
     assert "VOIDDESK_CAPTURE_ALL" in capture_script
+
+
+
+def test_first_run_onboarding_consumes_controller_input_before_scene_routes():
+    main = (LOVE / "main.lua").read_text(encoding="utf-8")
+    router = main.split("local function dispatch_control", 1)[1].split(
+        "-- ─── GAMEPAD", 1
+    )[0]
+    assert "if onboarding.active then" in router
+    assert "onboarding.handle_action(action, config)" in router
+    assert "input.press(action, source)" in router
+    gamepad = main.split("function love.gamepadpressed", 1)[1].split(
+        "-- ─── JOYSTICK", 1
+    )[0]
+    raw = main.split("function love.joystickpressed", 1)[1].split(
+        "-- ─── HAT", 1
+    )[0]
+    hat = main.split("function love.joystickhat", 1)[1].split(
+        "-- ─── AXIS", 1
+    )[0]
+    axis = main.split("function love.joystickaxis", 1)[1]
+    assert "dispatch_control(logical" in gamepad
+    assert "dispatch_control(logical" in raw
+    assert 'dispatch_control("up"' in hat
+    assert "dispatch_control(" in axis
