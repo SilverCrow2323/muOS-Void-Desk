@@ -54,6 +54,9 @@ function love.load()
     sm.register("hub_info", require("scenes.hub_info"))
 
     if os.getenv("VOIDDESK_CAPTURE_ALL") == "1" then
+        onboarding.disable_for_visual_capture()
+        tablet.active = false
+        jobs.overlay_open = false
         local ok, err = visual_capture.start_batch(sm)
         if not ok then error(err or "unable to start visual capture batch") end
     else
