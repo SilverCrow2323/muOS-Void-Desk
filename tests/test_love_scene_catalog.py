@@ -185,6 +185,8 @@ def test_notes_has_a_real_toolbox_route_and_visual_capture():
         assert f'"{command}": h_' in service
     for command in ("text_list", "text_read", "text_save", "text_delete"):
         assert f'"{command}": h_' in service
+    for command in ("text_list", "text_read", "text_save", "text_delete"):
+        assert f'"{command}": h_' in service
     editor = (LOVE / "scenes" / "tool_editor.lua").read_text(encoding="utf-8")
     assert 'bridge.call("text_list"' in editor
     assert 'bridge.call("text_read"' in editor
