@@ -19,6 +19,8 @@ import os
 import shutil
 import subprocess
 import sys
+import struct
+import zlib
 import time
 from pathlib import Path
 
@@ -56,6 +58,102 @@ def stop_process(proc: subprocess.Popen | None) -> None:
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=5)
+
+
+def perceptual_samples(path: Path, sample_width: int = 32,
+                       sample_height: int = 24) -> tuple[int, ...]:
+    """Decode a non-interlaced 8-bit RGB/RGBA PNG into a tiny pixel grid."""
+    data = path.read_bytes()
+    signature = b"\x89PNG\r\n\x1a\n"
+    if not data.startswith(signature):
+        raise ValueError("invalid PNG signature")
+
+    width = height = bit_depth = color_type = interlace = None
+    compressed = bytearray()
+    offset = len(signature)
+    while offset + 12 <= len(data):
+        length = struct.unpack(">I", data[offset:offset + 4])[0]
+        chunk_type = data[offset + 4:offset + 8]
+        start = offset + 8
+        end = start + length
+        if end + 4 > len(data):
+            raise ValueError("truncated PNG chunk")
+        if chunk_type == b"IHDR":
+            width, height, bit_depth, color_type, _, _, interlace = struct.unpack(
+                ">IIBBBBB", data[start:end]
+            )
+        elif chunk_type == b"IDAT":
+            compressed.extend(data[start:end])
+        elif chunk_type == b"IEND":
+            break
+        offset = end + 4
+
+    if (not width or not height or bit_depth != 8
+            or color_type not in (2, 6) or interlace != 0):
+        raise ValueError("unsupported PNG layout for visual comparison")
+
+    channels = 3 if color_type == 2 else 4
+    stride = width * channels
+    raw = zlib.decompress(bytes(compressed))
+    expected = height * (stride + 1)
+    if len(raw) != expected:
+        raise ValueError("PNG scanline data has an unexpected length")
+
+    xs = sorted({
+        min(width - 1, int((i + 0.5) * width / sample_width))
+        for i in range(sample_width)
+    })
+    ys = {
+        min(height - 1, int((i + 0.5) * height / sample_height))
+        for i in range(sample_height)
+    }
+    previous = bytearray(stride)
+    samples = []
+    offset = 0
+    for y in range(height):
+        filter_type = raw[offset]
+        row = bytearray(raw[offset + 1:offset + 1 + stride])
+        offset += stride + 1
+        if filter_type == 1:
+            for i in range(stride):
+                left = row[i - channels] if i >= channels else 0
+                row[i] = (row[i] + left) & 255
+        elif filter_type == 2:
+            for i in range(stride):
+                row[i] = (row[i] + previous[i]) & 255
+        elif filter_type == 3:
+            for i in range(stride):
+                left = row[i - channels] if i >= channels else 0
+                row[i] = (row[i] + ((left + previous[i]) // 2)) & 255
+        elif filter_type == 4:
+            for i in range(stride):
+                left = row[i - channels] if i >= channels else 0
+                up = previous[i]
+                upper_left = previous[i - channels] if i >= channels else 0
+                predictor = left + up - upper_left
+                pa = abs(predictor - left)
+                pb = abs(predictor - up)
+                pc = abs(predictor - upper_left)
+                nearest = left if pa <= pb and pa <= pc else (
+                    up if pb <= pc else upper_left
+                )
+                row[i] = (row[i] + nearest) & 255
+        elif filter_type != 0:
+            raise ValueError("unsupported PNG row filter %d" % filter_type)
+
+        if y in ys:
+            for x in xs:
+                base = x * channels
+                samples.extend(row[base:base + 3])
+        previous = row
+    return tuple(samples)
+
+
+def perceptual_distance(left: tuple[int, ...],
+                        right: tuple[int, ...]) -> float:
+    if len(left) != len(right) or not left:
+        return 255.0
+    return sum(abs(a - b) for a, b in zip(left, right)) / len(left)
 
 
 def read_manifest(path: Path) -> dict | None:
@@ -179,8 +277,7 @@ def main() -> int:
             print("ERROR: capture manifest contains missing or duplicate scene labels.",
                   file=sys.stderr)
             return 1
-        hashes = set()
-        png_signature = b"\\x89PNG\\r\\n\\x1a\\n"
+        fingerprints = []
         for entry in captured:
             relative = str(entry.get("path", ""))
             image_path = (ROOT / relative).resolve()
@@ -191,24 +288,29 @@ def main() -> int:
                       file=sys.stderr)
                 return 1
             try:
-                image_bytes = image_path.read_bytes()
-            except OSError as exc:
-                print("ERROR: missing capture for %s: %s" %
+                fingerprints.append(perceptual_samples(image_path))
+            except (OSError, ValueError, zlib.error, struct.error) as exc:
+                print("ERROR: invalid capture for %s: %s" %
                       (entry.get("screen", "?"), exc), file=sys.stderr)
                 return 1
-            if not image_bytes.startswith(png_signature):
-                print("ERROR: invalid PNG for %s." % entry.get("screen", "?"),
-                      file=sys.stderr)
-                return 1
-            hashes.add(hashlib.sha256(image_bytes).digest())
-        minimum_unique = max(1, (len(captured) * 3 + 3) // 4)
-        if len(hashes) < minimum_unique:
-            print("ERROR: only %d/%d captures contain distinct images; "
+
+        nearest_distances = []
+        for index, fingerprint in enumerate(fingerprints):
+            other_distances = [
+                perceptual_distance(fingerprint, other)
+                for other_index, other in enumerate(fingerprints)
+                if other_index != index
+            ]
+            nearest_distances.append(min(other_distances) if other_distances else 255.0)
+        visually_distinct = sum(distance >= 2.0 for distance in nearest_distances)
+        minimum_distinct = max(1, (len(captured) * 3 + 3) // 4)
+        if visually_distinct < minimum_distinct:
+            print("ERROR: only %d/%d captures are visually distinct; "
                   "a global overlay may be covering the scenes." %
-                  (len(hashes), len(captured)), file=sys.stderr)
+                  (visually_distinct, len(captured)), file=sys.stderr)
             return 1
-        print("Verified %d distinct PNGs across %d scene labels." %
-              (len(hashes), len(screens)))
+        print("Verified %d/%d visually distinct screens using 32x24 pixel samples." %
+              (visually_distinct, len(captured)))
         for entry in failed:
             print("  FAILED %-20s %s" %
                   (entry.get("screen", "?"), entry.get("error", "")))
