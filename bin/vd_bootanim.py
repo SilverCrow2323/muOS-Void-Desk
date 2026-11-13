@@ -16,6 +16,7 @@
 #
 #  uso: vd_bootanim.py <xfce|icewm|lxde>
 # ============================================================================
+import math
 import os
 import random
 import subprocess
@@ -37,238 +38,155 @@ FPS_DT = 0.085
 FRAMES = 30
 HOLD = 0.55
 
-# --- glifi 16x16 (bit piu' alto = colonna sinistra) -------------------------
-MOUSE = [  # muso XFCE: corpo, muso a sinistra, orecchio, coda a destra
-    0x0000, 0x0000, 0x0380, 0x0383,
-    0x07E2, 0x1FF6, 0x3FFC, 0x7FFC,
-    0x7FFC, 0x3FFC, 0x0FF8, 0x07F8,
-    0x0780, 0x0000, 0x0000, 0x0000,
-]
-BOLT = [  # tre picchi montani IceWM, altezza decrescente
-    0x0000, 0x0000, 0x0000, 0x0000,
-    0x1800, 0x1840, 0x1840, 0x3CE0,
-    0x3CE0, 0x3DFC, 0x7FFC, 0x7FFC,
-    0x7FFE, 0xFFFE, 0xFFFF, 0x0000,
-]
-SWOOSH = [  # ala/swoosh LXDE, punta in alto, tre dita in basso
-    0x0060, 0x00F0, 0x00F0, 0x00F8,
-    0x01F8, 0x01F8, 0x01FC, 0x03FC,
-    0x03FE, 0x07FE, 0x06FC, 0x04D8,
-    0x0CB0, 0x09A0, 0x0100, 0x0000,
-]
+# --- VOID DESK / PY-ENGINE -----------------------------------------------
+# PY and LÖVE share one visual grammar, but are deliberately mirrored.
+# PY: optical nucleus on the right, spiral expands left, cyan / glacier.
+BG = (2, 5, 10)
+INK = (0, 0, 0)
+LINE = (13, 27, 38)
+PY_ACCENT = (33, 211, 235)
+PY_HOT = (139, 248, 255)
+PY_MID = (18, 112, 137)
+PY_DIM = (9, 49, 65)
+
+FPS_DT = 0.09
+FRAMES = 24
+HOLD = 0.40
 
 
-def glyph(pt, mask, x, y, sc, col, rows=16):
-    """Disegna le prime `rows` righe del glifo, scalato a blocchi."""
-    for ry in range(min(rows, 16)):
-        bits = mask[ry]
-        for rx in range(16):
-            if bits & (1 << (15 - rx)):
-                pt.fill(x + rx * sc, y + ry * sc, sc - 1, sc - 1, col)
+def segment(pt, x0, y0, x1, y1, col, width=2):
+    """Linea DDA economica, con campioni ravvicinati e clipping del Painter."""
+    dx, dy = x1 - x0, y1 - y0
+    steps = max(1, int(max(abs(dx), abs(dy)) / 10.0))
+    for i in range(steps + 1):
+        q = i / float(steps)
+        pt.fill(int(x0 + dx * q), int(y0 + dy * q), width, width, col)
 
 
-def scanlines(pt, fb):
-    for y in range(0, fb.h, 3):
-        pt.fill(0, y, fb.w, 1, (0, 0, 0))
+def ring(pt, cx, cy, radius, col, width=2, squash=1.0):
+    """Anello ellittico a segmenti: evita dipendenze grafiche esterne."""
+    prev = None
+    for i in range(73):
+        a = (i / 72.0) * math.pi * 2.0
+        p = (cx + math.cos(a) * radius,
+             cy + math.sin(a) * radius * squash)
+        if prev is not None:
+            segment(pt, prev[0], prev[1], p[0], p[1], col, width)
+        prev = p
 
 
-def frame_base(pt, fb):
-    fb.clear(BG)
-    pt.fill(0, 0, fb.w, 2, INK)
-    pt.fill(0, fb.h - 2, fb.w, 2, INK)
+def disc(pt, cx, cy, radius, col):
+    """Disco pieno per il nucleo ottico nero."""
+    for dy in range(-radius, radius + 1):
+        half = int(math.sqrt(max(0, radius * radius - dy * dy)))
+        pt.fill(cx - half, cy + dy, half * 2 + 1, 1, col)
 
 
-SPDW_CORE = [   # ingranaggio: la firma SPDW per xfce/CORE (struttura)
-    0x0000, 0x0000, 0x0180, 0x13C8,
-    0x0FF0, 0x0FF0, 0x1C38, 0x3C3C,
-    0x3C3C, 0x1C38, 0x0FF0, 0x0FF0,
-    0x13C8, 0x0180, 0x0000, 0x0000,
-]
-SPDW_TURBO = [  # fulmine: la firma SPDW per icewm/TURBO (velocita')
-    0x0070, 0x00E0, 0x00E0, 0x01E0,
-    0x01C0, 0x03C0, 0x0780, 0x07F0,
-    0x0FE0, 0x01C0, 0x0380, 0x0300,
-    0x0600, 0x0C00, 0x0800, 0x1000,
-]
-SPDW_LIGHT = [  # foglia: la firma SPDW per lxde/LIGHT (leggerezza)
-    0x0000, 0x0080, 0x01F0, 0x03FC,
-    0x07F8, 0x0FF0, 0x1FE0, 0x1FE0,
-    0x1FC0, 0x1F80, 0x3F00, 0x3C00,
-    0x3000, 0x2000, 0x0000, 0x0000,
-]
-ENV_CODENAME = {"xfce": "CORE", "icewm": "TURBO", "lxde": "LIGHT"}
+def draw_reflection(pt, fb, now):
+    """Quarto destro: riflesso verticale deformato, non un semplice pannello."""
+    edge = int(fb.w * 0.75)
+    pt.fill(edge, 0, fb.w - edge, fb.h, (3, 9, 16))
+    for i in range(19):
+        base = edge + i * max(1, (fb.w - edge) // 18)
+        phase = i * 0.47
+        for y in range(0, fb.h, 13):
+            wave = math.sin(y * 0.031 + now * 2.1 + phase) * 7
+            wave += math.sin(y * 0.012 - now * 1.3 + phase) * 4
+            x = int(base + wave)
+            col = PY_MID if i % 4 == 0 else (10, 42, 57)
+            pt.fill(x, y, 1 if i % 3 else 2, 8, col)
+    for y in range(20, fb.h, 31):
+        shift = int(math.sin(y * 0.04 + now * 2.5) * 12)
+        pt.fill(edge + shift, y, max(0, fb.w - edge - shift), 1, (8, 32, 44))
+    pt.fill(edge, 0, 2, fb.h, (15, 79, 96))
+    pt.fill(edge + 3, 0, 1, fb.h, (5, 27, 38))
 
 
-def signature(pt, fb):
-    """SPDW Factory Lab, vicino al bordo superiore, centrata: la firma
-    apre la scena invece di chiuderla in fondo."""
-    sig = "SPDW Factory Lab"
-    fb.text((fb.w // fbtext.CW - len(sig)) // 2, 2, sig, (100, 103, 110))
+def draw_spiral(pt, fb, now, extent):
+    """Tre filamenti deformati si aprono dal nucleo destro verso i 3/4 sinistri."""
+    cx, cy = int(fb.w * 0.82), fb.h // 2
+    max_r = fb.w * 0.91
+    turns = math.pi * 8.6
+    strands = ((0.00, PY_ACCENT, 2), (0.15, PY_MID, 2),
+               (-0.15, PY_HOT, 1))
+    for phase, col, width in strands:
+        prev = None
+        for i in range(97):
+            u = (i / 96.0) * extent
+            radius = 9.0 + max_r * u
+            angle = turns * u + phase + math.sin(u * 17.0 + now * 2.0) * 0.13
+            warp = math.sin(angle * 1.9 - now * 3.2 + phase) * (3.0 + 19.0 * u)
+            x = cx - (radius * math.cos(angle) + warp * 0.62)
+            y = cy + radius * 0.64 * math.sin(angle) + warp
+            if prev is not None:
+                segment(pt, prev[0], prev[1], x, y, col, width)
+            prev = (x, y)
 
 
-def title_row(pt, fb, env, name, col, f, reveal_start, reveal_frames):
-    """Nome ambiente grande, centrato in basso. A sinistra non un
-    doppione rimpicciolito del logo ufficiale (che sta gia' al centro
-    scena) ma il marchio SPDW proprio di quell'ambiente -- ingranaggio,
-    fulmine o foglia -- con sotto il nome in codice (CORE/TURBO/LIGHT).
-    Ognuno prende forma in modo suo: CORE a blocchi che convergono dai
-    bordi, TURBO con uno sweep fulmineo, LIGHT con una dissolvenza
-    morbida (interpolazione colore, qui non c'e' alpha vero)."""
-    p = max(0.0, min(1.0, (f - reveal_start) / float(reveal_frames)))
-    if p <= 0:
-        return
-    mask = {"xfce": SPDW_CORE, "icewm": SPDW_TURBO,
-            "lxde": SPDW_LIGHT}[env]
-    sym_sc = 3
-    sym_w = 16 * sym_sc + 16
-    tw = len(name) * fbtext.CW * 3
-    ty = fb.h - 132
-    x0 = (fb.w - sym_w - tw) // 2
-    sym_x, sym_y = x0, ty + 4
-    if env == "xfce":
-        rows = int(8 * min(1.0, p * 1.5))
-        for ry in list(range(0, rows)) + list(range(16 - rows, 16)):
-            bits = mask[ry]
-            for rx in range(16):
-                if bits & (1 << (15 - rx)):
-                    pt.fill(sym_x + rx * sym_sc, sym_y + ry * sym_sc,
-                           sym_sc - 1, sym_sc - 1, col)
-    elif env == "icewm":
-        # sweep orizzontale fulmineo: resta il piu' veloce dei tre (la
-        # velocita' e' il punto), ma con vera progressione a colonne,
-        # non un semplice on/off
-        if p > 0.1:
-            wp = min(1.0, (p - 0.1) / 0.3)
-            cols = max(1, int(round(16 * wp)))
-            for ry in range(16):
-                bits = mask[ry]
-                for rx in range(cols):
-                    if bits & (1 << (15 - rx)):
-                        pt.fill(sym_x + rx * sym_sc, sym_y + ry * sym_sc,
-                               sym_sc - 1, sym_sc - 1, col)
-    else:
-        fade = min(1.0, p * 1.3)
-        fc = tuple(int(c0 + (c1 - c0) * fade)
-                  for c0, c1 in zip((10, 10, 12), col))
-        glyph(pt, mask, sym_x, sym_y, sym_sc, fc)
-    if p > 0.55:
-        cp = min(1.0, (p - 0.55) / 0.45)
-        code = ENV_CODENAME[env]
-        chars = max(1, int(round(len(code) * cp)))
-        fb.text((sym_x) // fbtext.CW,
-                (sym_y + 16 * sym_sc + 3) // fbtext.CH,
-                code[:chars], col)
-    if p > 0.35:
-        tp = min(1.0, (p - 0.35) / 0.65)
-        chars = max(1, int(round(len(name) * tp)))
-        shown = name[:chars]
-        tx = x0 + sym_w
-        pt.big_text(tx + 2, ty + 2, shown, INK, 3)
-        pt.big_text(tx, ty, shown, col, 3)
-    if p >= 0.99:
-        signature(pt, fb)
+def draw_core(pt, fb, now):
+    """Il punto di origine resta nero, incastonato in riflessi e orbite."""
+    cx, cy = int(fb.w * 0.82), fb.h // 2
+    pulse = 1.0 + 0.035 * math.sin(now * 5.0)
+    ring(pt, cx, cy, int(49 * pulse), PY_DIM, 2, 0.74)
+    ring(pt, cx, cy, 39, PY_MID, 2, 0.74)
+    ring(pt, cx, cy, 31, (5, 22, 31), 2, 0.74)
+    disc(pt, cx, cy, 25, INK)
+    ring(pt, cx, cy, 25, (1, 5, 9), 1, 0.74)
+    pt.fill(cx - 2, cy - 37, 4, 10, PY_HOT)
+    pt.fill(cx - 2, cy + 27, 4, 10, PY_ACCENT)
 
 
-# ---------------------------------------------------------------- XFCE -----
-def anim_xfce(pt, fb):
-    STEEL = (208, 214, 210)
-    CYAN = (74, 206, 224)
-    GR = (120, 30, 30)
-    GC = (34, 120, 140)
-    sc = 9
-    gx = (fb.w - 16 * sc) // 2
-    gy = 88
-    rnd = random.Random(7)
-    for f in range(FRAMES):
-        frame_base(pt, fb)
-        # nervature che convergono verso il centro
-        k = 1.0 - f / float(FRAMES)
-        for i in range(-5, 6):
-            x = fb.w // 2 + int(i * (40 + 220 * k))
-            pt.fill(x, 0, 1, fb.h, LINE)
-        pt.fill(0, gy + 8 * sc, fb.w, 1, LINE)
-        # il muso si materializza riga per riga, tra ghost cromatici
-        rows = min(16, 2 + f)
-        if f < FRAMES - 4:
-            j = rnd.choice((-2, -1, 1, 2))
-            glyph(pt, MOUSE, gx + j, gy, sc, GR, rows)
-            glyph(pt, MOUSE, gx - j, gy + 1, sc, GC, rows)
-        glyph(pt, MOUSE, gx, gy, sc, STEEL if f % 7 else CYAN, rows)
-        # riga di scansione che "stampa" il glifo
-        if rows < 16:
-            pt.fill(gx - 26, gy + rows * sc, 16 * sc + 52, 2, CYAN)
-        title_row(pt, fb, "xfce", "XFCE", STEEL, f, FRAMES - 14, 14)
-        scanlines(pt, fb)
-        fb.flush()
-        time.sleep(FPS_DT)
+def draw_logo(pt, fb, env, now):
+    """Tavola di marca leggibile sopra la spirale, nella regione sinistra."""
+    panel_x = int(fb.w * 0.055)
+    panel_y = int((fb.h - 154) / 2)
+    panel_w, panel_h = int(fb.w * 0.64), 154
+    pt.fill(panel_x, panel_y, panel_w, panel_h, (3, 10, 17))
+    pt.frame(panel_x, panel_y, panel_w, panel_h, PY_MID, 2, cut=16)
+    pt.fill(panel_x + 13, panel_y + 15, 3, panel_h - 30, PY_ACCENT)
+    pt.fill(panel_x + 20, panel_y + 15, 1, panel_h - 30, (8, 53, 68))
+
+    brand_y = (panel_y + 17) // fbtext.CH
+    fb.text((panel_x + 31) // fbtext.CW, brand_y,
+            "SPDW FACTORY", (115, 185, 197))
+    fb.text((panel_x + 31) // fbtext.CW, brand_y + 1,
+            "QWASAR ENVIRONMENT", PY_ACCENT)
+
+    title_y = panel_y + 53
+    pt.big_text(panel_x + 29, title_y + 2, "VOID DESK", (5, 20, 28), 3)
+    pt.big_text(panel_x + 27, title_y, "VOID DESK", (237, 249, 250), 3)
+
+    tag_x, tag_y = panel_x + 27, panel_y + 120
+    pt.fill(tag_x, tag_y, 116, 23, (7, 36, 47))
+    pt.frame(tag_x, tag_y, 116, 23, PY_ACCENT, 1)
+    fb.text((tag_x + 10) // fbtext.CW, (tag_y + 2) // fbtext.CH,
+            "PY-ENGINE", PY_HOT)
+    target = "ENV // " + (env or "DESKTOP").upper()
+    target_x = panel_x + panel_w - 13 - len(target) * fbtext.CW
+    fb.text(target_x // fbtext.CW, (tag_y + 2) // fbtext.CH,
+            target, (106, 151, 162))
 
 
-# --------------------------------------------------------------- ICEWM -----
-def anim_icewm(pt, fb):
-    ICE = (190, 230, 245)
-    BLU = (110, 195, 250)
-    DEEP = (26, 52, 78)
-    sc = 9
-    gy = 96
-    tx = (fb.w - 16 * sc) // 2
-    rnd = random.Random(11)
-    arrive = 12
-    for f in range(FRAMES):
-        frame_base(pt, fb)
-        # speedline manga: trattini orizzontali che sfrecciano
-        for _ in range(14):
-            y = rnd.randrange(20, fb.h - 20)
-            ln = rnd.randrange(60, 260)
-            x = (rnd.randrange(fb.w) + f * 90) % (fb.w + ln) - ln
-            pt.fill(x, y, ln, 2 if y % 3 else 1,
-                    DEEP if y % 4 else (60, 110, 150))
-        # la scheggia piomba da sinistra, overshoot e vibrazione
-        if f < arrive:
-            gx = int(-160 + (tx + 170) * (f / float(arrive)) ** 1.6)
-        else:
-            gx = tx + ((-3, 3, -2, 2, -1, 1)[f - arrive]
-                       if f - arrive < 6 else 0)
-        glyph(pt, BOLT, gx + 3, gy + 3, sc, DEEP)
-        glyph(pt, BOLT, gx, gy, sc, ICE if f % 5 else BLU)
-        if f == arrive:                      # flash d'impatto
-            pt.fill(0, gy - 8, fb.w, 3, ICE)
-            pt.fill(0, gy + 16 * sc, fb.w, 3, ICE)
-        title_row(pt, fb, "icewm", "ICEWM", ICE, f, arrive + 2, 8)
-        if f > arrive + 3:
-            tag = "// TURBO"
-            fb.text((fb.w // fbtext.CW - len(tag)) // 2,
-                    (fb.h - 36) // fbtext.CH, tag, BLU)
-        scanlines(pt, fb)
-        fb.flush()
-        time.sleep(FPS_DT)
+def anim_void_engine(pt, fb, env):
+    """Sigla PY definitiva: specchio a destra, nucleo nero, spirale verso sinistra."""
+    t0 = time.time()
+    for frame in range(FRAMES):
+        now = time.time() - t0
+        p = frame / float(max(1, FRAMES - 1))
+        extent = p * p * (3.0 - 2.0 * p)
+        fb.clear(BG)
+        for x in range(18, int(fb.w * 0.75), 42):
+            offset = int(math.sin(x * 0.025 + now) * 5)
+            pt.fill(x + offset, 0, 1, fb.h, LINE)
+        for y in range(34, fb.h, 48):
+            pt.fill(0, y, int(fb.w * 0.75), 1, (7, 16, 25))
 
-
-# ---------------------------------------------------------------- LXDE -----
-def anim_lxde(pt, fb):
-    AMBER = (255, 176, 46)
-    WARM = (255, 214, 130)
-    DIMW = (120, 90, 40)
-    sc = 8
-    ex, ey = (fb.w - 16 * sc) // 2, 92
-    for f in range(FRAMES):
-        frame_base(pt, fb)
-        # griglia di punti che sale, sempre piu' fitta: leggerezza
-        off = (f * 5) % 26
-        for gy in range(fb.h + 26, 40, -26):
-            for gx in range(16, fb.w, 32):
-                y = gy - off
-                if 0 < y < fb.h:
-                    pt.fill(gx, y, 2, 2,
-                            LINE if (gx // 32 + gy // 26) % 3 else DIMW)
-        # lo swoosh plana in diagonale verso il centro, con la scia
-        t = min(1.0, f / float(FRAMES - 8))
-        px = int(-140 + (ex + 140) * t)
-        py = int(fb.h - 60 - (fb.h - 60 - ey) * t)
-        for k, col in ((2, (60, 45, 22)), (1, DIMW)):
-            glyph(pt, SWOOSH, px - k * 34, py + k * 22, sc, col)
-        glyph(pt, SWOOSH, px, py, sc, AMBER if f % 6 else WARM)
-        title_row(pt, fb, "lxde", "LXDE", AMBER, f, FRAMES - 12, 12)
-        scanlines(pt, fb)
+        draw_reflection(pt, fb, now)
+        draw_spiral(pt, fb, now, extent)
+        draw_core(pt, fb, now)
+        for y in range(0, fb.h, 5):
+            pt.fill(0, y, fb.w, 1, (1, 3, 6))
+        draw_logo(pt, fb, env, now)
         fb.flush()
         time.sleep(FPS_DT)
 
@@ -422,9 +340,6 @@ def synth_bgm_pcm(env):
         return None
 
 
-ANIMS = {"xfce": anim_xfce, "icewm": anim_icewm, "lxde": anim_lxde}
-
-
 def main():
     env = (sys.argv[1] if len(sys.argv) > 1 else "xfce").lower()
     fb = open_fb()
@@ -441,7 +356,7 @@ def main():
         except Exception as e:
             bgm_log("play() failed: %s" % e)
         alsa_volume_hint()
-    ANIMS.get(env, anim_xfce)(pt, fb)
+    anim_void_engine(pt, fb, env)
     time.sleep(HOLD)
     if bgm:
         try:
