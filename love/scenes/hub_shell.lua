@@ -14,6 +14,7 @@ local nc = nodes.color_for(4)
 
 local t_enter = 0
 local status_msg = "Initializing PTY..."
+local python_repl = false
 local boot_t = 0
 local BOOT_DUR = 1.4
 
@@ -175,7 +176,7 @@ function scene.enter(args)
     osk_buf = ""
     osk_page = 0
     osk_sel = 0
-    local python_repl = args and args.python_repl == true
+    python_repl = args and args.python_repl == true
     status_msg = python_repl and "Starting Python REPL..." or "Initializing PTY..."
     shell.output = ""
     shell.start(function(resp)
