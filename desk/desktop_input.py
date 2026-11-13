@@ -65,6 +65,36 @@ class DesktopInputBridge:
         self._held = set()
         self._joy_hats = {}
         self._trigger_states = {}
+        self._joysticks = {}
+        self._init_joysticks()
+
+    def _open_joystick(self, device_index):
+        joystick_module = getattr(self.pygame, "joystick", None)
+        if joystick_module is None:
+            return
+        try:
+            joystick = joystick_module.Joystick(device_index)
+            joystick.init()
+            instance_id = (
+                joystick.get_instance_id()
+                if hasattr(joystick, "get_instance_id")
+                else joystick.get_id()
+            )
+            self._joysticks[instance_id] = joystick
+        except Exception:
+            # Desktop keyboard input remains usable if a controller cannot open.
+            return
+
+    def _init_joysticks(self):
+        joystick_module = getattr(self.pygame, "joystick", None)
+        if joystick_module is None:
+            return
+        try:
+            joystick_module.init()
+            for device_index in range(joystick_module.get_count()):
+                self._open_joystick(device_index)
+        except Exception:
+            return
 
     @staticmethod
     def _trigger_pressed(value):
@@ -96,10 +126,18 @@ class DesktopInputBridge:
                 action = self.JOY_BUTTON_ACTIONS.get(event.button)
                 if action is not None:
                     self._queue.append(action)
+            elif event.type == getattr(self.pygame, "JOYDEVICEADDED", None):
+                self._open_joystick(event.device_index)
             elif event.type == getattr(self.pygame, "JOYHATMOTION", None):
                 self._joy_hats[event.instance_id] = tuple(event.value)
             elif event.type == getattr(self.pygame, "JOYDEVICEREMOVED", None):
                 self._joy_hats.pop(event.instance_id, None)
+                joystick = self._joysticks.pop(event.instance_id, None)
+                if joystick is not None:
+                    try:
+                        joystick.quit()
+                    except Exception:
+                        pass
                 for key in [k for k in self._trigger_states if k[0] == event.instance_id]:
                     self._trigger_states.pop(key, None)
             elif event.type == getattr(self.pygame, "JOYAXISMOTION", None):
