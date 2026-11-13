@@ -199,3 +199,24 @@ def test_parse_rss_rejects_doctype_beyond_initial_prefix():
     )
     with pytest.raises(ValueError, match="forbidden document declaration"):
         tools.parse_rss(xml, "Untrusted")
+
+
+
+def test_refresh_rss_all_category_samples_every_available_category(monkeypatch):
+    tools = load_content_tools()
+    fixture = b"""<rss><channel><item><title>Headline</title>
+      <link>https://example.org/story</link></item></channel></rss>"""
+    requested = []
+    def fetch(url, host, max_bytes, timeout=6.0):
+        requested.append(host)
+        return fixture
+    monkeypatch.setattr(tools, "_fetch_https", fetch)
+    result = tools.refresh_rss("all", "all")
+    assert result["ok"] is True
+    expected = {feed["category"] for feed in tools.RSS_FEEDS}
+    actual = {
+        feed["category"] for feed in tools.RSS_FEEDS
+        if feed["url"] and __import__("urllib.parse").parse.urlparse(feed["url"]).hostname in requested
+    }
+    assert actual == expected
+    assert len(requested) == len(expected)
