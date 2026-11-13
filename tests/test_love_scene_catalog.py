@@ -34,6 +34,17 @@ def test_forge_shell_opens_existing_shell_scene():
 
 
 
+
+def test_media_library_clamps_navigation_and_explains_empty_or_unavailable_roots():
+    source = (LOVE / "scenes" / "media_library.lua").read_text(encoding="utf-8")
+    assert "entries = {}" in source
+    assert "math.min(math.max(1, #entries), selected + 1)" in source
+    assert "math.min(math.max(1, #entries), selected + 8)" in source
+    assert 'empty_title, empty_hint = "SCANNING MEDIA ROOTS"' in source
+    assert 'empty_title, empty_hint = "MEDIA LOCATION UNAVAILABLE"' in source
+    assert 'empty_title, empty_hint = "NO SUPPORTED MEDIA FOUND"' in source
+
+
 def test_iptv_epg_fallback_ignores_empty_configured_list():
     core = (LOVE / "core" / "iptv.lua").read_text(encoding="utf-8")
     scene = (LOVE / "scenes" / "hub_iptv.lua").read_text(encoding="utf-8")
