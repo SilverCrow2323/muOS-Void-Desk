@@ -148,3 +148,65 @@ def test_desktop_environment_operations_use_supervised_allowlisted_jobs(tmp_path
 
     assert service.h_env_uninstall({"id": "../../etc"})["ok"] is False
     assert service.h_env_update_check({"id": "unknown"})["ok"] is False
+
+
+
+def test_content_refresh_jobs_start_once_with_safe_worker_arguments(tmp_path, monkeypatch):
+    service = load_service()
+    app = tmp_path
+    data = app / "data"
+    (app / "service").mkdir()
+    (app / "service" / "content_refresh.py").write_text("print('worker')\n")
+    monkeypatch.setattr(service, "APP_DIR", app)
+    monkeypatch.setattr(service, "DATA", data)
+    monkeypatch.setattr(service, "_JOBS", {})
+    monkeypatch.setattr(service, "_JOB_SEQ", 0)
+    spawned = []
+
+    def fake_popen(command, **kwargs):
+        process = FakeProcess()
+        spawned.append((command, kwargs, process))
+        return process
+
+    monkeypatch.setattr(service.subprocess, "Popen", fake_popen)
+    rss = service.h_job_start({
+        "service_task": "rss_refresh",
+        "category": "retro",
+        "language": "it",
+        "name": "Refresh RSS",
+    })
+    assert rss["ok"] is True
+    assert rss["job"]["name"] == "Refresh RSS"
+    assert spawned[0][0][-3:] == ["rss", "retro", "it"]
+    assert rss["job"]["service_task"] == "rss_refresh"
+
+    duplicate_rss = service.h_job_start({
+        "service_task": "rss_refresh",
+        "category": "anime",
+        "language": "en",
+        "name": "Refresh RSS",
+    })
+    assert duplicate_rss["ok"] is True
+    assert duplicate_rss["already"] is True
+    assert duplicate_rss["job"]["id"] == rss["job"]["id"]
+    assert len(spawned) == 1
+
+    weather = service.h_job_start({
+        "service_task": "weather_refresh",
+        "city": "Milano",
+        "name": "Weather · Milano",
+    })
+    assert weather["ok"] is True
+    assert weather["job"]["name"] == "Weather · Milano"
+    assert spawned[1][0][-2:] == ["weather", "Milano"]
+    assert weather["job"]["service_task"] == "weather_refresh"
+
+    duplicate_weather = service.h_job_start({
+        "service_task": "weather_refresh",
+        "city": "Roma",
+        "name": "Weather · Roma",
+    })
+    assert duplicate_weather["ok"] is True
+    assert duplicate_weather["already"] is True
+    assert duplicate_weather["job"]["id"] == weather["job"]["id"]
+    assert len(spawned) == 2
