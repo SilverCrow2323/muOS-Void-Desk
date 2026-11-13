@@ -12,7 +12,7 @@ local categories = {"all","news","tech","linux","gaming","retro","anime"}
 local state = {
     category = 1, language = "all", items = {}, errors = {},
     selected = 1, first = 1, status = "Loading saved headlines...",
-    loading = false, job_id = nil, cache_time = "",
+    loading = false, job_id = nil, job_key = nil, cache_time = "",
     cached_category = nil, cached_language = nil,
 }
 local ROW_H = 42
@@ -46,14 +46,16 @@ local function cache_matches_filter()
 end
 
 local function request_refresh()
-    if state.job_id then
+    local category = categories[state.category]
+    local key = category .. ":" .. state.language
+    if state.job_id and state.job_key == key then
         local current = jobs.active[tostring(state.job_id)]
         if current and (current.status == "running" or current.status == "starting") then
             jobs.show_job(state.job_id)
             return
         end
     end
-    local category = categories[state.category]
+    state.job_key = key
     state.status = "Preparing " .. category .. " feeds..."
     bridge.call("job_start", {
         service_task = "rss_refresh",
@@ -98,6 +100,7 @@ function scene.enter()
     input.clear()
     state.selected, state.first = 1, 1
     state.job_id = nil
+    state.job_key = nil
     state.status = "Loading saved headlines..."
     refresh_cache()
     input.on("press", function(action)
