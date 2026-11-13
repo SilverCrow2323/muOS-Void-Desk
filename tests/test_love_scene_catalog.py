@@ -292,3 +292,15 @@ def test_system_tablet_pages_use_distinct_information_hierarchies():
     ):
         assert label in tablet
     assert "Open VOID MONITOR for live CPU samples" in tablet
+
+def test_icewm_and_lxde_offer_the_shared_xfce_base_install():
+    source = (LOVE / "scenes" / "hub_session.lua").read_text(encoding="utf-8")
+    dependency = source.split(
+        'if env.id ~= "xfce" and not installed("xfce") then', 1
+    )[1].split("return actions", 1)[0]
+    assert 'id = "install_base", label = "INSTALL BASE"' in dependency
+    assert "disabled = true" not in dependency
+    assert 'if action.id == "install_base" then' in source
+    assert 'bridge.call("xfce_install", {}' in source
+    assert 'running = active_operation("xfce")' in source
+    assert "Install IceWM/LXDE after it completes." in source
