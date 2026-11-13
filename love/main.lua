@@ -123,7 +123,7 @@ end
 
 function love.textinput(text)
     if onboarding.active then onboarding.textinput(text, config)
-    else sm.textinput(text) end
+    elseif not tablet.active and not jobs.overlay_open then sm.textinput(text) end
 end
 
 -- ─── GAMEPAD (named buttons, reliable) ────────────────────
