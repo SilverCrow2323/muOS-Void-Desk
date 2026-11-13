@@ -148,7 +148,7 @@ def test_love_dashboard_widget_budgets_leave_room_for_menu_rows():
     )
     for name in compact:
         source = (LOVE / "scenes" / name).read_text(encoding="utf-8")
-        match = re.search(r"widget_height\\s*=\\s*(\\d+)", source)
+        match = re.search(r"widget_height\s*=\s*(\d+)", source)
         assert match, f"{name} has no explicit widget budget"
         assert int(match.group(1)) <= 125, f"{name} still wastes vertical menu space"
 
