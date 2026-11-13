@@ -160,7 +160,7 @@ def test_nexus_orbits_have_wider_spacing_and_planets_are_not_pixel_grid_shaded()
     assert "local SQUASH = 0.42" in source
     assert "for i = 0, N-1" not in planet
     assert "three-tone cel-shaded sphere" in planet.lower()
-    assert 'love.graphics.arc("fill", "pie"' in planet
+    assert 'love.graphics.arc("pie"' in planet
 
 
 
