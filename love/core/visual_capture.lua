@@ -25,6 +25,8 @@ local BATCH_SCENES = {
     { name = "hub_monitor", args = {} },
     { name = "hub_toolbox", args = {} },
     { name = "hub_notes", args = {} },
+    { name = "hub_rss", args = {} },
+    { name = "hub_weather", args = {} },
     { name = "hub_mapps", args = {} },
     { name = "hub_external", args = {} },
     { name = "hub_settings", args = {} },
