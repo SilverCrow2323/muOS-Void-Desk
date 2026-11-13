@@ -1,14 +1,14 @@
 # Void Desk LÖVE Frontend — Gap Register
 
 **Scope:** current LÖVE frontend in `love/`, local service in `service/voiddesk_service.py`, and muOS launcher hand-off.
-**Baseline:** `fix/love-experience-overhaul` (draft PR work, November 13, 2026). CI #799 passed on `131da9af` for Python, packaging, Lua/LÖVE, 30 scene captures, Rt:Tailscale-M AArch64 and QEMU. Two later small UI/feed-selection commits are awaiting their own CI.
+**Baseline:** `fix/love-experience-overhaul` (draft PR work, November 13, 2026). CI #824 passed on `a8a5fbcc` for Python (263 tests), packaging, Lua/LÖVE, 37 scene captures, Rt:Tailscale-M AArch64 and QEMU (21/21 checks).
 **Evidence rule:** source checks and automated screenshots are not hardware certification. Status below distinguishes implemented code from device validation.
 
 ## Current shape
 
 - 10 visible NEXUS destinations: START SESSION, THE FORGE, UPLINK, MEDIA VAULT, WORKSHOP, TOOLBOX, MUOS APPS, SETTINGS, INFO and END NODE.
 - 5 additional NEXUS entries are currently hidden: GAMES, DEVELOP, COMMUNITY, OUTERDESK and LEGACY.
-- The automated LÖVE capture batch enumerates 37 scenes, including Notes, Signal/RSS, Weather, Void Radio, Media Library, all six System Tablet pages and the operation overlay. CI #799 captured 30/30 scenes with zero failures; the runner bypasses onboarding only in isolated capture mode and compares decoded 32×24 pixel samples to reject near-identical frames. The artefact from CI #809 was manually inspected as a contact sheet and as full-size NEXUS, Start Session, Notes, RSS and Weather captures. The 32×24 perceptual gate counted 33/37 screens as clearly distinct; the nearest pairs (Tablet System/Network, Tablet Processes/Activity, Notes/VOID Edit, RSS/Weather) were inspected at full size and are different views. A follow-up adds local, clearly labelled demo content to RSS, Weather, Notes and Activity so the capture shows representative non-empty states. This verifies rendering, not full interaction or handheld controller behaviour.
+- The automated LÖVE capture batch enumerates 37 scenes, including Notes, Signal/RSS, Weather, Void Radio, Media Library, all six System Tablet pages and the operation overlay. CI #824 captured 37/37 scenes with zero failures and 35/37 visually distinct 32×24 samples. The runner bypasses onboarding only in isolated capture mode and compares decoded pixels to reject near-identical frames. The #824 artefact was inspected as a contact sheet and at full size: NEXUS, Start Session, Notes, RSS, Weather, six Tablet pages and the operation overlay. RSS, Weather, Notes and Activity use explicitly labelled local demo fixtures in capture mode only; no network fetch or persistent write is performed. Similar pairs remain distinct on full-size review. This verifies rendering, not full interaction or handheld controller behaviour.
 - Global tests check scene-route resolution, visible NEXUS destination resolution and registration of bridge commands used by LÖVE.
 - Row-level action tests currently concentrate on Session, Forge, Workshop, Toolbox and MUOS APPS.
 
