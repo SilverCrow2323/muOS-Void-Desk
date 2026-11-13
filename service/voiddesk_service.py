@@ -1887,6 +1887,10 @@ def _start_desktop_maintenance(env_id, action):
     if not marker.exists():
         return {"ok": False, "error": ENV_NAMES[env_id] + " is not installed"}
     name = ("Remove " if action == "uninstall" else "Check updates for ") + ENV_NAMES[env_id]
+    for existing in _JOBS.values():
+        _job_refresh(existing)
+        if existing.get("name") == name and existing.get("status") in ("running", "starting"):
+            return {"ok": True, "job": _job_public(existing), "already": True}
     description = ("Remove the selected desktop environment." if action == "uninstall"
                    else "Refresh package indexes and simulate available updates without installing them.")
     reason = ("XFCE removal deletes the shared desktop image, including IceWM and LXDE if installed."
