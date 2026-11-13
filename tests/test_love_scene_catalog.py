@@ -189,6 +189,7 @@ def test_visual_capture_bypasses_onboarding_and_rejects_duplicate_scene_images()
     assert "function onboarding.disable_for_visual_capture()" in onboarding
     assert "onboarding.disable_for_visual_capture()" in main
     assert 'os.getenv("VOIDDESK_CAPTURE_ALL") ~= "1"' in onboarding
-    assert "hashlib.sha256(image_bytes).digest()" in capture_script
+    assert "def perceptual_samples(" in capture_script
+    assert "def perceptual_distance(" in capture_script
     assert "global overlay may be covering the scenes" in capture_script
-    assert "png_signature" in capture_script
+    assert "VOIDDESK_CAPTURE_ALL" in capture_script
