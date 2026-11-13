@@ -5,6 +5,10 @@ local theme      = require("theme.loader")
 local input      = require("core.input")
 local inputdbg   = require("core.input_debug")
 local notifications = require("core.notifications")
+local jobs       = require("core.jobs")
+local tablet     = require("core.tablet")
+local operation_overlay = require("core.operation_overlay")
+local onboarding = require("core.onboarding")
 local crt        = require("core.crt_shader")
 local visual_capture = require("core.visual_capture")
 local qwasar_profile = require("core.qwasar_profile")
@@ -14,6 +18,7 @@ local axis_state = {} -- analog-stick edge tracking (per axis)
 
 function love.load()
     config.load()
+    onboarding.init(config)
     theme.apply(config.get("theme", "cyberpunk"))
     local composition, profile_err = qwasar_profile.load()
     if composition then
@@ -57,8 +62,11 @@ function love.load()
 end
 
 function love.update(dt)
-    sm.update(dt)
+    if not onboarding.active then sm.update(dt) end
     bridge.poll()
+    jobs.update(dt)
+    tablet.update(dt)
+    onboarding.update(dt)
     notifications.update()
     visual_capture.update(dt)
 end
@@ -68,13 +76,22 @@ function love.draw()
         sm.draw()
     end)
     local chrome = require("core.chrome")
-    local theme = require("theme.loader")
-    notifications.draw(theme.get(), chrome.HEADER_H)
+    local current_theme = theme.get()
+    if not tablet.active and not jobs.overlay_open and not onboarding.active then
+        notifications.draw(current_theme, chrome.HEADER_H)
+    end
+    tablet.draw()
+    operation_overlay.draw()
+    onboarding.draw(current_theme)
 end
 
 -- ─── KEYBOARD ──────────────────────────────────────────────
 function love.keypressed(key, sc, isrepeat)
     if isrepeat then return end
+    if onboarding.active then
+        onboarding.keypressed(key, config)
+        return
+    end
     if key == "f12" then
         local ok, err = visual_capture.capture(sm.current_name())
         if not ok then
@@ -87,7 +104,7 @@ function love.keypressed(key, sc, isrepeat)
         return
     end
     if key == "m" then
-        notifications.toggle()
+        tablet.toggle()
         return
     end
     if key == "c" then
@@ -101,6 +118,10 @@ function love.keypressed(key, sc, isrepeat)
     end
     local logical = input.KEYMAP[key]
     if logical then input.press(logical, "key:" .. key) end
+end
+
+function love.textinput(text)
+    if onboarding.active then onboarding.textinput(text, config) end
 end
 
 -- ─── GAMEPAD (named buttons, reliable) ────────────────────
