@@ -150,7 +150,29 @@ function scene.enter()
     state.osk=false
     state.job_id=nil
     state.status="Loading saved forecast..."
-    refresh_cache()
+    if os.getenv("VOIDDESK_CAPTURE_ALL") == "1" then
+        state.city = "DEMO · MILANO"
+        state.data = {
+            city = "Milano", country = "IT", updated = "visual fixture",
+            current = {
+                temperature_2m = 14, apparent_temperature = 13,
+                weather_code = 2, relative_humidity_2m = 68,
+                wind_speed_10m = 12, precipitation = 0.2,
+            },
+            days = {
+                {date="FRI 13 NOV",code=2,high=16,low=9,rain_probability=10},
+                {date="SAT 14 NOV",code=1,high=15,low=8,rain_probability=5},
+                {date="SUN 15 NOV",code=3,high=13,low=7,rain_probability=20},
+                {date="MON 16 NOV",code=61,high=12,low=8,rain_probability=75},
+                {date="TUE 17 NOV",code=2,high=14,low=7,rain_probability=15},
+                {date="WED 18 NOV",code=0,high=15,low=6,rain_probability=0},
+                {date="THU 19 NOV",code=3,high=12,low=6,rain_probability=25},
+            },
+        }
+        state.status = "DEMO FORECAST · VISUAL FIXTURE · NOT LIVE"
+    else
+        refresh_cache()
+    end
     input.on("press",function(action)
         if state.osk then
             handle_keyboard(action)
