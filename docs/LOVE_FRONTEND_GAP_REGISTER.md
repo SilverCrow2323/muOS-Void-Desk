@@ -1,14 +1,14 @@
 # Void Desk LÖVE Frontend — Gap Register
 
 **Scope:** current LÖVE frontend in `love/`, local service in `service/voiddesk_service.py`, and muOS launcher hand-off.
-**Baseline:** `fix/love-experience-overhaul` (draft PR work, November 13, 2026). CI #774 passed on `cb7d9c64` for compile, tests, packaging and 28 scene captures; manual review invalidated the visual-capture evidence. The new pixel-level capture guard is pending CI.
+**Baseline:** `fix/love-experience-overhaul` (draft PR work, November 13, 2026). CI #799 passed on `131da9af` for Python, packaging, Lua/LÖVE, 30 scene captures, Rt:Tailscale-M AArch64 and QEMU. Two later small UI/feed-selection commits are awaiting their own CI.
 **Evidence rule:** source checks and automated screenshots are not hardware certification. Status below distinguishes implemented code from device validation.
 
 ## Current shape
 
 - 10 visible NEXUS destinations: START SESSION, THE FORGE, UPLINK, MEDIA VAULT, WORKSHOP, TOOLBOX, MUOS APPS, SETTINGS, INFO and END NODE.
 - 5 additional NEXUS entries are currently hidden: GAMES, DEVELOP, COMMUNITY, OUTERDESK and LEGACY.
-- The automated LÖVE capture batch now enumerates 30 scenes, including Notes, Signal/RSS, Weather, Void Radio and Media Library. Manual review of the CI #774 artifact found a capture false positive: onboarding remained above the scene manager, so all 28 screenshots showed the identity screen. The 28/28 count is therefore not accepted as visual proof. A follow-up now disables onboarding only in isolated capture mode and compares decoded 32×24 pixel samples to detect near-identical frames; the new CI run must validate this guard before the visual gate is reopened. Scene captures still prove rendering only, not full interaction.
+- The automated LÖVE capture batch enumerates 30 scenes, including Notes, Signal/RSS, Weather, Void Radio and Media Library. CI #799 captured 30/30 scenes with zero failures; the runner bypasses onboarding only in isolated capture mode and compares decoded 32×24 pixel samples to reject near-identical frames. The artifact was manually inspected as a contact sheet and as full-size NEXUS, Start Session, Notes, RSS and Weather captures. This verifies rendering, not full interaction or handheld controller behaviour.
 - Global tests check scene-route resolution, visible NEXUS destination resolution and registration of bridge commands used by LÖVE.
 - Row-level action tests currently concentrate on Session, Forge, Workshop, Toolbox and MUOS APPS.
 
