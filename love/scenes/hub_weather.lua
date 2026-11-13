@@ -49,7 +49,9 @@ local function refresh_cache()
             state.data = resp
             state.city = resp.city or state.city
             state.status = "Forecast updated " .. tostring(resp.updated or "")
-        elseif not resp.ok then
+        elseif resp.ok then
+            state.status = "No cached forecast · press Y to choose a city."
+        else
             state.status = "Weather cache: " .. tostring(resp.error or "unavailable")
         end
     end)
@@ -217,7 +219,8 @@ function scene.draw()
     love.graphics.rectangle("line",12,68,W-24,48,7)
     love.graphics.setFont(cached_font(12))
     love.graphics.setColor(0.93,0.96,1,1)
-    love.graphics.print("LOCATION  /  "..tostring(state.city):upper(),24,77)
+    local location_label = state.city ~= "" and state.city:upper() or "SELECT A CITY"
+    love.graphics.print("LOCATION  /  "..location_label,24,77)
     love.graphics.setFont(cached_font(9))
     love.graphics.setColor(0.55,0.68,0.8,1)
     love.graphics.print(state.city_mode and "TYPE CITY · R1 ON-SCREEN KEYS · START SEARCH" or "Y CHANGE CITY  ·  A UPDATE  ·  R1 RELOAD CACHE",24,96)
