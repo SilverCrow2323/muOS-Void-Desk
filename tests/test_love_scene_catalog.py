@@ -156,8 +156,8 @@ def test_love_dashboard_widget_budgets_leave_room_for_menu_rows():
 def test_nexus_orbits_have_wider_spacing_and_planets_are_not_pixel_grid_shaded():
     source = (LOVE / "scenes" / "nexus.lua").read_text(encoding="utf-8")
     planet = (LOVE / "core" / "planet.lua").read_text(encoding="utf-8")
-    assert "[2]=170, [3]=255, [4]=320" in source
-    assert "local SQUASH = 0.48" in source
+    assert "[2]=164, [3]=232, [4]=296" in source
+    assert "local SQUASH = 0.42" in source
     assert "for i = 0, N-1" not in planet
     assert "three-tone cel-shaded sphere" in planet.lower()
     assert 'love.graphics.arc("fill", "pie"' in planet
