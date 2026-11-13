@@ -18,6 +18,8 @@ local BATCH_SCENES = {
     { name = "hub_tailscale", args = {} },
     { name = "hub_syncthing", args = {} },
     { name = "hub_media", args = {} },
+    { name = "void_radio", args = {} },
+    { name = "media_library", args = {} },
     { name = "hub_workshop", args = {} },
     { name = "hub_diagnostics", args = {} },
     { name = "hub_monitor", args = {} },
