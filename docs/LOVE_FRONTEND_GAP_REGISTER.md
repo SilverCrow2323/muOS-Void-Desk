@@ -8,7 +8,7 @@
 
 - 10 visible NEXUS destinations: START SESSION, THE FORGE, UPLINK, MEDIA VAULT, WORKSHOP, TOOLBOX, MUOS APPS, SETTINGS, INFO and END NODE.
 - 5 additional NEXUS entries are currently hidden: GAMES, DEVELOP, COMMUNITY, OUTERDESK and LEGACY.
-- The automated LÖVE capture batch enumerates 30 scenes, including Notes, Signal/RSS, Weather, Void Radio and Media Library. CI #799 captured 30/30 scenes with zero failures; the runner bypasses onboarding only in isolated capture mode and compares decoded 32×24 pixel samples to reject near-identical frames. The artifact was manually inspected as a contact sheet and as full-size NEXUS, Start Session, Notes, RSS and Weather captures. This verifies rendering, not full interaction or handheld controller behaviour.
+- The automated LÖVE capture batch enumerates 37 scenes, including Notes, Signal/RSS, Weather, Void Radio, Media Library, all six System Tablet pages and the operation overlay. CI #799 captured 30/30 scenes with zero failures; the runner bypasses onboarding only in isolated capture mode and compares decoded 32×24 pixel samples to reject near-identical frames. The artefact from CI #809 was manually inspected as a contact sheet and as full-size NEXUS, Start Session, Notes, RSS and Weather captures. The 32×24 perceptual gate counted 28/30 screens as clearly distinct; the two nearest text-centric screens (Notes and VOID Edit) remain visually and functionally different when inspected at full size. This verifies rendering, not full interaction or handheld controller behaviour.
 - Global tests check scene-route resolution, visible NEXUS destination resolution and registration of bridge commands used by LÖVE.
 - Row-level action tests currently concentrate on Session, Forge, Workshop, Toolbox and MUOS APPS.
 
