@@ -9,7 +9,7 @@ local jobs = require("core.jobs")
 
 local scene = {}
 local state = {
-    city = "Milano", city_mode = false, osk = false, osk_index = 1,
+    city = "", city_mode = false, osk = false, osk_index = 1,
     data = nil, status = "Load a city forecast.", job_id = nil, loading = false,
 }
 local KEYS = {
@@ -242,20 +242,20 @@ function scene.draw()
     love.graphics.print("SEVEN-DAY OUTLOOK",20,244)
     local days=data.days or {}
     local row_y=264
-    for i=1,math.min(#days,6) do
+    for i=1,math.min(#days,7) do
         local d=days[i]
-        local y=row_y+(i-1)*25
+        local y=row_y+(i-1)*19
         love.graphics.setColor(0.055,0.08,0.11,0.94)
-        love.graphics.rectangle("fill",16,y,W-32,22,4)
+        love.graphics.rectangle("fill",16,y,W-32,17,4)
         love.graphics.setFont(cached_font(9))
         love.graphics.setColor(0.76,0.84,0.91,1)
-        love.graphics.print(tostring(d.date or "--"),24,y+6)
+        love.graphics.print(tostring(d.date or "--"),24,y+4)
         love.graphics.setColor(0.58,0.7,0.81,1)
-        love.graphics.print(weather_label(d.code),W*0.29,y+6)
+        love.graphics.print(weather_label(d.code),W*0.29,y+4)
         love.graphics.setColor(0.94,0.96,1,1)
-        love.graphics.printf(tostring(d.high or "--").."° / "..tostring(d.low or "--").."°",W*0.70,y+6,W*0.14,"right")
+        love.graphics.printf(tostring(d.high or "--").."° / "..tostring(d.low or "--").."°",W*0.70,y+4,W*0.14,"right")
         love.graphics.setColor(0.48,0.69,0.87,1)
-        love.graphics.printf(tostring(d.rain_probability or "--").."%",W*0.86,y+6,W*0.10,"right")
+        love.graphics.printf(tostring(d.rain_probability or "--").."%",W*0.86,y+4,W*0.10,"right")
     end
     if #days==0 then
         love.graphics.setFont(cached_font(11))
@@ -286,7 +286,7 @@ function scene.draw()
 
     love.graphics.setFont(cached_font(9))
     love.graphics.setColor(0.56,0.67,0.77,1)
-    love.graphics.printf(state.status,20,H-72,W-40,"left")
+    love.graphics.printf(state.status,20,H-60,W-40,"left")
     chrome.draw_footer({theme=th,hints={
         {icon="dpad",label="Navigate"},
         {icon="btn_y",label="Change city"},
