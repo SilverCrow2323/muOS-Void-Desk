@@ -16,7 +16,6 @@ import argparse
 import json
 import os
 import shutil
-import subprocess
 import struct
 import subprocess
 import sys
