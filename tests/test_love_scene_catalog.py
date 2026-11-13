@@ -247,3 +247,5 @@ def test_visual_capture_includes_all_system_tablet_pages_and_operation_overlay()
     assert 'target.overlay == "tablet"' in capture
     assert 'target.overlay == "operation"' in capture
     assert "jobs.POLL_INTERVAL = 10" in capture
+    assert "VISUAL FIXTURE" in capture
+    assert "DEMO AUDIO" in capture
