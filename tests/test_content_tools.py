@@ -185,3 +185,17 @@ def test_service_content_cache_and_job_allowlists(tmp_path, monkeypatch):
     assert service.h_job_start({
         "service_task": "weather_refresh", "city": "",
     })["ok"] is False
+
+
+
+def test_parse_rss_rejects_doctype_beyond_initial_prefix():
+    tools = load_content_tools()
+    xml = (
+        b'<?xml version="1.0"?>'
+        + (b" " * 9000)
+        + b'<!DOCTYPE rss [<!ENTITY expansion "unsafe">]>'
+        + b'<rss><channel><item><title>&expansion;</title>'
+        + b'<link>https://example.org/story</link></item></channel></rss>'
+    )
+    with pytest.raises(ValueError, match="forbidden document declaration"):
+        tools.parse_rss(xml, "Untrusted")
