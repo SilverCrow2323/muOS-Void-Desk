@@ -132,7 +132,7 @@ def main():
     if available < need:
         return fail("Not enough free storage. Need at least %.0f GB; only %.1f GB is available." % (need, available), 2, "STORAGE CHECK")
     if not os.path.exists(IMG_GZ):
-        log("FATAL: manca assets/xfce.img.gz")
+        log("FATAL: required assets/xfce.img.gz is missing")
         return 1
     report(5, "NETWORK CHECK", "Checking connection to Ubuntu mirrors",
            "The installer must download the Ubuntu base image and desktop packages.",
@@ -180,7 +180,7 @@ def main():
     ok, err = imgmount.mount_img(IMG, MNT)
     if not ok:
         return fail("Could not mount the desktop image: %s" % (err or "unknown error"), 22, "MOUNT")
-    log("   montata: %.1fGB liberi dentro l'immagine" % free_gb(MNT))
+    log("   mounted image: %.1f GB free" % free_gb(MNT))
 
     result = 1
     try:
