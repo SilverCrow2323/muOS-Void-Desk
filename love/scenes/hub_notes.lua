@@ -195,6 +195,19 @@ function scene.enter(args)
     state.loading=false
     state.osk=false
     state.status="Your notes stay in Void Desk's local data folder."
+    if os.getenv("VOIDDESK_CAPTURE_ALL") == "1" then
+        state.notes = {
+            {name="Launch checklist.txt",size=284,modified=love.timer.getTime(),
+             preview="Verify launcher, runtime, input and safe exit..."},
+            {name="Andromeda notes.txt",size=512,modified=love.timer.getTime()-3600,
+             preview="Controller mapping, paths and compatibility notes..."},
+            {name="Ideas for NEXUS.txt",size=196,modified=love.timer.getTime()-7200,
+             preview="Planet silhouettes, orbit spacing and motion study..."},
+        }
+        state.status="DEMO NOTES · VISUAL FIXTURE · NOT SAVED TO DISK"
+    else
+        state.notes = {}
+    end
     input.clear()
     input.on("press",function(action)
         if state.mode=="edit" then
@@ -222,7 +235,7 @@ function scene.enter(args)
             sm.back()
         end
     end)
-    refresh()
+    if os.getenv("VOIDDESK_CAPTURE_ALL") ~= "1" then refresh() end
 end
 
 function scene.leave()
