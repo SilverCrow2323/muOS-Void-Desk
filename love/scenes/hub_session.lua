@@ -116,6 +116,16 @@ local function active_actions(env)
         actions[#actions + 1] = {id = "back", label = "BACK", color = {0.55,0.64,0.73}}
         return actions
     end
+    if env.id ~= "xfce" and not installed("xfce") then
+        actions[#actions + 1] = {
+            id = "install", label = "INSTALL", color = env.accent,
+            disabled = true,
+        }
+        actions[#actions + 1] = {
+            id = "back", label = "BACK", color = {0.55,0.64,0.73},
+        }
+        return actions
+    end
     if installed(env.id) then
         actions[#actions + 1] = {id = "launch", label = "LAUNCH", color = env.accent}
         actions[#actions + 1] = {id = "uninstall", label = "UNINSTALL", color = {1.0,0.39,0.36}}
@@ -279,7 +289,9 @@ local function draw_card(env, x, y, w, h, selected, large, t)
     local status_font = font.bold(large and 14 or 11) or love.graphics.newFont(12)
     love.graphics.setFont(status_font)
     love.graphics.setColor(running and 1.0 or (ready and 0.42 or 0.70),running and 0.76 or (ready and 0.90 or 0.73),running and 0.31 or (ready and 0.62 or 0.78),1)
-    local status = running and "OPERATION RUNNING" or (ready and "INSTALLED" or "NOT INSTALLED")
+    local requires_base = env.id ~= "xfce" and not installed("xfce")
+    local status = running and "OPERATION RUNNING" or
+        (ready and "INSTALLED" or (requires_base and "REQUIRES XFCE" or "NOT INSTALLED"))
     love.graphics.print(status,x+(large and 22 or 14),y+(large and 126 or 76))
 
     love.graphics.setFont(font.regular(large and 13 or 10) or love.graphics.newFont(11))
