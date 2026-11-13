@@ -1451,7 +1451,7 @@ def _media_ipc(command):
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
             client.settimeout(0.6)
             client.connect(str(_MEDIA_PLAYER_SOCKET))
-            payload = json.dumps({"command": command, "request_id": 1}) + "\\n"
+            payload = json.dumps({"command": command, "request_id": 1}) + "\n"
             client.sendall(payload.encode("utf-8"))
             response = client.recv(4096).decode("utf-8", "replace").splitlines()
         for line in response:
