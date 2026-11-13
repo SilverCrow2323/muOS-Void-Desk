@@ -9,6 +9,8 @@ local tablet = {
     system = {},
     network = {},
     media = {},
+    radio = {},
+    iptv = {},
 }
 local pages = {"OVERVIEW", "PROCESSES", "SYSTEM", "NETWORK", "MEDIA", "ACTIVITY"}
 
@@ -21,6 +23,12 @@ local function request_status()
     end)
     bridge.call("media_status", {}, function(resp)
         if resp.ok then tablet.media = resp.media or {} end
+    end)
+    bridge.call("radio_status", {}, function(resp)
+        if resp.ok then tablet.radio = resp.status or {} end
+    end)
+    bridge.call("iptv_status", {}, function(resp)
+        if resp.ok then tablet.iptv = resp.state and resp or resp or {} end
     end)
     jobs.refresh()
 end
@@ -54,6 +62,75 @@ local function change_page(delta)
     tablet.scroll = 0
 end
 
+local function radio_playing()
+    local status = tablet.radio or {}
+    local state = tostring(status.state or status.status or ""):lower()
+    return status.running == true or status.playing == true or state == "playing"
+end
+
+local function iptv_playing()
+    local state = tostring((tablet.iptv or {}).state or ""):lower()
+    return state == "playing" or state == "buffering"
+end
+
+local function current_media_label()
+    if tablet.media.now_playing then return tostring(tablet.media.now_playing) end
+    local radio = tablet.radio or {}
+    if radio_playing() then
+        return tostring(radio.name or radio.station or radio.title or radio.now_playing or "Void Radio")
+    end
+    local iptv = tablet.iptv or {}
+    if iptv_playing() then
+        return tostring(iptv.channel or iptv.name or iptv.now_playing or "IPTV")
+    end
+    return "Nothing is playing"
+end
+
+local function stop_all_media()
+    bridge.call("media_stop", {}, function(resp)
+        if resp.ok then tablet.media.now_playing = nil end
+    end)
+    bridge.call("radio_action", {action="stop"}, function(resp)
+        if resp.ok then tablet.radio = {} end
+    end)
+    bridge.call("iptv_stop", {}, function(resp)
+        if resp.ok then tablet.iptv = {state="idle"} end
+    end)
+end
+
+local function toggle_pause()
+    if tablet.media.now_playing then
+        bridge.call("media_action", {action="toggle_pause"}, function(resp)
+            if resp.ok then
+                tablet.media.paused = resp.data == true
+            end
+        end)
+    elseif radio_playing() then
+        bridge.call("radio_action", {action="toggle_pause"}, function(resp)
+            if resp.ok then tablet.radio.paused = resp.pause == true end
+        end)
+    elseif iptv_playing() then
+        -- IPTV currently exposes stop/status only; do not display a fake pause command.
+        stop_all_media()
+    else
+        request_status()
+    end
+end
+
+local function adjust_volume(delta)
+    local current = tonumber(tablet.media.volume) or tonumber((tablet.radio or {}).volume) or 40
+    local next_volume = math.max(0, math.min(100, current + delta))
+    if tablet.media.now_playing then
+        bridge.call("media_action", {action="volume", value=next_volume}, function(resp)
+            if resp.ok then tablet.media.volume = resp.volume end
+        end)
+    elseif radio_playing() then
+        bridge.call("radio_action", {action="volume", value=next_volume}, function(resp)
+            if resp.ok then tablet.radio.volume = resp.volume end
+        end)
+    end
+end
+
 function tablet.handle_action(action)
     if not tablet.active then return false end
     if action == "b" or action == "menu" then
@@ -71,6 +148,11 @@ function tablet.handle_action(action)
     elseif action == "down" then
         tablet.scroll = tablet.scroll + 1
         return true
+    elseif action == "left" or action == "right" then
+        if tablet.page == 1 or tablet.page == 5 then
+            adjust_volume(action == "right" and 5 or -5)
+        end
+        return true
     elseif action == "a" then
         if pages[tablet.page] == "PROCESSES" then
             local list = jobs.list_active()
@@ -79,18 +161,14 @@ function tablet.handle_action(action)
                 jobs.show_job(job.id)
                 tablet.active = false
             end
-        elseif pages[tablet.page] == "MEDIA" and tablet.media.now_playing then
-            bridge.call("media_stop", {}, function(resp)
-                if resp.ok then tablet.media.now_playing = nil end
-            end)
+        elseif tablet.page == 1 or tablet.page == 5 then
+            toggle_pause()
         else
             request_status()
         end
         return true
-    elseif action == "x" and pages[tablet.page] == "MEDIA" then
-        bridge.call("media_stop", {}, function(resp)
-            if resp.ok then tablet.media.now_playing = nil end
-        end)
+    elseif action == "x" and (tablet.page == 1 or tablet.page == 5) then
+        stop_all_media()
         return true
     end
     return true
@@ -167,11 +245,12 @@ local function draw_overview(x, y, w, h, t)
     local right_w = w-left_w-10
     card(right_x, y, right_w, math.floor((h-10)/2), "NOW PLAYING", {0.44,0.73,0.98})
     love.graphics.setColor(0.90,0.93,0.98,1)
-    love.graphics.printf(tablet.media.now_playing or "Nothing is playing",
+    love.graphics.printf(current_media_label(),
         right_x+12, y+42, right_w-24, "left")
     love.graphics.setColor(0.56,0.65,0.74,1)
-    love.graphics.print(string.format("Volume  %s%%",
-        tostring(tablet.media.volume or 0)), right_x+12, y+72)
+    love.graphics.print(string.format("Volume  %s%%   %s",
+        tostring(tablet.media.volume or (tablet.radio or {}).volume or 0),
+        tablet.media.paused and "PAUSED" or (radio_playing() and tablet.radio.paused and "PAUSED" or "PLAYING")), right_x+12, y+72)
     card(right_x, y+math.floor((h-10)/2)+10, right_w,
         math.floor((h-10)/2), "DEVICE SNAPSHOT", {0.40,0.82,0.68})
     local sys = tablet.system or {}
@@ -229,10 +308,10 @@ local function rows_for_page()
         }
     elseif tablet.page == 5 then
         rows = {
-            {title="Now playing",detail=tostring(tablet.media.now_playing or "Nothing is playing")},
+            {title="Now playing",detail=current_media_label()},
             {title="Volume",detail=tostring(tablet.media.volume or 0).."%"},
             {title="Media library",detail=tostring(tablet.media.library_count or 0).." indexed items"},
-            {title="Playback control",detail="A / X stops the active player"},
+            {title="Playback control",detail="A pause/resume  ·  X stop all  ·  LEFT/RIGHT volume"},
         }
     else
         local history = require("core.notifications").items or {}
@@ -347,7 +426,7 @@ function tablet.draw()
     local count=jobs.total_running()
     local hint="M / B CLOSE     L1/R1 PANELS     UP/DOWN SCROLL"
     if tablet.page==2 then hint=hint.."     A DETAILS" end
-    if tablet.page==5 and tablet.media.now_playing then hint=hint.."     A STOP" end
+    if tablet.page==1 or tablet.page==5 then hint=hint.."     A PAUSE     X STOP     LEFT/RIGHT VOLUME" end
     love.graphics.setFont(love.graphics.newFont(9))
     love.graphics.setColor(0.50,0.62,0.72,1)
     love.graphics.print(hint,sx+12,sy+sh-18)
