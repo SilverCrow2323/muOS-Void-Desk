@@ -103,11 +103,13 @@ def bind_all():
 
 
 def main():
+    global STATUS_FILE
     if len(sys.argv) < 2 or sys.argv[1] not in ENVS:
         print("usage: env_install.py <icewm|lxde>", file=sys.stderr)
         return 2
     env_id = sys.argv[1]
     spec = ENVS[env_id]
+    STATUS_FILE = os.path.join(DATA, ".%s_install_state.json" % env_id)
     report(DATA, 1, "PRE-FLIGHT", "Checking the existing XFCE image",
            "This operation adds a desktop environment to the existing isolated image.",
            animation="loading")
