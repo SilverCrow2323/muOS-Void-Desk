@@ -217,7 +217,8 @@ def test_desktop_gamecontroller_events_use_standardized_button_order():
         SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, instance_id=4, button=10),
         SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, instance_id=4, button=11),
     ])
-    assert bridge.poll() == ["L1", "R1", "UP"]
+    assert bridge.poll() == ["L1", "R1"]
+    assert bridge.hat() == (0, 1)
 
 
 def test_gamecontroller_dpad_buttons_drive_hat_until_released():
