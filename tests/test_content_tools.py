@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import urllib.parse
 from pathlib import Path
 import pytest
 
@@ -216,7 +217,7 @@ def test_refresh_rss_all_category_samples_every_available_category(monkeypatch):
     expected = {feed["category"] for feed in tools.RSS_FEEDS}
     actual = {
         feed["category"] for feed in tools.RSS_FEEDS
-        if feed["url"] and __import__("urllib.parse").parse.urlparse(feed["url"]).hostname in requested
+        if feed["url"] and urllib.parse.urlparse(feed["url"]).hostname in requested
     }
     assert actual == expected
     assert len(requested) == len(expected)
