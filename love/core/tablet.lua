@@ -13,6 +13,12 @@ local tablet = {
     iptv = {},
 }
 local pages = {"OVERVIEW", "PROCESSES", "SYSTEM", "NETWORK", "MEDIA", "ACTIVITY"}
+local font_cache = {}
+
+local function get_font(size)
+    if not font_cache[size] then font_cache[size] = love.graphics.newFont(size) end
+    return font_cache[size]
+end
 
 local function request_status()
     bridge.call("system_status", {}, function(resp)
@@ -199,13 +205,13 @@ end
 local function value_line(x, y, w, label, value, accent)
     love.graphics.setColor(0.55, 0.63, 0.72, 1)
     love.graphics.print(label, x, y)
-    local f = love.graphics.newFont(13)
+    local f = get_font(13)
     love.graphics.setFont(f)
     local txt = tostring(value or "—")
     local tw = f:getWidth(txt)
     love.graphics.setColor(accent[1], accent[2], accent[3], 1)
     love.graphics.print(txt, x+w-tw, y)
-    love.graphics.setFont(love.graphics.newFont(11))
+    love.graphics.setFont(get_font(11))
 end
 
 local function draw_overview(x, y, w, h, t)
@@ -233,12 +239,12 @@ local function draw_overview(x, y, w, h, t)
     local angle = t*2.4
     love.graphics.setColor(0.76, 0.91, 1, 1)
     love.graphics.circle("fill", cx+math.cos(angle)*36, cy+math.sin(angle)*36, 4)
-    local f = love.graphics.newFont(25)
+    local f = get_font(25)
     love.graphics.setFont(f)
     local txt = tostring(count)
     love.graphics.setColor(accent[1], accent[2], accent[3], 1)
     love.graphics.print(txt, cx-f:getWidth(txt)/2, cy-19)
-    love.graphics.setFont(love.graphics.newFont(10))
+    love.graphics.setFont(get_font(10))
     love.graphics.setColor(0.68, 0.76, 0.84, 1)
     love.graphics.printf(count == 1 and "PROCESS" or "PROCESSES",
         x+8, y+158, left_w-16, "center")
@@ -346,10 +352,10 @@ local function draw_rows(x, y, w, h)
         love.graphics.rectangle("fill",x+4,yy+2,w-8,row_h-5,5)
         love.graphics.setColor(row.color and row.color[1] or 0.28,row.color and row.color[2] or 0.53,row.color and row.color[3] or 0.68,0.95)
         love.graphics.rectangle("fill",x+4,yy+2,3,row_h-5,2)
-        love.graphics.setFont(love.graphics.newFont(13))
+        love.graphics.setFont(get_font(13))
         love.graphics.setColor(0.91,0.94,0.98,1)
         love.graphics.print(tostring(row.title or ""):sub(1,72),x+16,yy+8)
-        love.graphics.setFont(love.graphics.newFont(10))
+        love.graphics.setFont(get_font(10))
         love.graphics.setColor(0.59,0.67,0.75,1)
         love.graphics.print(tostring(row.detail or ""):sub(1,100),x+16,yy+29)
     end
@@ -388,10 +394,10 @@ function tablet.draw()
     love.graphics.rectangle("fill",sx,sy,sw,sh,6)
     love.graphics.setColor(accent[1],accent[2],accent[3],0.35)
     love.graphics.rectangle("line",sx,sy,sw,sh,6)
-    love.graphics.setFont(love.graphics.newFont(14))
+    love.graphics.setFont(get_font(14))
     love.graphics.setColor(0.92,0.96,1,1)
     love.graphics.print("VOID DESK  //  SYSTEM TABLET",sx+13,sy+9)
-    love.graphics.setFont(love.graphics.newFont(10))
+    love.graphics.setFont(get_font(10))
     love.graphics.setColor(0.5,0.68,0.78,1)
     love.graphics.print(os.date("%H:%M  ·  %d %b"),sx+sw-115,sy+12)
 
@@ -406,7 +412,7 @@ function tablet.draw()
             love.graphics.setColor(accent[1],accent[2],accent[3],1)
             love.graphics.rectangle("fill",tx,tab_y+24,tab_w-3,3,1)
         end
-        love.graphics.setFont(love.graphics.newFont(9))
+        love.graphics.setFont(get_font(9))
         love.graphics.setColor(active and 0.92 or 0.54,active and 0.96 or 0.64,active and 1 or 0.72,1)
         love.graphics.printf(label,tx+2,tab_y+9,tab_w-7,"center")
     end
@@ -420,7 +426,7 @@ function tablet.draw()
         local rows=rows_for_page()
         local visible=math.max(1,math.floor((content_h-12)/54))
         if #rows>visible then
-            love.graphics.setFont(love.graphics.newFont(9))
+            love.graphics.setFont(get_font(9))
             love.graphics.setColor(0.50,0.62,0.72,1)
             love.graphics.print(string.format("SCROLL  %d-%d / %d",
                 tablet.scroll+1,math.min(#rows,tablet.scroll+visible),#rows),
@@ -432,7 +438,7 @@ function tablet.draw()
     local hint="M / B CLOSE     L1/R1 PANELS     UP/DOWN SCROLL"
     if tablet.page==2 then hint=hint.."     A DETAILS" end
     if tablet.page==1 or tablet.page==5 then hint=hint.."     A PAUSE     X STOP     LEFT/RIGHT VOLUME" end
-    love.graphics.setFont(love.graphics.newFont(9))
+    love.graphics.setFont(get_font(9))
     love.graphics.setColor(0.50,0.62,0.72,1)
     love.graphics.print(hint,sx+12,sy+sh-18)
     love.graphics.setColor(1,1,1,1)
