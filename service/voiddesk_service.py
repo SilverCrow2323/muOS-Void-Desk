@@ -2071,8 +2071,15 @@ def h_xfce_install(args):
     """Start the isolated XFCE bootstrap as a supervised LÖVE operation."""
     lock = DATA / ".xfce_install_running"
     if IS_DEVICE:
-        if (DATA / ".xfce_ready").exists():
+        ready_marker = DATA / ".xfce_ready"
+        desktop_image = DATA / "xfce.img"
+        if ready_marker.exists() and desktop_image.is_file() and desktop_image.stat().st_size > 3_000_000_000:
             return {"ok": True, "already": True, "note": "XFCE is already installed"}
+        if ready_marker.exists() and not desktop_image.exists():
+            try:
+                ready_marker.unlink()
+            except OSError:
+                pass
         if lock.exists():
             try:
                 pid = int(lock.read_text().strip())
