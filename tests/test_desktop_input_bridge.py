@@ -213,9 +213,9 @@ def test_desktop_gamecontroller_events_use_standardized_button_order():
     pygame = FakePygame()
     bridge = DesktopInputBridge(pygame)
     bridge.handle_events([
-        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, button=9),
-        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, button=10),
-        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, button=11),
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, instance_id=4, button=9),
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, instance_id=4, button=10),
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, instance_id=4, button=11),
     ])
     assert bridge.poll() == ["L1", "R1", "UP"]
 
