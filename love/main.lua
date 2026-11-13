@@ -129,10 +129,19 @@ function love.textinput(text)
     elseif not tablet.active and not jobs.overlay_open then sm.textinput(text) end
 end
 
+local function dispatch_control(action, source)
+    if not action then return end
+    if onboarding.active then
+        onboarding.handle_action(action, config)
+    else
+        input.press(action, source)
+    end
+end
+
 -- ─── GAMEPAD (named buttons, reliable) ────────────────────
 function love.gamepadpressed(joystick, button)
     local logical = input.GAMEPAD_NAMES[button]
-    if logical then input.press(logical, "gamepad:" .. button) end
+    dispatch_control(logical, "gamepad:" .. button)
 end
 
 -- ─── JOYSTICK (raw buttons, fallback for unmapped controllers) ──
@@ -140,7 +149,7 @@ function love.joystickpressed(joystick, button)
     -- If it IS a gamepad, gamepadpressed already fired: skip to avoid double
     if joystick:isGamepad() then return end
     local logical = input.JOYBTN_FALLBACK[button]
-    if logical then input.press(logical, "joybtn:" .. button)
+    if logical then dispatch_control(logical, "joybtn:" .. button)
     else
         if os.getenv("VOIDDESK_DEBUG_INPUT") == "1" then
             print("[input] unmapped joystick button: " .. tostring(button))
@@ -151,10 +160,10 @@ end
 -- ─── HAT (d-pad on most devices) ───────────────────────────
 function love.joystickhat(joystick, hat, direction)
     -- direction: "c" (center), "u","d","l","r","ru","rd","lu","ld"
-    if direction == "u" then input.press("up",    "hat:u")
-    elseif direction == "d" then input.press("down",  "hat:d")
-    elseif direction == "l" then input.press("left",  "hat:l")
-    elseif direction == "r" then input.press("right", "hat:r")
+    if direction == "u" then dispatch_control("up", "hat:u")
+    elseif direction == "d" then dispatch_control("down", "hat:d")
+    elseif direction == "l" then dispatch_control("left", "hat:l")
+    elseif direction == "r" then dispatch_control("right", "hat:r")
     end
     -- diagonal: fire the dominant axis only (menus don't like diagonals)
     -- ignored for now — user can navigate cleanly
@@ -174,10 +183,10 @@ function love.joystickaxis(joystick, axis, value)
 
     if dir == prev then return end
     if axis == 0 then
-        if dir ==  1 then input.press("right", "axis:x+")
-        elseif dir == -1 then input.press("left",  "axis:x-") end
+        if dir ==  1 then dispatch_control("right", "axis:x+")
+        elseif dir == -1 then dispatch_control("left",  "axis:x-") end
     elseif axis == 1 then
-        if dir == -1 then input.press("up",   "axis:y-")
-        elseif dir ==  1 then input.press("down", "axis:y+") end
+        if dir == -1 then dispatch_control("up",   "axis:y-")
+        elseif dir ==  1 then dispatch_control("down", "axis:y+") end
     end
 end
