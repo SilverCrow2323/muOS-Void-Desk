@@ -201,6 +201,8 @@ local function seed_global_overlay(target)
         jobs.poll_timer = 0
         jobs.POLL_INTERVAL = 10
     end
+    local notifications = package.loaded["core.notifications"]
+    if notifications then notifications.items = {} end
     if tablet then
         tablet.active = false
         tablet.slide = 0
@@ -256,6 +258,13 @@ local function seed_global_overlay(target)
         tablet.page = target.page or 1
         tablet.poll = 0
         tablet.scroll = 0
+        if target.page == 6 and notifications then
+            notifications.items = {
+                {title="Runtime package verified",body="AArch64 runtime checksum and metadata passed.",level="ok",ts=os.time()},
+                {title="Syncthing connected",body="2 devices online · 3 folders synchronized.",level="info",ts=os.time()-60},
+                {title="Storage warning",body="SD1 free space is below the 20 GB advisory target.",level="warn",ts=os.time()-180},
+            }
+        end
     elseif target.overlay == "operation" and jobs then
         local visual_job = {
             id = "visual-capture-operation",
