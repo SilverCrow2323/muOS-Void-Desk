@@ -1110,6 +1110,20 @@ def h_job_start(args):
             return {"ok": False, "error": "environment installer is missing"}
         progress_file = DATA / (".%s_install_state.json" % env_id)
         command = [sys.executable, str(script), env_id]
+    elif service_task == "desktop_maintenance":
+        action = str(args.get("action") or "")
+        env_id = str(args.get("id") or "")
+        if action not in ("uninstall", "updates") or env_id not in ENV_MARKERS:
+            return {"ok": False, "error": "unsupported desktop maintenance operation"}
+        if action == "uninstall" and not (DATA / ENV_MARKERS[env_id]).exists():
+            return {"ok": False, "error": "desktop environment is not installed"}
+        if action == "updates" and not (DATA / ENV_MARKERS[env_id]).exists():
+            return {"ok": False, "error": "install this desktop before checking for updates"}
+        script = APP_DIR / "bin" / "desktop_env_maintenance.py"
+        if not script.is_file():
+            return {"ok": False, "error": "desktop maintenance helper is missing"}
+        progress_file = DATA / (".%s_%s_state.json" % (env_id, action))
+        command = [sys.executable, str(script), action, env_id]
     elif tool_id:
         try:
             registry = json.loads(
@@ -1778,6 +1792,49 @@ def h_env_install(args):
             return {"ok": False, "error": "Cannot create operation lock: " + str(exc)}
     return result
 
+def _start_desktop_maintenance(env_id, action):
+    if env_id not in ENV_MARKERS or action not in ("uninstall", "updates"):
+        return {"ok": False, "error": "unsupported desktop maintenance operation"}
+    blocked = device_only("desktop_maintenance")
+    if blocked:
+        return blocked
+    marker = DATA / ENV_MARKERS[env_id]
+    if not marker.exists():
+        return {"ok": False, "error": ENV_NAMES[env_id] + " is not installed"}
+    name = ("Remove " if action == "uninstall" else "Check updates for ") + ENV_NAMES[env_id]
+    description = ("Remove the selected desktop environment." if action == "uninstall"
+                   else "Refresh package indexes and simulate available updates without installing them.")
+    reason = ("XFCE removal deletes the shared desktop image, including IceWM and LXDE if installed."
+              if action == "uninstall" and env_id == "xfce"
+              else "This operation is limited to the selected environment inside the isolated Ubuntu image.")
+    result = h_job_start({
+        "service_task": "desktop_maintenance",
+        "action": action,
+        "id": env_id,
+        "name": name,
+        "hub": "start-session",
+        "description": description,
+        "reason": reason,
+        "icon": "desktop",
+        "animation": "verify" if action == "updates" else "extract",
+        "can_background": True,
+    })
+    return result
+
+
+def h_env_uninstall(args):
+    env_id = str(args.get("id") or "")
+    if env_id not in ENV_MARKERS:
+        return {"ok": False, "error": "unknown desktop environment"}
+    return _start_desktop_maintenance(env_id, "uninstall")
+
+
+def h_env_update_check(args):
+    env_id = str(args.get("id") or "")
+    if env_id not in ENV_MARKERS:
+        return {"ok": False, "error": "unknown desktop environment"}
+    return _start_desktop_maintenance(env_id, "updates")
+
 def h_voidcast_launch(args):
     """Launch the bundled VoidCast IPTV app (outdesk/VoidCast). Same
     quit-and-handoff trick as session_launch, minus the install check —
@@ -2261,6 +2318,8 @@ HANDLERS = {
     "xfce_launch": h_xfce_launch,
     "apt_update": h_apt_update,
     "env_install": h_env_install,
+    "env_uninstall": h_env_uninstall,
+    "env_update_check": h_env_update_check,
     "voidcast_launch": h_voidcast_launch,
 }
 
