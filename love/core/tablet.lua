@@ -337,6 +337,154 @@ local function rows_for_page()
     return rows
 end
 
+local function draw_gauge(x, y, w, pct, accent)
+    pct = math.max(0, math.min(100, tonumber(pct) or 0))
+    love.graphics.setColor(0.025, 0.045, 0.065, 1)
+    love.graphics.rectangle("fill", x, y, w, 7, 4)
+    love.graphics.setColor(accent[1], accent[2], accent[3], 0.95)
+    love.graphics.rectangle("fill", x, y, w * pct / 100, 7, 4)
+end
+
+local function draw_system_page(x, y, w, h)
+    local s = tablet.system or {}
+    local ram = s.ram or {}
+    local disk = (s.disk or {})[1] or {}
+    local cyan = {0.30, 0.78, 0.96}
+    local violet = {0.65, 0.58, 0.98}
+    local green = {0.34, 0.86, 0.65}
+    local amber = {0.98, 0.72, 0.34}
+
+    -- Hardware identity is a single wide banner, not another generic status row.
+    card(x+4, y+2, w-8, 66, "DEVICE SNAPSHOT", cyan)
+    love.graphics.setFont(get_font(14))
+    love.graphics.setColor(0.94, 0.97, 1, 1)
+    love.graphics.print(tostring(s.model or s.device or s.hostname or "muOS handheld"), x+16, y+27)
+    love.graphics.setFont(get_font(9))
+    love.graphics.setColor(0.56, 0.71, 0.82, 1)
+    love.graphics.printf(
+        tostring(s.kernel or "Kernel unavailable") .. "   ·   UPTIME " ..
+        tostring(s.uptime or s.uptime_s or "—"),
+        x+16, y+48, w-32, "left"
+    )
+
+    local gap, card_w, card_h = 8, (w-20)/2, 91
+    local left, right = x+4, x+4+(w-20)/2+8
+    local top, bottom = y+76, y+174
+
+    -- Memory and storage each have their own gauge and scale.
+    card(left, top, card_w, card_h, "MEMORY PRESSURE", violet)
+    local ram_pct = tonumber(ram.pct) or 0
+    love.graphics.setFont(get_font(21))
+    love.graphics.setColor(0.94, 0.96, 1, 1)
+    love.graphics.print(string.format("%.0f%%", ram_pct), left+12, top+29)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.57, 0.68, 0.79, 1)
+    love.graphics.print(
+        string.format("%s / %s MB", tostring(ram.used_mb or "—"), tostring(ram.total_mb or "—")),
+        left+76, top+39
+    )
+    draw_gauge(left+12, top+66, card_w-24, ram_pct, violet)
+
+    card(right, top, card_w, card_h, "STORAGE VOLUME", green)
+    local free, total = tonumber(disk.free_gb), tonumber(disk.total_gb)
+    local free_pct = (free and total and total > 0) and free/total*100 or 0
+    love.graphics.setFont(get_font(20))
+    love.graphics.setColor(0.94, 0.96, 1, 1)
+    love.graphics.print(free and string.format("%.1f GB", free) or "—", right+12, top+29)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.57, 0.68, 0.79, 1)
+    love.graphics.print(total and string.format("of %.1f GB free", total) or "Capacity unavailable", right+12, top+51)
+    draw_gauge(right+12, top+66, card_w-24, free_pct, green)
+
+    card(left, bottom, card_w, card_h, "CPU TELEMETRY", amber)
+    local cpu = tonumber(s.cpu_pct or s.cpu_usage_pct)
+    love.graphics.setFont(get_font(16))
+    love.graphics.setColor(0.94, 0.96, 1, 1)
+    love.graphics.print(cpu and string.format("%.1f%%", cpu) or "LIVE MONITOR", left+12, bottom+31)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.59, 0.68, 0.78, 1)
+    love.graphics.printf(
+        cpu and "Current processor utilization" or "Open VOID MONITOR for live CPU samples",
+        left+12, bottom+58, card_w-24, "left"
+    )
+
+    card(right, bottom, card_w, card_h, "SESSION PROFILE", cyan)
+    love.graphics.setFont(get_font(13))
+    love.graphics.setColor(0.94, 0.96, 1, 1)
+    love.graphics.print(tostring(s.hostname or s.device_name or "HANDHELD"), right+12, bottom+31)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.59, 0.68, 0.78, 1)
+    love.graphics.printf("SYSTEM STATUS  ·  " .. tostring(s.status or "ONLINE"), right+12, bottom+58, card_w-24, "left")
+end
+
+local function draw_network_page(x, y, w, h)
+    local n = tablet.network or {}
+    local wifi = n.wifi or {}
+    local bt = n.bt or {}
+    local hot = n.hotspot or {}
+    local accent = {0.30, 0.82, 0.95}
+    local blue = {0.43, 0.67, 1.00}
+    local orange = {1.00, 0.59, 0.31}
+    local green = {0.34, 0.86, 0.65}
+    local connected = wifi.connected == true
+    local half = (w-20)/2
+
+    -- Wi-Fi gets a network hero with addressing information and explicit state.
+    card(x+4, y+2, w-8, 111, "WIRELESS UPLINK", accent)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.58, 0.72, 0.82, 1)
+    love.graphics.print("WI-FI CONNECTION", x+16, y+29)
+    love.graphics.setFont(get_font(17))
+    love.graphics.setColor(0.94, 0.97, 1, 1)
+    love.graphics.print(tostring(wifi.ssid or "No network selected"), x+16, y+43)
+    love.graphics.setColor(connected and green[1] or 1, connected and green[2] or 0.40,
+        connected and green[3] or 0.38, 1)
+    love.graphics.circle("fill", x+w-31, y+56, 5)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(connected and green[1] or 1, connected and green[2] or 0.40,
+        connected and green[3] or 0.38, 1)
+    love.graphics.printf(connected and "CONNECTED" or "OFFLINE", x+w-116, y+51, 72, "right")
+
+    love.graphics.setColor(0.20, 0.36, 0.47, 0.70)
+    love.graphics.line(x+16, y+76, x+w-16, y+76)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.54, 0.66, 0.77, 1)
+    love.graphics.print("IP ADDRESS", x+16, y+84)
+    love.graphics.print("DEFAULT GATEWAY", x+w*0.54, y+84)
+    love.graphics.setFont(get_font(10))
+    love.graphics.setColor(0.91, 0.95, 0.99, 1)
+    love.graphics.print(tostring(wifi.ip or "—"), x+16, y+97)
+    love.graphics.print(tostring((n.info or {}).gateway or "—"), x+w*0.54, y+97)
+
+    -- Bluetooth and hotspot are independent service cards with their own status lights.
+    local row_y = y+123
+    card(x+4, row_y, half, 91, "BLUETOOTH RADIO", blue)
+    love.graphics.setColor(bt.on and green[1] or 1, bt.on and green[2] or 0.40,
+        bt.on and green[3] or 0.38, 1)
+    love.graphics.circle("fill", x+20, row_y+39, 4)
+    love.graphics.setFont(get_font(13))
+    love.graphics.setColor(0.94, 0.97, 1, 1)
+    love.graphics.print(bt.on and "ENABLED" or "DISABLED", x+32, row_y+32)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.57, 0.69, 0.80, 1)
+    love.graphics.print(tostring(bt.count or 0) .. " paired devices", x+14, row_y+61)
+
+    card(x+4+half+8, row_y, half, 91, "PERSONAL HOTSPOT", orange)
+    love.graphics.setColor(hot.on and green[1] or 0.56, hot.on and green[2] or 0.63,
+        hot.on and green[3] or 0.73, 1)
+    love.graphics.circle("fill", x+4+half+24, row_y+39, 4)
+    love.graphics.setFont(get_font(13))
+    love.graphics.setColor(0.94, 0.97, 1, 1)
+    love.graphics.print(hot.on and "BROADCASTING" or "INACTIVE", x+4+half+36, row_y+32)
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.57, 0.69, 0.80, 1)
+    love.graphics.print(tostring(hot.ssid or "No access point active"), x+4+half+14, row_y+61)
+
+    love.graphics.setFont(get_font(8))
+    love.graphics.setColor(0.50, 0.66, 0.78, 1)
+    love.graphics.printf("NETWORK SERVICES  /  WI-FI  ·  BLUETOOTH  ·  HOTSPOT", x+8, row_y+99, w-16, "center")
+end
+
 local function draw_rows(x, y, w, h)
     local rows = rows_for_page()
     local row_h = 54
@@ -423,6 +571,10 @@ function tablet.draw()
     local content_h=sh-(content_y-sy)-48
     if tablet.page==1 then
         draw_overview(sx+10,content_y,sw-20,content_h,t)
+    elseif tablet.page==3 then
+        draw_system_page(sx+10,content_y,sw-20,content_h)
+    elseif tablet.page==4 then
+        draw_network_page(sx+10,content_y,sw-20,content_h)
     else
         draw_rows(sx+10,content_y,sw-20,content_h)
         local rows=rows_for_page()
