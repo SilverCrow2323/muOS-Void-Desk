@@ -145,7 +145,7 @@ local function draw_logo(W, H, progress, target)
     love.graphics.rectangle("fill", px + pw - 22, py + 15, 1, ph - 30)
 
     local small = font.regular(12)
-    local brand = "SPDW FACTORY  //  QWASAR ENV"
+    local brand = "SPDW FACTORY  //  QWASAR ENVIRONMENT"
     font.print_shadow(brand, px + pw - 24 - small:getWidth(brand), py + 18,
                       small, HOT, { 0, 0, 0, 0.7 })
 
