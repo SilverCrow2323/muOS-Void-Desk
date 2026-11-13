@@ -122,7 +122,8 @@ function love.keypressed(key, sc, isrepeat)
 end
 
 function love.textinput(text)
-    if onboarding.active then onboarding.textinput(text, config) end
+    if onboarding.active then onboarding.textinput(text, config)
+    else sm.textinput(text) end
 end
 
 -- ─── GAMEPAD (named buttons, reliable) ────────────────────
