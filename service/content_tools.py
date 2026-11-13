@@ -7,7 +7,6 @@ from html.parser import HTMLParser
 import json
 import re
 import socket
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -85,9 +84,13 @@ def _tag(element, name):
 
 
 def _entry_link(entry):
-    link = _tag(entry, "link")
-    if link is None:
+    links = [node for node in list(entry)
+             if node.tag.rsplit("}", 1)[-1].lower() == "link"]
+    if not links:
         return ""
+    link = next((node for node in links
+                 if node.attrib.get("rel", "alternate").lower() == "alternate"),
+                links[0])
     value = link.attrib.get("href") or (link.text or "").strip()
     parsed = urllib.parse.urlparse(value)
     if parsed.scheme not in ("https", "http") or not parsed.hostname:
