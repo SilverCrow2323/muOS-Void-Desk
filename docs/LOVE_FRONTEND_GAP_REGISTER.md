@@ -8,7 +8,7 @@
 
 - 10 visible NEXUS destinations: START SESSION, THE FORGE, UPLINK, MEDIA VAULT, WORKSHOP, TOOLBOX, MUOS APPS, SETTINGS, INFO and END NODE.
 - 5 additional NEXUS entries are currently hidden: GAMES, DEVELOP, COMMUNITY, OUTERDESK and LEGACY.
-- The automated LÖVE capture batch enumerates 26 scenes, including the new Notes workspace. A capture proves scene entry/rendering, not full interaction.
+- The automated LÖVE capture batch enumerates 28 scenes, including Notes, Void Radio and Media Library. A capture proves scene entry/rendering, not full interaction.
 - Global tests check scene-route resolution, visible NEXUS destination resolution and registration of bridge commands used by LÖVE.
 - Row-level action tests currently concentrate on Session, Forge, Workshop, Toolbox and MUOS APPS.
 
