@@ -17,7 +17,7 @@ local ABERR_LABEL = { [0] = "OFF", [1] = "LOW", [2] = "MED" }
 return dashboard.new({
     title = "DISPLAY FX",
     node_idx = 7,
-    widget_height = 120,
+    widget_height = 104,
     status = "CRT post-process",
 
     widgets_draw = function(scene, alpha)
