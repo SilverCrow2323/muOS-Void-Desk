@@ -295,10 +295,12 @@ end
 local function move_vertical(direction)
     local target = state.cursor_line + direction
     if target < 1 or target > #state.lines then return end
+    local preferred = state.preferred_col
     state.cursor_line = target
     state.cursor_col = byte_after_chars(state.lines[target],
-        math.max(0, state.preferred_col - 1))
+        math.max(0, preferred - 1))
     clamp_cursor()
+    state.preferred_col = preferred
     ensure_cursor_visible()
 end
 
