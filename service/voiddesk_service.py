@@ -1014,7 +1014,6 @@ def _job_refresh(job):
     if job["status"] == "running" and process is not None:
         code = process.poll()
         if code is not None:
-            state_status = job.get("status_file_status")
             job["status"] = "done" if code == 0 else "error"
             job["progress"] = 100 if code == 0 else job.get("progress", 0)
             job["severity"] = "success" if code == 0 else "error"
@@ -1720,40 +1719,58 @@ def h_session_launch(args):
     return h_xfce_launch(args)
 
 def h_env_install(args):
-    """Install icewm or lxde into the existing XFCE chroot (device only —
-    there's no PC-side equivalent, those run XFCE itself via apt/Xephyr)."""
+    """Install an allowlisted additional desktop inside the XFCE image."""
     env_id = args.get("id")
     if env_id not in ("icewm", "lxde"):
-        return {"ok": False, "error": f"unknown env: {env_id}"}
-    dcheck = device_only("env_install")
-    if dcheck:
-        return dcheck
+        return {"ok": False, "error": "unknown desktop environment"}
+    blocked = device_only("env_install")
+    if blocked:
+        return blocked
     if not (DATA / ".xfce_ready").exists():
-        return {"ok": False, "error": "install XFCE first — this adds onto it"}
+        return {"ok": False, "error": "Install XFCE before adding another desktop"}
     marker = DATA / ENV_MARKERS[env_id]
     if marker.exists():
-        return {"ok": True, "already": True,
-                "note": f"{ENV_NAMES[env_id]} already installed"}
-    lock = DATA / f".{env_id}_install_running"
+        return {"ok": True, "already": True, "note": ENV_NAMES[env_id] + " is already installed"}
+    lock = DATA / (".%s_install_running" % env_id)
     if lock.exists():
         try:
-            os.kill(int(lock.read_text().strip()), 0)
-            return {"ok": True, "note": "install already running in background"}
-        except Exception:
-            try: lock.unlink()
-            except OSError: pass
-    try:
-        log_path = DATA / f"{env_id}_install.log"
-        with open(log_path, "ab") as lf:
-            proc = subprocess.Popen(
-                [sys.executable, str(APP_DIR / "bin" / "env_install.py"), env_id],
-                stdout=lf, stderr=lf, start_new_session=True)
-        lock.write_text(str(proc.pid))
-        return {"ok": True,
-                "note": f"installing {ENV_NAMES[env_id]} in background — "
-                        f"progress in data/{env_id}_install.log"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+            pid = int(lock.read_text().strip())
+            os.kill(pid, 0)
+            for job in _JOBS.values():
+                process = job.get("process")
+                if process is not None and process.pid == pid:
+                    return {"ok": True, "job": _job_public(job), "already": True}
+            return {"ok": False, "error": "An existing desktop installation is still running"}
+        except (ValueError, ProcessLookupError, PermissionError, OSError):
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+    result = h_job_start({
+        "service_task": "env_install",
+        "id": env_id,
+        "name": "Install " + ENV_NAMES[env_id],
+        "hub": "start-session",
+        "description": "Install " + ENV_NAMES[env_id] + " into the existing XFCE image.",
+        "reason": "Additional window managers share the XFCE root filesystem and require XFCE to be installed first.",
+        "icon": "desktop",
+        "animation": "install",
+        "can_background": True,
+    })
+    if not result.get("ok"):
+        return result
+    job = _JOBS.get(str(result["job"]["id"]))
+    if job and job.get("process"):
+        try:
+            lock.write_text(str(job["process"].pid), encoding="utf-8")
+            job["lock_path"] = lock
+        except OSError as exc:
+            try:
+                os.killpg(job["process"].pid, signal.SIGTERM)
+            except OSError:
+                pass
+            return {"ok": False, "error": "Cannot create operation lock: " + str(exc)}
+    return result
 
 def h_voidcast_launch(args):
     """Launch the bundled VoidCast IPTV app (outdesk/VoidCast). Same
@@ -1801,39 +1818,51 @@ def h_apt_update(args):
         return {"ok": False, "error": str(e)}
 
 def h_xfce_install(args):
-    """Install XFCE:
-       - on device: kicks off bin/xfce_bootstrap.py in the background
-         (a real 10-20 min install needing network + ~5GB free) instead
-         of the previous stub that always reported fake success without
-         installing anything.
-       - on PC: apt install xfce4 + Xephyr via pkexec (GUI prompt),
-         also backgrounded so a long install can't block the whole
-         service (and therefore every other status query) for minutes."""
+    """Start the isolated XFCE bootstrap as a supervised LÖVE operation."""
     lock = DATA / ".xfce_install_running"
     if IS_DEVICE:
         if (DATA / ".xfce_ready").exists():
-            return {"ok": True, "already": True, "note": "XFCE already installed"}
+            return {"ok": True, "already": True, "note": "XFCE is already installed"}
         if lock.exists():
             try:
-                os.kill(int(lock.read_text().strip()), 0)
-                return {"ok": True, "note": "install already running in background"}
-            except Exception:
-                try: lock.unlink()
-                except OSError: pass
-        try:
-            log_path = DATA / "xfce_bootstrap.log"
-            with open(log_path, "ab") as lf:
-                proc = subprocess.Popen(
-                    [sys.executable, str(APP_DIR / "bin" / "xfce_bootstrap.py")],
-                    stdout=lf, stderr=lf, start_new_session=True)
-            lock.write_text(str(proc.pid))
-            return {"ok": True,
-                    "note": "install started in background (10-20 min) — "
-                            "progress in data/xfce_bootstrap.log"}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
+                pid = int(lock.read_text().strip())
+                os.kill(pid, 0)
+                for job in _JOBS.values():
+                    process = job.get("process")
+                    if process is not None and process.pid == pid:
+                        return {"ok": True, "job": _job_public(job), "already": True}
+                return {"ok": False, "error": "An existing XFCE operation is still running; restart Void Desk before starting another."}
+            except (ValueError, ProcessLookupError, PermissionError, OSError):
+                try:
+                    lock.unlink()
+                except OSError:
+                    pass
+        result = h_job_start({
+            "service_task": "xfce_bootstrap",
+            "name": "Install XFCE",
+            "hub": "start-session",
+            "description": "Prepare the isolated Ubuntu 24.04 / XFCE desktop image.",
+            "reason": "XFCE requires at least 5 GB free for a fresh image (1 GB when reusing an existing image), a working network and about 10–20 minutes.",
+            "icon": "desktop",
+            "animation": "extract",
+            "can_background": True,
+        })
+        if not result.get("ok"):
+            return result
+        job = _JOBS.get(str(result["job"]["id"]))
+        if job and job.get("process"):
+            try:
+                lock.write_text(str(job["process"].pid), encoding="utf-8")
+                job["lock_path"] = lock
+            except OSError as exc:
+                try:
+                    os.killpg(job["process"].pid, signal.SIGTERM)
+                except OSError:
+                    pass
+                return {"ok": False, "error": "Cannot create XFCE operation lock: " + str(exc)}
+        return result
     if shutil.which("startxfce4"):
-        return {"ok": True, "already": True, "note": "XFCE already installed"}
+        return {"ok": True, "already": True, "note": "XFCE is already installed"}
     try:
         log_path = DATA / "xfce_pc_install.log"
         with open(log_path, "ab") as lf:
@@ -1841,12 +1870,11 @@ def h_xfce_install(args):
                 ["pkexec", "apt-get", "install", "-y", "--no-install-recommends",
                  "xfce4", "xfce4-terminal", "xserver-xephyr"],
                 stdout=lf, stderr=lf, start_new_session=True)
-        return {"ok": True, "note": "install started in background — "
-                                    "check data/xfce_pc_install.log"}
+        return {"ok": True, "note": "PC XFCE installation started"}
     except FileNotFoundError:
-        return {"ok": False, "error": "pkexec missing — install polkit (sudo apt install pkexec)"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": "pkexec is missing; install polkit on the PC"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 # Track XFCE/Xephyr subprocesses so we can clean up on exit
 import atexit
