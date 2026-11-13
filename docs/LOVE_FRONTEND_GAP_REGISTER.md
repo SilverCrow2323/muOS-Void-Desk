@@ -1,14 +1,14 @@
 # Void Desk LÖVE Frontend — Gap Register
 
 **Scope:** current LÖVE frontend in `love/`, local service in `service/voiddesk_service.py`, and muOS launcher hand-off.
-**Baseline:** `fix/love-experience-overhaul` (draft PR work, November 13, 2026). CI #824 passed on `a8a5fbcc` for Python (263 tests), packaging, Lua/LÖVE, 37 scene captures, Rt:Tailscale-M AArch64 and QEMU (21/21 checks).
+**Baseline:** `fix/love-experience-overhaul` (draft PR work, November 13, 2026). CI #830 passed on `6202e27f` (November 13, 2026): Python 266 tests, repository audit/lint, `.muxapp/.deb`, Lua/LÖVE, 37 scene captures (37/37 visually distinct), Rt:Tailscale-M AArch64 and QEMU (21 passed, 0 failed).
 **Evidence rule:** source checks and automated screenshots are not hardware certification. Status below distinguishes implemented code from device validation.
 
 ## Current shape
 
 - 10 visible NEXUS destinations: START SESSION, THE FORGE, UPLINK, MEDIA VAULT, WORKSHOP, TOOLBOX, MUOS APPS, SETTINGS, INFO and END NODE.
 - 5 additional NEXUS entries are currently hidden: GAMES, DEVELOP, COMMUNITY, OUTERDESK and LEGACY.
-- The automated LÖVE capture batch enumerates 37 scenes, including Notes, Signal/RSS, Weather, Void Radio, Media Library, all six System Tablet pages and the operation overlay. CI #824 captured 37/37 scenes with zero failures and 35/37 visually distinct 32×24 samples. The runner bypasses onboarding only in isolated capture mode and compares decoded pixels to reject near-identical frames. The #824 artefact was inspected as a contact sheet and at full size: NEXUS, Start Session, Notes, RSS, Weather, six Tablet pages and the operation overlay. RSS, Weather, Notes and Activity use explicitly labelled local demo fixtures in capture mode only; no network fetch or persistent write is performed. Similar pairs remain distinct on full-size review. This verifies rendering, not full interaction or handheld controller behaviour.
+- The automated LÖVE capture batch enumerates 37 scenes, including Notes, Signal/RSS, Weather, Void Radio, Media Library, all six System Tablet pages and the operation overlay. CI #830 captured 37/37 scenes with zero failures and verified 37/37 visually distinct 32×24 samples. The runner bypasses onboarding only in isolated capture mode and compares decoded pixels to reject near-identical frames. The #824 artefact was inspected as a contact sheet and at full size: NEXUS, Start Session, Notes, RSS, Weather, six Tablet pages and the operation overlay. RSS, Weather, Notes and Activity use explicitly labelled local demo fixtures in capture mode only; no network fetch or persistent write is performed. Similar pairs remain distinct on full-size review. This verifies rendering, not full interaction or handheld controller behaviour.
 - Global tests check scene-route resolution, visible NEXUS destination resolution and registration of bridge commands used by LÖVE.
 - Row-level action tests currently concentrate on Session, Forge, Workshop, Toolbox and MUOS APPS.
 
@@ -19,7 +19,7 @@
 | START SESSION | Dedicated XFCE, IceWM and LXDE cards; supervised install; update checks; confirmed environment removal; launch hand-off | LÖVE cards, service handlers and job overlay are implemented. XFCE removal clearly warns that shared IceWM/LXDE content is also removed | Test free-space failure, install, update simulation, remove, launch, display release, return and cleanup on RG35XX-H |
 | THE FORGE | APT manager, XFCE install/launch, package jobs, shell, release lookup | Scene routes exist; bridge calls are registered; CI audits Forge actions | Exercise package operations inside the optional Debian/Ubuntu image; never on muOS host |
 | UPLINK | Network status, Tailscale, Syncthing and related connectivity panels | Scene family exists and is included in capture | Audit every selectable action and test daemon ownership, credentials, offline/error states on device |
-| MEDIA VAULT | IPTV, Void Radio and local media library | IPTV/Radio and local media service handlers exist. System Tablet can pause, resume, stop and adjust volume for local MPV, radio and IPTV streams | Test player IPC, audio routing, video hand-off, dependency errors and shutdown on hardware; finish media library browsing states |
+| MEDIA VAULT | IPTV, Void Radio and local media library | Radio Browser search/filter/favourites/playback handlers exist; local Media Library browses fixed SD roots with audio/video allowlists, skips symlinks, rejects external paths and launches MPV. Tablet can pause, resume, stop and adjust volume | Finish search and queue/playlist UX; validate empty/error/loading states, player IPC, audio routing, video hand-off and shutdown on hardware |
 | WORKSHOP | Diagnostics, monitor, APT maintenance and jobs/logs | Routes to Diagnostics, Monitor and APT tabs resolve; scene captures exist | Validate polling remains non-blocking; exercise jobs, cancellation, logs and low-storage cases |
 | TOOLBOX | Calculator, clock, calendar, PTY shell, Python REPL, File-GD X, System Monitor, Diagnostics, Notes, persistent VOID Edit, RSS, Weather, Syncthing/Tailscale/Uplink shortcuts, muOS Apps, Media Vault and external tools | Notes has bounded local CRUD; VOID Edit reads/writes allowlisted files in data/Texts with 128 KB cap, symlink/path protection, atomic save and controller OSK; RSS and Weather use supervised refresh jobs and bounded HTTPS/cache adapters; Python REPL uses supervised PTY | Verify first-run controller input, Notes/VOID Edit save/reopen/delete, RSS and Weather offline/refresh behavior, REPL, File-GD X and all cross-hub shortcuts on RG35XX-H; implement secure FTP/SFTP parity |
 | MUOS APPS | Discover applications on supported SD1/SD2 roots and hand off to selected app | Service handlers and dynamic list are present; launcher validates paths in static tests | Test on muOS hardware with real SD1/SD2 layouts, malformed entries and app exit |
@@ -61,10 +61,10 @@ These entries exist in the NEXUS catalogue but are hidden and must not be advert
 
 ### L1 — MEDIA VAULT
 
-1. Implement Void Radio with a bounded station catalogue, explicit player dependency checks, play/stop/status and clear error states.
-2. Implement Media Library using fixed, validated media roots and a bounded extension allowlist; never accept arbitrary filesystem paths from the frontend.
+1. Void Radio is implemented with Radio Browser search, category/country filters, persistent favourites, playback and pause/volume/stop controls; finish network-error and device interaction validation.
+2. Media Library already uses fixed `/mnt/mmc` and `/mnt/sdcard` roots, an audio/video extension allowlist, path/symlink guards and MPV playback. Complete local search plus queue/playlist controls and the remaining controller-driven browse/play states.
 3. Keep IPTV as its own scene and preserve its existing playlist/EPG/favourites flow.
-4. Add service tests, Lua interaction tests where practical, and capture states for empty, loading, playing and unavailable cases.
+4. Extend service and scene tests for empty roots, missing mounts, media errors, queue operations and audio/video hand-off.
 
 ### L2 — finish each visible hub
 
@@ -92,6 +92,6 @@ LÖVE is release-ready only when all of the following are true:
 - Every visible row has a working destination or an explicit unavailable state; no "soon" placeholder remains.
 - Every bridge command is registered, typed, bounded and covered by a service test.
 - All destructive or privileged actions have confirmation and honest result reporting.
-- Automated route/action tests and all 25 scene captures pass.
+- Automated route/action tests and all 37 scene captures pass.
 - The complete controller-driven journeys pass on real RG35XX-H hardware.
 - The package keeps Pygame as the reference frontend and treats LÖVE as selectable only after parity for the declared release scope is demonstrated.
