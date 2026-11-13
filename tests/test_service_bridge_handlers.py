@@ -282,9 +282,9 @@ def test_media_play_uses_argument_list_and_selects_audio_mode(tmp_path, monkeypa
     monkeypatch.setattr(service.subprocess, "Popen", fake_popen)
     result = service.h_media_play({"path": str(track)})
     assert result["ok"] is True
-    assert spawned["args"] == [
-        "/usr/bin/mpv", "--no-terminal", "--no-video", str(track)
-    ]
+    assert spawned["args"][:2] == ["/usr/bin/mpv", "--no-terminal"]
+    assert spawned["args"][2].startswith("--input-ipc-server=")
+    assert spawned["args"][3:] == ["--no-video", str(track)]
     assert "shell" not in spawned["kwargs"]
 
 
@@ -313,6 +313,8 @@ def test_media_play_uses_video_window_for_video_files(tmp_path, monkeypatch):
     )
     result = service.h_media_play({"path": str(video)})
     assert result["ok"] is True
+    assert spawned["args"][:2] == ["/usr/bin/mpv", "--no-terminal"]
+    assert spawned["args"][2].startswith("--input-ipc-server=")
     assert "--force-window=yes" in spawned["args"]
     assert "--no-video" not in spawned["args"]
 
