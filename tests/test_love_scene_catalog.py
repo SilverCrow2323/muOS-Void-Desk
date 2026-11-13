@@ -249,3 +249,20 @@ def test_visual_capture_includes_all_system_tablet_pages_and_operation_overlay()
     assert "jobs.POLL_INTERVAL = 10" in capture
     assert "VISUAL FIXTURE" in capture
     assert "DEMO AUDIO" in capture
+
+
+
+def test_visual_capture_scenes_use_explicit_local_demo_fixtures():
+    rss = (LOVE / "scenes" / "hub_rss.lua").read_text(encoding="utf-8")
+    weather = (LOVE / "scenes" / "hub_weather.lua").read_text(encoding="utf-8")
+    notes = (LOVE / "scenes" / "hub_notes.lua").read_text(encoding="utf-8")
+    capture = (LOVE / "core" / "visual_capture.lua").read_text(encoding="utf-8")
+    for source in (rss, weather, notes):
+        assert 'os.getenv("VOIDDESK_CAPTURE_ALL") == "1"' in source
+        assert "VISUAL FIXTURE" in source or "VISUAL FIXTURE" in source.upper()
+    assert "DEMO HEADLINES" in rss
+    assert "DEMO FORECAST" in weather
+    assert "DEMO NOTES" in notes
+    assert "notifications.items = {" in capture
+    assert "Runtime package verified" in capture
+    assert "Storage warning" in capture
