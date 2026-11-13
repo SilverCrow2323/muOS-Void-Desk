@@ -1278,7 +1278,7 @@ MEDIA_AUDIO_EXTS = {".mp3", ".ogg", ".oga", ".opus", ".flac", ".wav", ".m4a", ".
 MEDIA_VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v"}
 _MEDIA_PLAYER_PROC = None
 _MEDIA_NOW_PLAYING = ""
-_MEDIA_PLAYER_SOCKET = DATA / ".love_media.sock"
+_MEDIA_PLAYER_SOCKET = Path(os.environ.get("TMPDIR") or "/tmp") / ("voiddesk-mpv-%s.sock" % os.getpid())
 
 
 def _media_resolve(candidate):
