@@ -19,7 +19,7 @@
 | START SESSION | XFCE/IceWM install and launch; boot animation; session hand-off | Scene and service routes exist; launcher hand-off is covered by static tests | Test install, launch, display release, return and cleanup on RG35XX-H |
 | THE FORGE | APT manager, XFCE install/launch, package jobs, shell, release lookup | Scene routes exist; bridge calls are registered; CI audits Forge actions | Exercise package operations inside the optional Debian/Ubuntu image; never on muOS host |
 | UPLINK | Network status, Tailscale, Syncthing and related connectivity panels | Scene family exists and is included in capture | Audit every selectable action and test daemon ownership, credentials, offline/error states on device |
-| MEDIA VAULT | IPTV, external BGM normalizer, radio and local library entries | IPTV and external-tool routes exist; Radio and Media Library are placeholders | Implement Radio and Library or hide them with explicit unavailable state; test media dependencies and playback lifecycle |
+| MEDIA VAULT | IPTV, external BGM normalizer, Void Radio and Media Library | Radio and Media Library scenes call the registered mainline service handlers; service tests cover catalogue, playback requests, fixed roots, extension allowlists and path/symlink rejection | Run scene/bridge end-to-end checks and validate mpv, radio network, audio/video start-stop and controller flow on H700; keep the existing single IPTV route |
 | WORKSHOP | Diagnostics, monitor, APT maintenance and jobs/logs | Routes to Diagnostics, Monitor and APT tabs resolve; scene captures exist | Validate polling remains non-blocking; exercise jobs, cancellation, logs and low-storage cases |
 | TOOLBOX | Calculator, clock, editor and file/tool entries | Calculator and clock routes are asserted; scene exists | Audit all remaining rows and keyboard/controller editing behaviour |
 | MUOS APPS | Discover applications on supported SD1/SD2 roots and hand off to selected app | Service handlers and dynamic list are present; launcher validates paths in static tests | Test on muOS hardware with real SD1/SD2 layouts, malformed entries and app exit |
@@ -48,8 +48,8 @@ These entries exist in the NEXUS catalogue but are hidden and must not be advert
 
 ### L1 — MEDIA VAULT
 
-1. Implement Void Radio with a bounded station catalogue, explicit player dependency checks, play/stop/status and clear error states.
-2. Implement Media Library using fixed, validated media roots and a bounded extension allowlist; never accept arbitrary filesystem paths from the frontend.
+1. Validate the existing Void Radio scene against the mainline `radio_search`, `radio_favorites`, `radio_favorite_toggle`, `radio_play`, `radio_action` and `radio_status` handlers; verify network errors, player availability, volume and stop behaviour on device.
+2. Validate the existing Media Library scene against `media_list`, `media_play` and `media_stop`; retain fixed media roots, extension allowlists and symlink/path-traversal rejection, then test audio/video playback lifecycle with `mpv` on device.
 3. Keep IPTV as its own scene and preserve its existing playlist/EPG/favourites flow.
 4. Add service tests, Lua interaction tests where practical, and capture states for empty, loading, playing and unavailable cases.
 
