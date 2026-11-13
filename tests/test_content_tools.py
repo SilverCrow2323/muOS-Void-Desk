@@ -148,5 +148,5 @@ def test_service_content_cache_and_job_allowlists(tmp_path, monkeypatch):
         "service_task": "rss_refresh", "category": "malware",
     })["ok"] is False
     assert service.h_job_start({
-        "service_task": "weather_refresh", "city": "../unsafe",
-    })["ok"] is True or True
+        "service_task": "weather_refresh", "city": "",
+    })["ok"] is False
