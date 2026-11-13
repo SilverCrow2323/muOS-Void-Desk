@@ -570,6 +570,18 @@ def action(action_name: str, value: int | None = None) -> dict:
                     if response.get("request_id") == 1:
                         if response.get("error") != "success":
                             return {"ok": False, "error": "MPV rejected IPTV control"}
+                        if action_name == "toggle_pause":
+                            client.sendall((json.dumps({
+                                "command": ["get_property", "pause"], "request_id": 2,
+                            }) + "\\n").encode("utf-8"))
+                            followup = client.recv(2048).decode("utf-8", "replace")
+                            for follow_line in followup.splitlines():
+                                try:
+                                    follow = json.loads(follow_line)
+                                except (ValueError, TypeError):
+                                    continue
+                                if follow.get("request_id") == 2:
+                                    return {"ok": True, "data": follow.get("data")}
                         return {"ok": True, "data": response.get("data"),
                                 "volume": value if action_name == "volume" else None}
     except (OSError, ValueError, TimeoutError):
