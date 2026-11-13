@@ -1334,7 +1334,8 @@ def h_job_start(args):
     if service_task in ("rss_refresh", "weather_refresh"):
         for existing in _JOBS.values():
             _job_refresh(existing)
-            if existing.get("name") == requested_name and existing.get("status") in ("running", "starting"):
+            if (existing.get("service_task") == service_task
+                    and existing.get("status") in ("running", "starting")):
                 return {"ok": True, "job": _job_public(existing), "already": True}
 
     if progress_file is not None:
@@ -1363,6 +1364,7 @@ def h_job_start(args):
         "id": job_id,
         "name": name,
         "hub": hub,
+        "service_task": service_task,
         "status": "running",
         "started": time.time(),
         "progress": 0,
