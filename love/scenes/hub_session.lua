@@ -111,6 +111,11 @@ end
 local function active_actions(env)
     local actions = {}
     local running = active_operation(env.id)
+    -- IceWM and LXDE share the XFCE image. Surface its lifecycle instead
+    -- of allowing a second base install while that dependency is running.
+    if not running and env.id ~= "xfce" then
+        running = active_operation("xfce")
+    end
     if running then
         actions[#actions + 1] = {id = "view", label = "VIEW PROCESS", color = env.accent}
         actions[#actions + 1] = {id = "back", label = "BACK", color = {0.55,0.64,0.73}}
@@ -118,8 +123,7 @@ local function active_actions(env)
     end
     if env.id ~= "xfce" and not installed("xfce") then
         actions[#actions + 1] = {
-            id = "install", label = "INSTALL", color = env.accent,
-            disabled = true,
+            id = "install_base", label = "INSTALL BASE", color = env.accent,
         }
         actions[#actions + 1] = {
             id = "back", label = "BACK", color = {0.55,0.64,0.73},
@@ -159,10 +163,27 @@ local function run_action(action)
     end
     if action.id == "view" then
         local running = active_operation(env.id)
+        if not running and env.id ~= "xfce" then
+            running = active_operation("xfce")
+        end
         if running then
             jobs.show_job(running.id)
             state.detail_open = false
         end
+        return
+    end
+    if action.id == "install_base" then
+        set_status("XFCE base required. Starting the shared image installation...")
+        bridge.call("xfce_install", {}, function(resp)
+            if resp.ok then
+                state.status = resp.note or
+                    "XFCE base installation started. Install IceWM/LXDE after it completes."
+                refresh(true)
+            else
+                state.status = "XFCE base install failed: " ..
+                    tostring(resp.error or "unknown error")
+            end
+        end)
         return
     end
     if action.id == "launch" then
