@@ -477,3 +477,55 @@ def test_radio_actions_control_pause_volume_and_stop(monkeypatch):
         "ok": True, "running": False
     }
     assert player.stopped is True
+
+
+
+def test_notes_service_supports_atomic_crud_and_rejects_paths(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    saved = service.h_notes_save({
+        "name": "field log",
+        "content": "First line\nSecond line\n",
+    })
+    assert saved["ok"] is True
+    assert saved["name"] == "field log.txt"
+
+    listed = service.h_notes_list({})
+    assert listed["ok"] is True
+    assert listed["count"] == 1
+    assert listed["notes"][0]["name"] == "field log.txt"
+
+    opened = service.h_notes_read({"name": "field log.txt"})
+    assert opened["ok"] is True
+    assert opened["content"] == "First line\nSecond line\n"
+
+    updated = service.h_notes_save({
+        "name": "field log.txt",
+        "content": "Updated safely.\n",
+    })
+    assert updated["ok"] is True
+    assert service.h_notes_read({"name": "field log"})["content"] == "Updated safely.\n"
+
+    assert service.h_notes_save({
+        "name": "../../outside",
+        "content": "must not escape",
+    })["ok"] is False
+    assert service.h_notes_read({"name": "../field log.txt"})["ok"] is False
+
+    deleted = service.h_notes_delete({"name": "field log.txt"})
+    assert deleted["ok"] is True
+    assert service.h_notes_read({"name": "field log.txt"})["ok"] is False
+
+
+def test_notes_service_rejects_symlinks_and_large_notes(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    notes = tmp_path / "notes"
+    notes.mkdir()
+    (notes / "outside.txt").symlink_to(tmp_path / "secret.txt")
+    assert service.h_notes_read({"name": "outside.txt"})["ok"] is False
+    assert service.h_notes_delete({"name": "outside.txt"})["ok"] is False
+    assert service.h_notes_save({
+        "name": "large.txt",
+        "content": "x" * 32769,
+    })["ok"] is False
