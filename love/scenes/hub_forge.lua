@@ -41,7 +41,7 @@ end
 return dashboard.new({
     title = "THE FORGE",
     node_idx = 3,
-    widget_height = 140,
+    widget_height = 110,
     status = "Installer & updater",
 
     on_enter = function(scene) refresh(scene, false) end,
