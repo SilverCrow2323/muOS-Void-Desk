@@ -223,51 +223,29 @@ def run_pygame_runtime():
         print(f"{Color.RED}[RUNTIME ERR] Pygame is not installed in the virtual environment.{Color.RESET}")
         return 1
 
-    K = pygame
-    KEYS = {
-        K.K_z: "A", K.K_RETURN: "A",
-        K.K_x: "B", K.K_BACKSPACE: "B",
-        K.K_a: "Y", K.K_s: "X",
-        K.K_q: "L1", K.K_w: "R1",
-        K.K_e: "L2", K.K_r: "R2",
-        K.K_TAB: "SELECT", K.K_SPACE: "START",
-        K.K_ESCAPE: "MENU", K.K_m: "MENU",
-        K.K_MINUS: "VOL-", K.K_EQUALS: "VOL+",
-    }
-    RAW = {"A": 304, "B": 305, "Y": 306, "X": 307, "L1": 308, "R1": 309,
-           "L2": 314, "R2": 315, "SELECT": 310, "START": 311, "MENU": 312,
-           "VOL-": 114, "VOL+": 115}
-
-    _q, _held = [], set()
-
     def install_keyboard_bridge():
         try:
             import evinput
+            from desk.desktop_input import DesktopInputBridge
         except ImportError:
             return
         real_get = pygame.event.get
+        input_bridge = DesktopInputBridge(pygame)
 
         def get(*a, **k):
             evs = real_get(*a, **k)
-            for e in evs:
-                if e.type == pygame.KEYDOWN:
-                    _held.add(e.key)
-                    if e.key in KEYS:
-                        _q.append(KEYS[e.key])
-                elif e.type == pygame.KEYUP:
-                    _held.discard(e.key)
+            input_bridge.handle_events(evs)
             return evs
 
         pygame.event.get = get
-        state = {"active": False, "raw": []}
+        state = {"active": False}
 
         evinput.start = lambda: state.update({"active": True}) or True
         evinput.stop = lambda: state.update({"active": False})
         evinput.active = lambda: state["active"]
-        evinput.poll = lambda: _q.copy() and _q.clear()
-        evinput.poll_raw = lambda: [RAW[n] for n in evinput.poll() if n in RAW]
-        evinput.hat = lambda: ((pygame.K_RIGHT in _held) - (pygame.K_LEFT in _held),
-                               (pygame.K_UP in _held) - (pygame.K_DOWN in _held))
+        evinput.poll = input_bridge.poll
+        evinput.poll_raw = input_bridge.poll_raw
+        evinput.hat = input_bridge.hat
 
     def install_fbdisplay_bypass():
         try:
