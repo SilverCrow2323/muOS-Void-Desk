@@ -484,8 +484,11 @@ function nexus.draw()
             label = label .. "  // DISABLED"
         end
         local tw = f_label:getWidth(label)
-        local lx = selb.x - tw / 2
-        local ly = selb.y + selb.r + 32
+        local lx = math.max(12, math.min(W - tw - 12, selb.x - tw / 2))
+        local ly = selb.y + selb.r + 26
+        if ly + f_label:getHeight() > H - 62 then
+            ly = selb.y - selb.r - f_label:getHeight() - 16
+        end
         love.graphics.setColor(0, 0, 0, 0.65)
         love.graphics.print(label, lx + 1, ly + 1)
         love.graphics.setColor(selb.color[1], selb.color[2], selb.color[3], 1)
