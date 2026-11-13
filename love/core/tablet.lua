@@ -110,8 +110,9 @@ local function toggle_pause()
             if resp.ok then tablet.radio.paused = resp.pause == true end
         end)
     elseif iptv_playing() then
-        -- IPTV currently exposes stop/status only; do not display a fake pause command.
-        stop_all_media()
+        bridge.call("iptv_action", {action="toggle_pause"}, function(resp)
+            if resp.ok then tablet.iptv.paused = resp.data == true end
+        end)
     else
         request_status()
     end
@@ -127,6 +128,10 @@ local function adjust_volume(delta)
     elseif radio_playing() then
         bridge.call("radio_action", {action="volume", value=next_volume}, function(resp)
             if resp.ok then tablet.radio.volume = resp.volume end
+        end)
+    elseif iptv_playing() then
+        bridge.call("iptv_action", {action="volume", value=next_volume}, function(resp)
+            if resp.ok then tablet.media.volume = next_volume end
         end)
     end
 end
