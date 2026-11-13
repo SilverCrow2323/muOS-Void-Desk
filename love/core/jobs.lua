@@ -3,6 +3,7 @@ local bridge = require("core.bridge")
 local jobs = {}
 jobs.active = {}
 jobs.overlay_open = false
+jobs.focus_id = nil
 jobs.poll_timer = 0
 jobs.POLL_INTERVAL = 0.6
 
@@ -26,16 +27,27 @@ function jobs.update(dt)
     end
 end
 
+function jobs.show_job(job_id, seed)
+    if seed and job_id then jobs.active[tostring(job_id)] = seed end
+    jobs.focus_id = job_id and tostring(job_id) or jobs.focus_id
+    jobs.overlay_open = true
+    jobs.refresh()
+end
+
+function jobs.hide_overlay()
+    jobs.overlay_open = false
+end
+
 function jobs.start_tool(tool_id, name, hub, on_done)
     bridge.call("job_start", { tool_id = tool_id, name = name, hub = hub }, function(resp)
-        if resp.ok then jobs.refresh() end
+        if resp.ok and resp.job then jobs.show_job(resp.job.id, resp.job) end
         if on_done then on_done(resp) end
     end)
 end
 
 function jobs.start_cmd(cmd, name, hub, on_done)
     bridge.call("job_start", { cmd = cmd, name = name, hub = hub }, function(resp)
-        if resp.ok then jobs.refresh() end
+        if resp.ok and resp.job then jobs.show_job(resp.job.id, resp.job) end
         if on_done then on_done(resp) end
     end)
 end
@@ -88,6 +100,27 @@ end
 function jobs.toggle_overlay()
     jobs.overlay_open = not jobs.overlay_open
     if jobs.overlay_open then jobs.refresh() end
+end
+
+function jobs.focused()
+    if jobs.focus_id and jobs.active[jobs.focus_id] then
+        return jobs.active[jobs.focus_id]
+    end
+    local list = jobs.list_active()
+    local first = list[1]
+    if first then jobs.focus_id = tostring(first.id) end
+    return first
+end
+
+function jobs.total_progress()
+    local total, count = 0, 0
+    for _, job in pairs(jobs.active) do
+        if job.status == "running" or job.status == "starting" then
+            total = total + math.max(0, math.min(100, tonumber(job.progress) or 0))
+            count = count + 1
+        end
+    end
+    return count > 0 and total / count or 0, count
 end
 
 return jobs
