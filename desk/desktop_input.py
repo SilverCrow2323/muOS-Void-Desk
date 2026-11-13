@@ -28,6 +28,20 @@ class DesktopInputBridge:
         "R3": 318,      # BTN_THUMBR
     }
 
+    # SDL joystick fallback for common XInput-style desktop gamepads.
+    JOY_BUTTON_ACTIONS = {
+        0: "A", 1: "B", 2: "X", 3: "Y",
+        4: "L1", 5: "R1", 6: "SELECT", 7: "START",
+        8: "L3", 9: "R3", 10: "MENU",
+    }
+    # SDL GameController uses a standard logical button order.
+    CONTROLLER_BUTTON_ACTIONS = {
+        0: "A", 1: "B", 2: "X", 3: "Y",
+        4: "SELECT", 5: "MENU", 6: "START",
+        7: "L3", 8: "R3", 9: "L1", 10: "R1",
+        11: "UP", 12: "DOWN", 13: "LEFT", 14: "RIGHT",
+    }
+
     def __init__(self, pygame_module):
         self.pygame = pygame_module
         self.keymap = {
@@ -49,6 +63,24 @@ class DesktopInputBridge:
         }
         self._queue = []
         self._held = set()
+        self._joy_hats = {}
+        self._trigger_states = {}
+
+    @staticmethod
+    def _trigger_pressed(value):
+        # JOYAXISMOTION is float [-1, 1]; CONTROLLERAXISMOTION is int16.
+        return value > (16384 if isinstance(value, int) else 0.5)
+
+    def _queue_trigger(self, device, axis, value):
+        action = {4: "L2", 5: "R2"}.get(axis)
+        if action is None:
+            return
+        key = (device, action)
+        pressed = self._trigger_pressed(value)
+        previous = self._trigger_states.get(key, False)
+        if pressed and not previous:
+            self._queue.append(action)
+        self._trigger_states[key] = pressed
 
     def handle_events(self, events):
         """Consume a batch from pygame.event.get() without stealing its events."""
@@ -60,6 +92,27 @@ class DesktopInputBridge:
                     self._queue.append(action)
             elif event.type == self.pygame.KEYUP:
                 self._held.discard(event.key)
+            elif event.type == getattr(self.pygame, "JOYBUTTONDOWN", None):
+                action = self.JOY_BUTTON_ACTIONS.get(event.button)
+                if action is not None:
+                    self._queue.append(action)
+            elif event.type == getattr(self.pygame, "JOYHATMOTION", None):
+                self._joy_hats[event.instance_id] = tuple(event.value)
+            elif event.type == getattr(self.pygame, "JOYDEVICEREMOVED", None):
+                self._joy_hats.pop(event.instance_id, None)
+                for key in [k for k in self._trigger_states if k[0] == event.instance_id]:
+                    self._trigger_states.pop(key, None)
+            elif event.type == getattr(self.pygame, "JOYAXISMOTION", None):
+                self._queue_trigger(event.instance_id, event.axis, event.value)
+            elif event.type == getattr(self.pygame, "CONTROLLERBUTTONDOWN", None):
+                action = self.CONTROLLER_BUTTON_ACTIONS.get(event.button)
+                if action is not None:
+                    if action in ("UP", "DOWN", "LEFT", "RIGHT"):
+                        self._queue.append(action)
+                    else:
+                        self._queue.append(action)
+            elif event.type == getattr(self.pygame, "CONTROLLERAXISMOTION", None):
+                self._queue_trigger(event.instance_id, event.axis, event.value)
 
     def poll(self):
         """Return a real list of queued actions, then drain the queue."""
@@ -77,9 +130,13 @@ class DesktopInputBridge:
 
     def hat(self):
         """D-pad keyboard equivalent: (x, y), with positive y meaning UP."""
-        return (
-            int(self.pygame.K_RIGHT in self._held)
-            - int(self.pygame.K_LEFT in self._held),
-            int(self.pygame.K_UP in self._held)
-            - int(self.pygame.K_DOWN in self._held),
-        )
+        right = self.pygame.K_RIGHT in self._held
+        left = self.pygame.K_LEFT in self._held
+        up = self.pygame.K_UP in self._held
+        down = self.pygame.K_DOWN in self._held
+        for x, y in self._joy_hats.values():
+            right = right or x > 0
+            left = left or x < 0
+            up = up or y > 0
+            down = down or y < 0
+        return (int(right) - int(left), int(up) - int(down))
