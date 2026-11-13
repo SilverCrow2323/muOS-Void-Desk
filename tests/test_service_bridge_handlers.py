@@ -531,3 +531,79 @@ def test_notes_service_rejects_symlinks_and_large_notes(tmp_path, monkeypatch):
         "name": "large.txt",
         "content": "x" * 32769,
     })["ok"] is False
+
+
+
+def test_text_editor_service_supports_confined_atomic_crud(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+
+    created = service.h_text_save({
+        "name": "Project notes.md",
+        "content": "alpha\nβeta\n",
+    })
+    assert created == {
+        "ok": True, "name": "Project notes.md",
+        "size": len("alpha\nβeta\n".encode("utf-8")),
+    }
+
+    listing = service.h_text_list({})
+    assert listing["ok"] is True
+    assert listing["count"] == 1
+    assert listing["files"][0]["name"] == "Project notes.md"
+
+    opened = service.h_text_read({"name": "Project notes.md"})
+    assert opened["ok"] is True
+    assert opened["content"] == "alpha\nβeta\n"
+
+    updated = service.h_text_save({
+        "name": "Project notes.md",
+        "content": "saved atomically\n",
+    })
+    assert updated["ok"] is True
+    assert service.h_text_read({"name": "Project notes.md"})["content"] == "saved atomically\n"
+
+    deleted = service.h_text_delete({"name": "Project notes.md"})
+    assert deleted["ok"] is True
+    assert service.h_text_read({"name": "Project notes.md"})["ok"] is False
+
+
+def test_text_editor_service_rejects_paths_symlinks_and_unsupported_extensions(
+        tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    assert service.h_text_save({
+        "name": "../../outside.txt", "content": "escape",
+    })["ok"] is False
+    assert service.h_text_save({
+        "name": "image.png", "content": "not text",
+    })["ok"] is False
+    assert service.h_text_read({"name": "../secret.txt"})["ok"] is False
+    assert service.h_text_delete({"name": "../secret.txt"})["ok"] is False
+
+    directory = tmp_path / "Texts"
+    directory.mkdir()
+    secret = tmp_path / "secret.txt"
+    secret.write_text("private", encoding="utf-8")
+    (directory / "linked.txt").symlink_to(secret)
+    assert service.h_text_read({"name": "linked.txt"})["ok"] is False
+    assert service.h_text_delete({"name": "linked.txt"})["ok"] is False
+    assert service.h_text_save({
+        "name": "linked.txt", "content": "overwrite link target",
+    })["ok"] is False
+    assert secret.read_text(encoding="utf-8") == "private"
+
+
+def test_text_editor_service_enforces_size_limit_and_ignores_temp_files(
+        tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    assert service.h_text_save({
+        "name": "large.txt", "content": "x" * (service._TEXT_MAX_BYTES + 1),
+    })["ok"] is False
+    directory = tmp_path / "Texts"
+    directory.mkdir()
+    (directory / ".void-edit-orphan.tmp").write_text("partial", encoding="utf-8")
+    (directory / "readme.md").write_text("ok", encoding="utf-8")
+    files = service.h_text_list({})["files"]
+    assert [item["name"] for item in files] == ["readme.md"]
