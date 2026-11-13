@@ -197,7 +197,7 @@ function scene.draw()
         {icon="btn_y",label="Refresh"},
         {icon="btn_a",label="Open article"},
         {icon="btn_b",label="Back"},
-    },right_text="RSS / ATOM"})
+    }})
 end
 
 return scene
