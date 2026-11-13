@@ -42,14 +42,14 @@ local function draw_cel_sphere(x, y, r, base, lit_dx, lit_dy)
     love.graphics.setColor(SHADOW[1], SHADOW[2], SHADOW[3], 1)
     love.graphics.circle("fill", x, y, r, 48)
     love.graphics.setColor(MID[1], MID[2], MID[3], 1)
-    love.graphics.arc("pie", x, y, r, angle-math.pi/2,
+    love.graphics.arc("fill", "pie", x, y, r, angle-math.pi/2,
                       angle+math.pi/2, 40)
 
     -- Bright inner light mass; its edge is deliberately hard, like animation cel paint.
     local hx = x + lit_dx*r*0.08
     local hy = y + lit_dy*r*0.08
     love.graphics.setColor(LIGHT[1], LIGHT[2], LIGHT[3], 1)
-    love.graphics.arc("pie", hx, hy, r*0.84,
+    love.graphics.arc("fill", "pie", hx, hy, r*0.84,
                       angle-0.72, angle+0.72, 32)
 
     -- A restrained specular plate gives the body depth without a soft gradient.
@@ -66,7 +66,7 @@ local function draw_cel_sphere(x, y, r, base, lit_dx, lit_dy)
     love.graphics.setColor(MID[1]*0.72, MID[2]*0.72, MID[3]*0.72, 0.62)
     local tx = x - lit_dx*r*0.12
     local ty = y - lit_dy*r*0.12
-    love.graphics.arc("open", tx, ty, r*0.94,
+    love.graphics.arc("line", "open", tx, ty, r*0.94,
                       angle+math.pi*0.50, angle+math.pi*0.86, 18)
 
     -- Ink outline and a thin light-catching rim.
@@ -75,7 +75,7 @@ local function draw_cel_sphere(x, y, r, base, lit_dx, lit_dy)
     love.graphics.circle("line", x, y, r, 48)
     love.graphics.setColor(LIGHT[1], LIGHT[2], LIGHT[3], 0.72)
     love.graphics.setLineWidth(math.max(0.8,r*0.025))
-    love.graphics.arc("open", x, y, r*0.97,
+    love.graphics.arc("line", "open", x, y, r*0.97,
                       angle-0.52, angle+0.52, 24)
 end
 
