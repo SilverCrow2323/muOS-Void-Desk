@@ -1158,6 +1158,7 @@ def _job_public(job):
         "id": job["id"],
         "name": job["name"],
         "hub": job["hub"],
+        "service_task": job.get("service_task"),
         "status": job["status"],
         "started": job["started"],
         "progress": job.get("progress", 0),
