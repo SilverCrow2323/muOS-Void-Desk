@@ -93,3 +93,58 @@ def test_job_service_cancel_terminates_running_job(tmp_path, monkeypatch):
     result = service.h_job_cancel({"job_id": started["job"]["id"]})
     assert result == {"ok": True, "status": "cancelled"}
     assert process.terminated is True
+
+
+
+def test_desktop_environment_operations_use_supervised_allowlisted_jobs(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "APP_DIR", tmp_path)
+    monkeypatch.setattr(service, "DATA", tmp_path / "data")
+    monkeypatch.setattr(service, "IS_DEVICE", True)
+    monkeypatch.setattr(service, "_JOBS", {})
+    monkeypatch.setattr(service, "_JOB_SEQ", 0)
+    scripts = tmp_path / "bin"
+    scripts.mkdir()
+    (scripts / "xfce_bootstrap.py").write_text("print('bootstrap')\n")
+    (scripts / "env_install.py").write_text("print('install')\n")
+    (scripts / "desktop_env_maintenance.py").write_text("print('maintenance')\n")
+    (tmp_path / "service").mkdir()
+    process = FakeProcess()
+    monkeypatch.setattr(service.subprocess, "Popen",
+                        lambda *args, **kwargs: process)
+
+    xfce = service.h_xfce_install({})
+    assert xfce["ok"] is True
+    assert xfce["job"]["name"] == "Install XFCE"
+    assert xfce["job"]["status"] == "running"
+    assert (tmp_path / "data" / ".xfce_install_running").read_text() == str(process.pid)
+    assert xfce["job"]["progress"] == 0
+
+    process2 = FakeProcess()
+    monkeypatch.setattr(service.subprocess, "Popen",
+                        lambda *args, **kwargs: process2)
+    (tmp_path / "data" / ".xfce_ready").write_text("xfce ok\n")
+    icewm = service.h_env_install({"id": "icewm"})
+    assert icewm["ok"] is True
+    assert icewm["job"]["name"] == "Install IceWM"
+    assert icewm["job"]["animation"] == "install"
+
+    process3 = FakeProcess()
+    monkeypatch.setattr(service.subprocess, "Popen",
+                        lambda *args, **kwargs: process3)
+    (tmp_path / "data" / ".icewm_ready").write_text("icewm ok\n")
+    removal = service.h_env_uninstall({"id": "icewm"})
+    assert removal["ok"] is True
+    assert removal["job"]["name"] == "Remove IceWM"
+    assert "isolated" in removal["job"]["description"].lower()
+
+    process4 = FakeProcess()
+    monkeypatch.setattr(service.subprocess, "Popen",
+                        lambda *args, **kwargs: process4)
+    update = service.h_env_update_check({"id": "xfce"})
+    assert update["ok"] is True
+    assert update["job"]["name"] == "Check updates for XFCE"
+    assert update["job"]["animation"] == "verify"
+
+    assert service.h_env_uninstall({"id": "../../etc"})["ok"] is False
+    assert service.h_env_update_check({"id": "unknown"})["ok"] is False
