@@ -205,7 +205,16 @@ def refresh_rss(category: str = "all", language: str = "all", progress=None):
     selected = [feed for feed in RSS_FEEDS
                 if (category == "all" or feed["category"] == category)
                 and (language == "all" or feed["language"] == language)]
-    selected = selected[:3]
+    if category == "all":
+        # Give the ALL view genuine category breadth with at most one feed
+        # per category; a specific category may use up to three sources.
+        chosen = set()
+        selected = [
+            feed for feed in selected
+            if not (feed["category"] in chosen or chosen.add(feed["category"]))
+        ]
+    else:
+        selected = selected[:3]
     results, errors = [], []
     if not selected:
         raise ValueError("no feeds match the selected category and language")
