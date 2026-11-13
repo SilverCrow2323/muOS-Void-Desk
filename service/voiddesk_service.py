@@ -1330,8 +1330,8 @@ def h_job_start(args):
     else:
         return {"ok": False, "error": "job requires cmd or tool_id"}
 
+    requested_name = str(args.get("name") or tool_id or "Background job")[:80]
     if service_task in ("rss_refresh", "weather_refresh"):
-        requested_name = name
         for existing in _JOBS.values():
             _job_refresh(existing)
             if existing.get("name") == requested_name and existing.get("status") in ("running", "starting"):
@@ -1345,7 +1345,7 @@ def h_job_start(args):
 
     _JOB_SEQ += 1
     job_id = str(_JOB_SEQ)
-    name = str(args.get("name") or tool_id or "Background job")[:80]
+    name = requested_name
     hub = str(args.get("hub") or "system")[:32]
     log_path = DATA / ("love_job_%s.log" % job_id)
     try:
