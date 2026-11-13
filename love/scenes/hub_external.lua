@@ -74,7 +74,7 @@ end
 local config = {
     title = "EXTERNAL TOOLS",
     node_idx = 4,
-    widget_height = 130,
+    widget_height = 108,
     status = "VoidDesk ecosystem apps",
 
     on_enter = function(scene) refresh(scene, false) end,
