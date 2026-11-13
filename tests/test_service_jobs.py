@@ -136,7 +136,7 @@ def test_desktop_environment_operations_use_supervised_allowlisted_jobs(tmp_path
     removal = service.h_env_uninstall({"id": "icewm"})
     assert removal["ok"] is True
     assert removal["job"]["name"] == "Remove IceWM"
-    assert "isolated" in removal["job"]["description"].lower()
+    assert "isolated" in removal["job"]["reason"].lower()
 
     process4 = FakeProcess()
     monkeypatch.setattr(service.subprocess, "Popen",
