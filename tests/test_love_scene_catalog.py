@@ -266,3 +266,12 @@ def test_visual_capture_scenes_use_explicit_local_demo_fixtures():
     assert "notifications.items = {" in capture
     assert "Runtime package verified" in capture
     assert "Storage warning" in capture
+
+
+
+def test_first_run_onboarding_reuses_cached_fonts_for_controller_keyboard():
+    onboarding = (LOVE / "core" / "onboarding.lua").read_text(encoding="utf-8")
+    assert "local f = get_font(12)" in onboarding
+    assert "love.graphics.setFont(get_font(11))" in onboarding
+    assert "love.graphics.newFont(12)" not in onboarding
+    assert "love.graphics.newFont(11)" not in onboarding
