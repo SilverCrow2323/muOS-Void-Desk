@@ -832,6 +832,32 @@ def h_notes_delete(args):
         return {"ok": False, "error": "cannot delete note: " + str(exc)[:120]}
 
 
+def _read_content_cache(name, max_bytes=512 * 1024):
+    if name not in ("rss_cache.json", "weather_cache.json"):
+        return {"ok": False, "error": "unknown content cache"}
+    path = DATA / name
+    if path.is_symlink() or not path.is_file():
+        return {"ok": True, "cached": False}
+    try:
+        if path.stat().st_size > max_bytes:
+            return {"ok": False, "error": "cached content exceeds its size limit"}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or payload.get("ok") is not True:
+            return {"ok": False, "error": "cached content is malformed"}
+        payload["cached"] = True
+        return payload
+    except (OSError, ValueError, TypeError):
+        return {"ok": False, "error": "cannot read cached content"}
+
+
+def h_rss_cache(args):
+    return _read_content_cache("rss_cache.json")
+
+
+def h_weather_cache(args):
+    return _read_content_cache("weather_cache.json")
+
+
 def h_toolbox_stats(args):
     """Read-only counts for the LÖVE Toolbox dashboard."""
     notes_dir = DATA / "notes"
@@ -1200,6 +1226,27 @@ def h_job_start(args):
             return {"ok": False, "error": "XFCE bootstrap script is missing"}
         progress_file = DATA / ".xfce_bootstrap_state.json"
         command = [sys.executable, str(script)]
+    elif service_task == "rss_refresh":
+        category = str(args.get("category") or "all").lower()
+        language = str(args.get("language") or "all").lower()
+        if category not in ("all", "news", "tech", "linux", "gaming", "retro", "anime"):
+            return {"ok": False, "error": "unsupported RSS category"}
+        if language not in ("all", "en", "it"):
+            return {"ok": False, "error": "unsupported RSS language"}
+        script = APP_DIR / "service" / "content_refresh.py"
+        if not script.is_file():
+            return {"ok": False, "error": "content refresh worker is missing"}
+        progress_file = DATA / ".rss_refresh_state.json"
+        command = [sys.executable, str(script), "rss", category, language]
+    elif service_task == "weather_refresh":
+        city = " ".join(str(args.get("city") or "").split())
+        if not city or len(city) > 80 or any(ord(ch) < 32 for ch in city):
+            return {"ok": False, "error": "enter a city name up to 80 characters"}
+        script = APP_DIR / "service" / "content_refresh.py"
+        if not script.is_file():
+            return {"ok": False, "error": "content refresh worker is missing"}
+        progress_file = DATA / ".weather_refresh_state.json"
+        command = [sys.executable, str(script), "weather", city]
     elif service_task == "env_install":
         env_id = str(args.get("id") or "")
         if env_id not in ("icewm", "lxde"):
@@ -2500,6 +2547,8 @@ HANDLERS = {
     "list_external": h_list_external,
     "launch_external": h_launch_external,
     "toolbox_stats": h_toolbox_stats,
+    "rss_cache": h_rss_cache,
+    "weather_cache": h_weather_cache,
     "notes_list": h_notes_list,
     "notes_read": h_notes_read,
     "notes_save": h_notes_save,
