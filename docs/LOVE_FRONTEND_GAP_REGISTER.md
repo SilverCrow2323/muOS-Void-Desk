@@ -35,7 +35,8 @@
 - XFCE bootstrap: removes the competing `fbtext` framebuffer UI, publishes English structured progress, and reports storage/network/asset failures in the LÖVE overlay.
 - Start Session: separate visual environment cards, dependency-aware IceWM/LXDE install, confirmed removal, update simulation and job tracking.
 - NEXUS: wider orbit spacing within safe screen margins and hard three-tone cel-shaded planet lighting with ink outlines and directional highlights.
-- RT:Toolbox: new Notes workspace with allowlisted filenames, fixed `data/notes` storage, 32 KB limit, atomic writes and delete confirmation; text input is now routed to the active scene.
+- RT:Toolbox: Notes and VOID Edit now have separate file stores and native LÖVE editors. Notes uses `data/notes` and 32 KB limits; VOID Edit reads/writes allowlisted text types in `data/Texts` with a 128 KB limit, path/symlink validation and atomic saves. Both support controller input and an on-screen keyboard; physical keyboard input is routed to the active scene.
+- RT:Toolbox: RSS and Weather now have allowlisted HTTPS feeds/Open-Meteo adapters, bounded caches, supervised refresh jobs and visible progress; test their offline and network refresh behavior on device.
 
 These changes are implemented on the draft branch only. Passing source tests or screenshots does not establish that they work correctly on RG35XX-H hardware.
 
