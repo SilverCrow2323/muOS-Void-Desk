@@ -24,11 +24,10 @@ MNT = os.path.join(DATA, "xfce_mnt")
 sys.path.insert(0, os.path.join(APP, "desk"))
 import imgmount  # noqa: E402
 
-sys.path.insert(0, os.path.join(APP, "lib"))
-try:
-    import fbtext
-except Exception:
-    fbtext = None
+import json
+import time
+
+STATUS_FILE = None
 
 ENVS = {
     "icewm": {
@@ -48,13 +47,42 @@ ENVS = {
 }
 
 
-def log(msg, screen):
+def log(msg):
     print(msg, flush=True)
-    if screen:
-        try:
-            screen.log(msg)
-        except Exception:
-            pass
+
+
+def report(data_dir, progress, phase, message, detail="", status="running",
+           animation="install", severity="info"):
+    global STATUS_FILE
+    if STATUS_FILE is None:
+        STATUS_FILE = os.path.join(data_dir, ".env_install_state.json")
+    state = {
+        "progress": max(0, min(100, int(progress))),
+        "phase": str(phase)[:48],
+        "message": str(message)[:240],
+        "detail": str(detail)[:500],
+        "status": status,
+        "animation": animation,
+        "severity": severity,
+        "indeterminate": status == "running" and int(progress) <= 0,
+        "can_background": True,
+    }
+    temporary = STATUS_FILE + ".tmp"
+    try:
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump(state, handle, ensure_ascii=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, STATUS_FILE)
+    except OSError as exc:
+        log("WARNING: could not publish operation status: %s" % exc)
+
+
+def fail(data_dir, message, progress=0, phase="FAILED"):
+    log("ERROR: " + message)
+    report(data_dir, progress, phase, message, status="failed",
+           animation="verify", severity="error")
+    return 1
 
 
 def sh(cmd):
@@ -80,79 +108,81 @@ def main():
         return 2
     env_id = sys.argv[1]
     spec = ENVS[env_id]
-
-    screen = None
-    if fbtext:
-        try:
-            screen = fbtext.Screen(
-                title="VOIDDESK - installing %s" % spec["title"])
-        except Exception:
-            screen = None
-
+    report(DATA, 1, "PRE-FLIGHT", "Checking the existing XFCE image",
+           "This operation adds a desktop environment to the existing isolated image.",
+           animation="loading")
     if not os.path.exists(os.path.join(DATA, ".xfce_ready")):
-        log("FATAL: base desktop (XFCE) not installed yet — "
-            "install that first, this adds onto it", screen)
-        return 1
+        return fail(DATA, "Install XFCE first; this desktop uses the existing XFCE image.", 2, "PRE-FLIGHT")
     if not os.path.exists(IMG):
-        log("FATAL: desktop image missing: %s" % IMG, screen)
-        return 1
+        return fail(DATA, "The XFCE desktop image is missing.", 3, "PRE-FLIGHT")
     already = os.path.join(DATA, spec["marker"])
     if os.path.exists(already):
-        log("%s already installed" % spec["title"], screen)
+        report(DATA, 100, "COMPLETED", spec["title"] + " is already installed",
+               status="done", animation="verify", severity="success")
         return 0
 
-    log("==== VOIDDESK %s install ====" % spec["title"], screen)
+    log("==== VOID DESK %s INSTALL ====" % spec["title"].upper())
+    report(DATA, 8, "MOUNT", "Mounting the existing desktop image",
+           "The operation will not modify the muOS host root filesystem.",
+           animation="loading")
     if imgmount.is_mounted(MNT):
-        log("FATAL: XFCE desktop is already mounted; close the session first",
-            screen)
-        return 1
-    log("mounting desktop image...", screen)
+        return fail(DATA, "The desktop image is already mounted; close the desktop session first.", 8, "MOUNT")
     os.makedirs(MNT, exist_ok=True)
     ok, err = imgmount.mount_img(IMG, MNT)
     if not ok and not imgmount.is_mounted(MNT):
-        log("FATAL: mount loop failed - %s" % (err or "?"), screen)
-        return 1
+        return fail(DATA, "Could not mount the desktop image: %s" % (err or "unknown error"), 8, "MOUNT")
 
+    result = 1
     try:
         bind_all()
-
-        env = ("DEBIAN_FRONTEND=noninteractive "
-               "PATH=/usr/sbin:/usr/bin:/sbin:/bin")
+        env = "DEBIAN_FRONTEND=noninteractive PATH=/usr/sbin:/usr/bin:/sbin:/bin"
         aptop = ("-o Acquire::ForceIPv4=true "
                  "-o Acquire::https::Verify-Peer=false "
                  "-o Acquire::https::Verify-Host=false "
                  "-o Acquire::Retries=2")
-
-        log("apt-get update...", screen)
+        report(DATA, 22, "PACKAGE INDEX", "Refreshing Ubuntu package indexes",
+               "Checking the repositories configured in the isolated image.",
+               animation="download")
+        log("Refreshing Ubuntu package indexes...")
         if sh("chroot '%s' /bin/bash -c '%s apt-get %s update'"
               % (MNT, env, aptop)) != 0:
-            log("FATAL: apt-get update failed", screen)
-            return 1
+            return fail(DATA, "Ubuntu package index update failed.", 22, "PACKAGE INDEX")
 
-        log("installing %s (%s)..." % (spec["title"], spec["pkgs"]), screen)
+        report(DATA, 55, "INSTALLATION", "Installing " + spec["title"],
+               "Installing only the selected window manager into the existing XFCE image.",
+               animation="install")
+        log("Installing %s packages..." % spec["title"])
         if sh("chroot '%s' /bin/bash -c \"%s apt-get %s install -y "
               "--no-install-recommends %s && apt-get clean\""
               % (MNT, env, aptop, spec["pkgs"])) != 0:
-            log("FATAL: package install failed", screen)
-            return 1
+            return fail(DATA, spec["title"] + " package installation failed.", 55, "INSTALLATION")
 
+        report(DATA, 90, "VERIFICATION", "Checking " + spec["title"],
+               "Verifying the session launch executable before marking it installed.",
+               animation="verify")
         if not os.path.exists(MNT + spec["verify"]):
-            log("FATAL: %s missing after install" % spec["verify"], screen)
-            return 1
+            return fail(DATA, "Required executable is missing after installation: " + spec["verify"], 90, "VERIFICATION")
 
-        with open(already, "w") as f:
-            f.write("%s ok\n" % env_id)
-        log("==== %s INSTALLED ====" % spec["title"], screen)
-        log("Launch it from VOIDDESK -> START SESSION -> %s" % spec["title"],
-            screen)
-        return 0
+        with open(already, "w", encoding="utf-8") as handle:
+            handle.write(env_id + " ok\n")
+        log(spec["title"] + " is installed.")
+        result = 0
     finally:
-        log("unmounting...", screen)
+        report(DATA, 96, "CLEANUP", "Releasing temporary mounts",
+               "Finishing the operation before returning to Void Desk.",
+               animation="loading")
         cleanup_ok = imgmount.umount_tree(MNT, IMG)
         if not cleanup_ok:
-            log("FATAL: XFCE cleanup incomplete; mounts or loop still active",
-                screen)
-            return 1
+            fail(DATA, "Desktop image cleanup is incomplete; one or more mounts or loop devices remain active.", 96, "CLEANUP")
+            result = 1
+
+    if result == 0:
+        report(DATA, 100, "COMPLETED", spec["title"] + " is installed and ready",
+               "The desktop passed its post-install check.",
+               status="done", animation="verify", severity="success")
+        log("==== %s INSTALL COMPLETED ====" % spec["title"].upper())
+        return 0
+    return 1
 
 
 if __name__ == "__main__":
