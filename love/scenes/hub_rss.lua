@@ -91,7 +91,7 @@ local function change_category(delta)
     state.category = ((state.category - 1 + delta) % #categories) + 1
     state.selected = 1
     state.first = 1
-    state.status = "Filter: " .. categories[state.category]
+    state.status = "Filter changed · press Y to fetch " .. categories[state.category]
 end
 
 function scene.enter()
@@ -112,7 +112,7 @@ function scene.enter()
         elseif action == "x" then
             state.language = state.language == "all" and "it" or
                 (state.language == "it" and "en" or "all")
-            state.status = "Language: " .. state.language:upper()
+            state.status = "Language changed · press Y to fetch " .. state.language:upper()
         elseif action == "y" or action == "start" then
             request_refresh()
         elseif action == "a" then
@@ -157,7 +157,8 @@ function scene.draw()
     love.graphics.print("CATEGORY  /  "..categories[state.category]:upper(),24,78)
     love.graphics.setFont(font.regular(9) or love.graphics.newFont(9))
     love.graphics.setColor(0.53,0.68,0.8,1)
-    love.graphics.print("LANGUAGE "..state.language:upper().."  ·  "..#state.items.." HEADLINES",24,99)
+    local cached_count = cache_matches_filter() and #state.items or 0
+    love.graphics.print("LANGUAGE "..state.language:upper().."  ·  "..cached_count.." HEADLINES",24,99)
 
     local top,bottom = 132,H-84
     local matches_filter = cache_matches_filter()
