@@ -32,6 +32,10 @@ class FakePygame:
     JOYBUTTONDOWN = 31
     JOYHATMOTION = 32
     JOYAXISMOTION = 33
+    JOYDEVICEADDED = 34
+    JOYDEVICEREMOVED = 35
+    CONTROLLERBUTTONDOWN = 36
+    CONTROLLERAXISMOTION = 37
 
 
 def key_event(kind, key):
@@ -167,3 +171,71 @@ def test_gamepad_trigger_axis_queues_only_once_until_released():
         SimpleNamespace(type=pygame.JOYAXISMOTION, instance_id=2, axis=4, value=0.9),
     ])
     assert bridge.poll() == ["L2"]
+
+class FakeJoystickDevice:
+    def __init__(self, device_index):
+        self.device_index = device_index
+        self.instance_id = 100 + device_index
+        self.initialized = False
+        self.closed = False
+
+    def init(self):
+        self.initialized = True
+
+    def get_instance_id(self):
+        return self.instance_id
+
+    def quit(self):
+        self.closed = True
+
+
+class FakeJoystickModule:
+    def __init__(self, count=1):
+        self.count = count
+        self.initialized = False
+        self.devices = {}
+
+    def init(self):
+        self.initialized = True
+
+    def get_count(self):
+        return self.count
+
+    def Joystick(self, device_index):
+        device = FakeJoystickDevice(device_index)
+        self.devices[device_index] = device
+        return device
+
+
+def test_desktop_gamecontroller_events_use_standardized_button_order():
+    pygame = FakePygame()
+    bridge = DesktopInputBridge(pygame)
+    bridge.handle_events([
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, button=9),
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, button=10),
+        SimpleNamespace(type=pygame.CONTROLLERBUTTONDOWN, button=11),
+    ])
+    assert bridge.poll() == ["L1", "R1", "UP"]
+
+
+def test_desktop_joystick_initialization_and_hotplug_lifecycle():
+    pygame = FakePygame()
+    joystick_module = FakeJoystickModule(count=1)
+    pygame.joystick = joystick_module
+
+    bridge = DesktopInputBridge(pygame)
+    assert joystick_module.initialized is True
+    assert joystick_module.devices[0].initialized is True
+    assert 100 in bridge._joysticks
+
+    bridge.handle_events([
+        SimpleNamespace(type=pygame.JOYDEVICEADDED, device_index=1)
+    ])
+    assert joystick_module.devices[1].initialized is True
+    assert 101 in bridge._joysticks
+
+    bridge.handle_events([
+        SimpleNamespace(type=pygame.JOYDEVICEREMOVED, instance_id=101)
+    ])
+    assert 101 not in bridge._joysticks
+    assert joystick_module.devices[1].closed is True
