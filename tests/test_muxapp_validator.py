@@ -16,20 +16,34 @@ def load_validator():
     return module
 
 
-def make_archive(path: Path, members: dict[str, bytes]):
+def make_archive(path: Path, members: dict[str, bytes], *, executable_loader=True):
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name, payload in members.items():
             info = zipfile.ZipInfo(name)
-            mode = 0o755 if name == "Void-Desk/lib/love" else 0o644
+            mode = 0o755 if name == "Void-Desk/lib/love" and executable_loader else 0o644
             info.external_attr = (stat.S_IFREG | mode) << 16
             archive.writestr(info, payload)
 
 
+def elf64_aarch64(payload=b"", machine=183):
+    header = bytearray(64)
+    header[:4] = b"\x7fELF"
+    header[4], header[5], header[6] = 2, 1, 1
+    header[18:20] = machine.to_bytes(2, "little")
+    return bytes(header) + payload
+
+
 def valid_members():
+    loader = elf64_aarch64(b"liblove-11.5.so\0libluajit-5.1.so.2\0")
+    love_lib = elf64_aarch64(b"\0" * (1024 * 1024))
+    luajit_lib = elf64_aarch64()
     return {
         "Void-Desk/mux_launch.sh": b"#!/bin/sh\n",
         "Void-Desk/voiddesk.py": b"print('VoidDesk')\n",
         "Void-Desk/love/main.lua": b"function love.load() end\n",
+        "Void-Desk/lib/love": loader,
+        "Void-Desk/lib/liblove-11.5.so": love_lib,
+        "Void-Desk/lib/libluajit-5.1.so.2": luajit_lib,
     }
 
 
@@ -43,9 +57,8 @@ def test_muxapp_rejects_extra_top_level_directory(tmp_path):
     archive = tmp_path / "invalid.muxapp"
     members = valid_members()
     members["application/README.txt"] = b"wrong root"
-    errors = load_validator().validate_archive(
-        make_archive(archive, members) or archive
-    )
+    make_archive(archive, members)
+    errors = load_validator().validate_archive(archive)
     assert any("unexpected top-level entry: application" in e for e in errors)
 
 
@@ -60,7 +73,6 @@ def test_muxapp_rejects_missing_launcher_and_path_traversal(tmp_path):
     assert any("required file missing: Void-Desk/mux_launch.sh" in e for e in errors)
 
 
-
 def test_muxapp_rejects_missing_love_runtime(tmp_path):
     archive = tmp_path / "missing-love.muxapp"
     members = valid_members()
@@ -73,8 +85,10 @@ def test_muxapp_rejects_missing_love_runtime(tmp_path):
 def test_muxapp_rejects_wrong_architecture_and_missing_loader_dependency(tmp_path):
     archive = tmp_path / "wrong-arch.muxapp"
     members = valid_members()
-    members["Void-Desk/lib/liblove-11.5.so"] = elf64_aarch64(b"\\0" * (1024 * 1024), machine=62)
-    members["Void-Desk/lib/love"] = elf64_aarch64(b"libluajit-5.1.so.2\\0")
+    members["Void-Desk/lib/liblove-11.5.so"] = elf64_aarch64(
+        b"\0" * (1024 * 1024), machine=62
+    )
+    members["Void-Desk/lib/love"] = elf64_aarch64(b"libluajit-5.1.so.2\0")
     make_archive(archive, members)
     errors = load_validator().validate_archive(archive)
     assert any("not AArch64" in e for e in errors)
@@ -83,12 +97,6 @@ def test_muxapp_rejects_wrong_architecture_and_missing_loader_dependency(tmp_pat
 
 def test_muxapp_rejects_non_executable_love_loader(tmp_path):
     archive = tmp_path / "non-executable.muxapp"
-    members = valid_members()
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as package:
-        for name, payload in members.items():
-            info = zipfile.ZipInfo(name)
-            mode = 0o644
-            info.external_attr = (stat.S_IFREG | mode) << 16
-            package.writestr(info, payload)
+    make_archive(archive, valid_members(), executable_loader=False)
     errors = load_validator().validate_archive(archive)
     assert any("LÖVE launcher is not executable" in e for e in errors)
