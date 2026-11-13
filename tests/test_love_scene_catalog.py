@@ -275,3 +275,20 @@ def test_first_run_onboarding_reuses_cached_fonts_for_controller_keyboard():
     assert "love.graphics.setFont(get_font(11))" in onboarding
     assert "love.graphics.newFont(12)" not in onboarding
     assert "love.graphics.newFont(11)" not in onboarding
+
+
+
+def test_system_tablet_pages_use_distinct_information_hierarchies():
+    tablet = (LOVE / "core" / "tablet.lua").read_text(encoding="utf-8")
+    assert "local function draw_system_page" in tablet
+    assert "local function draw_network_page" in tablet
+    draw = tablet.split("function tablet.draw()", 1)[1]
+    assert "draw_system_page(sx+10,content_y,sw-20,content_h)" in draw
+    assert "draw_network_page(sx+10,content_y,sw-20,content_h)" in draw
+    for label in (
+        "DEVICE SNAPSHOT", "MEMORY PRESSURE", "STORAGE VOLUME",
+        "CPU TELEMETRY", "WIRELESS UPLINK", "BLUETOOTH RADIO",
+        "PERSONAL HOTSPOT",
+    ):
+        assert label in tablet
+    assert "Open VOID MONITOR for live CPU samples" in tablet
