@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import gzip
 import io
+import json
 import ipaddress
 import os
 import re
@@ -526,3 +527,51 @@ def status() -> dict:
         "error": _mpv_error,
         "pid": _mpv_proc.pid if _mpv_proc else None,
     }
+
+
+def action(action_name: str, value: int | None = None) -> dict:
+    """Bounded local control for the active IPTV MPV process."""
+    global _mpv_proc, _mpv_state
+    if _mpv_proc is None or _mpv_proc.poll() is not None or not _mpv_sock:
+        return {"ok": False, "error": "IPTV player is not running"}
+    if action_name == "toggle_pause":
+        command = ["cycle", "pause"]
+    elif action_name == "volume":
+        try:
+            volume = max(0, min(100, int(value)))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "volume must be between 0 and 100"}
+        command = ["set_property", "volume", volume]
+    elif action_name == "stop":
+        stop()
+        return {"ok": True, "state": "idle"}
+    else:
+        return {"ok": False, "error": "unsupported IPTV action"}
+
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(0.8)
+            client.connect(_mpv_sock)
+            client.sendall((json.dumps({
+                "command": command, "request_id": 1,
+            }) + "\\n").encode("utf-8"))
+            buffer = b""
+            deadline = time.monotonic() + 0.8
+            while time.monotonic() < deadline and len(buffer) < 4096:
+                chunk = client.recv(2048)
+                if not chunk:
+                    break
+                buffer += chunk
+                for line in buffer.splitlines():
+                    try:
+                        response = json.loads(line)
+                    except (ValueError, TypeError):
+                        continue
+                    if response.get("request_id") == 1:
+                        if response.get("error") != "success":
+                            return {"ok": False, "error": "MPV rejected IPTV control"}
+                        return {"ok": True, "data": response.get("data"),
+                                "volume": value if action_name == "volume" else None}
+    except (OSError, ValueError, TimeoutError):
+        return {"ok": False, "error": "IPTV player control socket is unavailable"}
+    return {"ok": False, "error": "no IPTV control response"}
