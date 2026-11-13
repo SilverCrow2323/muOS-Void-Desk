@@ -161,3 +161,15 @@ def test_nexus_orbits_have_wider_spacing_and_planets_are_not_pixel_grid_shaded()
     assert "for i = 0, N-1" not in planet
     assert "three-tone cel-shaded sphere" in planet.lower()
     assert 'love.graphics.arc("fill", "pie"' in planet
+
+
+
+def test_notes_has_a_real_toolbox_route_and_visual_capture():
+    toolbox = (LOVE / "scenes" / "hub_toolbox.lua").read_text(encoding="utf-8")
+    capture = (LOVE / "core" / "visual_capture.lua").read_text(encoding="utf-8")
+    service = (ROOT / "service" / "voiddesk_service.py").read_text(encoding="utf-8")
+    assert 'sm.push("hub_notes", {})' in toolbox
+    assert (LOVE / "scenes" / "hub_notes.lua").is_file()
+    assert 'name = "hub_notes"' in capture
+    for command in ("notes_list", "notes_read", "notes_save", "notes_delete"):
+        assert f'"{command}": h_' in service
