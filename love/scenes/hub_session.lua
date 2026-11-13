@@ -5,6 +5,7 @@ local input = require("core.input")
 local chrome = require("core.chrome")
 local font = require("core.font")
 local icon = require("core.icon")
+local jobs = require("core.jobs")
 local effects = require("core.effects")
 
 local scene = {}
@@ -73,6 +74,21 @@ local function installed(id)
     return session_state(id).installed == true
 end
 
+local function active_operation(id)
+    local env = env_by_id(id)
+    for _, job in ipairs(jobs.list_active()) do
+        if job.status == "running" or job.status == "starting" then
+            local expected = {
+                ["Install " .. env.name] = true,
+                ["Remove " .. env.name] = true,
+                ["Check updates for " .. env.name] = true,
+            }
+            if expected[job.name] then return job end
+        end
+    end
+    return nil
+end
+
 local function refresh(silent)
     if not silent then state.status = "Checking desktop environments..." end
     bridge.call("session_list", {}, function(resp)
@@ -94,6 +110,12 @@ end
 
 local function active_actions(env)
     local actions = {}
+    local running = active_operation(env.id)
+    if running then
+        actions[#actions + 1] = {id = "view", label = "VIEW PROCESS", color = env.accent}
+        actions[#actions + 1] = {id = "back", label = "BACK", color = {0.55,0.64,0.73}}
+        return actions
+    end
     if installed(env.id) then
         actions[#actions + 1] = {id = "launch", label = "LAUNCH", color = env.accent}
         actions[#actions + 1] = {id = "uninstall", label = "UNINSTALL", color = {1.0,0.39,0.36}}
@@ -123,6 +145,14 @@ local function run_action(action)
     end
     if action.id == "uninstall" then
         state.confirm_uninstall = true
+        return
+    end
+    if action.id == "view" then
+        local running = active_operation(env.id)
+        if running then
+            jobs.show_job(running.id)
+            state.detail_open = false
+        end
         return
     end
     if action.id == "launch" then
@@ -212,6 +242,7 @@ end
 
 local function draw_card(env, x, y, w, h, selected, large, t)
     local ready = installed(env.id)
+    local running = active_operation(env.id)
     local pulse = 0.5 + 0.5 * math.sin(t * 2.0)
     local accent = env.accent
     local bg = large and {0.045,0.064,0.088} or {0.055,0.071,0.092}
@@ -243,12 +274,12 @@ local function draw_card(env, x, y, w, h, selected, large, t)
 
     local led_x = x+w-(large and 28 or 22)
     local led_y = y+(large and 31 or 26)
-    draw_led(led_x,led_y,ready,accent,t)
+    draw_led(led_x,led_y,ready or running ~= nil,running and {1.0,0.72,0.25} or accent,t)
 
     local status_font = font.bold(large and 14 or 11) or love.graphics.newFont(12)
     love.graphics.setFont(status_font)
-    love.graphics.setColor(ready and 0.42 or 0.70,ready and 0.90 or 0.73,ready and 0.62 or 0.78,1)
-    local status = ready and "INSTALLED" or "NOT INSTALLED"
+    love.graphics.setColor(running and 1.0 or (ready and 0.42 or 0.70),running and 0.76 or (ready and 0.90 or 0.73),running and 0.31 or (ready and 0.62 or 0.78),1)
+    local status = running and "OPERATION RUNNING" or (ready and "INSTALLED" or "NOT INSTALLED")
     love.graphics.print(status,x+(large and 22 or 14),y+(large and 126 or 76))
 
     love.graphics.setFont(font.regular(large and 13 or 10) or love.graphics.newFont(11))
