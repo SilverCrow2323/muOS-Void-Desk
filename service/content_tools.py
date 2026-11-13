@@ -102,7 +102,7 @@ def parse_rss(xml_bytes: bytes, source: str, limit: int = RSS_MAX_ITEMS):
     if not isinstance(xml_bytes, (bytes, bytearray)) or len(xml_bytes) > RSS_MAX_BYTES:
         raise ValueError("feed exceeds the response size limit")
     sample = bytes(xml_bytes)
-    upper = sample[:8192].upper()
+    upper = sample.upper()
     if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
         raise ValueError("feed contains a forbidden document declaration")
     root = ET.fromstring(sample)
