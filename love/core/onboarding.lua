@@ -15,6 +15,12 @@ local keys = {
 }
 local columns = 8
 local max_length = 18
+local font_cache = {}
+
+local function get_font(size)
+    if not font_cache[size] then font_cache[size] = love.graphics.newFont(size) end
+    return font_cache[size]
+end
 
 local function clean(value)
     value = tostring(value or ""):gsub("[%c]", "")
@@ -174,11 +180,11 @@ function onboarding.draw(theme)
     love.graphics.setColor(accent[1], accent[2], accent[3], 0.75)
     love.graphics.rectangle("fill", px+18, py+18, 4, 56, 2)
 
-    local title = love.graphics.newFont(24)
+    local title = get_font(24)
     love.graphics.setFont(title)
     love.graphics.setColor(text[1], text[2], text[3], 1)
     love.graphics.print("WELCOME TO VOID DESK", px+34, py+20)
-    local sub = love.graphics.newFont(12)
+    local sub = get_font(12)
     love.graphics.setFont(sub)
     love.graphics.setColor(accent[1], accent[2], accent[3], 1)
     love.graphics.print("IDENTITY INITIALIZATION  /  LOCAL PROFILE", px+35, py+54)
@@ -187,10 +193,10 @@ function onboarding.draw(theme)
     love.graphics.rectangle("fill", px+24, py+88, panel_w-48, 48, 6)
     love.graphics.setColor(accent[1], accent[2], accent[3], 0.7)
     love.graphics.rectangle("line", px+24, py+88, panel_w-48, 48, 6)
-    love.graphics.setFont(love.graphics.newFont(11))
+    love.graphics.setFont(get_font(11))
     love.graphics.setColor(dim[1], dim[2], dim[3], 1)
     love.graphics.print("DISPLAY NAME", px+36, py+96)
-    love.graphics.setFont(love.graphics.newFont(19))
+    love.graphics.setFont(get_font(19))
     love.graphics.setColor(text[1], text[2], text[3], 1)
     local shown = onboarding.name ~= "" and onboarding.name or "Type or select a name..."
     love.graphics.print(shown .. (math.floor(onboarding.pulse*2)%2==0 and "_" or ""),
