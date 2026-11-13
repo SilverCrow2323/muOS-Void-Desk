@@ -355,6 +355,7 @@ local function draw_system_page(x, y, w, h)
     local amber = {0.98, 0.72, 0.34}
 
     -- Hardware identity is a single wide banner, not another generic status row.
+    love.graphics.setFont(get_font(9))
     card(x+4, y+2, w-8, 66, "DEVICE SNAPSHOT", cyan)
     love.graphics.setFont(get_font(14))
     love.graphics.setColor(0.94, 0.97, 1, 1)
@@ -430,6 +431,7 @@ local function draw_network_page(x, y, w, h)
     local half = (w-20)/2
 
     -- Wi-Fi gets a network hero with addressing information and explicit state.
+    love.graphics.setFont(get_font(9))
     card(x+4, y+2, w-8, 111, "WIRELESS UPLINK", accent)
     love.graphics.setFont(get_font(8))
     love.graphics.setColor(0.58, 0.72, 0.82, 1)
@@ -458,6 +460,7 @@ local function draw_network_page(x, y, w, h)
 
     -- Bluetooth and hotspot are independent service cards with their own status lights.
     local row_y = y+123
+    love.graphics.setFont(get_font(9))
     card(x+4, row_y, half, 91, "BLUETOOTH RADIO", blue)
     love.graphics.setColor(bt.on and green[1] or 1, bt.on and green[2] or 0.40,
         bt.on and green[3] or 0.38, 1)
@@ -469,6 +472,7 @@ local function draw_network_page(x, y, w, h)
     love.graphics.setColor(0.57, 0.69, 0.80, 1)
     love.graphics.print(tostring(bt.count or 0) .. " paired devices", x+14, row_y+61)
 
+    love.graphics.setFont(get_font(9))
     card(x+4+half+8, row_y, half, 91, "PERSONAL HOTSPOT", orange)
     love.graphics.setColor(hot.on and green[1] or 0.56, hot.on and green[2] or 0.63,
         hot.on and green[3] or 0.73, 1)
