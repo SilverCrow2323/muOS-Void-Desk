@@ -19,6 +19,8 @@ local row_h, list_top, list_bottom = 28, 112, 414
 local function load_directory(target)
     if loading then return end
     loading = true
+    entries = {}
+    selected, first_visible = 1, 1
     status = "Reading library..."
     bridge.call("media_list", {path = target or ""}, function(resp)
         loading = false
@@ -76,11 +78,11 @@ function scene.enter()
         if action == "up" then
             selected = math.max(1, selected - 1)
         elseif action == "down" then
-            selected = math.min(#entries, selected + 1)
+            selected = math.min(math.max(1, #entries), selected + 1)
         elseif action == "left" then
             selected = math.max(1, selected - 8)
         elseif action == "right" then
-            selected = math.min(#entries, selected + 8)
+            selected = math.min(math.max(1, #entries), selected + 8)
         elseif action == "a" then
             enter_selected()
         elseif action == "x" then
@@ -136,6 +138,22 @@ function scene.draw()
         local label = (item.is_dir and "[DIR] " or "      ") .. item.name
         if #label > 66 then label = label:sub(1, 63) .. "..." end
         love.graphics.print(label, 20, y + 6)
+    end
+    if #entries == 0 then
+        local empty_title, empty_hint
+        if loading then
+            empty_title, empty_hint = "SCANNING MEDIA ROOTS", "Reading supported audio and video files..."
+        elseif status:lower():find("error", 1, true) then
+            empty_title, empty_hint = "MEDIA LOCATION UNAVAILABLE", "Check the SD card mount and try R1 to refresh."
+        else
+            empty_title, empty_hint = "NO SUPPORTED MEDIA FOUND", "Open a folder containing audio or video files."
+        end
+        love.graphics.setFont(font.bold(16) or love.graphics.newFont(16))
+        love.graphics.setColor(th.text[1], th.text[2], th.text[3], 0.92)
+        love.graphics.printf(empty_title, 24, 238, W - 48, "center")
+        love.graphics.setFont(font.regular(11) or love.graphics.newFont(11))
+        love.graphics.setColor(0.55, 0.64, 0.72, 0.95)
+        love.graphics.printf(empty_hint, 32, 264, W - 64, "center")
     end
     love.graphics.setColor(th.panel_bg[1], th.panel_bg[2], th.panel_bg[3], 0.95)
     love.graphics.rectangle("fill", 12, 420, W - 24, 25, 4)

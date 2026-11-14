@@ -23,6 +23,22 @@ function input.emit(event, ...)
 end
 
 function input.press(action, source)
+    -- Global modal priority: required first-run identity, operation details,
+    -- then the system tablet. A modal consumes input before the active scene.
+    local onboarding = package.loaded["core.onboarding"]
+    if onboarding and onboarding.active then
+        return onboarding.handle_action(action, package.loaded["core.config"])
+    end
+    local jobs = package.loaded["core.jobs"]
+    local operation = package.loaded["core.operation_overlay"]
+    if jobs and jobs.overlay_open and operation then
+        return operation.handle_action(action)
+    end
+    local tablet = package.loaded["core.tablet"]
+    if tablet and tablet.active then
+        return tablet.handle_action(action)
+    end
+
     local now = love.timer.getTime()
     -- Directions: debounce strictly to avoid dpad 2-step
     local DIRS = { up = true, down = true, left = true, right = true }

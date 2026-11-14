@@ -18,10 +18,15 @@ local BATCH_SCENES = {
     { name = "hub_tailscale", args = {} },
     { name = "hub_syncthing", args = {} },
     { name = "hub_media", args = {} },
+    { name = "void_radio", args = {} },
+    { name = "media_library", args = {} },
     { name = "hub_workshop", args = {} },
     { name = "hub_diagnostics", args = {} },
     { name = "hub_monitor", args = {} },
     { name = "hub_toolbox", args = {} },
+    { name = "hub_notes", args = {} },
+    { name = "hub_rss", args = {} },
+    { name = "hub_weather", args = {} },
     { name = "hub_mapps", args = {} },
     { name = "hub_external", args = {} },
     { name = "hub_settings", args = {} },
@@ -33,6 +38,13 @@ local BATCH_SCENES = {
     { name = "tool_calc", args = {} },
     { name = "tool_clock", args = {} },
     { name = "tool_editor", args = {} },
+    { name = "tablet_overview", scene = "nexus", overlay = "tablet", page = 1, args = {} },
+    { name = "tablet_processes", scene = "nexus", overlay = "tablet", page = 2, args = {} },
+    { name = "tablet_system", scene = "nexus", overlay = "tablet", page = 3, args = {} },
+    { name = "tablet_network", scene = "nexus", overlay = "tablet", page = 4, args = {} },
+    { name = "tablet_media", scene = "nexus", overlay = "tablet", page = 5, args = {} },
+    { name = "tablet_activity", scene = "nexus", overlay = "tablet", page = 6, args = {} },
+    { name = "operation_overlay", scene = "hub_toolbox", overlay = "operation", args = {} },
 }
 
 local function app_dir()
@@ -179,6 +191,106 @@ local function add_failed(name, reason)
     })
 end
 
+local function seed_global_overlay(target)
+    local jobs = package.loaded["core.jobs"]
+    local tablet = package.loaded["core.tablet"]
+    if jobs then
+        jobs.active = {}
+        jobs.focus_id = nil
+        jobs.overlay_open = false
+        jobs.poll_timer = 0
+        jobs.POLL_INTERVAL = 10
+    end
+    local notifications = package.loaded["core.notifications"]
+    if notifications then notifications.items = {} end
+    if tablet then
+        tablet.active = false
+        tablet.slide = 0
+        tablet.poll = 0
+        tablet.scroll = 0
+    end
+
+    if target.overlay == "tablet" and tablet and jobs then
+        local visual_job = {
+            id = "visual-capture-job",
+            name = "Download system runtime",
+            hub = "THE FORGE",
+            status = "running",
+            started = love.timer.getTime(),
+            progress = 64,
+            phase = "DOWNLOADING",
+            message = "Receiving verified package chunks",
+            detail = "runtime-aarch64.tar.zst · 14.2 / 22.0 MB",
+            description = "Downloading the matching AArch64 runtime into the staging area.",
+            reason = "The selected desktop operation needs the runtime before package assembly.",
+            icon = "download",
+            animation = "download",
+            severity = "info",
+            indeterminate = false,
+            can_background = true,
+            color = {0.24, 0.72, 0.96},
+        }
+        jobs.active[visual_job.id] = visual_job
+        tablet.system = {
+            model = "VISUAL FIXTURE · muOS H700 (SIMULATED)",
+            kernel = "6.1.73-muos",
+            uptime = "4h 12m",
+            ram = {pct = 42, used_mb = 860, total_mb = 2048},
+            disk = {{free_gb = 18.4, total_gb = 64.0}},
+        }
+        tablet.network = {
+            wifi = {connected = true, ssid = "QWASAR-LINK", ip = "192.168.1.42"},
+            bt = {on = true, count = 2},
+            hotspot = {on = false},
+            info = {gateway = "192.168.1.1"},
+        }
+        tablet.media = {
+            now_playing = "DEMO AUDIO · Night Drive",
+            volume = 42,
+            paused = false,
+            library_count = 128,
+            recordings = 3,
+        }
+        tablet.radio = {}
+        tablet.iptv = {state = "idle"}
+        tablet.active = true
+        tablet.slide = 1
+        tablet.page = target.page or 1
+        tablet.poll = 0
+        tablet.scroll = 0
+        if target.page == 6 and notifications then
+            notifications.items = {
+                {title="Runtime package verified",body="AArch64 runtime checksum and metadata passed.",level="ok",ts=os.time()},
+                {title="Syncthing connected",body="2 devices online · 3 folders synchronized.",level="info",ts=os.time()-60},
+                {title="Storage warning",body="SD1 free space is below the 20 GB advisory target.",level="warn",ts=os.time()-180},
+            }
+        end
+    elseif target.overlay == "operation" and jobs then
+        local visual_job = {
+            id = "visual-capture-operation",
+            name = "Install desktop runtime",
+            hub = "START SESSION",
+            status = "running",
+            started = love.timer.getTime(),
+            progress = 64,
+            phase = "EXTRACTING",
+            message = "Unpacking verified runtime files",
+            detail = "lib/runtime · 14.2 / 22.0 MB",
+            description = "Preparing the selected runtime inside the isolated desktop image.",
+            reason = "XFCE and the selected desktop session require this runtime before launch.",
+            icon = "package",
+            animation = "extract",
+            severity = "info",
+            indeterminate = false,
+            can_background = true,
+            color = {0.24, 0.72, 0.96},
+        }
+        jobs.active[visual_job.id] = visual_job
+        jobs.focus_id = visual_job.id
+        jobs.overlay_open = true
+    end
+end
+
 local function switch_to_next_scene()
     if not batch then return end
     if batch.index > #batch.scenes then
@@ -187,7 +299,8 @@ local function switch_to_next_scene()
     end
 
     local target = batch.scenes[batch.index]
-    local ok, result = pcall(batch.manager.switch, target.name, target.args)
+    local scene_name = target.scene or target.name
+    local ok, result = pcall(batch.manager.switch, scene_name, target.args)
     if not ok or result ~= true then
         add_failed(target.name, ok and batch.manager.last_error()
             or result)
@@ -196,6 +309,7 @@ local function switch_to_next_scene()
         return
     end
 
+    seed_global_overlay(target)
     batch.current = target
     batch.elapsed = 0
     batch.phase = "settle"
@@ -215,7 +329,7 @@ function capture.start_batch(scene_manager, settle_seconds)
         elapsed = 0,
         settle_seconds = tonumber(settle_seconds)
             or tonumber(os.getenv("VOIDDESK_CAPTURE_SETTLE"))
-            or 0.85,
+            or 1.6,
         phase = "settle",
         started_utc = os.date("!%Y-%m-%dT%H:%M:%SZ"),
         captured = {},

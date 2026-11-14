@@ -6,6 +6,7 @@
 # Fasi: preflight -> immagine -> ubuntu-base -> configurazione -> apt XFCE.
 
 import gzip
+import json
 import os
 import shutil
 import subprocess
@@ -33,23 +34,48 @@ PKGS = ("xserver-xorg-core xserver-xorg-video-fbdev xserver-xorg-input-evdev "
 sys.path.insert(0, os.path.join(APP, "desk"))
 import imgmount  # noqa: E402
 
-sys.path.insert(0, os.path.join(APP, "lib"))
-try:
-    import fbtext
-    SCREEN = fbtext.Screen(title="VOIDDESK - installazione desktop XFCE")
-except Exception:
-    SCREEN = None
-
+STATUS_FILE = os.path.join(DATA, ".xfce_bootstrap_state.json")
 os.makedirs(DATA, exist_ok=True)
 
 
 def log(msg):
+    # LÖVE owns the framebuffer; the UI reads this structured status.
     print(msg, flush=True)
-    if SCREEN:
+
+
+def report(progress, phase, message, detail="", status="running",
+           animation="loading", severity="info"):
+    state = {
+        "progress": max(0, min(100, int(progress))),
+        "phase": str(phase)[:48],
+        "message": str(message)[:240],
+        "detail": str(detail)[:500],
+        "status": status,
+        "animation": animation,
+        "severity": severity,
+        "indeterminate": status == "running" and int(progress) <= 0,
+        "can_background": True,
+    }
+    temporary = STATUS_FILE + ".tmp"
+    try:
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump(state, handle, ensure_ascii=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, STATUS_FILE)
+    except OSError as exc:
         try:
-            SCREEN.log(msg)
-        except Exception:
+            os.remove(temporary)
+        except OSError:
             pass
+        log("WARNING: cannot publish live operation status: %s" % exc)
+
+
+def fail(message, progress=0, phase="FAILED"):
+    log("ERROR: " + message)
+    report(progress, phase, message, status="failed",
+           animation="verify", severity="error")
+    return 1
 
 
 def sh(cmd, **kw):
@@ -92,34 +118,40 @@ def free_gb(path):
 
 
 def main():
-    log("==== VOIDDESK XFCE bootstrap ====")
+    log("==== VOID DESK XFCE BOOTSTRAP ====")
+    report(1, "PRE-FLIGHT", "Checking storage, image and network",
+           "XFCE needs enough free space before preparing its desktop image.",
+           animation="loading")
 
     # ---- 0. preflight -------------------------------------------------
-    log("0/5 controlli preliminari...")
+    log("0/5 Pre-flight checks...")
     img_ok = (os.path.exists(IMG) and os.path.getsize(IMG) > 3e9
               and os.path.exists(MARKER + ".img"))
     need = 1.0 if img_ok else 5.0
-    if free_gb(DATA) < need:
-        log("FATAL: servono almeno %.0fGB liberi (ora: %.1fGB)"
-            % (need, free_gb(DATA)))
-        return 1
+    available = free_gb(DATA)
+    if available < need:
+        return fail("Not enough free storage. Need at least %.0f GB; only %.1f GB is available." % (need, available), 2, "STORAGE CHECK")
     if not os.path.exists(IMG_GZ):
-        log("FATAL: manca assets/xfce.img.gz")
+        log("FATAL: required assets/xfce.img.gz is missing")
         return 1
+    report(5, "NETWORK CHECK", "Checking connection to Ubuntu mirrors",
+           "The installer must download the Ubuntu base image and desktop packages.",
+           animation="download")
     rc = subprocess.call(["curl", "-sI", "--max-time", "8",
                           "https://cdimage.ubuntu.com"],
                          stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
     if rc != 0:
-        log("FATAL: rete missing (active il WiFi e riprova)")
-        return 1
+        return fail("No connection to cdimage.ubuntu.com. Connect to Wi-Fi and retry.", 5, "NETWORK CHECK")
 
     # ---- 1. immagine ext4 ---------------------------------------------
     if os.path.exists(IMG) and os.path.getsize(IMG) > 3e9 \
             and os.path.exists(MARKER + ".img"):
-        log("1/5 immagine gia' presente, salto")
+        log("1/5 Existing desktop image found; skipping.")
+        report(18, "DESKTOP IMAGE", "Existing desktop image found", "The current ext4 image will be reused.", animation="verify")
     else:
-        log("1/5 preparo l'immagine ext4 (4GB, alcuni minuti)...")
+        log("1/5 Preparing the 4 GB ext4 desktop image...")
+        report(8, "DESKTOP IMAGE", "Extracting the desktop image", "Writing the ext4 image to the application data directory.", animation="extract")
         try:
             with gzip.open(IMG_GZ, "rb") as src, open(IMG, "wb") as dst:
                 done = 0
@@ -131,44 +163,47 @@ def main():
                     dst.write(chunk)
                     done += len(chunk)
                     if done >= nxt:
-                        log("   %dMB / 4096MB" % (done >> 20))
-                        nxt += 512 << 20
+                        pct = min(20, 8 + int(done / float(4096 << 20) * 12))
+                        report(pct, "DESKTOP IMAGE", "Writing image: %d MB / 4096 MB" % (done >> 20), "Extracting the compressed ext4 image.", animation="extract")
+                        log("   %d MB / 4096 MB" % (done >> 20))
+                        nxt += 128 << 20
         except Exception as e:
-            log("FATAL: creazione immagine failed: %s" % e)
-            return 1
+            return fail("Could not create the desktop image: %s" % e, 8, "DESKTOP IMAGE")
         open(MARKER + ".img", "w").close()
 
-    log("   monto l'immagine in loopback...")
+    report(22, "MOUNT", "Mounting the desktop image", "Preparing the isolated Ubuntu filesystem. The muOS host root is not modified.", animation="loading")
+    log("Mounting the desktop image...")
     if not umount_all():
-        log("FATAL: mount XFCE ancora attivi; rifiuto il remount")
-        return 1
+        return fail("An XFCE image mount is still active; refusing to remount it.", 22, "MOUNT")
     os.makedirs(MNT, exist_ok=True)
     sh("modprobe loop 2>/dev/null || true")
     ok, err = imgmount.mount_img(IMG, MNT)
     if not ok:
-        log("FATAL: mount loop failed - %s" % (err or "?"))
-        return 1
-    log("   montata: %.1fGB liberi dentro l'immagine" % free_gb(MNT))
+        return fail("Could not mount the desktop image: %s" % (err or "unknown error"), 22, "MOUNT")
+    log("   mounted image: %.1f GB free" % free_gb(MNT))
 
+    result = 1
     try:
         # ---- 2. ubuntu-base ---------------------------------------------
         if os.path.exists(MNT + "/etc/os-release"):
-            log("2/5 rootfs gia' estratto, salto")
+            log("2/5 Ubuntu Base already extracted; skipping.")
+            report(42, "UBUNTU BASE", "Existing Ubuntu Base found", "The current root filesystem will be reused.", animation="verify")
         else:
-            log("2/5 scarico ubuntu-base 24.04 arm64 (~30MB)...")
+            report(26, "DOWNLOAD", "Downloading Ubuntu Base 24.04 ARM64", "The base system archive is approximately 30 MB.", animation="download")
+            log("2/5 Downloading Ubuntu Base 24.04 ARM64 (about 30 MB)...")
             if not (os.path.exists(TGZ) and
                     sh(["gzip", "-t", TGZ]) == 0):
                 if sh(["curl", "-fL", "--retry", "2", "-o", TGZ, UB_URL]) != 0:
-                    log("FATAL: download failed")
-                    return 1
-            log("   estraggo nel filesystem ext4...")
+                    return fail("Ubuntu Base download failed.", 26, "DOWNLOAD")
+            report(36, "EXTRACTION", "Extracting Ubuntu Base", "Expanding the base filesystem into the isolated ext4 image.", animation="extract")
+            log("   extracting into the ext4 filesystem...")
             if sh("gzip -dc '%s' | tar -xf - -C '%s'" % (TGZ, MNT)) != 0:
-                log("FATAL: estrazione failed")
-                return 1
+                return fail("Ubuntu Base extraction failed.", 36, "EXTRACTION")
             os.remove(TGZ)
 
         # ---- 3. configurazione --------------------------------------------
-        log("3/5 configuro il sistema...")
+        report(48, "CONFIGURATION", "Configuring the isolated desktop", "Setting hostname, package sources, Xorg and controller layout.", animation="loading")
+        log("3/5 Configuring the isolated desktop...")
         shutil.copy("/etc/resolv.conf", MNT + "/etc/resolv.conf")
         with open(MNT + "/etc/hosts", "w") as f:
             f.write("127.0.0.1 localhost voiddesk\n")
@@ -199,43 +234,53 @@ def main():
         os.chmod(MNT + "/root/.xinitrc", 0o755)
 
         # ---- 4. pacchetti ---------------------------------------------
-        log("4/5 installo Xorg + XFCE (~400MB, 10-20 minuti)...")
-        log("    NON SPEGNERE LA CONSOLE")
+        log("4/5 Installing Xorg and XFCE (typically 10-20 minutes)...")
+        log("   Keep the device powered on.")
         if not bind_all():
-            log("FATAL: bind mount falliti")
-            return 1
+            return fail("Could not prepare the required bind mounts.", 55, "MOUNT")
         env = "DEBIAN_FRONTEND=noninteractive " \
               "PATH=/usr/sbin:/usr/bin:/sbin:/bin"
         aptop = ("-o Acquire::ForceIPv4=true "
                  "-o Acquire::https::Verify-Peer=false "
                  "-o Acquire::https::Verify-Host=false "
                  "-o Acquire::Retries=2")
+        report(60, "PACKAGE INDEX", "Refreshing Ubuntu package indexes", "Connecting to the configured Ubuntu repositories.", animation="download")
         if sh("chroot '%s' /bin/bash -c '%s apt-get %s update'"
               % (MNT, env, aptop)) != 0:
-            log("FATAL: apt-get update failed")
-            return 1
+            return fail("Ubuntu package index update failed.", 60, "PACKAGE INDEX")
+        report(68, "INSTALLATION", "Installing Xorg and XFCE packages", "This phase can take 10-20 minutes. Void Desk remains available while it runs.", animation="install")
         if sh("chroot '%s' /bin/bash -c \"%s apt-get %s install -y "
               "--no-install-recommends %s && apt-get clean\""
               % (MNT, env, aptop, PKGS)) != 0:
-            log("FATAL: installazione pacchetti failed")
-            return 1
+            return fail("Xorg / XFCE package installation failed.", 68, "INSTALLATION")
 
         # ---- 5. verifica ----------------------------------------------
-        log("5/5 verify...")
+        report(94, "VERIFICATION", "Checking the installed desktop", "Validating Xorg, XFCE and controller launch binaries.", animation="verify")
+        log("5/5 Verifying the installed desktop...")
         for p in ("/usr/bin/startx", "/usr/bin/startxfce4",
                   "/usr/bin/qjoypad"):
             if not os.path.exists(MNT + p):
-                log("FATAL: manca %s nel chroot" % p)
-                return 1
+                return fail("Required desktop component is missing: %s" % p, 94, "VERIFICATION")
         with open(MARKER, "w") as f:
             f.write("xfce ok\n")
-        log("==== DESKTOP XFCE INSTALLATO ====")
-        log("Avvialo da VOIDDESK -> DESKTOP XFCE")
-        return 0
+        log("==== XFCE DESKTOP INSTALLED ====")
+        log("Launch it from Void Desk / Start Session.")
+        result = 0
     finally:
         if not umount_all():
-            log("FATAL: cleanup XFCE incompleto; mount o loop ancora attivi")
-            return 1
+            fail("XFCE cleanup is incomplete; one or more mounts or loop devices remain active.", 97, "CLEANUP")
+            try:
+                os.remove(MARKER)
+            except OSError:
+                pass
+            result = 1
+
+    if result == 0:
+        report(100, "COMPLETED", "XFCE is installed and ready",
+               "The desktop image passed its post-install checks.",
+               status="done", animation="verify", severity="success")
+        log("==== XFCE BOOTSTRAP COMPLETED ====")
+    return result
 
 
 if __name__ == "__main__":

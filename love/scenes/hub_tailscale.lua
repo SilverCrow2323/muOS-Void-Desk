@@ -179,7 +179,7 @@ end
 local config = {
     title = "TAILSCALE",
     node_idx = 5,
-    widget_height = 142,
+    widget_height = 110,
     row_height = 46,
     status = "Native service integration",
     on_enter = function(scene)

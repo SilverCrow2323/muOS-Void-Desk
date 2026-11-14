@@ -5,6 +5,10 @@ local theme      = require("theme.loader")
 local input      = require("core.input")
 local inputdbg   = require("core.input_debug")
 local notifications = require("core.notifications")
+local jobs       = require("core.jobs")
+local tablet     = require("core.tablet")
+local operation_overlay = require("core.operation_overlay")
+local onboarding = require("core.onboarding")
 local crt        = require("core.crt_shader")
 local visual_capture = require("core.visual_capture")
 local qwasar_profile = require("core.qwasar_profile")
@@ -14,6 +18,7 @@ local axis_state = {} -- analog-stick edge tracking (per axis)
 
 function love.load()
     config.load()
+    onboarding.init(config)
     theme.apply(config.get("theme", "cyberpunk"))
     local composition, profile_err = qwasar_profile.load()
     if composition then
@@ -49,6 +54,9 @@ function love.load()
     sm.register("hub_info", require("scenes.hub_info"))
 
     if os.getenv("VOIDDESK_CAPTURE_ALL") == "1" then
+        onboarding.disable_for_visual_capture()
+        tablet.active = false
+        jobs.overlay_open = false
         local ok, err = visual_capture.start_batch(sm)
         if not ok then error(err or "unable to start visual capture batch") end
     else
@@ -57,8 +65,11 @@ function love.load()
 end
 
 function love.update(dt)
-    sm.update(dt)
+    if not onboarding.active then sm.update(dt) end
     bridge.poll()
+    jobs.update(dt)
+    tablet.update(dt)
+    onboarding.update(dt)
     notifications.update()
     visual_capture.update(dt)
 end
@@ -68,13 +79,22 @@ function love.draw()
         sm.draw()
     end)
     local chrome = require("core.chrome")
-    local theme = require("theme.loader")
-    notifications.draw(theme.get(), chrome.HEADER_H)
+    local current_theme = theme.get()
+    if not tablet.active and not jobs.overlay_open and not onboarding.active then
+        notifications.draw(current_theme, chrome.HEADER_H)
+    end
+    tablet.draw()
+    operation_overlay.draw()
+    onboarding.draw(current_theme)
 end
 
 -- ─── KEYBOARD ──────────────────────────────────────────────
 function love.keypressed(key, sc, isrepeat)
     if isrepeat then return end
+    if onboarding.active then
+        onboarding.keypressed(key, config)
+        return
+    end
     if key == "f12" then
         local ok, err = visual_capture.capture(sm.current_name())
         if not ok then
@@ -87,7 +107,8 @@ function love.keypressed(key, sc, isrepeat)
         return
     end
     if key == "m" then
-        notifications.toggle()
+        if jobs.overlay_open then jobs.hide_overlay() end
+        tablet.toggle()
         return
     end
     if key == "c" then
@@ -103,10 +124,24 @@ function love.keypressed(key, sc, isrepeat)
     if logical then input.press(logical, "key:" .. key) end
 end
 
+function love.textinput(text)
+    if onboarding.active then onboarding.textinput(text, config)
+    elseif not tablet.active and not jobs.overlay_open then sm.textinput(text) end
+end
+
+local function dispatch_control(action, source)
+    if not action then return end
+    if onboarding.active then
+        onboarding.handle_action(action, config)
+    else
+        input.press(action, source)
+    end
+end
+
 -- ─── GAMEPAD (named buttons, reliable) ────────────────────
 function love.gamepadpressed(joystick, button)
     local logical = input.GAMEPAD_NAMES[button]
-    if logical then input.press(logical, "gamepad:" .. button) end
+    dispatch_control(logical, "gamepad:" .. button)
 end
 
 -- ─── JOYSTICK (raw buttons, fallback for unmapped controllers) ──
@@ -114,7 +149,7 @@ function love.joystickpressed(joystick, button)
     -- If it IS a gamepad, gamepadpressed already fired: skip to avoid double
     if joystick:isGamepad() then return end
     local logical = input.JOYBTN_FALLBACK[button]
-    if logical then input.press(logical, "joybtn:" .. button)
+    if logical then dispatch_control(logical, "joybtn:" .. button)
     else
         if os.getenv("VOIDDESK_DEBUG_INPUT") == "1" then
             print("[input] unmapped joystick button: " .. tostring(button))
@@ -125,10 +160,10 @@ end
 -- ─── HAT (d-pad on most devices) ───────────────────────────
 function love.joystickhat(joystick, hat, direction)
     -- direction: "c" (center), "u","d","l","r","ru","rd","lu","ld"
-    if direction == "u" then input.press("up",    "hat:u")
-    elseif direction == "d" then input.press("down",  "hat:d")
-    elseif direction == "l" then input.press("left",  "hat:l")
-    elseif direction == "r" then input.press("right", "hat:r")
+    if direction == "u" then dispatch_control("up", "hat:u")
+    elseif direction == "d" then dispatch_control("down", "hat:d")
+    elseif direction == "l" then dispatch_control("left", "hat:l")
+    elseif direction == "r" then dispatch_control("right", "hat:r")
     end
     -- diagonal: fire the dominant axis only (menus don't like diagonals)
     -- ignored for now — user can navigate cleanly
@@ -148,10 +183,10 @@ function love.joystickaxis(joystick, axis, value)
 
     if dir == prev then return end
     if axis == 0 then
-        if dir ==  1 then input.press("right", "axis:x+")
-        elseif dir == -1 then input.press("left",  "axis:x-") end
+        if dir ==  1 then dispatch_control("right", "axis:x+")
+        elseif dir == -1 then dispatch_control("left",  "axis:x-") end
     elseif axis == 1 then
-        if dir == -1 then input.press("up",   "axis:y-")
-        elseif dir ==  1 then input.press("down", "axis:y+") end
+        if dir == -1 then dispatch_control("up",   "axis:y-")
+        elseif dir ==  1 then dispatch_control("down", "axis:y+") end
     end
 end

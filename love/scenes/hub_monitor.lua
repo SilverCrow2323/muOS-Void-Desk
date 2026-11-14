@@ -80,7 +80,7 @@ end
 return dashboard.new({
     title = "VOID MONITOR",
     node_idx = 6,
-    widget_height = 210,
+    widget_height = 150,
     row_height = 46,
     status = "Live CPU and memory history",
 

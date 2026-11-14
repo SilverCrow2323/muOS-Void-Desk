@@ -17,10 +17,12 @@ import shlex
 import struct
 import signal
 import shutil
+import socket
 import subprocess
 import sys
 import termios
 import time
+import tempfile
 import traceback
 import urllib.error
 import urllib.parse
@@ -733,6 +735,259 @@ def h_launch_external(args):
     })
 
 
+def _notes_name(candidate):
+    if not isinstance(candidate, str):
+        return None
+    value = candidate.strip()
+    if not value or len(value) > 64 or "/" in value or "\\" in value or "\x00" in value:
+        return None
+    if not value.lower().endswith(".txt"):
+        value += ".txt"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _.-]{0,47}\.txt", value):
+        return None
+    return value
+
+
+def h_notes_list(args):
+    notes_dir = DATA / "notes"
+    try:
+        notes_dir.mkdir(parents=True, exist_ok=True)
+        items = []
+        for path in notes_dir.iterdir():
+            if path.is_symlink() or not path.is_file() or path.suffix.lower() != ".txt":
+                continue
+            try:
+                stat = path.stat()
+                preview = path.read_text(encoding="utf-8", errors="replace")[:120]
+                items.append({
+                    "name": path.name,
+                    "size": stat.st_size,
+                    "modified": int(stat.st_mtime),
+                    "preview": preview.replace("\n", " ").strip(),
+                })
+            except OSError:
+                continue
+        items.sort(key=lambda item: item["modified"], reverse=True)
+        return {"ok": True, "notes": items[:100], "count": min(len(items), 100)}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot list notes: " + str(exc)[:120]}
+
+
+def h_notes_read(args):
+    name = _notes_name(args.get("name"))
+    if not name:
+        return {"ok": False, "error": "invalid note name"}
+    target = DATA / "notes" / name
+    if target.is_symlink() or not target.is_file():
+        return {"ok": False, "error": "note does not exist"}
+    try:
+        if target.stat().st_size > 32768:
+            return {"ok": False, "error": "note is larger than the 32 KB editor limit"}
+        return {"ok": True, "name": name,
+                "content": target.read_text(encoding="utf-8", errors="replace")}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot read note: " + str(exc)[:120]}
+
+
+def h_notes_save(args):
+    name = _notes_name(args.get("name"))
+    content = args.get("content")
+    if not name:
+        return {"ok": False, "error": "invalid note name"}
+    if not isinstance(content, str):
+        return {"ok": False, "error": "note content must be text"}
+    if len(content.encode("utf-8")) > 32768:
+        return {"ok": False, "error": "note exceeds the 32 KB limit"}
+    notes_dir = DATA / "notes"
+    target = notes_dir / name
+    temporary = notes_dir / ("." + name + ".tmp")
+    try:
+        notes_dir.mkdir(parents=True, exist_ok=True)
+        if target.is_symlink() or temporary.is_symlink():
+            return {"ok": False, "error": "linked note files are not allowed"}
+        with temporary.open("w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+        return {"ok": True, "name": name, "size": target.stat().st_size}
+    except OSError as exc:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {"ok": False, "error": "cannot save note: " + str(exc)[:120]}
+
+
+def h_notes_delete(args):
+    name = _notes_name(args.get("name"))
+    if not name:
+        return {"ok": False, "error": "invalid note name"}
+    target = DATA / "notes" / name
+    if target.is_symlink() or not target.is_file():
+        return {"ok": False, "error": "note does not exist"}
+    try:
+        target.unlink()
+        return {"ok": True, "name": name}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot delete note: " + str(exc)[:120]}
+
+
+def _read_content_cache(name, max_bytes=512 * 1024):
+    if name not in ("rss_cache.json", "weather_cache.json"):
+        return {"ok": False, "error": "unknown content cache"}
+    path = DATA / name
+    if path.is_symlink() or not path.is_file():
+        return {"ok": True, "cached": False}
+    try:
+        if path.stat().st_size > max_bytes:
+            return {"ok": False, "error": "cached content exceeds its size limit"}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or payload.get("ok") is not True:
+            return {"ok": False, "error": "cached content is malformed"}
+        payload["cached"] = True
+        return payload
+    except (OSError, ValueError, TypeError):
+        return {"ok": False, "error": "cannot read cached content"}
+
+
+def h_rss_cache(args):
+    return _read_content_cache("rss_cache.json")
+
+
+def h_weather_cache(args):
+    return _read_content_cache("weather_cache.json")
+
+
+_TEXT_EXTS = {
+    ".txt", ".md", ".log", ".cfg", ".ini", ".json", ".csv",
+    ".yml", ".yaml", ".sh", ".conf", ".xml",
+}
+_TEXT_MAX_BYTES = 128 * 1024
+
+
+def _text_filename(candidate):
+    if not isinstance(candidate, str):
+        return None
+    value = candidate.strip()
+    if (not value or len(value) > 112 or "\x00" in value or
+            "/" in value or "\\" in value or value in (".", "..") or
+            value.startswith(".")):
+        return None
+    suffix = Path(value).suffix.lower()
+    if suffix not in _TEXT_EXTS:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _().-]{0,79}\.[A-Za-z0-9]{1,8}", value):
+        return None
+    return value
+
+
+def _text_directory():
+    directory = DATA / "Texts"
+    directory.mkdir(parents=True, exist_ok=True)
+    if directory.is_symlink() or not directory.is_dir():
+        raise OSError("Texts directory must be a real directory")
+    return directory
+
+
+def h_text_list(args):
+    try:
+        directory = _text_directory()
+        files = []
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if entry.is_symlink() or not entry.is_file(follow_symlinks=False):
+                    continue
+                name = entry.name
+                if not _text_filename(name):
+                    continue
+                try:
+                    stat = entry.stat(follow_symlinks=False)
+                    files.append({
+                        "name": name,
+                        "size": stat.st_size,
+                        "modified": int(stat.st_mtime),
+                    })
+                except OSError:
+                    continue
+        files.sort(key=lambda item: item["name"].casefold())
+        return {"ok": True, "files": files[:200], "count": min(len(files), 200)}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot list text files: " + str(exc)[:120]}
+
+
+def h_text_read(args):
+    name = _text_filename(args.get("name"))
+    if not name:
+        return {"ok": False, "error": "invalid text filename or extension"}
+    try:
+        directory = _text_directory()
+        target = directory / name
+        if target.is_symlink() or not target.is_file():
+            return {"ok": False, "error": "text file does not exist"}
+        if target.stat().st_size > _TEXT_MAX_BYTES:
+            return {"ok": False, "error": "text file exceeds the 128 KB editor limit"}
+        content = target.read_text(encoding="utf-8", errors="replace")
+        if len(content.encode("utf-8")) > _TEXT_MAX_BYTES:
+            return {"ok": False, "error": "decoded text file exceeds the editor limit"}
+        return {"ok": True, "name": name, "content": content}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot read text file: " + str(exc)[:120]}
+
+
+def h_text_save(args):
+    name = _text_filename(args.get("name"))
+    content = args.get("content")
+    if not name:
+        return {"ok": False, "error": "invalid text filename or extension"}
+    if not isinstance(content, str):
+        return {"ok": False, "error": "text content must be a string"}
+    try:
+        encoded = content.encode("utf-8")
+    except UnicodeEncodeError:
+        return {"ok": False, "error": "text content is not valid UTF-8"}
+    if len(encoded) > _TEXT_MAX_BYTES:
+        return {"ok": False, "error": "text file exceeds the 128 KB editor limit"}
+    temporary = None
+    try:
+        directory = _text_directory()
+        target = directory / name
+        if target.is_symlink():
+            return {"ok": False, "error": "linked text files are not allowed"}
+        fd, temporary = tempfile.mkstemp(prefix=".void-edit-", suffix=".tmp",
+                                         dir=str(directory))
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+        temporary = None
+        return {"ok": True, "name": name, "size": len(encoded)}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot save text file: " + str(exc)[:120]}
+    finally:
+        if temporary:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
+
+
+def h_text_delete(args):
+    name = _text_filename(args.get("name"))
+    if not name:
+        return {"ok": False, "error": "invalid text filename or extension"}
+    try:
+        directory = _text_directory()
+        target = directory / name
+        if target.is_symlink() or not target.is_file():
+            return {"ok": False, "error": "text file does not exist"}
+        target.unlink()
+        return {"ok": True, "name": name}
+    except OSError as exc:
+        return {"ok": False, "error": "cannot delete text file: " + str(exc)[:120]}
+
+
 def h_toolbox_stats(args):
     """Read-only counts for the LÖVE Toolbox dashboard."""
     notes_dir = DATA / "notes"
@@ -996,13 +1251,34 @@ def h_apt_catalog(args):
 
 
 def _job_refresh(job):
+    state_path = job.get("progress_file")
+    if state_path:
+        try:
+            state = json.loads(Path(state_path).read_text(encoding="utf-8"))
+            if isinstance(state, dict):
+                for field in ("progress", "phase", "message", "detail",
+                              "animation", "severity", "indeterminate"):
+                    if field in state:
+                        job[field] = state[field]
+                if state.get("status") == "failed":
+                    job["severity"] = "error"
+        except (OSError, ValueError, TypeError):
+            pass
+
     process = job.get("process")
     if job["status"] == "running" and process is not None:
         code = process.poll()
         if code is not None:
             job["status"] = "done" if code == 0 else "error"
-            job["progress"] = 100 if code == 0 else 0
+            job["progress"] = 100 if code == 0 else job.get("progress", 0)
+            job["severity"] = "success" if code == 0 else "error"
             job["exit_code"] = code
+            lock_path = job.get("lock_path")
+            if lock_path:
+                try:
+                    Path(lock_path).unlink(missing_ok=True)
+                except OSError:
+                    pass
     return job
 
 
@@ -1012,10 +1288,21 @@ def _job_public(job):
         "id": job["id"],
         "name": job["name"],
         "hub": job["hub"],
+        "service_task": job.get("service_task"),
         "status": job["status"],
         "started": job["started"],
-        "progress": job["progress"],
-        "color": [0.45, 0.72, 0.95],
+        "progress": job.get("progress", 0),
+        "phase": job.get("phase", ""),
+        "message": job.get("message", ""),
+        "detail": job.get("detail", ""),
+        "description": job.get("description", "Void Desk is performing this operation."),
+        "reason": job.get("reason", "This step is required to complete the selected action."),
+        "icon": job.get("icon", "tool"),
+        "animation": job.get("animation", "loading"),
+        "severity": job.get("severity", "info"),
+        "indeterminate": job.get("indeterminate", False),
+        "can_background": job.get("can_background", True),
+        "color": job.get("color", [0.45, 0.72, 0.95]),
     }
 
 
@@ -1024,8 +1311,10 @@ def h_job_start(args):
     global _JOB_SEQ
     command = None
     cwd = APP_DIR
+    progress_file = None
     cmd_text = args.get("cmd")
     tool_id = args.get("tool_id")
+    service_task = args.get("service_task")
 
     apt_action = args.get("apt_action")
     if apt_action is not None:
@@ -1055,11 +1344,63 @@ def h_job_start(args):
         if not script.is_file():
             return {"ok": False, "error": "package installer is missing"}
         command = ["sh", str(script), tokens[2]]
-    elif args.get("service_task") == "tailscale_start":
+    elif service_task == "tailscale_start":
         script = APP_DIR / "service" / "tailscale_job.py"
         if not script.is_file():
             return {"ok": False, "error": "Tailscale service job is missing"}
         command = [sys.executable, str(script)]
+    elif service_task == "xfce_bootstrap":
+        if not IS_DEVICE:
+            return {"ok": False, "error": "XFCE handheld bootstrap is available only on muOS devices"}
+        script = APP_DIR / "bin" / "xfce_bootstrap.py"
+        if not script.is_file():
+            return {"ok": False, "error": "XFCE bootstrap script is missing"}
+        progress_file = DATA / ".xfce_bootstrap_state.json"
+        command = [sys.executable, str(script)]
+    elif service_task == "rss_refresh":
+        category = str(args.get("category") or "all").lower()
+        language = str(args.get("language") or "all").lower()
+        if category not in ("all", "news", "tech", "linux", "gaming", "retro", "anime"):
+            return {"ok": False, "error": "unsupported RSS category"}
+        if language not in ("all", "en", "it"):
+            return {"ok": False, "error": "unsupported RSS language"}
+        script = APP_DIR / "service" / "content_refresh.py"
+        if not script.is_file():
+            return {"ok": False, "error": "content refresh worker is missing"}
+        progress_file = DATA / ".rss_refresh_state.json"
+        command = [sys.executable, str(script), "rss", category, language]
+    elif service_task == "weather_refresh":
+        city = " ".join(str(args.get("city") or "").split())
+        if not city or len(city) > 80 or any(ord(ch) < 32 for ch in city):
+            return {"ok": False, "error": "enter a city name up to 80 characters"}
+        script = APP_DIR / "service" / "content_refresh.py"
+        if not script.is_file():
+            return {"ok": False, "error": "content refresh worker is missing"}
+        progress_file = DATA / ".weather_refresh_state.json"
+        command = [sys.executable, str(script), "weather", city]
+    elif service_task == "env_install":
+        env_id = str(args.get("id") or "")
+        if env_id not in ("icewm", "lxde"):
+            return {"ok": False, "error": "unsupported desktop environment"}
+        script = APP_DIR / "bin" / "env_install.py"
+        if not script.is_file():
+            return {"ok": False, "error": "environment installer is missing"}
+        progress_file = DATA / (".%s_install_state.json" % env_id)
+        command = [sys.executable, str(script), env_id]
+    elif service_task == "desktop_maintenance":
+        action = str(args.get("action") or "")
+        env_id = str(args.get("id") or "")
+        if action not in ("uninstall", "updates") or env_id not in ENV_MARKERS:
+            return {"ok": False, "error": "unsupported desktop maintenance operation"}
+        if action == "uninstall" and not (DATA / ENV_MARKERS[env_id]).exists():
+            return {"ok": False, "error": "desktop environment is not installed"}
+        if action == "updates" and not (DATA / ENV_MARKERS[env_id]).exists():
+            return {"ok": False, "error": "install this desktop before checking for updates"}
+        script = APP_DIR / "bin" / "desktop_env_maintenance.py"
+        if not script.is_file():
+            return {"ok": False, "error": "desktop maintenance helper is missing"}
+        progress_file = DATA / (".%s_%s_state.json" % (env_id, action))
+        command = [sys.executable, str(script), action, env_id]
     elif tool_id:
         try:
             registry = json.loads(
@@ -1120,9 +1461,23 @@ def h_job_start(args):
     else:
         return {"ok": False, "error": "job requires cmd or tool_id"}
 
+    requested_name = str(args.get("name") or tool_id or "Background job")[:80]
+    if service_task in ("rss_refresh", "weather_refresh"):
+        for existing in _JOBS.values():
+            _job_refresh(existing)
+            if (existing.get("service_task") == service_task
+                    and existing.get("status") in ("running", "starting")):
+                return {"ok": True, "job": _job_public(existing), "already": True}
+
+    if progress_file is not None:
+        try:
+            progress_file.unlink(missing_ok=True)
+        except OSError:
+            pass
+
     _JOB_SEQ += 1
     job_id = str(_JOB_SEQ)
-    name = str(args.get("name") or tool_id or "Background job")[:80]
+    name = requested_name
     hub = str(args.get("hub") or "system")[:32]
     log_path = DATA / ("love_job_%s.log" % job_id)
     try:
@@ -1140,11 +1495,24 @@ def h_job_start(args):
         "id": job_id,
         "name": name,
         "hub": hub,
+        "service_task": service_task,
         "status": "running",
         "started": time.time(),
         "progress": 0,
+        "phase": "Preparing",
+        "message": "Starting operation...",
+        "detail": "",
+        "description": str(args.get("description") or "Void Desk is performing this operation.")[:240],
+        "reason": str(args.get("reason") or "This step is required to complete the selected action.")[:240],
+        "icon": str(args.get("icon") or "tool")[:32],
+        "animation": str(args.get("animation") or "loading")[:24],
+        "severity": "info",
+        "indeterminate": progress_file is not None,
+        "can_background": args.get("can_background", True) is not False,
         "process": process,
         "log_path": log_path,
+        "progress_file": progress_file,
+        "color": args.get("color") or [0.45, 0.72, 0.95],
     }
     _JOBS[job_id] = job
     return {"ok": True, "job": _job_public(job)}
@@ -1195,6 +1563,7 @@ MEDIA_AUDIO_EXTS = {".mp3", ".ogg", ".oga", ".opus", ".flac", ".wav", ".m4a", ".
 MEDIA_VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v"}
 _MEDIA_PLAYER_PROC = None
 _MEDIA_NOW_PLAYING = ""
+_MEDIA_PLAYER_SOCKET = Path(os.environ.get("TMPDIR") or "/tmp") / ("voiddesk-mpv-%s.sock" % os.getpid())
 
 
 def _media_resolve(candidate):
@@ -1261,6 +1630,29 @@ def h_media_list(args):
     return {"ok": True, "path": str(directory), "items": items[:200], "root": False}
 
 
+def _media_ipc(command):
+    """Send one bounded command to the local MPV Unix socket."""
+    if not _MEDIA_PLAYER_SOCKET.exists() or _MEDIA_PLAYER_SOCKET.is_symlink():
+        return None
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(0.6)
+            client.connect(str(_MEDIA_PLAYER_SOCKET))
+            payload = json.dumps({"command": command, "request_id": 1}) + "\n"
+            client.sendall(payload.encode("utf-8"))
+            response = client.recv(4096).decode("utf-8", "replace").splitlines()
+        for line in response:
+            try:
+                parsed = json.loads(line)
+                if parsed.get("request_id") == 1:
+                    return parsed
+            except (ValueError, TypeError):
+                continue
+    except (OSError, ValueError):
+        return None
+    return None
+
+
 def h_media_play(args):
     global _MEDIA_PLAYER_PROC, _MEDIA_NOW_PLAYING
     target = _media_resolve(args.get("path"))
@@ -1273,8 +1665,12 @@ def h_media_play(args):
         return {"ok": False, "error": "mpv is not installed"}
     h_media_stop({})
     try:
+        if _MEDIA_PLAYER_SOCKET.is_symlink():
+            return {"ok": False, "error": "refusing a linked MPV control socket"}
+        _MEDIA_PLAYER_SOCKET.unlink(missing_ok=True)
         video = target.suffix.lower() in MEDIA_VIDEO_EXTS
-        player_args = [player, "--no-terminal"]
+        player_args = [player, "--no-terminal",
+                       "--input-ipc-server=" + str(_MEDIA_PLAYER_SOCKET)]
         player_args.append("--force-window=yes" if video else "--no-video")
         player_args.append(str(target))
         _MEDIA_PLAYER_PROC = subprocess.Popen(
@@ -1291,20 +1687,54 @@ def h_media_play(args):
         return {"ok": False, "error": "cannot start mpv: " + str(exc)[:120]}
 
 
+def h_media_action(args):
+    action = str(args.get("action") or "")
+    if action == "stop":
+        return h_media_stop({})
+    if _MEDIA_PLAYER_PROC is None or _MEDIA_PLAYER_PROC.poll() is not None:
+        return {"ok": False, "error": "no local media is playing"}
+    if action == "toggle_pause":
+        response = _media_ipc(["cycle", "pause"])
+        if not response or response.get("error") != "success":
+            return {"ok": False, "error": "MPV pause control is unavailable"}
+        status = _media_ipc(["get_property", "pause"])
+        paused = status.get("data") if status and status.get("error") == "success" else None
+        return {"ok": True, "action": action, "data": paused}
+    if action == "volume":
+        try:
+            value = max(0, min(100, int(args.get("value"))))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "volume must be between 0 and 100"}
+        response = _media_ipc(["set_property", "volume", value])
+        if not response or response.get("error") != "success":
+            return {"ok": False, "error": "MPV volume control is unavailable"}
+        return {"ok": True, "volume": value}
+    return {"ok": False, "error": "unsupported media action"}
+
+
 def h_media_stop(args):
     global _MEDIA_PLAYER_PROC, _MEDIA_NOW_PLAYING
     process = _MEDIA_PLAYER_PROC
     if process is not None and process.poll() is None:
+        # Ask MPV to exit cleanly first; terminate is the bounded fallback.
+        _media_ipc(["quit"])
         try:
-            process.terminate()
             process.wait(timeout=2)
         except Exception:
             try:
-                process.kill()
-            except OSError:
-                pass
+                process.terminate()
+                process.wait(timeout=2)
+            except Exception:
+                try:
+                    process.kill()
+                except OSError:
+                    pass
     _MEDIA_PLAYER_PROC = None
     _MEDIA_NOW_PLAYING = ""
+    try:
+        _MEDIA_PLAYER_SOCKET.unlink(missing_ok=True)
+    except OSError:
+        pass
     return {"ok": True}
 
 
@@ -1312,18 +1742,30 @@ def h_media_status(args):
     try:
         if IS_VISUAL_CAPTURE:
             return {"ok": True, "media": {
-                "volume": 40,
-                "now_playing": None,
-                "library_count": 0,
-                "recordings": 0,
+                "volume": 40, "now_playing": None, "paused": False,
+                "library_count": 0, "recordings": 0,
             }}
-        vol = deskinfo.volume() if deskinfo is not None else None
         playing = None
+        paused = False
+        player_volume = None
         if _MEDIA_PLAYER_PROC is not None and _MEDIA_PLAYER_PROC.poll() is None:
             playing = _MEDIA_NOW_PLAYING or "Media"
+            pause_response = _media_ipc(["get_property", "pause"])
+            volume_response = _media_ipc(["get_property", "volume"])
+            if pause_response and pause_response.get("error") == "success":
+                paused = bool(pause_response.get("data"))
+            if volume_response and volume_response.get("error") == "success":
+                try:
+                    player_volume = int(volume_response.get("data"))
+                except (TypeError, ValueError):
+                    player_volume = None
+        vol = player_volume
+        if vol is None:
+            vol = deskinfo.volume() if deskinfo is not None else None
         return {"ok": True, "media": {
             "volume": vol if vol is not None else 0,
             "now_playing": playing,
+            "paused": paused,
             "library_count": 0,
             "recordings": 0,
         }}
@@ -1499,6 +1941,18 @@ def h_iptv_play(args):
             "channel": channel.get("name", "Live stream")}
 
 
+def h_iptv_action(args):
+    if IS_VISUAL_CAPTURE:
+        return {"ok": False, "error": "playback controls are disabled during visual capture"}
+    if iptv_module is None:
+        return {"ok": False, "error": "IPTV service module unavailable"}
+    action = str(args.get("action") or "")
+    try:
+        return iptv_module.action(action, args.get("value"))
+    except Exception as exc:
+        return {"ok": False, "error": "IPTV control failed: " + str(exc)[:120]}
+
+
 def h_iptv_stop(args):
     if IS_VISUAL_CAPTURE:
         return {"ok": True, "state": "idle"}
@@ -1657,40 +2111,105 @@ def h_session_launch(args):
     return h_xfce_launch(args)
 
 def h_env_install(args):
-    """Install icewm or lxde into the existing XFCE chroot (device only —
-    there's no PC-side equivalent, those run XFCE itself via apt/Xephyr)."""
+    """Install an allowlisted additional desktop inside the XFCE image."""
     env_id = args.get("id")
     if env_id not in ("icewm", "lxde"):
-        return {"ok": False, "error": f"unknown env: {env_id}"}
-    dcheck = device_only("env_install")
-    if dcheck:
-        return dcheck
+        return {"ok": False, "error": "unknown desktop environment"}
+    blocked = device_only("env_install")
+    if blocked:
+        return blocked
     if not (DATA / ".xfce_ready").exists():
-        return {"ok": False, "error": "install XFCE first — this adds onto it"}
+        return {"ok": False, "error": "Install XFCE before adding another desktop"}
     marker = DATA / ENV_MARKERS[env_id]
     if marker.exists():
-        return {"ok": True, "already": True,
-                "note": f"{ENV_NAMES[env_id]} already installed"}
-    lock = DATA / f".{env_id}_install_running"
+        return {"ok": True, "already": True, "note": ENV_NAMES[env_id] + " is already installed"}
+    lock = DATA / (".%s_install_running" % env_id)
     if lock.exists():
         try:
-            os.kill(int(lock.read_text().strip()), 0)
-            return {"ok": True, "note": "install already running in background"}
-        except Exception:
-            try: lock.unlink()
-            except OSError: pass
-    try:
-        log_path = DATA / f"{env_id}_install.log"
-        with open(log_path, "ab") as lf:
-            proc = subprocess.Popen(
-                [sys.executable, str(APP_DIR / "bin" / "env_install.py"), env_id],
-                stdout=lf, stderr=lf, start_new_session=True)
-        lock.write_text(str(proc.pid))
-        return {"ok": True,
-                "note": f"installing {ENV_NAMES[env_id]} in background — "
-                        f"progress in data/{env_id}_install.log"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+            pid = int(lock.read_text().strip())
+            os.kill(pid, 0)
+            for job in _JOBS.values():
+                process = job.get("process")
+                if process is not None and process.pid == pid:
+                    return {"ok": True, "job": _job_public(job), "already": True}
+            return {"ok": False, "error": "An existing desktop installation is still running"}
+        except (ValueError, ProcessLookupError, PermissionError, OSError):
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+    result = h_job_start({
+        "service_task": "env_install",
+        "id": env_id,
+        "name": "Install " + ENV_NAMES[env_id],
+        "hub": "start-session",
+        "description": "Install " + ENV_NAMES[env_id] + " into the existing XFCE image.",
+        "reason": "Additional window managers share the XFCE root filesystem and require XFCE to be installed first.",
+        "icon": "desktop",
+        "animation": "install",
+        "can_background": True,
+    })
+    if not result.get("ok"):
+        return result
+    job = _JOBS.get(str(result["job"]["id"]))
+    if job and job.get("process"):
+        try:
+            lock.write_text(str(job["process"].pid), encoding="utf-8")
+            job["lock_path"] = lock
+        except OSError as exc:
+            try:
+                os.killpg(job["process"].pid, signal.SIGTERM)
+            except OSError:
+                pass
+            return {"ok": False, "error": "Cannot create operation lock: " + str(exc)}
+    return result
+
+def _start_desktop_maintenance(env_id, action):
+    if env_id not in ENV_MARKERS or action not in ("uninstall", "updates"):
+        return {"ok": False, "error": "unsupported desktop maintenance operation"}
+    blocked = device_only("desktop_maintenance")
+    if blocked:
+        return blocked
+    marker = DATA / ENV_MARKERS[env_id]
+    if not marker.exists():
+        return {"ok": False, "error": ENV_NAMES[env_id] + " is not installed"}
+    name = ("Remove " if action == "uninstall" else "Check updates for ") + ENV_NAMES[env_id]
+    for existing in _JOBS.values():
+        _job_refresh(existing)
+        if existing.get("name") == name and existing.get("status") in ("running", "starting"):
+            return {"ok": True, "job": _job_public(existing), "already": True}
+    description = ("Remove the selected desktop environment." if action == "uninstall"
+                   else "Refresh package indexes and simulate available updates without installing them.")
+    reason = ("XFCE removal deletes the shared desktop image, including IceWM and LXDE if installed."
+              if action == "uninstall" and env_id == "xfce"
+              else "This operation is limited to the selected environment inside the isolated Ubuntu image.")
+    result = h_job_start({
+        "service_task": "desktop_maintenance",
+        "action": action,
+        "id": env_id,
+        "name": name,
+        "hub": "start-session",
+        "description": description,
+        "reason": reason,
+        "icon": "desktop",
+        "animation": "verify" if action == "updates" else "extract",
+        "can_background": True,
+    })
+    return result
+
+
+def h_env_uninstall(args):
+    env_id = str(args.get("id") or "")
+    if env_id not in ENV_MARKERS:
+        return {"ok": False, "error": "unknown desktop environment"}
+    return _start_desktop_maintenance(env_id, "uninstall")
+
+
+def h_env_update_check(args):
+    env_id = str(args.get("id") or "")
+    if env_id not in ENV_MARKERS:
+        return {"ok": False, "error": "unknown desktop environment"}
+    return _start_desktop_maintenance(env_id, "updates")
 
 def h_voidcast_launch(args):
     """Launch the bundled VoidCast IPTV app (outdesk/VoidCast). Same
@@ -1738,39 +2257,61 @@ def h_apt_update(args):
         return {"ok": False, "error": str(e)}
 
 def h_xfce_install(args):
-    """Install XFCE:
-       - on device: kicks off bin/xfce_bootstrap.py in the background
-         (a real 10-20 min install needing network + ~5GB free) instead
-         of the previous stub that always reported fake success without
-         installing anything.
-       - on PC: apt install xfce4 + Xephyr via pkexec (GUI prompt),
-         also backgrounded so a long install can't block the whole
-         service (and therefore every other status query) for minutes."""
+    """Start the isolated XFCE bootstrap as a supervised LÖVE operation."""
     lock = DATA / ".xfce_install_running"
     if IS_DEVICE:
-        if (DATA / ".xfce_ready").exists():
-            return {"ok": True, "already": True, "note": "XFCE already installed"}
+        ready_marker = DATA / ".xfce_ready"
+        desktop_image = DATA / "xfce.img"
+        if ready_marker.exists():
+            try:
+                if desktop_image.is_file() and desktop_image.stat().st_size > 3_000_000_000:
+                    return {"ok": True, "already": True, "note": "XFCE is already installed"}
+            except OSError:
+                pass
+            try:
+                ready_marker.unlink()
+            except OSError:
+                pass
         if lock.exists():
             try:
-                os.kill(int(lock.read_text().strip()), 0)
-                return {"ok": True, "note": "install already running in background"}
-            except Exception:
-                try: lock.unlink()
-                except OSError: pass
-        try:
-            log_path = DATA / "xfce_bootstrap.log"
-            with open(log_path, "ab") as lf:
-                proc = subprocess.Popen(
-                    [sys.executable, str(APP_DIR / "bin" / "xfce_bootstrap.py")],
-                    stdout=lf, stderr=lf, start_new_session=True)
-            lock.write_text(str(proc.pid))
-            return {"ok": True,
-                    "note": "install started in background (10-20 min) — "
-                            "progress in data/xfce_bootstrap.log"}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
+                pid = int(lock.read_text().strip())
+                os.kill(pid, 0)
+                for job in _JOBS.values():
+                    process = job.get("process")
+                    if process is not None and process.pid == pid:
+                        return {"ok": True, "job": _job_public(job), "already": True}
+                return {"ok": False, "error": "An existing XFCE operation is still running; restart Void Desk before starting another."}
+            except (ValueError, ProcessLookupError, PermissionError, OSError):
+                try:
+                    lock.unlink()
+                except OSError:
+                    pass
+        result = h_job_start({
+            "service_task": "xfce_bootstrap",
+            "name": "Install XFCE",
+            "hub": "start-session",
+            "description": "Prepare the isolated Ubuntu 24.04 / XFCE desktop image.",
+            "reason": "XFCE requires at least 5 GB free for a fresh image (1 GB when reusing an existing image), a working network and about 10–20 minutes.",
+            "icon": "desktop",
+            "animation": "extract",
+            "can_background": True,
+        })
+        if not result.get("ok"):
+            return result
+        job = _JOBS.get(str(result["job"]["id"]))
+        if job and job.get("process"):
+            try:
+                lock.write_text(str(job["process"].pid), encoding="utf-8")
+                job["lock_path"] = lock
+            except OSError as exc:
+                try:
+                    os.killpg(job["process"].pid, signal.SIGTERM)
+                except OSError:
+                    pass
+                return {"ok": False, "error": "Cannot create XFCE operation lock: " + str(exc)}
+        return result
     if shutil.which("startxfce4"):
-        return {"ok": True, "already": True, "note": "XFCE already installed"}
+        return {"ok": True, "already": True, "note": "XFCE is already installed"}
     try:
         log_path = DATA / "xfce_pc_install.log"
         with open(log_path, "ab") as lf:
@@ -1778,12 +2319,11 @@ def h_xfce_install(args):
                 ["pkexec", "apt-get", "install", "-y", "--no-install-recommends",
                  "xfce4", "xfce4-terminal", "xserver-xephyr"],
                 stdout=lf, stderr=lf, start_new_session=True)
-        return {"ok": True, "note": "install started in background — "
-                                    "check data/xfce_pc_install.log"}
+        return {"ok": True, "note": "PC XFCE installation started"}
     except FileNotFoundError:
-        return {"ok": False, "error": "pkexec missing — install polkit (sudo apt install pkexec)"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": "pkexec is missing; install polkit on the PC"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 # Track XFCE/Xephyr subprocesses so we can clean up on exit
 import atexit
@@ -2129,6 +2669,7 @@ HANDLERS = {
     "media_list": h_media_list,
     "media_play": h_media_play,
     "media_stop": h_media_stop,
+    "media_action": h_media_action,
     "radio_search": h_radio_search,
     "radio_favorites": h_radio_favorites,
     "radio_favorite_toggle": h_radio_favorite_toggle,
@@ -2140,11 +2681,22 @@ HANDLERS = {
     "iptv_load_epg": h_iptv_load_epg,
     "iptv_epg_for": h_iptv_epg_for,
     "iptv_play": h_iptv_play,
+    "iptv_action": h_iptv_action,
     "iptv_stop": h_iptv_stop,
     "iptv_status": h_iptv_status,
     "list_external": h_list_external,
     "launch_external": h_launch_external,
     "toolbox_stats": h_toolbox_stats,
+    "rss_cache": h_rss_cache,
+    "weather_cache": h_weather_cache,
+    "notes_list": h_notes_list,
+    "notes_read": h_notes_read,
+    "notes_save": h_notes_save,
+    "notes_delete": h_notes_delete,
+    "text_list": h_text_list,
+    "text_read": h_text_read,
+    "text_save": h_text_save,
+    "text_delete": h_text_delete,
     "calendar_events": h_calendar_events,
     "hotspot_toggle": h_hotspot_toggle,
     "tailscale_status": h_tailscale_status,
@@ -2164,6 +2716,8 @@ HANDLERS = {
     "xfce_launch": h_xfce_launch,
     "apt_update": h_apt_update,
     "env_install": h_env_install,
+    "env_uninstall": h_env_uninstall,
+    "env_update_check": h_env_update_check,
     "voidcast_launch": h_voidcast_launch,
 }
 

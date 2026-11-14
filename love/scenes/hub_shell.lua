@@ -14,6 +14,7 @@ local nc = nodes.color_for(4)
 
 local t_enter = 0
 local status_msg = "Initializing PTY..."
+local python_repl = false
 local boot_t = 0
 local BOOT_DUR = 1.4
 
@@ -175,9 +176,17 @@ function scene.enter(args)
     osk_buf = ""
     osk_page = 0
     osk_sel = 0
-    status_msg = "Initializing PTY..."
+    python_repl = args and args.python_repl == true
+    status_msg = python_repl and "Starting Python REPL..." or "Initializing PTY..."
     shell.output = ""
-    shell.start()
+    shell.start(function(resp)
+        if resp.ok and python_repl then
+            shell.exec("python3 -q")
+            scene.set_status("Python interactive console")
+        elseif not resp.ok then
+            scene.set_status("Terminal unavailable: " .. tostring(resp.error or "start failed"))
+        end
+    end)
     input.clear()
     input.on("press", function(action)
         if boot_t < BOOT_DUR then return end
@@ -293,7 +302,7 @@ function scene.draw()
 
     -- Header
     chrome.draw_header({
-        theme = th, title = "Void-DESK", subtitle = "SHELL",
+        theme = th, title = "Void-DESK", subtitle = (python_repl and "PYTHON CONSOLE" or "SHELL"),
         status_icons = { "wifi", "battery" },
     })
 

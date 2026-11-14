@@ -22,6 +22,12 @@ function bridge.resp_path()
 end
 
 local function notify(req, response)
+    if type(response) == "table" and response.ok and type(response.job) == "table" then
+        local jobs = package.loaded["core.jobs"]
+        if jobs and jobs.show_job then
+            jobs.show_job(response.job.id, response.job)
+        end
+    end
     if req and req.cb then
         local ok, err = pcall(req.cb, response)
         if not ok then

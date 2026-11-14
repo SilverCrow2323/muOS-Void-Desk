@@ -187,6 +187,20 @@ function sm.draw()
     return true
 end
 
+function sm.textinput(text)
+    if current and current.textinput then
+        local ok, err = pcall(current.textinput, text)
+        if not ok then
+            current_error = tostring(err)
+            last_error = current_error
+            print("[scene] textinput failed " .. current_name .. ": " .. last_error)
+            return false
+        end
+        return true
+    end
+    return false
+end
+
 function sm.keypressed(key, sc, isrepeat)
     if current and current.keypressed then current.keypressed(key, sc, isrepeat) end
 end

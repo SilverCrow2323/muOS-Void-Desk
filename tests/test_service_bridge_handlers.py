@@ -282,9 +282,9 @@ def test_media_play_uses_argument_list_and_selects_audio_mode(tmp_path, monkeypa
     monkeypatch.setattr(service.subprocess, "Popen", fake_popen)
     result = service.h_media_play({"path": str(track)})
     assert result["ok"] is True
-    assert spawned["args"] == [
-        "/usr/bin/mpv", "--no-terminal", "--no-video", str(track)
-    ]
+    assert spawned["args"][:2] == ["/usr/bin/mpv", "--no-terminal"]
+    assert spawned["args"][2].startswith("--input-ipc-server=")
+    assert spawned["args"][3:] == ["--no-video", str(track)]
     assert "shell" not in spawned["kwargs"]
 
 
@@ -313,6 +313,8 @@ def test_media_play_uses_video_window_for_video_files(tmp_path, monkeypatch):
     )
     result = service.h_media_play({"path": str(video)})
     assert result["ok"] is True
+    assert spawned["args"][:2] == ["/usr/bin/mpv", "--no-terminal"]
+    assert spawned["args"][2].startswith("--input-ipc-server=")
     assert "--force-window=yes" in spawned["args"]
     assert "--no-video" not in spawned["args"]
 
@@ -477,3 +479,143 @@ def test_radio_actions_control_pause_volume_and_stop(monkeypatch):
         "ok": True, "running": False
     }
     assert player.stopped is True
+
+
+
+def test_notes_service_supports_atomic_crud_and_rejects_paths(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    saved = service.h_notes_save({
+        "name": "field log",
+        "content": "First line\nSecond line\n",
+    })
+    assert saved["ok"] is True
+    assert saved["name"] == "field log.txt"
+
+    listed = service.h_notes_list({})
+    assert listed["ok"] is True
+    assert listed["count"] == 1
+    assert listed["notes"][0]["name"] == "field log.txt"
+
+    opened = service.h_notes_read({"name": "field log.txt"})
+    assert opened["ok"] is True
+    assert opened["content"] == "First line\nSecond line\n"
+
+    updated = service.h_notes_save({
+        "name": "field log.txt",
+        "content": "Updated safely.\n",
+    })
+    assert updated["ok"] is True
+    assert service.h_notes_read({"name": "field log"})["content"] == "Updated safely.\n"
+
+    assert service.h_notes_save({
+        "name": "../../outside",
+        "content": "must not escape",
+    })["ok"] is False
+    assert service.h_notes_read({"name": "../field log.txt"})["ok"] is False
+
+    deleted = service.h_notes_delete({"name": "field log.txt"})
+    assert deleted["ok"] is True
+    assert service.h_notes_read({"name": "field log.txt"})["ok"] is False
+
+
+def test_notes_service_rejects_symlinks_and_large_notes(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    notes = tmp_path / "notes"
+    notes.mkdir()
+    (notes / "outside.txt").symlink_to(tmp_path / "secret.txt")
+    assert service.h_notes_read({"name": "outside.txt"})["ok"] is False
+    assert service.h_notes_delete({"name": "outside.txt"})["ok"] is False
+    assert service.h_notes_save({
+        "name": "large.txt",
+        "content": "x" * 32769,
+    })["ok"] is False
+
+
+
+def test_text_editor_service_supports_confined_atomic_crud(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+
+    created = service.h_text_save({
+        "name": "Project notes.md",
+        "content": "alpha\nβeta\n",
+    })
+    assert created == {
+        "ok": True, "name": "Project notes.md",
+        "size": len("alpha\nβeta\n".encode("utf-8")),
+    }
+
+    listing = service.h_text_list({})
+    assert listing["ok"] is True
+    assert listing["count"] == 1
+    assert listing["files"][0]["name"] == "Project notes.md"
+
+    opened = service.h_text_read({"name": "Project notes.md"})
+    assert opened["ok"] is True
+    assert opened["content"] == "alpha\nβeta\n"
+
+    updated = service.h_text_save({
+        "name": "Project notes.md",
+        "content": "saved atomically\n",
+    })
+    assert updated["ok"] is True
+    assert service.h_text_read({"name": "Project notes.md"})["content"] == "saved atomically\n"
+
+    deleted = service.h_text_delete({"name": "Project notes.md"})
+    assert deleted["ok"] is True
+    assert service.h_text_read({"name": "Project notes.md"})["ok"] is False
+
+
+def test_text_editor_service_rejects_paths_symlinks_and_unsupported_extensions(
+        tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    assert service.h_text_save({
+        "name": "../../outside.txt", "content": "escape",
+    })["ok"] is False
+    assert service.h_text_save({
+        "name": "image.png", "content": "not text",
+    })["ok"] is False
+    assert service.h_text_read({"name": "../secret.txt"})["ok"] is False
+    assert service.h_text_delete({"name": "../secret.txt"})["ok"] is False
+
+    directory = tmp_path / "Texts"
+    directory.mkdir()
+    secret = tmp_path / "secret.txt"
+    secret.write_text("private", encoding="utf-8")
+    (directory / "linked.txt").symlink_to(secret)
+    assert service.h_text_read({"name": "linked.txt"})["ok"] is False
+    assert service.h_text_delete({"name": "linked.txt"})["ok"] is False
+    assert service.h_text_save({
+        "name": "linked.txt", "content": "overwrite link target",
+    })["ok"] is False
+    assert secret.read_text(encoding="utf-8") == "private"
+
+
+def test_text_editor_service_enforces_size_limit_and_ignores_temp_files(
+        tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    assert service.h_text_save({
+        "name": "large.txt", "content": "x" * (service._TEXT_MAX_BYTES + 1),
+    })["ok"] is False
+    directory = tmp_path / "Texts"
+    directory.mkdir()
+    (directory / ".void-edit-orphan.tmp").write_text("partial", encoding="utf-8")
+    (directory / "readme.md").write_text("ok", encoding="utf-8")
+    files = service.h_text_list({})["files"]
+    assert [item["name"] for item in files] == ["readme.md"]
+
+
+
+def test_text_editor_service_handler_map_and_workspace_confinement(tmp_path, monkeypatch):
+    service = load_service()
+    monkeypatch.setattr(service, "DATA", tmp_path)
+    assert service.HANDLERS["text_list"] is service.h_text_list
+    assert service.HANDLERS["text_read"] is service.h_text_read
+    assert service.HANDLERS["text_save"] is service.h_text_save
+    assert service.HANDLERS["text_delete"] is service.h_text_delete
+    (tmp_path / "Texts").symlink_to(tmp_path / "outside", target_is_directory=True)
+    assert service.h_text_list({})["ok"] is False

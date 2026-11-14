@@ -153,7 +153,7 @@ jobs:
         run: |
           python3 tools/capture_love_screenshots.py \
             --timeout 300 \
-            --settle 0.85
+            --settle 1.6
       - name: Fetch pinned Rt:Tailscale-M source
         run: |
           git clone https://github.com/SilverCrow2323/muOS-Rt-Tailscale.git external/rt-tailscale-m

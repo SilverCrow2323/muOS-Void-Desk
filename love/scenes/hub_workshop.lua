@@ -45,7 +45,7 @@ end
 return dashboard.new({
     title = "WORKSHOP",
     node_idx = 6,
-    widget_height = 160,
+    widget_height = 112,
     status = "System maintenance",
 
     on_enter = function(self) refresh(self, false) end,

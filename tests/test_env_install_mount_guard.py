@@ -26,7 +26,6 @@ def test_env_install_refuses_to_modify_an_active_xfce_session(
     monkeypatch.setattr(module, "DATA", str(data))
     monkeypatch.setattr(module, "IMG", str(image))
     monkeypatch.setattr(module, "MNT", str(data / "xfce_mnt"))
-    monkeypatch.setattr(module, "fbtext", None)
     monkeypatch.setattr(module.imgmount, "is_mounted", lambda _path: True)
     monkeypatch.setattr(
         module.imgmount, "mount_img",

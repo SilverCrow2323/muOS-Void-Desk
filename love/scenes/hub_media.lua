@@ -21,7 +21,7 @@ end
 return dashboard.new({
     title = "MEDIA VAULT",
     node_idx = 2,
-    widget_height = 128,
+    widget_height = 110,
     row_height = 50,
     status = "Media control center",
 

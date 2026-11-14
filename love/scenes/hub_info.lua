@@ -74,7 +74,7 @@ end
 local scene = dashboard.new({
     title = "INFO & ABOUT",
     node_idx = 8,
-    widget_height = 130,
+    widget_height = 106,
     row_height = 50,
     status = "Project archive",
     items = {},

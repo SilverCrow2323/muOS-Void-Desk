@@ -27,7 +27,7 @@ local sel = {
 local warp = { active=false, t=0, target_idx=nil,
                target_scene=nil, use_stub=false, quit=false }
 
-local RING_RADII = { [1]=0, [2]=175, [3]=235, [4]=290 }
+local RING_RADII = { [1]=0, [2]=164, [3]=232, [4]=296 }
 local SQUASH = 0.42
 
 local function lerp(a, b, t) return a + (b - a) * t end
@@ -395,6 +395,9 @@ function nexus.draw()
         love.graphics.setColor(th.orbit_color[1], th.orbit_color[2],
                                th.orbit_color[3], 0.35 * warp_dim)
         love.graphics.ellipse("line", 320, 240, rr, rr * SQUASH)
+        love.graphics.setColor(th.orbit_color[1], th.orbit_color[2], th.orbit_color[3], 0.10 * warp_dim)
+        love.graphics.setLineWidth(1)
+        love.graphics.ellipse("line", 320, 240, rr - 4, (rr - 4) * SQUASH)
     end
 
     -- Sort for depth
@@ -481,8 +484,11 @@ function nexus.draw()
             label = label .. "  // DISABLED"
         end
         local tw = f_label:getWidth(label)
-        local lx = selb.x - tw / 2
-        local ly = selb.y + selb.r + 32
+        local lx = math.max(12, math.min(W - tw - 12, selb.x - tw / 2))
+        local ly = selb.y + selb.r + 26
+        if ly + f_label:getHeight() > H - 62 then
+            ly = selb.y - selb.r - f_label:getHeight() - 16
+        end
         love.graphics.setColor(0, 0, 0, 0.65)
         love.graphics.print(label, lx + 1, ly + 1)
         love.graphics.setColor(selb.color[1], selb.color[2], selb.color[3], 1)
