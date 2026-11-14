@@ -4,6 +4,7 @@ import zlib
 import pytest
 
 from tools.capture_love_screenshots import (
+    DEFAULT_SETTLE_SECONDS,
     perceptual_distance,
     perceptual_samples,
 )
@@ -59,3 +60,7 @@ def test_perceptual_samples_reject_invalid_png(tmp_path):
     invalid.write_bytes(b"not a png")
     with pytest.raises(ValueError, match="invalid PNG signature"):
         perceptual_samples(invalid)
+
+
+def test_default_capture_settle_covers_pty_initialization_animation():
+    assert DEFAULT_SETTLE_SECONDS == 1.6

@@ -27,6 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CAPTURE_DIR = ROOT / "data" / "visual-captures"
 MANIFEST = CAPTURE_DIR / "love-batch-manifest.json"
+DEFAULT_SETTLE_SECONDS = 1.6
 
 
 def find_love(value: str | None) -> str | None:
@@ -168,7 +169,7 @@ def main() -> int:
     parser.add_argument("--love-bin", help="LÖVE 11.5 binary; defaults to PATH lookup")
     parser.add_argument("--timeout", type=int, default=240,
                         help="maximum runtime in seconds (default: 240)")
-    parser.add_argument("--settle", type=float, default=0.85,
+    parser.add_argument("--settle", type=float, default=DEFAULT_SETTLE_SECONDS,
                         help="seconds to let each scene settle before capture")
     parser.add_argument("--no-service", action="store_true",
                         help="do not start the Python companion service")

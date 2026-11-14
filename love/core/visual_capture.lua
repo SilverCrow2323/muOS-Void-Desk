@@ -329,7 +329,7 @@ function capture.start_batch(scene_manager, settle_seconds)
         elapsed = 0,
         settle_seconds = tonumber(settle_seconds)
             or tonumber(os.getenv("VOIDDESK_CAPTURE_SETTLE"))
-            or 0.85,
+            or 1.6,
         phase = "settle",
         started_utc = os.date("!%Y-%m-%dT%H:%M:%SZ"),
         captured = {},
